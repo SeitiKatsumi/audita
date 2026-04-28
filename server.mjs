@@ -54,7 +54,8 @@ async function initializeDatabase() {
   }
 
   try {
-    const { Pool } = await import("pg");
+    const pg = await import("pg");
+    const { Pool } = pg.default || pg;
     pool = new Pool({
       connectionString: databaseUrl,
       max: Number(process.env.DB_POOL_MAX || 5),
