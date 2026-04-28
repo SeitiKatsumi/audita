@@ -40,9 +40,9 @@ function drawSignal() {
   }
 
   const gradients = [
-    ["rgba(39, 225, 213, 0.95)", 64, 0.9],
-    ["rgba(120, 255, 207, 0.8)", 104, 0.7],
-    ["rgba(45, 140, 255, 0.68)", 145, 0.54],
+    ["rgba(51, 204, 255, 0.95)", 64, 0.9],
+    ["rgba(143, 215, 255, 0.82)", 104, 0.7],
+    ["rgba(41, 119, 255, 0.74)", 145, 0.54],
   ];
 
   gradients.forEach(([color, offset, amp], index) => {
@@ -72,7 +72,7 @@ function drawSignal() {
     const radius = 2 + ((i + Math.floor(phase / 10)) % 3);
 
     ctx.beginPath();
-    ctx.fillStyle = i % 5 === 0 ? "rgba(255, 99, 125, 0.86)" : "rgba(120, 255, 207, 0.82)";
+    ctx.fillStyle = i % 5 === 0 ? "rgba(255, 99, 125, 0.86)" : "rgba(143, 215, 255, 0.84)";
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
   }
