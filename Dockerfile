@@ -9,6 +9,7 @@ COPY package.json ./
 RUN npm install --omit=dev
 
 COPY index.html styles.css app.js server.mjs ./
+COPY assets ./assets
 COPY db ./db
 
 EXPOSE 8080
