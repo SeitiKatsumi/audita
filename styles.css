@@ -531,6 +531,10 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.agent-settings-panel {
+  grid-column: 1 / -1;
+}
+
 .agent-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -538,6 +542,14 @@ h2 {
   align-items: end;
 }
 
+.agent-settings-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.agent-settings-form label,
 .agent-form label {
   display: grid;
   gap: 7px;
@@ -545,9 +557,11 @@ h2 {
   font-weight: 800;
 }
 
+.agent-settings-form input,
+.agent-settings-form select,
+.agent-settings-form textarea,
 .agent-form textarea {
   width: 100%;
-  min-height: 88px;
   padding: 12px;
   border: 1px solid rgba(73, 169, 255, 0.28);
   border-radius: 8px;
@@ -559,6 +573,23 @@ h2 {
   resize: vertical;
 }
 
+.agent-settings-form input,
+.agent-settings-form select {
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.agent-settings-form textarea {
+  min-height: 104px;
+}
+
+.agent-form textarea {
+  min-height: 88px;
+}
+
+.agent-settings-form input:focus,
+.agent-settings-form select:focus,
+.agent-settings-form textarea:focus,
 .agent-form textarea:focus {
   border-color: var(--line-strong);
   box-shadow: 0 0 0 3px rgba(73, 169, 255, 0.14);
@@ -881,6 +912,10 @@ h2 {
   .agent-form {
     grid-template-columns: 1fr;
   }
+
+  .agent-settings-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 820px) {
@@ -899,6 +934,7 @@ h2 {
   .pipeline,
   .source-form,
   .agent-form,
+  .agent-settings-form,
   .consultation-form,
   .integration-grid {
     grid-template-columns: 1fr;

@@ -104,6 +104,19 @@ CREATE TABLE IF NOT EXISTS audita_api_sources (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS audita_agent_settings (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT,
+  provider TEXT NOT NULL DEFAULT 'openai',
+  model TEXT NOT NULL DEFAULT 'gpt-5-mini',
+  api_key_secret_ref TEXT NOT NULL DEFAULT 'OPENAI_API_KEY',
+  system_prompt TEXT NOT NULL DEFAULT 'Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.',
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'testing', 'active', 'paused')),
+  created_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS audita_consultation_requests (
   id BIGSERIAL PRIMARY KEY,
   tenant_id BIGINT,
@@ -124,6 +137,7 @@ ALTER TABLE audita_audit_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_reports ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_app_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_api_sources ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
+ALTER TABLE audita_agent_settings ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_consultation_requests ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 
 UPDATE audita_sources
@@ -146,6 +160,10 @@ UPDATE audita_api_sources
 SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
 WHERE tenant_id IS NULL;
 
+UPDATE audita_agent_settings
+SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
+WHERE tenant_id IS NULL;
+
 UPDATE audita_consultation_requests
 SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
 WHERE tenant_id IS NULL;
@@ -155,6 +173,7 @@ ALTER TABLE audita_audit_events ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_reports ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_app_events ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_api_sources ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE audita_agent_settings ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_consultation_requests ALTER COLUMN tenant_id SET NOT NULL;
 
 DO $$
@@ -205,6 +224,14 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+DO $$
+BEGIN
+  ALTER TABLE audita_agent_settings
+    ADD CONSTRAINT audita_agent_settings_tenant_fk
+    FOREIGN KEY (tenant_id) REFERENCES audita_tenants(id) ON DELETE RESTRICT;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 CREATE INDEX IF NOT EXISTS audita_sources_tenant_idx ON audita_sources(tenant_id);
 CREATE INDEX IF NOT EXISTS audita_audit_events_tenant_idx ON audita_audit_events(tenant_id, status, severity);
 CREATE INDEX IF NOT EXISTS audita_reports_tenant_idx ON audita_reports(tenant_id, created_at DESC);
@@ -212,6 +239,7 @@ CREATE INDEX IF NOT EXISTS audita_sessions_token_hash_idx ON audita_sessions(tok
 CREATE INDEX IF NOT EXISTS audita_consultation_requests_tenant_idx ON audita_consultation_requests(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_consultation_requests_subject_idx ON audita_consultation_requests(tenant_id, subject_identifier_hash);
 CREATE INDEX IF NOT EXISTS audita_api_sources_tenant_idx ON audita_api_sources(tenant_id, status, category);
+CREATE INDEX IF NOT EXISTS audita_agent_settings_tenant_idx ON audita_agent_settings(tenant_id, status);
 
 DO $$
 BEGIN
@@ -222,6 +250,18 @@ BEGIN
   ) THEN
     ALTER TABLE audita_api_sources
       ADD CONSTRAINT audita_api_sources_tenant_name_unique UNIQUE (tenant_id, name);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'audita_agent_settings_tenant_provider_unique'
+  ) THEN
+    ALTER TABLE audita_agent_settings
+      ADD CONSTRAINT audita_agent_settings_tenant_provider_unique UNIQUE (tenant_id, provider);
   END IF;
 END $$;
 

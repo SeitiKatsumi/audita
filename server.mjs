@@ -745,6 +745,131 @@ function summarizeCnae(classes) {
   };
 }
 
+async function getAgentSettings(request) {
+  if (!pool || !dbReady) {
+    return {
+      provider: "openai",
+      model: "gpt-5-mini",
+      apiKeySecretRef: "OPENAI_API_KEY",
+      systemPrompt:
+        "Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
+      status: "draft",
+      configured: Boolean(process.env.OPENAI_API_KEY),
+    };
+  }
+
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const result = await pool.query(
+    `SELECT
+       provider,
+       model,
+       api_key_secret_ref AS "apiKeySecretRef",
+       system_prompt AS "systemPrompt",
+       status,
+       updated_at AS "updatedAt"
+     FROM audita_agent_settings
+     WHERE tenant_id = $1 AND provider = 'openai'
+     LIMIT 1`,
+    [authContext.tenantId],
+  );
+
+  const settings =
+    result.rows[0] || {
+      provider: "openai",
+      model: "gpt-5-mini",
+      apiKeySecretRef: "OPENAI_API_KEY",
+      systemPrompt:
+        "Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
+      status: "draft",
+      updatedAt: null,
+    };
+
+  return {
+    ...settings,
+    configured: Boolean(process.env[settings.apiKeySecretRef]),
+  };
+}
+
+async function saveAgentSettings(request) {
+  if (!pool || !dbReady) {
+    return { unavailable: true };
+  }
+
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+  if (!canManageIntegrations(authContext.user)) {
+    return { forbidden: true };
+  }
+
+  const body = await readJsonBody(request);
+  const model = String(body.model || "gpt-5-mini").trim();
+  const apiKeySecretRef = String(body.apiKeySecretRef || "OPENAI_API_KEY").trim();
+  const systemPrompt = String(body.systemPrompt || "").trim();
+  const status = String(body.status || "draft").trim();
+
+  if (!model || !apiKeySecretRef || !systemPrompt) {
+    return { invalid: true };
+  }
+
+  if (!/^[A-Z0-9_]+$/.test(apiKeySecretRef)) {
+    return { invalid: true };
+  }
+
+  const result = await pool.query(
+    `INSERT INTO audita_agent_settings (
+       tenant_id,
+       provider,
+       model,
+       api_key_secret_ref,
+       system_prompt,
+       status,
+       created_by_user_id
+     )
+     VALUES ($1, 'openai', $2, $3, $4, $5, $6)
+     ON CONFLICT (tenant_id, provider)
+     DO UPDATE SET
+       model = EXCLUDED.model,
+       api_key_secret_ref = EXCLUDED.api_key_secret_ref,
+       system_prompt = EXCLUDED.system_prompt,
+       status = EXCLUDED.status,
+       updated_at = NOW()
+     RETURNING
+       provider,
+       model,
+       api_key_secret_ref AS "apiKeySecretRef",
+       system_prompt AS "systemPrompt",
+       status,
+       updated_at AS "updatedAt"`,
+    [authContext.tenantId, model, apiKeySecretRef, systemPrompt, status, authContext.user?.id || null],
+  );
+
+  await pool.query(
+    `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+     VALUES ($1, 'agent.openai_settings.saved', $2)`,
+    [
+      authContext.tenantId,
+      JSON.stringify({
+        provider: "openai",
+        model,
+        apiKeySecretRef,
+        status,
+        configured: Boolean(process.env[apiKeySecretRef]),
+      }),
+    ],
+  );
+
+  return {
+    ...result.rows[0],
+    configured: Boolean(process.env[apiKeySecretRef]),
+  };
+}
+
 async function runAuditaAgent(request) {
   const authContext = await getTenantIdForRequest(request);
   if (authContext.unauthorized) {
@@ -965,6 +1090,52 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "agent_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/agent/settings" && request.method === "GET") {
+    try {
+      const settings = await getAgentSettings(request);
+      if (settings.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, { settings });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "agent_settings_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/agent/settings" && request.method === "POST") {
+    try {
+      const settings = await saveAgentSettings(request);
+      if (settings.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (settings.forbidden) {
+        sendJson(response, 403, { error: "insufficient_role" });
+        return true;
+      }
+      if (settings.unavailable) {
+        sendJson(response, 503, { error: "database_unavailable" });
+        return true;
+      }
+      if (settings.invalid) {
+        sendJson(response, 400, { error: "invalid_agent_settings" });
+        return true;
+      }
+      sendJson(response, 200, { settings });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "agent_settings_save_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

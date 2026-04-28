@@ -58,6 +58,29 @@ Tambem existe uma primeira versao do Agente Audita em `/api/agent/query`, capaz 
 
 Essa camada nao usa LLM externo ainda; ela interpreta perguntas simples, consulta a fonte oficial e responde de forma humanizada.
 
+## Configuracao OpenAI/ChatGPT
+
+Administradores podem configurar o provedor OpenAI na interface da Audita informando:
+
+- modelo;
+- referencia do secret da API key;
+- status;
+- prompt base do agente.
+
+A chave real da OpenAI nao deve ser salva no banco. Ela deve ficar no CapRover como variavel de ambiente, por exemplo:
+
+```text
+OPENAI_API_KEY=sk-...
+```
+
+Na Audita, o campo `Secret da API key` deve receber apenas:
+
+```text
+OPENAI_API_KEY
+```
+
+De acordo com a documentacao oficial da OpenAI, API keys devem ser carregadas com seguranca por variavel de ambiente ou servico de gerenciamento de chaves no servidor.
+
 ## Proximos passos
 
 1. Definir quais APIs oficiais serao usadas primeiro.

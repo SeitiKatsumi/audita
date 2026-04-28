@@ -159,6 +159,46 @@
             </div>
           </article>
 
+          <article class="module agent-settings-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">IA generativa</p>
+                <h2>API ChatGPT/OpenAI</h2>
+              </div>
+              <span class="live" id="agentSettingsStatus">Nao configurada</span>
+            </div>
+
+            <form class="agent-settings-form" id="agentSettingsForm">
+              <label>
+                Modelo
+                <input id="agentModel" type="text" value="gpt-5-mini" required />
+              </label>
+              <label>
+                Secret da API key
+                <input id="agentApiKeySecretRef" type="text" value="OPENAI_API_KEY" required />
+              </label>
+              <label>
+                Status
+                <select id="agentProviderStatus">
+                  <option value="draft">Rascunho</option>
+                  <option value="testing">Teste</option>
+                  <option value="active">Ativa</option>
+                  <option value="paused">Pausada</option>
+                </select>
+              </label>
+              <label class="wide-field">
+                Prompt base do agente
+                <textarea id="agentSystemPrompt" rows="4" required>Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.</textarea>
+              </label>
+              <button class="primary-action" type="submit">Salvar configuracao</button>
+            </form>
+
+            <small class="consultation-note">
+              A chave real deve ficar no CapRover como variavel/secret. Aqui salve apenas o nome da variavel.
+            </small>
+            <small class="login-error" id="agentSettingsError" role="alert"></small>
+          </article>
+
           <article class="module consultation-builder">
             <div class="module-header">
               <div>

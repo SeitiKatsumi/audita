@@ -36,6 +36,13 @@ const agentForm = document.querySelector("#agentForm");
 const agentQuestion = document.querySelector("#agentQuestion");
 const agentAnswer = document.querySelector("#agentAnswer");
 const promptSuggestions = document.querySelectorAll("[data-question]");
+const agentSettingsForm = document.querySelector("#agentSettingsForm");
+const agentModel = document.querySelector("#agentModel");
+const agentApiKeySecretRef = document.querySelector("#agentApiKeySecretRef");
+const agentProviderStatus = document.querySelector("#agentProviderStatus");
+const agentSystemPrompt = document.querySelector("#agentSystemPrompt");
+const agentSettingsStatus = document.querySelector("#agentSettingsStatus");
+const agentSettingsError = document.querySelector("#agentSettingsError");
 
 let phase = 0;
 
@@ -314,6 +321,36 @@ function hideLogin() {
   loginError.textContent = "";
 }
 
+function renderAgentSettings(settings) {
+  if (!settings) {
+    return;
+  }
+
+  agentModel.value = settings.model || "gpt-5-mini";
+  agentApiKeySecretRef.value = settings.apiKeySecretRef || "OPENAI_API_KEY";
+  agentProviderStatus.value = settings.status || "draft";
+  agentSystemPrompt.value =
+    settings.systemPrompt ||
+    "Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.";
+  agentSettingsStatus.textContent = settings.configured ? "Secret detectado" : "Aguardando secret";
+}
+
+async function loadAgentSettings() {
+  try {
+    const response = await fetch("/api/agent/settings", { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      return;
+    }
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    renderAgentSettings(data.settings);
+  } catch {
+    agentSettingsStatus.textContent = "Indisponivel";
+  }
+}
+
 async function loadAuthState() {
   try {
     const response = await fetch("/api/auth/me", { headers: { accept: "application/json" } });
@@ -394,6 +431,7 @@ loginForm.addEventListener("submit", async (event) => {
     await loadDashboard();
     await loadConsultations();
     await loadSources();
+    await loadAgentSettings();
   } catch {
     showLogin("Nao foi possivel autenticar agora.");
   }
@@ -437,6 +475,42 @@ sourceForm.addEventListener("submit", async (event) => {
     await loadSources();
   } catch {
     sourceError.textContent = "Falha ao comunicar com a API.";
+  }
+});
+
+agentSettingsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  agentSettingsError.textContent = "";
+
+  try {
+    const response = await fetch("/api/agent/settings", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        model: agentModel.value,
+        apiKeySecretRef: agentApiKeySecretRef.value,
+        status: agentProviderStatus.value,
+        systemPrompt: agentSystemPrompt.value,
+      }),
+    });
+
+    if (response.status === 401) {
+      showLogin("Entre para configurar a IA.");
+      return;
+    }
+    if (response.status === 403) {
+      agentSettingsError.textContent = "Seu usuario nao tem permissao para configurar a IA.";
+      return;
+    }
+    if (!response.ok) {
+      agentSettingsError.textContent = "Nao foi possivel salvar a configuracao.";
+      return;
+    }
+
+    const data = await response.json();
+    renderAgentSettings(data.settings);
+  } catch {
+    agentSettingsError.textContent = "Falha ao comunicar com a API.";
   }
 });
 
@@ -526,4 +600,5 @@ if (authState.authRequired && !authState.user) {
   await loadDashboard();
   await loadConsultations();
   await loadSources();
+  await loadAgentSettings();
 }
