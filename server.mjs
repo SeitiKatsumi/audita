@@ -169,9 +169,9 @@ async function bootstrapAdminUser() {
     return;
   }
 
-  const email = process.env.AUDITA_BOOTSTRAP_ADMIN_EMAIL;
-  const password = process.env.AUDITA_BOOTSTRAP_ADMIN_PASSWORD;
-  const name = process.env.AUDITA_BOOTSTRAP_ADMIN_NAME || "Audita Admin";
+  const email = String(process.env.AUDITA_BOOTSTRAP_ADMIN_EMAIL || "").trim();
+  const password = String(process.env.AUDITA_BOOTSTRAP_ADMIN_PASSWORD || "").trim();
+  const name = String(process.env.AUDITA_BOOTSTRAP_ADMIN_NAME || "Audita Admin").trim();
 
   if (!email || !password) {
     return;
@@ -179,17 +179,30 @@ async function bootstrapAdminUser() {
 
   await pool.query(
     `INSERT INTO audita_users (tenant_id, email, name, role, password_hash)
-     VALUES ($1, LOWER($2), $3, 'owner', $4)
+     VALUES ($1, LOWER($2), $3, 'super_admin', $4)
      ON CONFLICT (email)
      DO UPDATE SET
        tenant_id = EXCLUDED.tenant_id,
        name = EXCLUDED.name,
-       role = 'owner',
+       role = 'super_admin',
        status = 'active',
        password_hash = EXCLUDED.password_hash,
        updated_at = NOW()`,
     [defaultTenantId, email, name, hashPassword(password)],
   );
+}
+
+async function ensureBootstrapUserForLogin(email, password) {
+  const bootstrapEmail = String(process.env.AUDITA_BOOTSTRAP_ADMIN_EMAIL || "").trim().toLowerCase();
+  const bootstrapPassword = String(process.env.AUDITA_BOOTSTRAP_ADMIN_PASSWORD || "").trim();
+
+  if (!bootstrapEmail || !bootstrapPassword) {
+    return;
+  }
+
+  if (email === bootstrapEmail && password === bootstrapPassword) {
+    await bootstrapAdminUser();
+  }
 }
 
 function parseCookies(request) {
@@ -306,7 +319,7 @@ function publicUser(user) {
 }
 
 function canManageIntegrations(user) {
-  return ["owner", "admin"].includes(user?.role);
+  return ["super_admin", "owner", "admin"].includes(user?.role);
 }
 
 async function createSession(response, request, userId) {
@@ -706,6 +719,7 @@ async function handleApi(request, response, pathname) {
       const body = await readJsonBody(request);
       const email = String(body.email || "").trim().toLowerCase();
       const password = String(body.password || "");
+      await ensureBootstrapUserForLogin(email, password);
       const result = await pool.query(
         `SELECT id, password_hash
          FROM audita_users

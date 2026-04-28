@@ -11,12 +11,17 @@ CREATE TABLE IF NOT EXISTS audita_users (
   tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE RESTRICT,
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'analyst', 'member')),
+  role TEXT NOT NULL DEFAULT 'member',
   password_hash TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE audita_users DROP CONSTRAINT IF EXISTS audita_users_role_check;
+ALTER TABLE audita_users
+  ADD CONSTRAINT audita_users_role_check
+  CHECK (role IN ('super_admin', 'owner', 'admin', 'analyst', 'member'));
 
 CREATE TABLE IF NOT EXISTS audita_sessions (
   id BIGSERIAL PRIMARY KEY,
