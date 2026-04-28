@@ -68,10 +68,39 @@ CREATE TABLE IF NOT EXISTS audita_app_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS audita_government_modules (
+  id BIGSERIAL PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  access_method TEXT NOT NULL CHECK (access_method IN ('api', 'scraping', 'manual', 'hybrid')),
+  auth_type TEXT NOT NULL DEFAULT 'none',
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'sandbox', 'active', 'paused')),
+  description TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_consultation_requests (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT,
+  module_id BIGINT NOT NULL REFERENCES audita_government_modules(id) ON DELETE RESTRICT,
+  requested_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  subject_type TEXT NOT NULL,
+  subject_identifier_hash TEXT NOT NULL,
+  subject_identifier_masked TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed', 'blocked')),
+  request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  result_summary TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
 ALTER TABLE audita_sources ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_audit_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_reports ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_app_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
+ALTER TABLE audita_consultation_requests ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 
 UPDATE audita_sources
 SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
@@ -89,10 +118,15 @@ UPDATE audita_app_events
 SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
 WHERE tenant_id IS NULL;
 
+UPDATE audita_consultation_requests
+SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
+WHERE tenant_id IS NULL;
+
 ALTER TABLE audita_sources ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_audit_events ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_reports ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_app_events ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE audita_consultation_requests ALTER COLUMN tenant_id SET NOT NULL;
 
 DO $$
 BEGIN
@@ -126,10 +160,36 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+DO $$
+BEGIN
+  ALTER TABLE audita_consultation_requests
+    ADD CONSTRAINT audita_consultation_requests_tenant_fk
+    FOREIGN KEY (tenant_id) REFERENCES audita_tenants(id) ON DELETE RESTRICT;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 CREATE INDEX IF NOT EXISTS audita_sources_tenant_idx ON audita_sources(tenant_id);
 CREATE INDEX IF NOT EXISTS audita_audit_events_tenant_idx ON audita_audit_events(tenant_id, status, severity);
 CREATE INDEX IF NOT EXISTS audita_reports_tenant_idx ON audita_reports(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_sessions_token_hash_idx ON audita_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS audita_consultation_requests_tenant_idx ON audita_consultation_requests(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS audita_consultation_requests_subject_idx ON audita_consultation_requests(tenant_id, subject_identifier_hash);
+
+INSERT INTO audita_government_modules (slug, name, category, provider, access_method, auth_type, status, description)
+VALUES
+  ('receita-cnpj', 'Consulta CNPJ Receita Federal', 'fiscal', 'Receita Federal', 'api', 'certificate_or_token', 'planned', 'Consulta cadastral e fiscal de pessoa juridica quando houver credencial autorizada.'),
+  ('cnj-processos', 'Consulta Processual CNJ/Tribunais', 'judicial', 'CNJ e tribunais', 'hybrid', 'token_or_public', 'planned', 'Consulta e acompanhamento de processos judiciais em fontes oficiais.'),
+  ('cadin', 'Consulta CADIN', 'fiscal', 'Governo Federal', 'api', 'token', 'planned', 'Verificacao de pendencias e registros restritivos quando houver permissao legal.'),
+  ('imoveis-registro', 'Registro Imobiliario', 'imobiliario', 'Registradores e cartorios', 'hybrid', 'credential', 'planned', 'Consulta de matriculas, pendencias e situacao documental de imoveis.'),
+  ('diarios-oficiais', 'Diarios Oficiais', 'juridico', 'Fontes oficiais', 'scraping', 'none', 'sandbox', 'Monitoramento de publicacoes oficiais e mencoes relevantes.')
+ON CONFLICT (slug) DO UPDATE SET
+  name = EXCLUDED.name,
+  category = EXCLUDED.category,
+  provider = EXCLUDED.provider,
+  access_method = EXCLUDED.access_method,
+  auth_type = EXCLUDED.auth_type,
+  status = EXCLUDED.status,
+  description = EXCLUDED.description;
 
 INSERT INTO audita_sources (tenant_id, name, category, status, last_sync_at)
 SELECT (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging'), *

@@ -516,6 +516,113 @@ h2 {
   gap: 18px;
 }
 
+.consultation-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.consultation-builder {
+  grid-column: 1 / -1;
+}
+
+.consultation-form {
+  display: grid;
+  grid-template-columns: 1.1fr 0.8fr 1fr auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.consultation-form label {
+  display: grid;
+  gap: 7px;
+  color: #cde7ff;
+  font-weight: 800;
+}
+
+.consultation-form input,
+.consultation-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(73, 169, 255, 0.28);
+  border-radius: 8px;
+  color: var(--text);
+  background:
+    linear-gradient(90deg, rgba(41, 119, 255, 0.1), transparent 28%),
+    rgba(3, 13, 28, 0.78);
+  outline: none;
+}
+
+.consultation-form input:focus,
+.consultation-form select:focus {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(73, 169, 255, 0.14);
+}
+
+.consultation-note {
+  display: block;
+  margin-top: 12px;
+  color: var(--muted);
+}
+
+.module-list,
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.module-item,
+.history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(41, 119, 255, 0.06);
+}
+
+.module-item p,
+.history-item p,
+.empty-state {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.module-item strong,
+.history-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.module-status {
+  display: inline-grid;
+  min-height: 26px;
+  place-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--aqua);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: rgba(73, 169, 255, 0.1);
+}
+
+.module-status.blocked,
+.module-status.planned {
+  color: var(--warning);
+}
+
+.module-status.active,
+.module-status.completed {
+  color: var(--aqua);
+}
+
 .module-header {
   justify-content: space-between;
   gap: 12px;
@@ -636,8 +743,13 @@ h2 {
   }
 
   .hero-grid,
+  .consultation-grid,
   .operations-grid {
     grid-template-columns: 1fr;
+  }
+
+  .consultation-form {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -655,6 +767,7 @@ h2 {
   .nav-list,
   .metrics,
   .pipeline,
+  .consultation-form,
   .integration-grid {
     grid-template-columns: 1fr;
   }

@@ -45,6 +45,7 @@
 
         <nav class="nav-list">
           <a class="active" href="#overview">Visao geral</a>
+          <a href="#consultas">Consultas</a>
           <a href="#coletas">Coletas</a>
           <a href="#riscos">Riscos</a>
           <a href="#relatorios">Relatorios</a>
@@ -120,6 +121,64 @@
             <small>Tempo medio</small>
             <strong>4.8s</strong>
             <span>Analise preliminar</span>
+          </article>
+        </section>
+
+        <section class="consultation-grid" id="consultas">
+          <article class="module consultation-builder">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Fontes oficiais</p>
+                <h2>Consultas governamentais</h2>
+              </div>
+              <span class="live">API ready</span>
+            </div>
+
+            <form class="consultation-form" id="consultationForm">
+              <label>
+                Modulo
+                <select id="consultationModule" required></select>
+              </label>
+              <label>
+                Tipo
+                <select id="subjectType" required>
+                  <option value="cnpj">CNPJ</option>
+                  <option value="cpf">CPF</option>
+                  <option value="processo">Processo</option>
+                  <option value="imovel">Imovel</option>
+                </select>
+              </label>
+              <label>
+                Identificador
+                <input id="subjectIdentifier" type="text" placeholder="Digite o identificador" autocomplete="off" required />
+              </label>
+              <button class="primary-action" type="submit">Registrar consulta</button>
+            </form>
+
+            <small class="consultation-note">
+              Identificadores sao mascarados e armazenados como hash para rastreabilidade.
+            </small>
+            <small class="login-error" id="consultationError" role="alert"></small>
+          </article>
+
+          <article class="module">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Catalogo</p>
+                <h2>Modulos previstos</h2>
+              </div>
+            </div>
+            <div class="module-list" id="moduleList"></div>
+          </article>
+
+          <article class="module consultation-history">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Rastreabilidade</p>
+                <h2>Consultas recentes</h2>
+              </div>
+            </div>
+            <div class="history-list" id="consultationHistory"></div>
           </article>
         </section>
 

@@ -13,6 +13,13 @@ const loginError = document.querySelector("#loginError");
 const logoutButton = document.querySelector("#logoutButton");
 const environmentName = document.querySelector("#environmentName");
 const environmentDetail = document.querySelector("#environmentDetail");
+const consultationForm = document.querySelector("#consultationForm");
+const consultationModule = document.querySelector("#consultationModule");
+const subjectType = document.querySelector("#subjectType");
+const subjectIdentifier = document.querySelector("#subjectIdentifier");
+const consultationError = document.querySelector("#consultationError");
+const moduleList = document.querySelector("#moduleList");
+const consultationHistory = document.querySelector("#consultationHistory");
 
 let phase = 0;
 
@@ -141,6 +148,79 @@ function renderDashboard(data) {
   }
 }
 
+function renderModules(modules) {
+  consultationModule.innerHTML = modules
+    .map((module) => `<option value="${escapeHtml(module.slug)}">${escapeHtml(module.name)}</option>`)
+    .join("");
+
+  moduleList.innerHTML = modules
+    .map(
+      (module) => `
+        <article class="module-item">
+          <div>
+            <strong>${escapeHtml(module.name)}</strong>
+            <small>${escapeHtml(module.provider)} | ${escapeHtml(module.accessMethod)}</small>
+          </div>
+          <span class="module-status ${escapeHtml(module.status)}">${escapeHtml(module.status)}</span>
+          <p>${escapeHtml(module.description)}</p>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+function renderConsultations(consultations) {
+  if (!Array.isArray(consultations) || consultations.length === 0) {
+    consultationHistory.innerHTML = `<p class="empty-state">Nenhuma consulta registrada ainda.</p>`;
+    return;
+  }
+
+  consultationHistory.innerHTML = consultations
+    .map(
+      (consultation) => `
+        <article class="history-item">
+          <div>
+            <strong>${escapeHtml(consultation.moduleName)}</strong>
+            <small>${escapeHtml(consultation.subjectType)} | ${escapeHtml(consultation.subjectIdentifierMasked)}</small>
+          </div>
+          <span class="module-status ${escapeHtml(consultation.status)}">${escapeHtml(consultation.status)}</span>
+          <p>${escapeHtml(consultation.resultSummary || "Consulta registrada.")}</p>
+        </article>
+      `,
+    )
+    .join("");
+}
+
+async function loadModules() {
+  try {
+    const response = await fetch("/api/modules", { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    renderModules(data.modules || []);
+  } catch {
+    moduleList.innerHTML = `<p class="empty-state">Nao foi possivel carregar os modulos.</p>`;
+  }
+}
+
+async function loadConsultations() {
+  try {
+    const response = await fetch("/api/consultations", { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      renderConsultations([]);
+      return;
+    }
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    renderConsultations(data.consultations || []);
+  } catch {
+    renderConsultations([]);
+  }
+}
+
 function showLogin(message = "") {
   loginScreen.classList.remove("hidden");
   loginError.textContent = message;
@@ -231,8 +311,41 @@ loginForm.addEventListener("submit", async (event) => {
     hideLogin();
     logoutButton.classList.remove("hidden");
     await loadDashboard();
+    await loadConsultations();
   } catch {
     showLogin("Nao foi possivel autenticar agora.");
+  }
+});
+
+consultationForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  consultationError.textContent = "";
+
+  try {
+    const response = await fetch("/api/consultations", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        moduleSlug: consultationModule.value,
+        subjectType: subjectType.value,
+        subjectIdentifier: subjectIdentifier.value,
+      }),
+    });
+
+    if (response.status === 401) {
+      showLogin("Entre para registrar consultas.");
+      return;
+    }
+
+    if (!response.ok) {
+      consultationError.textContent = "Nao foi possivel registrar a consulta.";
+      return;
+    }
+
+    subjectIdentifier.value = "";
+    await loadConsultations();
+  } catch {
+    consultationError.textContent = "Falha ao comunicar com a API.";
   }
 });
 
@@ -245,6 +358,7 @@ setInterval(rotateRisk, 1400);
 drawSignal();
 
 await loadAppConfig();
+await loadModules();
 const authState = await loadAuthState();
 if (authState.authRequired && !authState.user) {
   showLogin();
@@ -253,4 +367,5 @@ if (authState.authRequired && !authState.user) {
     logoutButton.classList.remove("hidden");
   }
   await loadDashboard();
+  await loadConsultations();
 }

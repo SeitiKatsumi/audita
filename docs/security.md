@@ -70,3 +70,11 @@ Checklist inicial:
 - Remover ou rotacionar credenciais bootstrap apos validacao inicial.
 - Sessoes usam cookie HttpOnly e devem trafegar com HTTPS.
 - Toda consulta de dados deve respeitar `tenant_id`.
+
+## Consultas governamentais
+
+- Validar base legal antes de consultar dados pessoais ou empresariais.
+- Usar credenciais oficiais autorizadas por ambiente.
+- Nao persistir identificadores sensiveis em texto puro quando um hash for suficiente.
+- Respeitar limites de taxa e termos de uso das fontes oficiais.
+- Registrar auditoria da consulta sem vazar o identificador bruto.

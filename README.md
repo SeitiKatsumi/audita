@@ -42,6 +42,7 @@ A stack final da aplicacao deve ser confirmada em ADR antes da primeira implemen
 - [Arquitetura](docs/architecture.md)
 - [Ambientes](docs/environments.md)
 - [Banco de dados](docs/database.md)
+- [Consultas governamentais](docs/government-consultations.md)
 - [Deploy](docs/deployment.md)
 - [Seguranca](docs/security.md)
 - [Operacoes](docs/operations.md)

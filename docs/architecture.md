@@ -37,6 +37,7 @@ Observabilidade
 - Portal web: experiencia principal do usuario.
 - API: regras de negocio, autenticacao, permissoes e integracoes.
 - Coleta: scraping, APIs externas, agendamentos e importacoes.
+- Consultas governamentais: catalogo de fontes oficiais, API interna de pedidos, rastreabilidade por tenant e adapters isolados por fonte.
 - Normalizacao: padronizacao dos dados coletados.
 - IA: analises, explicacoes, alertas, predicoes e recomendacoes.
 - Relatorios: geracao de documentos, dashboards e historico.

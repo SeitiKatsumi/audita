@@ -55,6 +55,39 @@ const fallbackDashboard = {
     "Foram encontrados sinais relevantes em 3 fontes. A recomendacao e priorizar a divergencia fiscal, validar documentos do imovel e gerar relatorio executivo para aprovacao.",
 };
 
+const fallbackGovernmentModules = [
+  {
+    slug: "receita-cnpj",
+    name: "Consulta CNPJ Receita Federal",
+    category: "fiscal",
+    provider: "Receita Federal",
+    accessMethod: "api",
+    authType: "certificate_or_token",
+    status: "planned",
+    description: "Consulta cadastral e fiscal de pessoa juridica quando houver credencial autorizada.",
+  },
+  {
+    slug: "cnj-processos",
+    name: "Consulta Processual CNJ/Tribunais",
+    category: "judicial",
+    provider: "CNJ e tribunais",
+    accessMethod: "hybrid",
+    authType: "token_or_public",
+    status: "planned",
+    description: "Consulta e acompanhamento de processos judiciais em fontes oficiais.",
+  },
+  {
+    slug: "diarios-oficiais",
+    name: "Diarios Oficiais",
+    category: "juridico",
+    provider: "Fontes oficiais",
+    accessMethod: "scraping",
+    authType: "none",
+    status: "sandbox",
+    description: "Monitoramento de publicacoes oficiais e mencoes relevantes.",
+  },
+];
+
 async function initializeDatabase() {
   if (!databaseUrl) {
     return;
@@ -114,6 +147,21 @@ function verifyPassword(password, storedValue) {
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function hashSubjectIdentifier(tenantId, identifier) {
+  return crypto.createHash("sha256").update(`${tenantId}:${identifier}`).digest("hex");
+}
+
+function maskIdentifier(identifier) {
+  const cleaned = String(identifier || "").replace(/\s+/g, "");
+  if (cleaned.length <= 4) {
+    return "*".repeat(cleaned.length);
+  }
+
+  const first = cleaned.slice(0, 3);
+  const last = cleaned.slice(-2);
+  return `${first}${"*".repeat(Math.min(cleaned.length - 5, 12))}${last}`;
 }
 
 async function bootstrapAdminUser() {
@@ -324,6 +372,140 @@ async function getDashboard(request) {
   };
 }
 
+async function getGovernmentModules() {
+  if (!pool || !dbReady) {
+    return fallbackGovernmentModules;
+  }
+
+  const result = await pool.query(
+    `SELECT
+       slug,
+       name,
+       category,
+       provider,
+       access_method AS "accessMethod",
+       auth_type AS "authType",
+       status,
+       description
+     FROM audita_government_modules
+     ORDER BY category, name`,
+  );
+
+  return result.rows;
+}
+
+async function listConsultations(request) {
+  if (!pool || !dbReady) {
+    return [];
+  }
+
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const result = await pool.query(
+    `SELECT
+       cr.id,
+       gm.slug AS "moduleSlug",
+       gm.name AS "moduleName",
+       cr.subject_type AS "subjectType",
+       cr.subject_identifier_masked AS "subjectIdentifierMasked",
+       cr.status,
+       cr.result_summary AS "resultSummary",
+       cr.created_at AS "createdAt",
+       cr.completed_at AS "completedAt"
+     FROM audita_consultation_requests cr
+     JOIN audita_government_modules gm ON gm.id = cr.module_id
+     WHERE cr.tenant_id = $1
+     ORDER BY cr.created_at DESC
+     LIMIT 8`,
+    [authContext.tenantId],
+  );
+
+  return result.rows;
+}
+
+async function createConsultation(request) {
+  if (!pool || !dbReady) {
+    return { unavailable: true };
+  }
+
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const body = await readJsonBody(request);
+  const moduleSlug = String(body.moduleSlug || "").trim();
+  const subjectType = String(body.subjectType || "").trim();
+  const subjectIdentifier = String(body.subjectIdentifier || "").trim();
+
+  if (!moduleSlug || !subjectType || subjectIdentifier.length < 4) {
+    return { invalid: true };
+  }
+
+  const moduleResult = await pool.query(
+    "SELECT id, name, status FROM audita_government_modules WHERE slug = $1 LIMIT 1",
+    [moduleSlug],
+  );
+  const module = moduleResult.rows[0];
+  if (!module) {
+    return { notFound: true };
+  }
+
+  const subjectHash = hashSubjectIdentifier(authContext.tenantId, subjectIdentifier);
+  const subjectMasked = maskIdentifier(subjectIdentifier);
+  const simulatedSummary =
+    module.status === "active"
+      ? `Consulta registrada para ${module.name}.`
+      : `Modulo ${module.name} esta em preparacao; consulta registrada para rastreabilidade.`;
+
+  const result = await pool.query(
+    `INSERT INTO audita_consultation_requests (
+       tenant_id,
+       module_id,
+       requested_by_user_id,
+       subject_type,
+       subject_identifier_hash,
+       subject_identifier_masked,
+       status,
+       request_payload,
+       result_summary,
+       completed_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+     RETURNING id, status, result_summary AS "resultSummary", created_at AS "createdAt"`,
+    [
+      authContext.tenantId,
+      module.id,
+      authContext.user?.id || null,
+      subjectType,
+      subjectHash,
+      subjectMasked,
+      module.status === "active" ? "completed" : "blocked",
+      JSON.stringify({ moduleSlug, subjectType }),
+      simulatedSummary,
+    ],
+  );
+
+  await pool.query(
+    `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+     VALUES ($1, 'consultation.requested', $2)`,
+    [
+      authContext.tenantId,
+      JSON.stringify({
+        moduleSlug,
+        subjectType,
+        subjectIdentifierMasked: subjectMasked,
+        status: result.rows[0].status,
+      }),
+    ],
+  );
+
+  return result.rows[0];
+}
+
 async function handleApi(request, response, pathname) {
   if (pathname === "/api/health") {
     sendJson(response, 200, {
@@ -416,6 +598,57 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "dashboard_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/modules") {
+    sendJson(response, 200, { modules: await getGovernmentModules() });
+    return true;
+  }
+
+  if (pathname === "/api/consultations" && request.method === "GET") {
+    try {
+      const consultations = await listConsultations(request);
+      if (consultations.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, { consultations });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "consultations_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/consultations" && request.method === "POST") {
+    try {
+      const consultation = await createConsultation(request);
+      if (consultation.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (consultation.unavailable) {
+        sendJson(response, 503, { error: "database_unavailable" });
+        return true;
+      }
+      if (consultation.invalid) {
+        sendJson(response, 400, { error: "invalid_consultation_request" });
+        return true;
+      }
+      if (consultation.notFound) {
+        sendJson(response, 404, { error: "module_not_found" });
+        return true;
+      }
+      sendJson(response, 201, { consultation });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "consultation_create_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
