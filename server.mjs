@@ -731,6 +731,35 @@ function summarizeMunicipalities(uf, municipalities) {
   };
 }
 
+function summarizeLargestMunicipalities(apiResult, requestedLimit) {
+  const series = apiResult?.[0]?.resultados?.[0]?.series || [];
+  const period =
+    series[0]?.serie && Object.keys(series[0].serie).length
+      ? Object.keys(series[0].serie)[0]
+      : "periodo mais recente";
+  const ranked = series
+    .map((item) => {
+      const population = Number(String(item.serie?.[period] || "0").replace(/\D/g, ""));
+      const [name, uf] = String(item.localidade?.nome || "").split(" - ");
+      return {
+        id: item.localidade?.id,
+        nome: name,
+        uf,
+        populacao: population,
+      };
+    })
+    .filter((item) => item.populacao > 0)
+    .sort((a, b) => b.populacao - a.populacao)
+    .slice(0, requestedLimit);
+
+  return {
+    answer: `Interpretei "maiores" como maior populacao estimada. Segundo a tabela 6579 do IBGE/SIDRA (${period}), os ${ranked.length} maiores municipios sao ${ranked
+      .map((city, index) => `${index + 1}. ${city.nome}/${city.uf} (${city.populacao.toLocaleString("pt-BR")} habitantes)`)
+      .join("; ")}.`,
+    records: ranked,
+  };
+}
+
 function summarizeCnae(classes) {
   return {
     answer: `Consultei a classificacao CNAE do IBGE e encontrei ${classes.length} classes. Exemplos: ${classes
@@ -880,6 +909,7 @@ async function runAuditaAgent(request) {
   const question = String(body.question || "").trim();
   const normalized = normalizeQuestion(question);
   const ufMatch = normalized.match(/\b(ac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|sp|se|to)\b/);
+  const requestedLimit = Math.min(Number(normalized.match(/\b(\d{1,2})\b/)?.[1] || 5), 20);
 
   if (!question || question.length < 4) {
     return { invalid: true };
@@ -889,7 +919,15 @@ async function runAuditaAgent(request) {
   let endpoint = `${ibgeBaseUrl}/v1/localidades/estados`;
   let result;
 
-  if (normalized.includes("cnae") || normalized.includes("atividade economica")) {
+  if (
+    (normalized.includes("maior") || normalized.includes("ranking") || normalized.includes("top")) &&
+    (normalized.includes("municip") || normalized.includes("cidade")) &&
+    (normalized.includes("popul") || normalized.includes("brasil") || normalized.includes("habitante"))
+  ) {
+    source = "IBGE SIDRA - Populacao estimada";
+    endpoint = `${ibgeBaseUrl}/v3/agregados/6579/periodos/-1/variaveis/9324?localidades=N6[all]`;
+    result = summarizeLargestMunicipalities(await fetchJson(endpoint), requestedLimit);
+  } else if (normalized.includes("cnae") || normalized.includes("atividade economica")) {
     source = "IBGE CNAE";
     endpoint = `${ibgeBaseUrl}/v2/cnae/classes`;
     result = summarizeCnae(await fetchJson(endpoint));

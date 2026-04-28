@@ -250,6 +250,8 @@ function renderAgentAnswer(result) {
                 <span>${escapeHtml(
                   record.sigla
                     ? `${record.sigla} - ${record.nome}`
+                    : record.populacao
+                      ? `${record.nome}/${record.uf} - ${Number(record.populacao).toLocaleString("pt-BR")} hab.`
                     : record.descricao
                       ? `${record.id} - ${record.descricao}`
                       : record.nome || record.id,
