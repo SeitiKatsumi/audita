@@ -12,6 +12,8 @@ const autoMigrate = process.env.AUDITA_AUTO_MIGRATE !== "false";
 const authRequired = process.env.AUDITA_AUTH_REQUIRED === "true";
 const sessionCookieName = "audita_session";
 const appVersion = process.env.APP_VERSION || "local";
+const appEnv = process.env.APP_ENV || "local";
+const appUrl = process.env.APP_URL || "";
 let pool;
 let dbReady = false;
 let dbError = null;
@@ -327,6 +329,7 @@ async function handleApi(request, response, pathname) {
     sendJson(response, 200, {
       status: "ok",
       version: appVersion,
+      environment: appEnv,
       database: {
         configured: Boolean(databaseUrl),
         ready: dbReady,
@@ -335,6 +338,15 @@ async function handleApi(request, response, pathname) {
       auth: {
         required: authRequired,
       },
+    });
+    return true;
+  }
+
+  if (pathname === "/api/config") {
+    sendJson(response, 200, {
+      environment: appEnv,
+      appUrl,
+      authRequired,
     });
     return true;
   }

@@ -11,6 +11,8 @@ const loginEmail = document.querySelector("#loginEmail");
 const loginPassword = document.querySelector("#loginPassword");
 const loginError = document.querySelector("#loginError");
 const logoutButton = document.querySelector("#logoutButton");
+const environmentName = document.querySelector("#environmentName");
+const environmentDetail = document.querySelector("#environmentDetail");
 
 let phase = 0;
 
@@ -163,6 +165,33 @@ async function loadAuthState() {
   }
 }
 
+function formatEnvironmentName(environment) {
+  const names = {
+    local: "Local",
+    development: "Desenvolvimento",
+    staging: "Staging",
+    production: "Producao",
+  };
+
+  return names[environment] || environment;
+}
+
+async function loadAppConfig() {
+  try {
+    const response = await fetch("/api/config", { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      return;
+    }
+
+    const config = await response.json();
+    environmentName.textContent = formatEnvironmentName(config.environment || "local");
+    environmentDetail.textContent = config.appUrl ? new URL(config.appUrl).hostname : "Ambiente Audita";
+  } catch {
+    environmentName.textContent = "Local";
+    environmentDetail.textContent = "Ambiente Audita";
+  }
+}
+
 async function loadDashboard() {
   try {
     const response = await fetch("/api/dashboard", { headers: { accept: "application/json" } });
@@ -215,6 +244,7 @@ logoutButton.addEventListener("click", async () => {
 setInterval(rotateRisk, 1400);
 drawSignal();
 
+await loadAppConfig();
 const authState = await loadAuthState();
 if (authState.authRequired && !authState.user) {
   showLogin();
