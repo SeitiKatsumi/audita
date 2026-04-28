@@ -1,0 +1,14 @@
+.git
+.github
+docs
+README.md
+CONTRIBUTING.md
+.env
+.env.*
+!.env.example
+node_modules
+dist
+build
+logs
+*.log
+backups

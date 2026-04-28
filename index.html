@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audita | Elevenmind</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Navegacao principal">
+        <div class="brand">
+          <span class="brand-mark">A</span>
+          <div>
+            <strong>Audita</strong>
+            <small>Elevenmind</small>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <a class="active" href="#overview">Visao geral</a>
+          <a href="#coletas">Coletas</a>
+          <a href="#riscos">Riscos</a>
+          <a href="#relatorios">Relatorios</a>
+          <a href="#integracoes">Integracoes</a>
+        </nav>
+
+        <div class="environment">
+          <span class="pulse"></span>
+          <div>
+            <strong>Staging</strong>
+            <small>Ambiente Audita</small>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Plataforma de consulta e auditoria</p>
+            <h1>Centro de inteligencia Audita</h1>
+          </div>
+          <div class="actions">
+            <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">↻</button>
+            <button class="primary-action">Nova consulta</button>
+          </div>
+        </header>
+
+        <section class="hero-grid" id="overview">
+          <article class="intel-panel">
+            <div class="panel-copy">
+              <span class="status-chip">IA ativa</span>
+              <h2>Dados brutos transformados em risco, contexto e acao.</h2>
+              <p>
+                A Audita centraliza fontes judiciais, fiscais, imobiliarias e APIs para
+                gerar explicacoes claras, alertas e relatorios acionaveis.
+              </p>
+            </div>
+            <canvas id="signalCanvas" width="760" height="360" aria-label="Visualizacao de sinais analiticos"></canvas>
+          </article>
+
+          <article class="risk-card">
+            <div class="card-heading">
+              <span>Risco consolidado</span>
+              <strong id="riskScore">72</strong>
+            </div>
+            <div class="risk-orbit">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <p>Alta atividade em consultas fiscais e duas anomalias em fontes judiciais.</p>
+          </article>
+        </section>
+
+        <section class="metrics" aria-label="Indicadores">
+          <article>
+            <small>Consultas hoje</small>
+            <strong>1.284</strong>
+            <span>+18% vs. ontem</span>
+          </article>
+          <article>
+            <small>Fontes conectadas</small>
+            <strong>37</strong>
+            <span>Judicial, fiscal, imoveis e APIs</span>
+          </article>
+          <article>
+            <small>Alertas criticos</small>
+            <strong>9</strong>
+            <span>3 exigem revisao humana</span>
+          </article>
+          <article>
+            <small>Tempo medio</small>
+            <strong>4.8s</strong>
+            <span>Analise preliminar</span>
+          </article>
+        </section>
+
+        <section class="operations-grid">
+          <article class="module" id="coletas">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Pipeline</p>
+                <h2>Coleta e normalizacao</h2>
+              </div>
+              <span class="live">Tempo real</span>
+            </div>
+            <div class="pipeline">
+              <div>
+                <span>01</span>
+                <strong>Captura</strong>
+                <small>Scraping e APIs externas</small>
+              </div>
+              <div>
+                <span>02</span>
+                <strong>Normalizacao</strong>
+                <small>JSON padronizado</small>
+              </div>
+              <div>
+                <span>03</span>
+                <strong>Analise IA</strong>
+                <small>Riscos e recomendacoes</small>
+              </div>
+              <div>
+                <span>04</span>
+                <strong>Relatorio</strong>
+                <small>Entrega web e WhatsApp</small>
+              </div>
+            </div>
+          </article>
+
+          <article class="module" id="riscos">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Auditoria</p>
+                <h2>Sinais prioritarios</h2>
+              </div>
+            </div>
+            <ul class="signal-list">
+              <li>
+                <span class="severity high"></span>
+                <div>
+                  <strong>Inconsistencia fiscal recorrente</strong>
+                  <small>Cliente ACME | 2 fontes divergentes</small>
+                </div>
+              </li>
+              <li>
+                <span class="severity medium"></span>
+                <div>
+                  <strong>Processo judicial com mudanca recente</strong>
+                  <small>Atualizacao detectada ha 14 minutos</small>
+                </div>
+              </li>
+              <li>
+                <span class="severity low"></span>
+                <div>
+                  <strong>Imovel com pendencia documental</strong>
+                  <small>Recomendacao pronta para revisao</small>
+                </div>
+              </li>
+            </ul>
+          </article>
+
+          <article class="module assistant-panel" id="relatorios">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Assistente</p>
+                <h2>Resumo inteligente</h2>
+              </div>
+            </div>
+            <p id="assistantText">
+              Foram encontrados sinais relevantes em 3 fontes. A recomendacao e
+              priorizar a divergencia fiscal, validar documentos do imovel e gerar
+              relatorio executivo para aprovacao.
+            </p>
+            <button class="secondary-action" id="generateReport">Gerar relatorio</button>
+          </article>
+
+          <article class="module" id="integracoes">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Ecossistema</p>
+                <h2>Integracoes previstas</h2>
+              </div>
+            </div>
+            <div class="integration-grid">
+              <span>Directus</span>
+              <span>OneDash</span>
+              <span>SkillShift</span>
+              <span>AppCenter</span>
+              <span>WhatsApp</span>
+              <span>APIs externas</span>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

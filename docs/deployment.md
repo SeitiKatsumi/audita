@@ -28,6 +28,26 @@ Cada app deve ter:
 - health check;
 - deploy rastreavel por commit.
 
+## Deploy Docker atual
+
+O projeto possui uma primeira versao estatica pronta para build Docker via CapRover:
+
+- `Dockerfile`
+- `captain-definition`
+- `nginx.conf`
+- `.dockerignore`
+
+O container usa Nginx unprivileged e escuta internamente na porta `8080`.
+
+No CapRover, configurar o app para usar:
+
+- Repository: `https://github.com/SeitiKatsumi/audita`
+- Branch de staging: `develop`
+- Branch de producao: `main`
+- Container HTTP Port: `8080`
+
+Enquanto o projeto estiver como app estatico, nao ha variaveis obrigatorias em producao. Quando backend, Directus, banco ou IA forem adicionados, as variaveis devem ser criadas por ambiente no CapRover/GitHub e documentadas em `.env.example`.
+
 ## CI/CD
 
 Pipeline minima:

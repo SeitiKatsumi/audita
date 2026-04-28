@@ -51,4 +51,29 @@ A stack final da aplicacao deve ser confirmada em ADR antes da primeira implemen
 
 ## Status
 
-Projeto em fase inicial de estruturacao tecnica.
+Projeto em fase inicial de estruturacao tecnica, com uma primeira interface web estatica e artefatos Docker para deploy no CapRover.
+
+## Execucao local
+
+Com Node.js disponivel:
+
+```bash
+node server.mjs
+```
+
+Acesse:
+
+```text
+http://localhost:3001
+```
+
+## Deploy CapRover
+
+O projeto inclui:
+
+- `Dockerfile`
+- `captain-definition`
+- `nginx.conf`
+- `.dockerignore`
+
+No CapRover, configure o app para usar a porta interna `8080`.
