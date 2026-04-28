@@ -26,6 +26,9 @@ Thumbs.db
 # data/dumps
 *.dump
 *.sql
+!db/
+!db/*.sql
+!db/**/*.sql
 *.sqlite
 *.db
 backups/

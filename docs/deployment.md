@@ -31,13 +31,13 @@ Cada app deve ter:
 ## Deploy Docker atual
 
 O projeto possui uma primeira versao estatica pronta para build Docker via CapRover:
+O projeto possui uma primeira versao web com API Node.js e PostgreSQL pronta para build Docker via CapRover:
 
 - `Dockerfile`
 - `captain-definition`
-- `nginx.conf`
 - `.dockerignore`
 
-O container usa Nginx unprivileged e escuta internamente na porta `8080`.
+O container usa Node.js e escuta internamente na porta `8080`.
 
 No CapRover, configurar o app para usar:
 
@@ -46,7 +46,20 @@ No CapRover, configurar o app para usar:
 - Branch de producao: `main`
 - Container HTTP Port: `8080`
 
-Enquanto o projeto estiver como app estatico, nao ha variaveis obrigatorias em producao. Quando backend, Directus, banco ou IA forem adicionados, as variaveis devem ser criadas por ambiente no CapRover/GitHub e documentadas em `.env.example`.
+Variaveis de staging recomendadas:
+
+```text
+APP_ENV=staging
+APP_URL=https://SEU_DOMINIO_DE_STAGING
+PORT=8080
+HOST=0.0.0.0
+DATABASE_URL=postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:5432/audita_staging
+AUDITA_AUTO_MIGRATE=true
+DB_POOL_MAX=5
+DB_SSL=false
+```
+
+O valor real de `DATABASE_URL` deve ficar somente no CapRover/GitHub secrets, nunca no repositorio.
 
 ## CI/CD
 

@@ -51,14 +51,14 @@ A stack final da aplicacao deve ser confirmada em ADR antes da primeira implemen
 
 ## Status
 
-Projeto em fase inicial de estruturacao tecnica, com uma primeira interface web estatica e artefatos Docker para deploy no CapRover.
+Projeto em fase inicial de estruturacao tecnica, com uma primeira interface web, API Node.js, schema PostgreSQL inicial e artefatos Docker para deploy no CapRover.
 
 ## Execucao local
 
 Com Node.js disponivel:
 
 ```bash
-node server.mjs
+PORT=3001 HOST=127.0.0.1 node server.mjs
 ```
 
 Acesse:
@@ -73,7 +73,21 @@ O projeto inclui:
 
 - `Dockerfile`
 - `captain-definition`
-- `nginx.conf`
 - `.dockerignore`
 
 No CapRover, configure o app para usar a porta interna `8080`.
+
+Variaveis minimas do app `audita-staging` no CapRover:
+
+```text
+APP_ENV=staging
+APP_URL=https://SEU_DOMINIO_DE_STAGING
+PORT=8080
+HOST=0.0.0.0
+DATABASE_URL=postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:5432/audita_staging
+AUDITA_AUTO_MIGRATE=true
+DB_POOL_MAX=5
+DB_SSL=false
+```
+
+Nao commite valores reais de `DATABASE_URL`.

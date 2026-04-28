@@ -3,6 +3,8 @@ const ctx = canvas.getContext("2d");
 const riskScore = document.querySelector("#riskScore");
 const assistantText = document.querySelector("#assistantText");
 const reportButton = document.querySelector("#generateReport");
+const metricCards = document.querySelectorAll(".metrics article");
+const signalList = document.querySelector(".signal-list");
 
 let phase = 0;
 
@@ -81,5 +83,68 @@ reportButton.addEventListener("click", () => {
     "Relatorio executivo preparado: 9 alertas consolidados, 3 prioridades criticas, 4 fontes verificadas e recomendacao de revisao fiscal imediata antes da aprovacao final.";
 });
 
+function formatNumber(value) {
+  return new Intl.NumberFormat("pt-BR").format(value);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderDashboard(data) {
+  const metrics = data.metrics || {};
+  const values = [
+    formatNumber(metrics.consultationsToday || 0),
+    formatNumber(metrics.connectedSources || 0),
+    formatNumber(metrics.criticalAlerts || 0),
+    metrics.averageAnalysisTime || "0s",
+  ];
+
+  metricCards.forEach((card, index) => {
+    const value = card.querySelector("strong");
+    if (value && values[index]) {
+      value.textContent = values[index];
+    }
+  });
+
+  if (Array.isArray(data.signals) && data.signals.length > 0) {
+    signalList.innerHTML = data.signals
+      .map(
+        (signal) => `
+          <li>
+            <span class="severity ${escapeHtml(signal.severity)}"></span>
+            <div>
+              <strong>${escapeHtml(signal.title)}</strong>
+              <small>${escapeHtml(signal.description)}</small>
+            </div>
+          </li>
+        `,
+      )
+      .join("");
+  }
+
+  if (data.assistantSummary) {
+    assistantText.textContent = data.assistantSummary;
+  }
+}
+
+async function loadDashboard() {
+  try {
+    const response = await fetch("/api/dashboard", { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      return;
+    }
+    renderDashboard(await response.json());
+  } catch {
+    // The static demo remains available when the API is not reachable.
+  }
+}
+
 setInterval(rotateRisk, 1400);
 drawSignal();
+loadDashboard();

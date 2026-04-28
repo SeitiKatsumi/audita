@@ -10,6 +10,24 @@ Cada ambiente deve possuir banco separado:
 
 O banco de producao nao deve ter porta exposta publicamente. O acesso deve acontecer pela rede interna do CapRover/Docker ou por tunel SSH temporario e controlado.
 
+## Staging atual
+
+Banco criado no CapRover:
+
+- App: `audita-db-staging`
+- Host interno: `srv-captain--audita-db-staging`
+- Database: `audita_staging`
+- Usuario da aplicacao: `audita_app_staging`
+- Porta interna: `5432`
+
+A aplicacao `audita-staging` deve receber a variavel `DATABASE_URL` no CapRover:
+
+```text
+postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:5432/audita_staging
+```
+
+Nao expor a porta do PostgreSQL publicamente.
+
 ## Usuarios
 
 Criar usuarios separados por finalidade:
