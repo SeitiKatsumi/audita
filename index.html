@@ -126,6 +126,39 @@
         </section>
 
         <section class="consultation-grid" id="consultas">
+          <article class="module agent-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Agente Audita</p>
+                <h2>Pergunte sobre bases oficiais</h2>
+              </div>
+              <span class="live">IBGE aberto</span>
+            </div>
+
+            <form class="agent-form" id="agentForm">
+              <label>
+                Pergunta
+                <textarea
+                  id="agentQuestion"
+                  rows="3"
+                  placeholder="Ex: Liste os estados do Brasil pelo IBGE ou Quais municipios existem em SP?"
+                  required
+                ></textarea>
+              </label>
+              <button class="primary-action" type="submit">Perguntar ao agente</button>
+            </form>
+
+            <div class="prompt-suggestions">
+              <button type="button" data-question="Liste os estados do Brasil pela base do IBGE.">Estados do Brasil</button>
+              <button type="button" data-question="Quais municipios existem em SP segundo o IBGE?">Municipios de SP</button>
+              <button type="button" data-question="Mostre exemplos de classes CNAE do IBGE.">Classes CNAE</button>
+            </div>
+
+            <div class="agent-answer" id="agentAnswer">
+              <p>Faca uma pergunta em linguagem natural. Eu busco na fonte oficial disponivel e resumo o resultado.</p>
+            </div>
+          </article>
+
           <article class="module consultation-builder">
             <div class="module-header">
               <div>

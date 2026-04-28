@@ -32,6 +32,10 @@ const sourceStatus = document.querySelector("#sourceStatus");
 const sourceSchemaNotes = document.querySelector("#sourceSchemaNotes");
 const sourceError = document.querySelector("#sourceError");
 const sourceList = document.querySelector("#sourceList");
+const agentForm = document.querySelector("#agentForm");
+const agentQuestion = document.querySelector("#agentQuestion");
+const agentAnswer = document.querySelector("#agentAnswer");
+const promptSuggestions = document.querySelectorAll("[data-question]");
 
 let phase = 0;
 
@@ -226,6 +230,31 @@ function renderSources(sources) {
     .join("");
 }
 
+function renderAgentAnswer(result) {
+  const records = Array.isArray(result.records) ? result.records.slice(0, 8) : [];
+  agentAnswer.innerHTML = `
+    <strong>${escapeHtml(result.source)}</strong>
+    <p>${escapeHtml(result.answer)}</p>
+    ${
+      records.length
+        ? `<div class="agent-records">${records
+            .map(
+              (record) => `
+                <span>${escapeHtml(
+                  record.sigla
+                    ? `${record.sigla} - ${record.nome}`
+                    : record.descricao
+                      ? `${record.id} - ${record.descricao}`
+                      : record.nome || record.id,
+                )}</span>
+              `,
+            )
+            .join("")}</div>`
+        : ""
+    }
+  `;
+}
+
 async function loadModules() {
   try {
     const response = await fetch("/api/modules", { headers: { accept: "application/json" } });
@@ -408,6 +437,40 @@ sourceForm.addEventListener("submit", async (event) => {
     await loadSources();
   } catch {
     sourceError.textContent = "Falha ao comunicar com a API.";
+  }
+});
+
+promptSuggestions.forEach((button) => {
+  button.addEventListener("click", () => {
+    agentQuestion.value = button.dataset.question || "";
+    agentQuestion.focus();
+  });
+});
+
+agentForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  agentAnswer.innerHTML = `<p>Consultando a fonte oficial...</p>`;
+
+  try {
+    const response = await fetch("/api/agent/query", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ question: agentQuestion.value }),
+    });
+
+    if (response.status === 401) {
+      showLogin("Entre para usar o agente.");
+      return;
+    }
+
+    if (!response.ok) {
+      agentAnswer.innerHTML = `<p>Nao consegui consultar essa fonte agora. Tente outra pergunta.</p>`;
+      return;
+    }
+
+    renderAgentAnswer(await response.json());
+  } catch {
+    agentAnswer.innerHTML = `<p>Falha ao comunicar com o agente.</p>`;
   }
 });
 

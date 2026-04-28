@@ -88,6 +88,8 @@ const fallbackGovernmentModules = [
   },
 ];
 
+const ibgeBaseUrl = "https://servicodados.ibge.gov.br/api";
+
 async function initializeDatabase() {
   if (!databaseUrl) {
     return;
@@ -674,6 +676,130 @@ async function createApiSource(request) {
   return result.rows[0];
 }
 
+function normalizeQuestion(question) {
+  return String(question || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, {
+    headers: {
+      accept: "application/json",
+      "user-agent": "Audita/0.1 government-consultation-agent",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Fonte retornou HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+function summarizeStates(states) {
+  const ordered = [...states].sort((a, b) => a.sigla.localeCompare(b.sigla));
+  return {
+    answer: `Encontrei ${ordered.length} UFs na base aberta do IBGE. As primeiras para conferencia sao ${ordered
+      .slice(0, 8)
+      .map((state) => `${state.sigla} (${state.nome})`)
+      .join(", ")}. Posso detalhar por regiao ou buscar municipios de uma UF especifica.`,
+    records: ordered.map((state) => ({
+      id: state.id,
+      nome: state.nome,
+      sigla: state.sigla,
+      regiao: state.regiao?.nome,
+    })),
+  };
+}
+
+function summarizeMunicipalities(uf, municipalities) {
+  const ordered = [...municipalities].sort((a, b) => a.nome.localeCompare(b.nome));
+  return {
+    answer: `Localizei ${ordered.length} municipios para ${uf.toUpperCase()} na base oficial do IBGE. Alguns exemplos: ${ordered
+      .slice(0, 10)
+      .map((city) => city.nome)
+      .join(", ")}.`,
+    records: ordered.slice(0, 80).map((city) => ({
+      id: city.id,
+      nome: city.nome,
+      microrregiao: city.microrregiao?.nome,
+      mesorregiao: city.microrregiao?.mesorregiao?.nome,
+    })),
+  };
+}
+
+function summarizeCnae(classes) {
+  return {
+    answer: `Consultei a classificacao CNAE do IBGE e encontrei ${classes.length} classes. Exemplos: ${classes
+      .slice(0, 6)
+      .map((item) => `${item.id} - ${item.descricao}`)
+      .join("; ")}.`,
+    records: classes.slice(0, 60).map((item) => ({
+      id: item.id,
+      descricao: item.descricao,
+      grupo: item.grupo?.descricao,
+    })),
+  };
+}
+
+async function runAuditaAgent(request) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const body = await readJsonBody(request);
+  const question = String(body.question || "").trim();
+  const normalized = normalizeQuestion(question);
+  const ufMatch = normalized.match(/\b(ac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|sp|se|to)\b/);
+
+  if (!question || question.length < 4) {
+    return { invalid: true };
+  }
+
+  let source = "IBGE Localidades";
+  let endpoint = `${ibgeBaseUrl}/v1/localidades/estados`;
+  let result;
+
+  if (normalized.includes("cnae") || normalized.includes("atividade economica")) {
+    source = "IBGE CNAE";
+    endpoint = `${ibgeBaseUrl}/v2/cnae/classes`;
+    result = summarizeCnae(await fetchJson(endpoint));
+  } else if ((normalized.includes("municip") || normalized.includes("cidade")) && ufMatch) {
+    endpoint = `${ibgeBaseUrl}/v1/localidades/estados/${ufMatch[1].toUpperCase()}/municipios`;
+    result = summarizeMunicipalities(ufMatch[1], await fetchJson(endpoint));
+  } else {
+    result = summarizeStates(await fetchJson(endpoint));
+  }
+
+  if (pool && dbReady && authContext.tenantId) {
+    await pool.query(
+      `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+       VALUES ($1, 'agent.query.executed', $2)`,
+      [
+        authContext.tenantId,
+        JSON.stringify({
+          question,
+          source,
+          endpoint,
+          records: result.records.length,
+        }),
+      ],
+    );
+  }
+
+  return {
+    source,
+    endpoint,
+    question,
+    answer: result.answer,
+    records: result.records,
+  };
+}
+
 async function handleApi(request, response, pathname) {
   if (pathname === "/api/health") {
     sendJson(response, 200, {
@@ -818,6 +944,27 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "api_source_create_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/agent/query" && request.method === "POST") {
+    try {
+      const result = await runAuditaAgent(request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_agent_question" });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "agent_query_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

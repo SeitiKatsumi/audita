@@ -49,7 +49,14 @@ Essas fontes serao usadas por adapters especificos e pelo pipeline de normalizac
 
 ## Estado atual
 
-Os modulos estao como `planned` ou `sandbox`. A API registra a consulta e cria rastreabilidade, mas ainda nao chama servicos governamentais externos.
+Os modulos estao como `planned` ou `sandbox`. A API registra a consulta e cria rastreabilidade.
+
+Tambem existe uma primeira versao do Agente Audita em `/api/agent/query`, capaz de responder perguntas em linguagem natural usando APIs abertas do IBGE:
+
+- Localidades: estados e municipios por UF.
+- CNAE: classes de atividades economicas.
+
+Essa camada nao usa LLM externo ainda; ela interpreta perguntas simples, consulta a fonte oficial e responde de forma humanizada.
 
 ## Proximos passos
 
