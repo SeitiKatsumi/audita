@@ -5,6 +5,12 @@ const assistantText = document.querySelector("#assistantText");
 const reportButton = document.querySelector("#generateReport");
 const metricCards = document.querySelectorAll(".metrics article");
 const signalList = document.querySelector(".signal-list");
+const loginScreen = document.querySelector("#loginScreen");
+const loginForm = document.querySelector("#loginForm");
+const loginEmail = document.querySelector("#loginEmail");
+const loginPassword = document.querySelector("#loginPassword");
+const loginError = document.querySelector("#loginError");
+const logoutButton = document.querySelector("#logoutButton");
 
 let phase = 0;
 
@@ -133,9 +139,37 @@ function renderDashboard(data) {
   }
 }
 
+function showLogin(message = "") {
+  loginScreen.classList.remove("hidden");
+  loginError.textContent = message;
+  logoutButton.classList.add("hidden");
+  loginEmail.focus();
+}
+
+function hideLogin() {
+  loginScreen.classList.add("hidden");
+  loginError.textContent = "";
+}
+
+async function loadAuthState() {
+  try {
+    const response = await fetch("/api/auth/me", { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      return { authRequired: false, user: null };
+    }
+    return response.json();
+  } catch {
+    return { authRequired: false, user: null };
+  }
+}
+
 async function loadDashboard() {
   try {
     const response = await fetch("/api/dashboard", { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      showLogin("Entre para acessar o dashboard.");
+      return;
+    }
     if (!response.ok) {
       return;
     }
@@ -145,6 +179,48 @@ async function loadDashboard() {
   }
 }
 
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  loginError.textContent = "";
+
+  try {
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        email: loginEmail.value,
+        password: loginPassword.value,
+      }),
+    });
+
+    if (!response.ok) {
+      showLogin("E-mail ou senha invalidos.");
+      return;
+    }
+
+    loginPassword.value = "";
+    hideLogin();
+    logoutButton.classList.remove("hidden");
+    await loadDashboard();
+  } catch {
+    showLogin("Nao foi possivel autenticar agora.");
+  }
+});
+
+logoutButton.addEventListener("click", async () => {
+  await fetch("/api/auth/logout", { method: "POST" });
+  showLogin("Sessao encerrada.");
+});
+
 setInterval(rotateRisk, 1400);
 drawSignal();
-loadDashboard();
+
+const authState = await loadAuthState();
+if (authState.authRequired && !authState.user) {
+  showLogin();
+} else {
+  if (authState.user) {
+    logoutButton.classList.remove("hidden");
+  }
+  await loadDashboard();
+}

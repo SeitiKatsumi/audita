@@ -7,6 +7,28 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
+      <form class="login-panel" id="loginForm">
+        <span class="brand-mark">A</span>
+        <p class="eyebrow">Acesso seguro</p>
+        <h1>Audita</h1>
+        <p>Entre para acessar o ambiente de auditoria da sua organizacao.</p>
+
+        <label>
+          E-mail
+          <input id="loginEmail" name="email" type="email" autocomplete="email" required />
+        </label>
+
+        <label>
+          Senha
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+        </label>
+
+        <button class="primary-action" type="submit">Entrar</button>
+        <small class="login-error" id="loginError" role="alert"></small>
+      </form>
+    </section>
+
     <div class="shell">
       <aside class="sidebar" aria-label="Navegacao principal">
         <div class="brand">
@@ -40,9 +62,10 @@
             <p class="eyebrow">Plataforma de consulta e auditoria</p>
             <h1>Centro de inteligencia Audita</h1>
           </div>
-          <div class="actions">
-            <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">↻</button>
+        <div class="actions">
+            <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
             <button class="primary-action">Nova consulta</button>
+            <button class="icon-button hidden" id="logoutButton" aria-label="Sair" title="Sair">S</button>
           </div>
         </header>
 
@@ -196,6 +219,6 @@
       </main>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

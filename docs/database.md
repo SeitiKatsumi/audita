@@ -28,6 +28,19 @@ postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:5432/audita_s
 
 Nao expor a porta do PostgreSQL publicamente.
 
+## Multi-tenancy
+
+O schema inicial cria:
+
+- `audita_tenants`: organizacoes/clientes.
+- `audita_users`: usuarios vinculados a um tenant.
+- `audita_sessions`: sessoes autenticadas.
+- `audita_sources`: fontes por tenant.
+- `audita_audit_events`: eventos/sinais por tenant.
+- `audita_reports`: relatorios por tenant.
+
+Toda consulta operacional deve filtrar por `tenant_id`. Dados reais de clientes diferentes nao devem compartilhar consultas sem filtro de tenant.
+
 ## Usuarios
 
 Criar usuarios separados por finalidade:

@@ -57,9 +57,16 @@ DATABASE_URL=postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:
 AUDITA_AUTO_MIGRATE=true
 DB_POOL_MAX=5
 DB_SSL=false
+AUDITA_AUTH_REQUIRED=true
+AUDITA_BOOTSTRAP_ADMIN_EMAIL=admin@seudominio.com
+AUDITA_BOOTSTRAP_ADMIN_PASSWORD=SENHA_FORTE
+AUDITA_BOOTSTRAP_ADMIN_NAME=Audita Admin
+COOKIE_SECURE=true
 ```
 
 O valor real de `DATABASE_URL` deve ficar somente no CapRover/GitHub secrets, nunca no repositorio.
+
+As variaveis `AUDITA_BOOTSTRAP_ADMIN_*` criam o primeiro usuario administrador. Elas nao devem ser versionadas e precisam usar uma senha forte.
 
 ## CI/CD
 

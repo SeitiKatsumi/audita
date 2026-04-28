@@ -88,6 +88,13 @@ DATABASE_URL=postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:
 AUDITA_AUTO_MIGRATE=true
 DB_POOL_MAX=5
 DB_SSL=false
+AUDITA_AUTH_REQUIRED=true
+AUDITA_BOOTSTRAP_ADMIN_EMAIL=admin@seudominio.com
+AUDITA_BOOTSTRAP_ADMIN_PASSWORD=SENHA_FORTE
+AUDITA_BOOTSTRAP_ADMIN_NAME=Audita Admin
+COOKIE_SECURE=true
 ```
 
 Nao commite valores reais de `DATABASE_URL`.
+
+O usuario admin inicial e criado/atualizado automaticamente quando `AUDITA_BOOTSTRAP_ADMIN_EMAIL` e `AUDITA_BOOTSTRAP_ADMIN_PASSWORD` estao configurados. Depois do primeiro acesso em producao, troque a senha e remova ou rotacione essas variaveis conforme a politica de seguranca do ambiente.

@@ -61,3 +61,12 @@ Checklist inicial:
 - Mascarar identificadores sensiveis.
 - Registrar eventos de seguranca relevantes.
 - Definir retencao de logs.
+
+## Autenticacao
+
+- Habilitar `AUDITA_AUTH_REQUIRED=true` em staging/producao.
+- Criar o primeiro admin apenas por variaveis de ambiente seguras.
+- Usar senha forte para `AUDITA_BOOTSTRAP_ADMIN_PASSWORD`.
+- Remover ou rotacionar credenciais bootstrap apos validacao inicial.
+- Sessoes usam cookie HttpOnly e devem trafegar com HTTPS.
+- Toda consulta de dados deve respeitar `tenant_id`.
