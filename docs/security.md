@@ -75,6 +75,7 @@ Checklist inicial:
 
 - Validar base legal antes de consultar dados pessoais ou empresariais.
 - Usar credenciais oficiais autorizadas por ambiente.
+- Armazenar apenas referencias de secrets no banco, nao os valores dos tokens/certificados.
 - Nao persistir identificadores sensiveis em texto puro quando um hash for suficiente.
 - Respeitar limites de taxa e termos de uso das fontes oficiais.
 - Registrar auditoria da consulta sem vazar o identificador bruto.

@@ -534,6 +534,21 @@ h2 {
   align-items: end;
 }
 
+.integrations-admin {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.source-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.source-form label,
 .consultation-form label {
   display: grid;
   gap: 7px;
@@ -541,6 +556,9 @@ h2 {
   font-weight: 800;
 }
 
+.source-form input,
+.source-form select,
+.source-form textarea,
 .consultation-form input,
 .consultation-form select {
   width: 100%;
@@ -555,6 +573,23 @@ h2 {
   outline: none;
 }
 
+.source-form textarea {
+  min-height: 92px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.source-form .primary-action {
+  width: fit-content;
+}
+
+.source-form input:focus,
+.source-form select:focus,
+.source-form textarea:focus,
 .consultation-form input:focus,
 .consultation-form select:focus {
   border-color: var(--line-strong);
@@ -568,13 +603,15 @@ h2 {
 }
 
 .module-list,
-.history-list {
+.history-list,
+.source-list {
   display: grid;
   gap: 10px;
 }
 
 .module-item,
-.history-item {
+.history-item,
+.source-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px 12px;
@@ -586,6 +623,7 @@ h2 {
 
 .module-item p,
 .history-item p,
+.source-item p,
 .empty-state {
   grid-column: 1 / -1;
   margin: 0;
@@ -594,9 +632,14 @@ h2 {
 }
 
 .module-item strong,
-.history-item strong {
+.history-item strong,
+.source-item strong {
   display: block;
   margin-bottom: 4px;
+}
+
+.source-item small {
+  color: var(--muted);
 }
 
 .module-status {
@@ -744,6 +787,7 @@ h2 {
 
   .hero-grid,
   .consultation-grid,
+  .integrations-admin,
   .operations-grid {
     grid-template-columns: 1fr;
   }
@@ -767,6 +811,7 @@ h2 {
   .nav-list,
   .metrics,
   .pipeline,
+  .source-form,
   .consultation-form,
   .integration-grid {
     grid-template-columns: 1fr;

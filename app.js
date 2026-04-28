@@ -20,6 +20,18 @@ const subjectIdentifier = document.querySelector("#subjectIdentifier");
 const consultationError = document.querySelector("#consultationError");
 const moduleList = document.querySelector("#moduleList");
 const consultationHistory = document.querySelector("#consultationHistory");
+const sourceForm = document.querySelector("#sourceForm");
+const sourceName = document.querySelector("#sourceName");
+const sourceAgency = document.querySelector("#sourceAgency");
+const sourceCategory = document.querySelector("#sourceCategory");
+const sourceBaseUrl = document.querySelector("#sourceBaseUrl");
+const sourceAccessMethod = document.querySelector("#sourceAccessMethod");
+const sourceAuthType = document.querySelector("#sourceAuthType");
+const sourceSecretRef = document.querySelector("#sourceSecretRef");
+const sourceStatus = document.querySelector("#sourceStatus");
+const sourceSchemaNotes = document.querySelector("#sourceSchemaNotes");
+const sourceError = document.querySelector("#sourceError");
+const sourceList = document.querySelector("#sourceList");
 
 let phase = 0;
 
@@ -191,6 +203,29 @@ function renderConsultations(consultations) {
     .join("");
 }
 
+function renderSources(sources) {
+  if (!Array.isArray(sources) || sources.length === 0) {
+    sourceList.innerHTML = `<p class="empty-state">Nenhuma fonte configurada ainda.</p>`;
+    return;
+  }
+
+  sourceList.innerHTML = sources
+    .map(
+      (source) => `
+        <article class="source-item">
+          <div>
+            <strong>${escapeHtml(source.name)}</strong>
+            <small>${escapeHtml(source.agency)} | ${escapeHtml(source.category)} | ${escapeHtml(source.accessMethod)}</small>
+          </div>
+          <span class="module-status ${escapeHtml(source.status)}">${escapeHtml(source.status)}</span>
+          <p>${escapeHtml(source.baseUrl)}</p>
+          <small>Normalizacao: ${escapeHtml(source.normalizationStatus)}${source.secretRef ? " | Secret referenciado" : ""}</small>
+        </article>
+      `,
+    )
+    .join("");
+}
+
 async function loadModules() {
   try {
     const response = await fetch("/api/modules", { headers: { accept: "application/json" } });
@@ -218,6 +253,23 @@ async function loadConsultations() {
     renderConsultations(data.consultations || []);
   } catch {
     renderConsultations([]);
+  }
+}
+
+async function loadSources() {
+  try {
+    const response = await fetch("/api/integrations/sources", { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      renderSources([]);
+      return;
+    }
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    renderSources(data.sources || []);
+  } catch {
+    renderSources([]);
   }
 }
 
@@ -312,8 +364,50 @@ loginForm.addEventListener("submit", async (event) => {
     logoutButton.classList.remove("hidden");
     await loadDashboard();
     await loadConsultations();
+    await loadSources();
   } catch {
     showLogin("Nao foi possivel autenticar agora.");
+  }
+});
+
+sourceForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  sourceError.textContent = "";
+
+  try {
+    const response = await fetch("/api/integrations/sources", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        name: sourceName.value,
+        agency: sourceAgency.value,
+        category: sourceCategory.value,
+        baseUrl: sourceBaseUrl.value,
+        accessMethod: sourceAccessMethod.value,
+        authType: sourceAuthType.value,
+        secretRef: sourceSecretRef.value,
+        status: sourceStatus.value,
+        schemaNotes: sourceSchemaNotes.value,
+      }),
+    });
+
+    if (response.status === 401) {
+      showLogin("Entre para gerenciar integracoes.");
+      return;
+    }
+    if (response.status === 403) {
+      sourceError.textContent = "Seu usuario nao tem permissao para gerenciar fontes.";
+      return;
+    }
+    if (!response.ok) {
+      sourceError.textContent = "Nao foi possivel salvar a fonte.";
+      return;
+    }
+
+    sourceForm.reset();
+    await loadSources();
+  } catch {
+    sourceError.textContent = "Falha ao comunicar com a API.";
   }
 });
 
@@ -368,4 +462,5 @@ if (authState.authRequired && !authState.user) {
   }
   await loadDashboard();
   await loadConsultations();
+  await loadSources();
 }

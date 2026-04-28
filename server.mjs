@@ -305,6 +305,10 @@ function publicUser(user) {
   };
 }
 
+function canManageIntegrations(user) {
+  return ["owner", "admin"].includes(user?.role);
+}
+
 async function createSession(response, request, userId) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashToken(token);
@@ -506,6 +510,157 @@ async function createConsultation(request) {
   return result.rows[0];
 }
 
+async function listApiSources(request) {
+  if (!pool || !dbReady) {
+    return [];
+  }
+
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const result = await pool.query(
+    `SELECT
+       id,
+       name,
+       agency,
+       category,
+       base_url AS "baseUrl",
+       access_method AS "accessMethod",
+       auth_type AS "authType",
+       secret_ref AS "secretRef",
+       status,
+       normalization_status AS "normalizationStatus",
+       schema_notes AS "schemaNotes",
+       created_at AS "createdAt",
+       updated_at AS "updatedAt"
+     FROM audita_api_sources
+     WHERE tenant_id = $1
+     ORDER BY updated_at DESC, name`,
+    [authContext.tenantId],
+  );
+
+  return result.rows;
+}
+
+async function createApiSource(request) {
+  if (!pool || !dbReady) {
+    return { unavailable: true };
+  }
+
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+  if (!canManageIntegrations(authContext.user)) {
+    return { forbidden: true };
+  }
+
+  const body = await readJsonBody(request);
+  const name = String(body.name || "").trim();
+  const agency = String(body.agency || "").trim();
+  const category = String(body.category || "").trim();
+  const baseUrl = String(body.baseUrl || "").trim();
+  const accessMethod = String(body.accessMethod || "api").trim();
+  const authType = String(body.authType || "none").trim();
+  const secretRef = String(body.secretRef || "").trim() || null;
+  const status = String(body.status || "draft").trim();
+  const normalizationStatus = String(body.normalizationStatus || "pending").trim();
+  const schemaNotes = String(body.schemaNotes || "").trim() || null;
+
+  if (!name || !agency || !category || !baseUrl) {
+    return { invalid: true };
+  }
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(baseUrl);
+  } catch {
+    return { invalid: true };
+  }
+
+  if (!["https:", "http:"].includes(parsedUrl.protocol)) {
+    return { invalid: true };
+  }
+
+  const result = await pool.query(
+    `INSERT INTO audita_api_sources (
+       tenant_id,
+       name,
+       agency,
+       category,
+       base_url,
+       access_method,
+       auth_type,
+       secret_ref,
+       status,
+       normalization_status,
+       schema_notes,
+       created_by_user_id
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+     ON CONFLICT (tenant_id, name)
+     DO UPDATE SET
+       agency = EXCLUDED.agency,
+       category = EXCLUDED.category,
+       base_url = EXCLUDED.base_url,
+       access_method = EXCLUDED.access_method,
+       auth_type = EXCLUDED.auth_type,
+       secret_ref = EXCLUDED.secret_ref,
+       status = EXCLUDED.status,
+       normalization_status = EXCLUDED.normalization_status,
+       schema_notes = EXCLUDED.schema_notes,
+       updated_at = NOW()
+     RETURNING
+       id,
+       name,
+       agency,
+       category,
+       base_url AS "baseUrl",
+       access_method AS "accessMethod",
+       auth_type AS "authType",
+       secret_ref AS "secretRef",
+       status,
+       normalization_status AS "normalizationStatus",
+       schema_notes AS "schemaNotes",
+       created_at AS "createdAt",
+       updated_at AS "updatedAt"`,
+    [
+      authContext.tenantId,
+      name,
+      agency,
+      category,
+      parsedUrl.toString(),
+      accessMethod,
+      authType,
+      secretRef,
+      status,
+      normalizationStatus,
+      schemaNotes,
+      authContext.user?.id || null,
+    ],
+  );
+
+  await pool.query(
+    `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+     VALUES ($1, 'integration.source.saved', $2)`,
+    [
+      authContext.tenantId,
+      JSON.stringify({
+        name,
+        agency,
+        category,
+        status,
+        normalizationStatus,
+        secretRef: Boolean(secretRef),
+      }),
+    ],
+  );
+
+  return result.rows[0];
+}
+
 async function handleApi(request, response, pathname) {
   if (pathname === "/api/health") {
     sendJson(response, 200, {
@@ -606,6 +761,52 @@ async function handleApi(request, response, pathname) {
 
   if (pathname === "/api/modules") {
     sendJson(response, 200, { modules: await getGovernmentModules() });
+    return true;
+  }
+
+  if (pathname === "/api/integrations/sources" && request.method === "GET") {
+    try {
+      const sources = await listApiSources(request);
+      if (sources.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, { sources });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "api_sources_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/integrations/sources" && request.method === "POST") {
+    try {
+      const source = await createApiSource(request);
+      if (source.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (source.forbidden) {
+        sendJson(response, 403, { error: "insufficient_role" });
+        return true;
+      }
+      if (source.unavailable) {
+        sendJson(response, 503, { error: "database_unavailable" });
+        return true;
+      }
+      if (source.invalid) {
+        sendJson(response, 400, { error: "invalid_api_source" });
+        return true;
+      }
+      sendJson(response, 201, { source });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "api_source_create_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
     return true;
   }
 

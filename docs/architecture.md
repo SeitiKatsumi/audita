@@ -38,6 +38,7 @@ Observabilidade
 - API: regras de negocio, autenticacao, permissoes e integracoes.
 - Coleta: scraping, APIs externas, agendamentos e importacoes.
 - Consultas governamentais: catalogo de fontes oficiais, API interna de pedidos, rastreabilidade por tenant e adapters isolados por fonte.
+- Integracoes de orgaos: cadastro administravel de fontes/API com referencia de secrets e observacoes para normalizacao.
 - Normalizacao: padronizacao dos dados coletados.
 - IA: analises, explicacoes, alertas, predicoes e recomendacoes.
 - Relatorios: geracao de documentos, dashboards e historico.

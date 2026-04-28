@@ -182,6 +182,93 @@
           </article>
         </section>
 
+        <section class="integrations-admin" id="integracoes-admin">
+          <article class="module integration-form-card">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Administracao</p>
+                <h2>Integracoes de orgaos</h2>
+              </div>
+              <span class="live">Fontes configuraveis</span>
+            </div>
+
+            <form class="source-form" id="sourceForm">
+              <label>
+                Nome da fonte
+                <input id="sourceName" type="text" placeholder="Ex: Receita Federal CNPJ" required />
+              </label>
+              <label>
+                Orgao
+                <input id="sourceAgency" type="text" placeholder="Ex: Receita Federal" required />
+              </label>
+              <label>
+                Categoria
+                <select id="sourceCategory" required>
+                  <option value="fiscal">Fiscal</option>
+                  <option value="judicial">Judicial</option>
+                  <option value="imobiliario">Imobiliario</option>
+                  <option value="juridico">Juridico</option>
+                  <option value="compliance">Compliance</option>
+                </select>
+              </label>
+              <label>
+                URL base
+                <input id="sourceBaseUrl" type="url" placeholder="https://api.orgao.gov.br" required />
+              </label>
+              <label>
+                Acesso
+                <select id="sourceAccessMethod">
+                  <option value="api">API</option>
+                  <option value="hybrid">Hibrido</option>
+                  <option value="scraping">Coleta controlada</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </label>
+              <label>
+                Autenticacao
+                <select id="sourceAuthType">
+                  <option value="none">Sem autenticacao</option>
+                  <option value="token">Token</option>
+                  <option value="certificate_or_token">Certificado ou token</option>
+                  <option value="credential">Credencial</option>
+                </select>
+              </label>
+              <label>
+                Referencia do secret
+                <input id="sourceSecretRef" type="text" placeholder="Ex: CAPROVER_SECRET_RECEITA_TOKEN" />
+              </label>
+              <label>
+                Status
+                <select id="sourceStatus">
+                  <option value="draft">Rascunho</option>
+                  <option value="testing">Teste</option>
+                  <option value="active">Ativa</option>
+                  <option value="paused">Pausada</option>
+                </select>
+              </label>
+              <label class="wide-field">
+                Observacoes de normalizacao
+                <textarea id="sourceSchemaNotes" rows="3" placeholder="Campos esperados, formato de resposta, regras de normalizacao"></textarea>
+              </label>
+              <button class="primary-action" type="submit">Salvar fonte</button>
+            </form>
+            <small class="consultation-note">
+              Guarde tokens e certificados no CapRover/secrets. Aqui salve apenas a referencia do secret.
+            </small>
+            <small class="login-error" id="sourceError" role="alert"></small>
+          </article>
+
+          <article class="module">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Normalizacao</p>
+                <h2>Fontes cadastradas</h2>
+              </div>
+            </div>
+            <div class="source-list" id="sourceList"></div>
+          </article>
+        </section>
+
         <section class="operations-grid">
           <article class="module" id="coletas">
             <div class="module-header">

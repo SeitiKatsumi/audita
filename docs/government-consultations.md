@@ -7,6 +7,7 @@ Esta camada organiza os modulos de consulta a fontes governamentais e oficiais d
 O MVP atual cria:
 
 - catalogo de modulos governamentais;
+- cadastro administravel de fontes/API por tenant;
 - historico de consultas por tenant;
 - endpoint para registrar pedidos de consulta;
 - mascaramento do identificador visivel;
@@ -27,7 +28,24 @@ O MVP atual cria:
 - Mostrar apenas `subject_identifier_masked` na interface.
 - Toda consulta deve estar vinculada a `tenant_id`.
 - Toda integracao real deve usar credenciais de ambiente, nunca valores no codigo.
+- A tabela `audita_api_sources` armazena apenas metadados da fonte e `secret_ref`; tokens, certificados e senhas ficam no CapRover/secrets.
 - Respeitar termos de uso, limites de taxa e base legal/LGPD.
+
+## Fontes configuraveis
+
+Administradores podem cadastrar fontes de orgaos com:
+
+- nome da fonte;
+- orgao/provedor;
+- categoria;
+- URL base;
+- metodo de acesso;
+- tipo de autenticacao;
+- referencia do secret;
+- status operacional;
+- observacoes de normalizacao.
+
+Essas fontes serao usadas por adapters especificos e pelo pipeline de normalizacao.
 
 ## Estado atual
 
@@ -41,3 +59,4 @@ Os modulos estao como `planned` ou `sandbox`. A API registra a consulta e cria r
 4. Implementar fila de jobs para consultas demoradas.
 5. Registrar logs tecnicos sem dados sensiveis.
 6. Adicionar rate limit por tenant e usuario.
+7. Criar mapeamentos de normalizacao por fonte.
