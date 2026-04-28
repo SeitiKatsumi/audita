@@ -210,9 +210,14 @@ CREATE INDEX IF NOT EXISTS audita_api_sources_tenant_idx ON audita_api_sources(t
 
 DO $$
 BEGIN
-  ALTER TABLE audita_api_sources
-    ADD CONSTRAINT audita_api_sources_tenant_name_unique UNIQUE (tenant_id, name);
-EXCEPTION WHEN duplicate_object THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'audita_api_sources_tenant_name_unique'
+  ) THEN
+    ALTER TABLE audita_api_sources
+      ADD CONSTRAINT audita_api_sources_tenant_name_unique UNIQUE (tenant_id, name);
+  END IF;
 END $$;
 
 INSERT INTO audita_government_modules (slug, name, category, provider, access_method, auth_type, status, description)
