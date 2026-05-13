@@ -11,8 +11,14 @@ const loginEmail = document.querySelector("#loginEmail");
 const loginPassword = document.querySelector("#loginPassword");
 const loginError = document.querySelector("#loginError");
 const logoutButton = document.querySelector("#logoutButton");
+const newQueryButton = document.querySelector("#newQueryButton");
 const environmentName = document.querySelector("#environmentName");
 const environmentDetail = document.querySelector("#environmentDetail");
+const pageTitle = document.querySelector("#pageTitle");
+const pageEyebrow = document.querySelector("#pageEyebrow");
+const navLinks = document.querySelectorAll(".nav-list a[href^='#']");
+const pageBlocks = document.querySelectorAll("[data-page]");
+const operationsPages = document.querySelector("#operationsPages");
 const consultationForm = document.querySelector("#consultationForm");
 const consultationModule = document.querySelector("#consultationModule");
 const subjectType = document.querySelector("#subjectType");
@@ -51,6 +57,67 @@ const assistantResult = document.querySelector("#assistantResult");
 const assistantSourceStatus = document.querySelector("#assistantSourceStatus");
 
 let phase = 0;
+
+const pageMeta = {
+  overview: {
+    title: "Centro de inteligencia Audita",
+    eyebrow: "Plataforma de consulta e auditoria",
+  },
+  assistente: {
+    title: "Assistente Audita",
+    eyebrow: "Consulta inteligente em fontes oficiais",
+  },
+  consultas: {
+    title: "Consultas governamentais",
+    eyebrow: "Registro, catalogo e rastreabilidade",
+  },
+  coletas: {
+    title: "Coleta e normalizacao",
+    eyebrow: "Pipeline de dados oficiais",
+  },
+  riscos: {
+    title: "Sinais prioritarios",
+    eyebrow: "Auditoria e classificacao de risco",
+  },
+  relatorios: {
+    title: "Relatorios inteligentes",
+    eyebrow: "Resumo executivo e recomendacoes",
+  },
+  "integracoes-admin": {
+    title: "Integracoes de orgaos",
+    eyebrow: "Administracao de fontes oficiais",
+  },
+  integracoes: {
+    title: "Ecossistema Audita",
+    eyebrow: "Conectores e integracoes previstas",
+  },
+};
+
+function getActivePage() {
+  const hash = window.location.hash.replace("#", "");
+  return pageMeta[hash] ? hash : "overview";
+}
+
+function setActivePage(page) {
+  const activePage = pageMeta[page] ? page : "overview";
+  const activeMeta = pageMeta[activePage];
+
+  pageTitle.textContent = activeMeta.title;
+  pageEyebrow.textContent = activeMeta.eyebrow;
+
+  pageBlocks.forEach((block) => {
+    block.classList.toggle("page-hidden", block.dataset.page !== activePage);
+  });
+
+  const operationPages = ["coletas", "riscos", "relatorios", "integracoes"];
+  if (operationsPages) {
+    operationsPages.classList.toggle("page-hidden", !operationPages.includes(activePage));
+  }
+
+  navLinks.forEach((link) => {
+    link.classList.toggle("active", link.getAttribute("href") === `#${activePage}`);
+  });
+}
 
 function drawSignal() {
   const width = canvas.width;
@@ -704,9 +771,18 @@ logoutButton.addEventListener("click", async () => {
   showLogin("Sessao encerrada.");
 });
 
+newQueryButton.addEventListener("click", () => {
+  window.location.hash = "assistente";
+});
+
+window.addEventListener("hashchange", () => {
+  setActivePage(getActivePage());
+});
+
 setInterval(rotateRisk, 1400);
 drawSignal();
 
+setActivePage(getActivePage());
 await loadAppConfig();
 await loadModules();
 const authState = await loadAuthState();

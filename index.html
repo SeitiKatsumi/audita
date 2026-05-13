@@ -66,17 +66,17 @@
       <main class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Plataforma de consulta e auditoria</p>
-            <h1>Centro de inteligencia Audita</h1>
+            <p class="eyebrow" id="pageEyebrow">Plataforma de consulta e auditoria</p>
+            <h1 id="pageTitle">Centro de inteligencia Audita</h1>
           </div>
         <div class="actions">
             <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
-            <button class="primary-action">Nova consulta</button>
+            <button class="primary-action" id="newQueryButton">Nova consulta</button>
             <button class="icon-button hidden" id="logoutButton" aria-label="Sair" title="Sair">S</button>
           </div>
         </header>
 
-        <section class="hero-grid" id="overview">
+        <section class="hero-grid" id="overview" data-page="overview">
           <article class="intel-panel">
             <div class="panel-copy">
               <span class="status-chip">IA ativa</span>
@@ -103,7 +103,7 @@
           </article>
         </section>
 
-        <section class="metrics" aria-label="Indicadores">
+        <section class="metrics" aria-label="Indicadores" data-page="overview">
           <article>
             <small>Consultas hoje</small>
             <strong>1.284</strong>
@@ -126,7 +126,7 @@
           </article>
         </section>
 
-        <section class="assistant-workbench" id="assistente">
+        <section class="assistant-workbench" id="assistente" data-page="assistente">
           <article class="module assistant-query-panel">
             <div class="module-header">
               <div>
@@ -172,7 +172,7 @@
           </article>
         </section>
 
-        <section class="consultation-grid" id="consultas">
+        <section class="consultation-grid" id="consultas" data-page="consultas">
           <article class="module agent-panel">
             <div class="module-header">
               <div>
@@ -303,7 +303,7 @@
           </article>
         </section>
 
-        <section class="integrations-admin" id="integracoes-admin">
+        <section class="integrations-admin" id="integracoes-admin" data-page="integracoes-admin">
           <article class="module integration-form-card">
             <div class="module-header">
               <div>
@@ -390,8 +390,8 @@
           </article>
         </section>
 
-        <section class="operations-grid">
-          <article class="module" id="coletas">
+        <section class="operations-grid" id="operationsPages" data-page-container="operations">
+          <article class="module" id="coletas" data-page="coletas">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Pipeline</p>
@@ -423,7 +423,7 @@
             </div>
           </article>
 
-          <article class="module" id="riscos">
+          <article class="module" id="riscos" data-page="riscos">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Auditoria</p>
@@ -455,7 +455,7 @@
             </ul>
           </article>
 
-          <article class="module assistant-panel" id="relatorios">
+          <article class="module assistant-panel" id="relatorios" data-page="relatorios">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Assistente</p>
@@ -470,7 +470,7 @@
             <button class="secondary-action" id="generateReport">Gerar relatorio</button>
           </article>
 
-          <article class="module" id="integracoes">
+          <article class="module" id="integracoes" data-page="integracoes">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Ecossistema</p>

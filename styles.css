@@ -63,6 +63,10 @@ body {
   display: none !important;
 }
 
+.page-hidden {
+  display: none !important;
+}
+
 button,
 a {
   font: inherit;
@@ -514,6 +518,10 @@ h2 {
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
   gap: 18px;
+}
+
+.operations-grid > [data-page] {
+  grid-column: 1 / -1;
 }
 
 .consultation-grid {
