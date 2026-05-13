@@ -43,6 +43,12 @@ const agentProviderStatus = document.querySelector("#agentProviderStatus");
 const agentSystemPrompt = document.querySelector("#agentSystemPrompt");
 const agentSettingsStatus = document.querySelector("#agentSettingsStatus");
 const agentSettingsError = document.querySelector("#agentSettingsError");
+const assistantQueryForm = document.querySelector("#assistantQueryForm");
+const assistantSource = document.querySelector("#assistantSource");
+const assistantCode = document.querySelector("#assistantCode");
+const assistantPrompt = document.querySelector("#assistantPrompt");
+const assistantResult = document.querySelector("#assistantResult");
+const assistantSourceStatus = document.querySelector("#assistantSourceStatus");
 
 let phase = 0;
 
@@ -264,6 +270,84 @@ function renderAgentAnswer(result) {
   `;
 }
 
+function renderAssistantSources(sources) {
+  if (!assistantSource) {
+    return;
+  }
+
+  const availableSources = Array.isArray(sources) ? sources : [];
+  assistantSource.innerHTML = availableSources
+    .map(
+      (source) =>
+        `<option value="${escapeHtml(source.id)}">${escapeHtml(source.name)} | ${escapeHtml(source.agency)}</option>`,
+    )
+    .join("");
+
+  assistantSourceStatus.textContent = availableSources.length
+    ? `${availableSources.length} fontes`
+    : "Sem fontes";
+}
+
+function formatRecord(record) {
+  if (!record || typeof record !== "object") {
+    return String(record || "");
+  }
+
+  if (record.sigla) {
+    return `${record.sigla} - ${record.nome}`;
+  }
+  if (record.populacao) {
+    return `${record.nome}/${record.uf} - ${Number(record.populacao).toLocaleString("pt-BR")} hab.`;
+  }
+  if (record.descricao) {
+    return `${record.id || ""} - ${record.descricao}`.trim();
+  }
+  if (record.nome) {
+    return record.nome;
+  }
+  if (record.id) {
+    return String(record.id);
+  }
+
+  return JSON.stringify(record).slice(0, 180);
+}
+
+function renderAssistantResult(result) {
+  const records = Array.isArray(result.records) ? result.records.slice(0, 10) : [];
+  assistantResult.innerHTML = `
+    <strong>${escapeHtml(result.source || "Fonte consultada")}</strong>
+    <p>${escapeHtml(result.answer || "Consulta concluida.")}</p>
+    ${
+      records.length
+        ? `<div class="agent-records">${records
+            .map((record) => `<span>${escapeHtml(formatRecord(record))}</span>`)
+            .join("")}</div>`
+        : ""
+    }
+  `;
+}
+
+async function loadAssistantSources() {
+  if (!assistantSource) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/assistant/sources", { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      renderAssistantSources([]);
+      return;
+    }
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    renderAssistantSources(data.sources || []);
+  } catch {
+    renderAssistantSources([]);
+  }
+}
+
 async function loadModules() {
   try {
     const response = await fetch("/api/modules", { headers: { accept: "application/json" } });
@@ -434,6 +518,7 @@ loginForm.addEventListener("submit", async (event) => {
     await loadConsultations();
     await loadSources();
     await loadAgentSettings();
+    await loadAssistantSources();
   } catch {
     showLogin("Nao foi possivel autenticar agora.");
   }
@@ -475,6 +560,7 @@ sourceForm.addEventListener("submit", async (event) => {
 
     sourceForm.reset();
     await loadSources();
+    await loadAssistantSources();
   } catch {
     sourceError.textContent = "Falha ao comunicar com a API.";
   }
@@ -550,6 +636,37 @@ agentForm.addEventListener("submit", async (event) => {
   }
 });
 
+assistantQueryForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  assistantResult.innerHTML = `<p>Consultando a fonte selecionada...</p>`;
+
+  try {
+    const response = await fetch("/api/assistant/query", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        sourceId: assistantSource.value,
+        code: assistantCode.value,
+        prompt: assistantPrompt.value,
+      }),
+    });
+
+    if (response.status === 401) {
+      showLogin("Entre para usar o assistente.");
+      return;
+    }
+
+    if (!response.ok) {
+      assistantResult.innerHTML = `<p>Nao consegui concluir essa consulta. Verifique a fonte, o codigo e as credenciais.</p>`;
+      return;
+    }
+
+    renderAssistantResult(await response.json());
+  } catch {
+    assistantResult.innerHTML = `<p>Falha ao comunicar com o assistente.</p>`;
+  }
+});
+
 consultationForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   consultationError.textContent = "";
@@ -603,4 +720,5 @@ if (authState.authRequired && !authState.user) {
   await loadConsultations();
   await loadSources();
   await loadAgentSettings();
+  await loadAssistantSources();
 }

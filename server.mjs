@@ -89,6 +89,32 @@ const fallbackGovernmentModules = [
 ];
 
 const ibgeBaseUrl = "https://servicodados.ibge.gov.br/api";
+const builtinAssistantSources = [
+  {
+    id: "builtin:ibge-localidades",
+    name: "IBGE Localidades",
+    agency: "IBGE",
+    category: "demografico",
+    status: "active",
+    description: "Estados e municipios por UF/codigo oficial.",
+  },
+  {
+    id: "builtin:ibge-cnae",
+    name: "IBGE CNAE",
+    agency: "IBGE",
+    category: "economico",
+    status: "active",
+    description: "Classes CNAE e atividades economicas.",
+  },
+  {
+    id: "builtin:ibge-populacao",
+    name: "IBGE Populacao estimada",
+    agency: "IBGE/SIDRA",
+    category: "demografico",
+    status: "active",
+    description: "Ranking populacional de municipios.",
+  },
+];
 
 async function initializeDatabase() {
   if (!databaseUrl) {
@@ -699,6 +725,95 @@ async function fetchJson(url) {
   return response.json();
 }
 
+function isBlockedExternalUrl(parsedUrl) {
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const privateHostPatterns = [
+    /^localhost$/,
+    /^0\.0\.0\.0$/,
+    /^127\./,
+    /^10\./,
+    /^192\.168\./,
+    /^172\.(1[6-9]|2\d|3[0-1])\./,
+    /^\[?::1\]?$/,
+    /\.local$/,
+  ];
+
+  return privateHostPatterns.some((pattern) => pattern.test(hostname));
+}
+
+function buildSourceUrl(baseUrl, code) {
+  const trimmedCode = String(code || "").trim();
+  const rawUrl = String(baseUrl || "");
+  const urlWithCode = rawUrl.includes("{codigo}")
+    ? rawUrl.replaceAll("{codigo}", encodeURIComponent(trimmedCode))
+    : trimmedCode
+      ? `${rawUrl.replace(/\/$/, "")}/${encodeURIComponent(trimmedCode)}`
+      : rawUrl;
+  const parsedUrl = new URL(urlWithCode);
+
+  if (!["https:", "http:"].includes(parsedUrl.protocol) || isBlockedExternalUrl(parsedUrl)) {
+    throw new Error("Endpoint externo bloqueado por politica de seguranca");
+  }
+
+  return parsedUrl.toString();
+}
+
+function summarizeGenericApiResult(data, sourceName) {
+  const records = Array.isArray(data)
+    ? data.slice(0, 30)
+    : Array.isArray(data?.items)
+      ? data.items.slice(0, 30)
+      : Array.isArray(data?.results)
+        ? data.results.slice(0, 30)
+        : Array.isArray(data?.data)
+          ? data.data.slice(0, 30)
+          : data && typeof data === "object"
+            ? [data]
+            : [{ value: data }];
+
+  return {
+    answer: `Consultei ${sourceName} e normalizei uma pre-visualizacao com ${records.length} registro(s). Verifique os campos retornados antes de usar em automacoes criticas.`,
+    records,
+  };
+}
+
+async function listAssistantSources(request) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  let configuredSources = [];
+  if (pool && dbReady) {
+    const result = await pool.query(
+      `SELECT
+         id,
+         name,
+         agency,
+         category,
+         status,
+         access_method AS "accessMethod"
+       FROM audita_api_sources
+       WHERE tenant_id = $1
+         AND status IN ('testing', 'active')
+         AND access_method IN ('api', 'hybrid')
+       ORDER BY name`,
+      [authContext.tenantId],
+    );
+
+    configuredSources = result.rows.map((source) => ({
+      id: `api:${source.id}`,
+      name: source.name,
+      agency: source.agency,
+      category: source.category,
+      status: source.status,
+      accessMethod: source.accessMethod,
+    }));
+  }
+
+  return [...builtinAssistantSources, ...configuredSources];
+}
+
 function summarizeStates(states) {
   const ordered = [...states].sort((a, b) => a.sigla.localeCompare(b.sigla));
   return {
@@ -772,6 +887,163 @@ function summarizeCnae(classes) {
       grupo: item.grupo?.descricao,
     })),
   };
+}
+
+function summarizeCnaeByCode(code, classes) {
+  const normalizedCode = String(code || "").replace(/\D/g, "");
+  const matched = classes.find((item) => String(item.id) === normalizedCode);
+
+  if (!matched) {
+    return {
+      answer: `Nao encontrei a classe CNAE ${code} na lista oficial do IBGE. Confirme se o codigo tem 5 digitos ou consulte sem codigo para ver exemplos.`,
+      records: [],
+    };
+  }
+
+  return {
+    answer: `Encontrei a classe CNAE ${matched.id}: ${matched.descricao}. Grupo: ${matched.grupo?.descricao || "nao informado"}.`,
+    records: [matched],
+  };
+}
+
+async function runBuiltinAssistantSource(sourceId, code, prompt) {
+  const normalizedPrompt = normalizeQuestion(prompt);
+  const normalizedCode = normalizeQuestion(code);
+  const ufFromCode = normalizedCode.match(/^(ac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|sp|se|to)$/);
+  const requestedLimit = Math.min(Number(normalizedPrompt.match(/\b(\d{1,2})\b/)?.[1] || 5), 20);
+  let source = "IBGE Localidades";
+  let endpoint = `${ibgeBaseUrl}/v1/localidades/estados`;
+  let result;
+
+  if (sourceId === "builtin:ibge-populacao") {
+    source = "IBGE SIDRA - Populacao estimada";
+    endpoint = `${ibgeBaseUrl}/v3/agregados/6579/periodos/-1/variaveis/9324?localidades=N6[all]`;
+    result = summarizeLargestMunicipalities(await fetchJson(endpoint), requestedLimit);
+  } else if (sourceId === "builtin:ibge-cnae") {
+    source = "IBGE CNAE";
+    endpoint = `${ibgeBaseUrl}/v2/cnae/classes`;
+    const classes = await fetchJson(endpoint);
+    result = String(code || "").trim() ? summarizeCnaeByCode(code, classes) : summarizeCnae(classes);
+  } else if (ufFromCode) {
+    endpoint = `${ibgeBaseUrl}/v1/localidades/estados/${ufFromCode[1].toUpperCase()}/municipios`;
+    result = summarizeMunicipalities(ufFromCode[1], await fetchJson(endpoint));
+  } else {
+    result = summarizeStates(await fetchJson(endpoint));
+  }
+
+  return {
+    source,
+    endpoint,
+    code,
+    prompt,
+    answer: result.answer,
+    records: result.records,
+  };
+}
+
+async function runConfiguredAssistantSource(request, authContext, numericSourceId, code, prompt) {
+  if (!pool || !dbReady) {
+    return { unavailable: true };
+  }
+
+  const result = await pool.query(
+    `SELECT
+       id,
+       name,
+       agency,
+       base_url AS "baseUrl",
+       access_method AS "accessMethod",
+       auth_type AS "authType",
+       secret_ref AS "secretRef",
+       status
+     FROM audita_api_sources
+     WHERE tenant_id = $1 AND id = $2
+     LIMIT 1`,
+    [authContext.tenantId, numericSourceId],
+  );
+  const source = result.rows[0];
+
+  if (!source || !["testing", "active"].includes(source.status) || !["api", "hybrid"].includes(source.accessMethod)) {
+    return { notFound: true };
+  }
+
+  const endpoint = buildSourceUrl(source.baseUrl, code);
+  const headers = {
+    accept: "application/json",
+    "user-agent": "Audita/0.1 assistant-query",
+  };
+  const secretValue = source.secretRef ? process.env[source.secretRef] : "";
+
+  if (secretValue) {
+    headers.authorization = `Bearer ${secretValue}`;
+    headers["x-api-key"] = secretValue;
+    headers["chave-api-dados"] = secretValue;
+  }
+
+  const response = await fetch(endpoint, { headers });
+  if (!response.ok) {
+    throw new Error(`Fonte retornou HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+  const summary = summarizeGenericApiResult(data, source.name);
+
+  return {
+    source: source.name,
+    endpoint,
+    code,
+    prompt,
+    answer: summary.answer,
+    records: summary.records,
+  };
+}
+
+async function runAssistantQuery(request) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const body = await readJsonBody(request);
+  const sourceId = String(body.sourceId || "").trim();
+  const code = String(body.code || "").trim();
+  const prompt = String(body.prompt || "").trim();
+
+  if (!sourceId || !prompt || prompt.length < 4) {
+    return { invalid: true };
+  }
+
+  let result;
+  if (sourceId.startsWith("builtin:")) {
+    result = await runBuiltinAssistantSource(sourceId, code, prompt);
+  } else if (sourceId.startsWith("api:")) {
+    result = await runConfiguredAssistantSource(request, authContext, Number(sourceId.replace("api:", "")), code, prompt);
+  } else {
+    return { invalid: true };
+  }
+
+  if (result.unavailable || result.notFound) {
+    return result;
+  }
+
+  if (pool && dbReady && authContext.tenantId) {
+    await pool.query(
+      `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+       VALUES ($1, 'assistant.query.executed', $2)`,
+      [
+        authContext.tenantId,
+        JSON.stringify({
+          sourceId,
+          source: result.source,
+          endpoint: result.endpoint,
+          codeProvided: Boolean(code),
+          records: Array.isArray(result.records) ? result.records.length : 0,
+        }),
+      ],
+    );
+  }
+
+  return result;
 }
 
 async function getAgentSettings(request) {
@@ -1107,6 +1379,52 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "api_source_create_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/assistant/sources" && request.method === "GET") {
+    try {
+      const sources = await listAssistantSources(request);
+      if (sources.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, { sources });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "assistant_sources_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/assistant/query" && request.method === "POST") {
+    try {
+      const result = await runAssistantQuery(request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_assistant_query" });
+        return true;
+      }
+      if (result.unavailable) {
+        sendJson(response, 503, { error: "database_unavailable" });
+        return true;
+      }
+      if (result.notFound) {
+        sendJson(response, 404, { error: "assistant_source_not_found" });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "assistant_query_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

@@ -45,6 +45,7 @@
 
         <nav class="nav-list">
           <a class="active" href="#overview">Visao geral</a>
+          <a href="#assistente">Assistente</a>
           <a href="#consultas">Consultas</a>
           <a href="#coletas">Coletas</a>
           <a href="#riscos">Riscos</a>
@@ -122,6 +123,52 @@
             <small>Tempo medio</small>
             <strong>4.8s</strong>
             <span>Analise preliminar</span>
+          </article>
+        </section>
+
+        <section class="assistant-workbench" id="assistente">
+          <article class="module assistant-query-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Assistente Audita</p>
+                <h2>Consultar orgaos por codigo</h2>
+              </div>
+              <span class="live" id="assistantSourceStatus">Fontes oficiais</span>
+            </div>
+
+            <form class="assistant-query-form" id="assistantQueryForm">
+              <label>
+                Orgao ou fonte
+                <select id="assistantSource" required></select>
+              </label>
+              <label>
+                Codigo ou identificador
+                <input
+                  id="assistantCode"
+                  type="text"
+                  placeholder="Ex: SP, 3550308, CNPJ, processo ou codigo da API"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="wide-field">
+                Pergunta
+                <textarea
+                  id="assistantPrompt"
+                  rows="3"
+                  placeholder="Ex: Consulte esse codigo e resuma os principais dados encontrados."
+                  required
+                ></textarea>
+              </label>
+              <button class="primary-action" type="submit">Consultar assistente</button>
+            </form>
+
+            <small class="consultation-note">
+              Para fontes cadastradas, use uma URL com {codigo} quando a API exigir identificador no endpoint.
+            </small>
+
+            <div class="agent-answer assistant-result" id="assistantResult">
+              <p>Selecione uma fonte, informe o codigo quando necessario e descreva a consulta.</p>
+            </div>
           </article>
         </section>
 

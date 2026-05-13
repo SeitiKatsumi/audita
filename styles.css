@@ -523,6 +523,12 @@ h2 {
   margin-bottom: 18px;
 }
 
+.assistant-workbench {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
 .consultation-builder {
   grid-column: 1 / -1;
 }
@@ -535,11 +541,16 @@ h2 {
   grid-column: 1 / -1;
 }
 
-.agent-form {
+.agent-form,
+.assistant-query-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: end;
+}
+
+.assistant-query-form {
+  grid-template-columns: minmax(220px, 0.7fr) minmax(220px, 0.8fr) minmax(320px, 1.4fr) auto;
 }
 
 .agent-settings-form {
@@ -550,7 +561,8 @@ h2 {
 }
 
 .agent-settings-form label,
-.agent-form label {
+.agent-form label,
+.assistant-query-form label {
   display: grid;
   gap: 7px;
   color: #cde7ff;
@@ -560,7 +572,10 @@ h2 {
 .agent-settings-form input,
 .agent-settings-form select,
 .agent-settings-form textarea,
-.agent-form textarea {
+.agent-form textarea,
+.assistant-query-form input,
+.assistant-query-form select,
+.assistant-query-form textarea {
   width: 100%;
   padding: 12px;
   border: 1px solid rgba(73, 169, 255, 0.28);
@@ -574,7 +589,9 @@ h2 {
 }
 
 .agent-settings-form input,
-.agent-settings-form select {
+.agent-settings-form select,
+.assistant-query-form input,
+.assistant-query-form select {
   min-height: 42px;
   padding: 0 12px;
 }
@@ -583,14 +600,18 @@ h2 {
   min-height: 104px;
 }
 
-.agent-form textarea {
+.agent-form textarea,
+.assistant-query-form textarea {
   min-height: 88px;
 }
 
 .agent-settings-form input:focus,
 .agent-settings-form select:focus,
 .agent-settings-form textarea:focus,
-.agent-form textarea:focus {
+.agent-form textarea:focus,
+.assistant-query-form input:focus,
+.assistant-query-form select:focus,
+.assistant-query-form textarea:focus {
   border-color: var(--line-strong);
   box-shadow: 0 0 0 3px rgba(73, 169, 255, 0.14);
 }
@@ -623,6 +644,10 @@ h2 {
   margin: 8px 0 0;
   color: var(--muted);
   line-height: 1.65;
+}
+
+.assistant-result {
+  margin-top: 12px;
 }
 
 .agent-records {
@@ -909,7 +934,8 @@ h2 {
     grid-template-columns: 1fr 1fr;
   }
 
-  .agent-form {
+  .agent-form,
+  .assistant-query-form {
     grid-template-columns: 1fr;
   }
 
@@ -934,6 +960,7 @@ h2 {
   .pipeline,
   .source-form,
   .agent-form,
+  .assistant-query-form,
   .agent-settings-form,
   .consultation-form,
   .integration-grid {

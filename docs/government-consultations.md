@@ -55,8 +55,29 @@ Tambem existe uma primeira versao do Agente Audita em `/api/agent/query`, capaz 
 
 - Localidades: estados e municipios por UF.
 - CNAE: classes de atividades economicas.
+- Populacao estimada: ranking de maiores municipios via SIDRA.
 
 Essa camada nao usa LLM externo ainda; ela interpreta perguntas simples, consulta a fonte oficial e responde de forma humanizada.
+
+## Aba Assistente
+
+A aba **Assistente** permite selecionar uma fonte/orgao e executar uma consulta por codigo/identificador.
+
+Fontes internas disponiveis no MVP:
+
+- `IBGE Localidades`: aceita UF como `SP` para listar municipios, ou sem codigo para listar UFs.
+- `IBGE CNAE`: aceita codigo de classe CNAE, ou sem codigo para listar exemplos.
+- `IBGE Populacao estimada`: usa a pergunta para definir o limite do ranking, por exemplo "liste os 5 maiores municipios".
+
+Fontes cadastradas em **Integracoes de orgaos** tambem aparecem no Assistente quando estiverem com status `testing` ou `active` e acesso `api` ou `hybrid`.
+
+Para APIs que dependem de identificador no endpoint, cadastre a URL usando o placeholder:
+
+```text
+https://api.orgao.gov.br/recurso/{codigo}
+```
+
+Se a URL nao tiver `{codigo}`, o assistente anexa o codigo ao final do endpoint. Por seguranca, URLs locais ou privadas sao bloqueadas para evitar consultas indevidas a servicos internos da VPS.
 
 ## Configuracao OpenAI/ChatGPT
 
