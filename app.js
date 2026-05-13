@@ -60,7 +60,7 @@ let phase = 0;
 
 const pageMeta = {
   overview: {
-    title: "Centro de inteligencia Audita",
+    title: "Centro de inteligência Audita",
     eyebrow: "Plataforma de consulta e auditoria",
   },
   assistente: {
@@ -69,27 +69,27 @@ const pageMeta = {
   },
   consultas: {
     title: "Consultas governamentais",
-    eyebrow: "Registro, catalogo e rastreabilidade",
+    eyebrow: "Registro, catálogo e rastreabilidade",
   },
   coletas: {
-    title: "Coleta e normalizacao",
+    title: "Coleta e normalização",
     eyebrow: "Pipeline de dados oficiais",
   },
   riscos: {
-    title: "Sinais prioritarios",
-    eyebrow: "Auditoria e classificacao de risco",
+    title: "Sinais prioritários",
+    eyebrow: "Auditoria e classificação de risco",
   },
   relatorios: {
-    title: "Relatorios inteligentes",
-    eyebrow: "Resumo executivo e recomendacoes",
+    title: "Relatórios inteligentes",
+    eyebrow: "Resumo executivo e recomendações",
   },
   "integracoes-admin": {
-    title: "Integracoes de orgaos",
-    eyebrow: "Administracao de fontes oficiais",
+    title: "Integrações de órgãos",
+    eyebrow: "Administração de fontes oficiais",
   },
   integracoes: {
     title: "Ecossistema Audita",
-    eyebrow: "Conectores e integracoes previstas",
+    eyebrow: "Conectores e integrações previstas",
   },
 };
 
@@ -191,11 +191,28 @@ function rotateRisk() {
 
 reportButton.addEventListener("click", () => {
   assistantText.textContent =
-    "Relatorio executivo preparado: 9 alertas consolidados, 3 prioridades criticas, 4 fontes verificadas e recomendacao de revisao fiscal imediata antes da aprovacao final.";
+    "Relatório executivo preparado: 9 alertas consolidados, 3 prioridades críticas, 4 fontes verificadas e recomendação de revisão fiscal imediata antes da aprovação final.";
 });
 
 function formatNumber(value) {
   return new Intl.NumberFormat("pt-BR").format(value);
+}
+
+function formatStatusLabel(value) {
+  const labels = {
+    active: "Ativa",
+    draft: "Rascunho",
+    testing: "Teste",
+    paused: "Pausada",
+    pending: "Pendente",
+    ready: "Pronta",
+    failed: "Falhou",
+    completed: "Concluída",
+    planned: "Planejada",
+    sandbox: "Sandbox",
+  };
+
+  return labels[value] || value;
 }
 
 function escapeHtml(value) {
@@ -257,7 +274,7 @@ function renderModules(modules) {
             <strong>${escapeHtml(module.name)}</strong>
             <small>${escapeHtml(module.provider)} | ${escapeHtml(module.accessMethod)}</small>
           </div>
-          <span class="module-status ${escapeHtml(module.status)}">${escapeHtml(module.status)}</span>
+          <span class="module-status ${escapeHtml(module.status)}">${escapeHtml(formatStatusLabel(module.status))}</span>
           <p>${escapeHtml(module.description)}</p>
         </article>
       `,
@@ -279,7 +296,7 @@ function renderConsultations(consultations) {
             <strong>${escapeHtml(consultation.moduleName)}</strong>
             <small>${escapeHtml(consultation.subjectType)} | ${escapeHtml(consultation.subjectIdentifierMasked)}</small>
           </div>
-          <span class="module-status ${escapeHtml(consultation.status)}">${escapeHtml(consultation.status)}</span>
+          <span class="module-status ${escapeHtml(consultation.status)}">${escapeHtml(formatStatusLabel(consultation.status))}</span>
           <p>${escapeHtml(consultation.resultSummary || "Consulta registrada.")}</p>
         </article>
       `,
@@ -301,9 +318,9 @@ function renderSources(sources) {
             <strong>${escapeHtml(source.name)}</strong>
             <small>${escapeHtml(source.agency)} | ${escapeHtml(source.category)} | ${escapeHtml(source.accessMethod)}</small>
           </div>
-          <span class="module-status ${escapeHtml(source.status)}">${escapeHtml(source.status)}</span>
+          <span class="module-status ${escapeHtml(source.status)}">${escapeHtml(formatStatusLabel(source.status))}</span>
           <p>${escapeHtml(source.baseUrl)}</p>
-          <small>Normalizacao: ${escapeHtml(source.normalizationStatus)}${source.secretRef ? " | Secret referenciado" : ""}</small>
+          <small>Normalização: ${escapeHtml(formatStatusLabel(source.normalizationStatus))}${source.secretRef ? " | Secret referenciado" : ""}</small>
         </article>
       `,
     )
@@ -424,7 +441,7 @@ async function loadModules() {
     const data = await response.json();
     renderModules(data.modules || []);
   } catch {
-    moduleList.innerHTML = `<p class="empty-state">Nao foi possivel carregar os modulos.</p>`;
+    moduleList.innerHTML = `<p class="empty-state">Não foi possível carregar os módulos.</p>`;
   }
 }
 
@@ -484,7 +501,7 @@ function renderAgentSettings(settings) {
   agentProviderStatus.value = settings.status || "draft";
   agentSystemPrompt.value =
     settings.systemPrompt ||
-    "Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.";
+    "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.";
   agentSettingsStatus.textContent = settings.configured ? "Secret detectado" : "Aguardando secret";
 }
 
@@ -500,7 +517,7 @@ async function loadAgentSettings() {
     const data = await response.json();
     renderAgentSettings(data.settings);
   } catch {
-    agentSettingsStatus.textContent = "Indisponivel";
+    agentSettingsStatus.textContent = "Indisponível";
   }
 }
 
@@ -521,7 +538,7 @@ function formatEnvironmentName(environment) {
     local: "Local",
     development: "Desenvolvimento",
     staging: "Staging",
-    production: "Producao",
+    production: "Produção",
   };
 
   return names[environment] || environment;
@@ -587,7 +604,7 @@ loginForm.addEventListener("submit", async (event) => {
     await loadAgentSettings();
     await loadAssistantSources();
   } catch {
-    showLogin("Nao foi possivel autenticar agora.");
+    showLogin("Não foi possível autenticar agora.");
   }
 });
 
@@ -613,15 +630,15 @@ sourceForm.addEventListener("submit", async (event) => {
     });
 
     if (response.status === 401) {
-      showLogin("Entre para gerenciar integracoes.");
+      showLogin("Entre para gerenciar integrações.");
       return;
     }
     if (response.status === 403) {
-      sourceError.textContent = "Seu usuario nao tem permissao para gerenciar fontes.";
+      sourceError.textContent = "Seu usuário não tem permissão para gerenciar fontes.";
       return;
     }
     if (!response.ok) {
-      sourceError.textContent = "Nao foi possivel salvar a fonte.";
+      sourceError.textContent = "Não foi possível salvar a fonte.";
       return;
     }
 
@@ -654,11 +671,11 @@ agentSettingsForm.addEventListener("submit", async (event) => {
       return;
     }
     if (response.status === 403) {
-      agentSettingsError.textContent = "Seu usuario nao tem permissao para configurar a IA.";
+      agentSettingsError.textContent = "Seu usuário não tem permissão para configurar a IA.";
       return;
     }
     if (!response.ok) {
-      agentSettingsError.textContent = "Nao foi possivel salvar a configuracao.";
+      agentSettingsError.textContent = "Não foi possível salvar a configuração.";
       return;
     }
 
@@ -693,7 +710,7 @@ agentForm.addEventListener("submit", async (event) => {
     }
 
     if (!response.ok) {
-      agentAnswer.innerHTML = `<p>Nao consegui consultar essa fonte agora. Tente outra pergunta.</p>`;
+      agentAnswer.innerHTML = `<p>Não consegui consultar essa fonte agora. Tente outra pergunta.</p>`;
       return;
     }
 
@@ -705,6 +722,15 @@ agentForm.addEventListener("submit", async (event) => {
 
 assistantQueryForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const prompt = assistantPrompt.value.trim();
+  const code = assistantCode.value.trim();
+
+  if (!prompt) {
+    assistantResult.innerHTML = `<p>Digite a pergunta para orientar a consulta.</p>`;
+    assistantPrompt.focus();
+    return;
+  }
+
   assistantResult.innerHTML = `<p>Consultando a fonte selecionada...</p>`;
 
   try {
@@ -713,8 +739,8 @@ assistantQueryForm.addEventListener("submit", async (event) => {
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
         sourceId: assistantSource.value,
-        code: assistantCode.value,
-        prompt: assistantPrompt.value,
+        code,
+        prompt,
       }),
     });
 
@@ -724,7 +750,7 @@ assistantQueryForm.addEventListener("submit", async (event) => {
     }
 
     if (!response.ok) {
-      assistantResult.innerHTML = `<p>Nao consegui concluir essa consulta. Verifique a fonte, o codigo e as credenciais.</p>`;
+      assistantResult.innerHTML = `<p>Não consegui concluir essa consulta. Verifique a fonte, o código e as credenciais.</p>`;
       return;
     }
 
@@ -755,7 +781,7 @@ consultationForm.addEventListener("submit", async (event) => {
     }
 
     if (!response.ok) {
-      consultationError.textContent = "Nao foi possivel registrar a consulta.";
+      consultationError.textContent = "Não foi possível registrar a consulta.";
       return;
     }
 
@@ -768,7 +794,7 @@ consultationForm.addEventListener("submit", async (event) => {
 
 logoutButton.addEventListener("click", async () => {
   await fetch("/api/auth/logout", { method: "POST" });
-  showLogin("Sessao encerrada.");
+  showLogin("Sessão encerrada.");
 });
 
 newQueryButton.addEventListener("click", () => {

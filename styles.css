@@ -228,9 +228,9 @@ a {
 
 .brand-logo {
   display: block;
-  width: 54px;
+  width: 56px;
   height: 44px;
-  padding: 7px;
+  padding: 6px 8px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   object-fit: contain;
@@ -391,14 +391,14 @@ h2 {
 .panel-copy {
   position: relative;
   z-index: 1;
-  max-width: 620px;
-  padding: 28px;
+  max-width: 520px;
+  padding: 24px;
 }
 
 .panel-copy h2 {
-  max-width: 12ch;
-  font-size: clamp(2rem, 4vw, 4.25rem);
-  line-height: 0.98;
+  max-width: 22ch;
+  font-size: clamp(1.45rem, 2vw, 2.15rem);
+  line-height: 1.12;
 }
 
 .panel-copy p {

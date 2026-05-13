@@ -4,19 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
-    <link rel="icon" href="assets/audita-logo-white.png" type="image/png" />
+    <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
       <form class="login-panel" id="loginForm">
         <div class="login-logo-frame">
-          <img src="assets/audita-logo-white.png" alt="Audita" />
+          <img src="assets/audita-logo-white.svg" alt="Audita" />
         </div>
         <div class="login-heading">
           <p class="eyebrow">Acesso seguro</p>
           <h1>Audita</h1>
-          <p>Entre para acessar o ambiente de auditoria da sua organizacao.</p>
+          <p>Entre para acessar o ambiente de auditoria da sua organização.</p>
         </div>
 
         <label>
@@ -35,9 +35,9 @@
     </section>
 
     <div class="shell">
-      <aside class="sidebar" aria-label="Navegacao principal">
+      <aside class="sidebar" aria-label="Navegação principal">
         <div class="brand">
-          <img class="brand-logo" src="assets/audita-logo-white.png" alt="Audita" />
+          <img class="brand-logo" src="assets/audita-logo-white.svg" alt="Audita" />
           <div>
             <strong>Audita</strong>
             <small>Elevenmind</small>
@@ -45,13 +45,13 @@
         </div>
 
         <nav class="nav-list">
-          <a class="active" href="#overview">Visao geral</a>
+          <a class="active" href="#overview">Visão geral</a>
           <a href="#assistente">Assistente</a>
           <a href="#consultas">Consultas</a>
           <a href="#coletas">Coletas</a>
           <a href="#riscos">Riscos</a>
-          <a href="#relatorios">Relatorios</a>
-          <a href="#integracoes-admin">Integracoes de orgaos</a>
+          <a href="#relatorios">Relatórios</a>
+          <a href="#integracoes-admin">Integrações de órgãos</a>
           <a href="#integracoes">Ecossistema</a>
         </nav>
 
@@ -68,7 +68,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow" id="pageEyebrow">Plataforma de consulta e auditoria</p>
-            <h1 id="pageTitle">Centro de inteligencia Audita</h1>
+            <h1 id="pageTitle">Centro de inteligência Audita</h1>
           </div>
         <div class="actions">
             <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
@@ -83,11 +83,11 @@
               <span class="status-chip">IA ativa</span>
               <h2>Dados Governamentais Brutos transformados em Intelig&ecirc;ncia Competitiva, Contexto e A&ccedil;&otilde;es efetivas</h2>
               <p>
-                A Audita centraliza fontes judiciais, fiscais, imobiliarias e APIs para
-                gerar explicacoes claras, alertas e relatorios acionaveis.
+                A Audita centraliza fontes judiciais, fiscais, imobiliárias e APIs para
+                gerar explicações claras, alertas e relatórios acionáveis.
               </p>
             </div>
-            <canvas id="signalCanvas" width="760" height="360" aria-label="Visualizacao de sinais analiticos"></canvas>
+            <canvas id="signalCanvas" width="760" height="360" aria-label="Visualização de sinais analíticos"></canvas>
           </article>
 
           <article class="risk-card">
@@ -113,17 +113,17 @@
           <article>
             <small>Fontes conectadas</small>
             <strong>37</strong>
-            <span>Judicial, fiscal, imoveis e APIs</span>
+            <span>Judicial, fiscal, imóveis e APIs</span>
           </article>
           <article>
-            <small>Alertas criticos</small>
+            <small>Alertas críticos</small>
             <strong>9</strong>
-            <span>3 exigem revisao humana</span>
+            <span>3 exigem revisão humana</span>
           </article>
           <article>
-            <small>Tempo medio</small>
+            <small>Tempo médio</small>
             <strong>4.8s</strong>
-            <span>Analise preliminar</span>
+            <span>Análise preliminar</span>
           </article>
         </section>
 
@@ -132,22 +132,22 @@
             <div class="module-header">
               <div>
                 <p class="eyebrow">Assistente Audita</p>
-                <h2>Consultar orgaos por codigo</h2>
+                <h2>Consultar órgãos por código</h2>
               </div>
               <span class="live" id="assistantSourceStatus">Fontes oficiais</span>
             </div>
 
             <form class="assistant-query-form" id="assistantQueryForm">
               <label>
-                Orgao ou fonte
+                Órgão ou fonte
                 <select id="assistantSource" required></select>
               </label>
               <label>
-                Codigo ou identificador
+                Código ou identificador
                 <input
                   id="assistantCode"
                   type="text"
-                  placeholder="Ex: SP, 3550308, CNPJ, processo ou codigo da API"
+                  placeholder="Ex: SP, 3550308, CNPJ, processo ou código da API"
                   autocomplete="off"
                 />
               </label>
@@ -156,7 +156,7 @@
                 <textarea
                   id="assistantPrompt"
                   rows="3"
-                  placeholder="Ex: Consulte esse codigo e resuma os principais dados encontrados."
+                  placeholder="Ex: Consulte esse código e resuma os principais dados encontrados."
                   required
                 ></textarea>
               </label>
@@ -168,7 +168,7 @@
             </small>
 
             <div class="agent-answer assistant-result" id="assistantResult">
-              <p>Selecione uma fonte, informe o codigo quando necessario e descreva a consulta.</p>
+              <p>Selecione uma fonte, informe o código quando necessário e descreva a consulta.</p>
             </div>
           </article>
         </section>
@@ -189,7 +189,7 @@
                 <textarea
                   id="agentQuestion"
                   rows="3"
-                  placeholder="Ex: Liste os estados do Brasil pelo IBGE ou Quais municipios existem em SP?"
+                  placeholder="Ex: Liste os estados do Brasil pelo IBGE ou Quais municípios existem em SP?"
                   required
                 ></textarea>
               </label>
@@ -198,12 +198,12 @@
 
             <div class="prompt-suggestions">
               <button type="button" data-question="Liste os estados do Brasil pela base do IBGE.">Estados do Brasil</button>
-              <button type="button" data-question="Quais municipios existem em SP segundo o IBGE?">Municipios de SP</button>
+              <button type="button" data-question="Quais municípios existem em SP segundo o IBGE?">Municípios de SP</button>
               <button type="button" data-question="Mostre exemplos de classes CNAE do IBGE.">Classes CNAE</button>
             </div>
 
             <div class="agent-answer" id="agentAnswer">
-              <p>Faca uma pergunta em linguagem natural. Eu busco na fonte oficial disponivel e resumo o resultado.</p>
+              <p>Faça uma pergunta em linguagem natural. Eu busco na fonte oficial disponível e resumo o resultado.</p>
             </div>
           </article>
 
@@ -213,7 +213,7 @@
                 <p class="eyebrow">IA generativa</p>
                 <h2>API ChatGPT/OpenAI</h2>
               </div>
-              <span class="live" id="agentSettingsStatus">Nao configurada</span>
+              <span class="live" id="agentSettingsStatus">Não configurada</span>
             </div>
 
             <form class="agent-settings-form" id="agentSettingsForm">
@@ -236,13 +236,13 @@
               </label>
               <label class="wide-field">
                 Prompt base do agente
-                <textarea id="agentSystemPrompt" rows="4" required>Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.</textarea>
+                <textarea id="agentSystemPrompt" rows="4" required>Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.</textarea>
               </label>
-              <button class="primary-action" type="submit">Salvar configuracao</button>
+              <button class="primary-action" type="submit">Salvar configuração</button>
             </form>
 
             <small class="consultation-note">
-              A chave real deve ficar no CapRover como variavel/secret. Aqui salve apenas o nome da variavel.
+              A chave real deve ficar no CapRover como variável/secret. Aqui salve apenas o nome da variável.
             </small>
             <small class="login-error" id="agentSettingsError" role="alert"></small>
           </article>
@@ -253,12 +253,12 @@
                 <p class="eyebrow">Fontes oficiais</p>
                 <h2>Consultas governamentais</h2>
               </div>
-              <span class="live">API ready</span>
+              <span class="live">API pronta</span>
             </div>
 
             <form class="consultation-form" id="consultationForm">
               <label>
-                Modulo
+                Módulo
                 <select id="consultationModule" required></select>
               </label>
               <label>
@@ -267,7 +267,7 @@
                   <option value="cnpj">CNPJ</option>
                   <option value="cpf">CPF</option>
                   <option value="processo">Processo</option>
-                  <option value="imovel">Imovel</option>
+                  <option value="imovel">Imóvel</option>
                 </select>
               </label>
               <label>
@@ -278,7 +278,7 @@
             </form>
 
             <small class="consultation-note">
-              Identificadores sao mascarados e armazenados como hash para rastreabilidade.
+              Identificadores são mascarados e armazenados como hash para rastreabilidade.
             </small>
             <small class="login-error" id="consultationError" role="alert"></small>
           </article>
@@ -286,8 +286,8 @@
           <article class="module">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Catalogo</p>
-                <h2>Modulos previstos</h2>
+                <p class="eyebrow">Catálogo</p>
+                <h2>Módulos previstos</h2>
               </div>
             </div>
             <div class="module-list" id="moduleList"></div>
@@ -308,10 +308,10 @@
           <article class="module integration-form-card">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Administracao</p>
-                <h2>Integracoes de orgaos</h2>
+                <p class="eyebrow">Administração</p>
+                <h2>Integrações de órgãos</h2>
               </div>
-              <span class="live">Fontes configuraveis</span>
+              <span class="live">Fontes configuráveis</span>
             </div>
 
             <form class="source-form" id="sourceForm">
@@ -320,7 +320,7 @@
                 <input id="sourceName" type="text" placeholder="Ex: Receita Federal CNPJ" required />
               </label>
               <label>
-                Orgao
+                Órgão
                 <input id="sourceAgency" type="text" placeholder="Ex: Receita Federal" required />
               </label>
               <label>
@@ -328,8 +328,8 @@
                 <select id="sourceCategory" required>
                   <option value="fiscal">Fiscal</option>
                   <option value="judicial">Judicial</option>
-                  <option value="imobiliario">Imobiliario</option>
-                  <option value="juridico">Juridico</option>
+                  <option value="imobiliario">Imobiliário</option>
+                  <option value="juridico">Jurídico</option>
                   <option value="compliance">Compliance</option>
                 </select>
               </label>
@@ -341,22 +341,22 @@
                 Acesso
                 <select id="sourceAccessMethod">
                   <option value="api">API</option>
-                  <option value="hybrid">Hibrido</option>
+                  <option value="hybrid">Híbrido</option>
                   <option value="scraping">Coleta controlada</option>
                   <option value="manual">Manual</option>
                 </select>
               </label>
               <label>
-                Autenticacao
+                Autenticação
                 <select id="sourceAuthType">
-                  <option value="none">Sem autenticacao</option>
+                  <option value="none">Sem autenticação</option>
                   <option value="token">Token</option>
                   <option value="certificate_or_token">Certificado ou token</option>
                   <option value="credential">Credencial</option>
                 </select>
               </label>
               <label>
-                Referencia do secret
+                Referência do secret
                 <input id="sourceSecretRef" type="text" placeholder="Ex: CAPROVER_SECRET_RECEITA_TOKEN" />
               </label>
               <label>
@@ -369,13 +369,13 @@
                 </select>
               </label>
               <label class="wide-field">
-                Observacoes de normalizacao
-                <textarea id="sourceSchemaNotes" rows="3" placeholder="Campos esperados, formato de resposta, regras de normalizacao"></textarea>
+                Observações de normalização
+                <textarea id="sourceSchemaNotes" rows="3" placeholder="Campos esperados, formato de resposta, regras de normalização"></textarea>
               </label>
               <button class="primary-action" type="submit">Salvar fonte</button>
             </form>
             <small class="consultation-note">
-              Guarde tokens e certificados no CapRover/secrets. Aqui salve apenas a referencia do secret.
+              Guarde tokens e certificados no CapRover/secrets. Aqui salve apenas a referência do secret.
             </small>
             <small class="login-error" id="sourceError" role="alert"></small>
           </article>
@@ -383,7 +383,7 @@
           <article class="module">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Normalizacao</p>
+                <p class="eyebrow">Normalização</p>
                 <h2>Fontes cadastradas</h2>
               </div>
             </div>
@@ -396,7 +396,7 @@
             <div class="module-header">
               <div>
                 <p class="eyebrow">Pipeline</p>
-                <h2>Coleta e normalizacao</h2>
+                <h2>Coleta e normalização</h2>
               </div>
               <span class="live">Tempo real</span>
             </div>
@@ -408,17 +408,17 @@
               </div>
               <div>
                 <span>02</span>
-                <strong>Normalizacao</strong>
+                <strong>Normalização</strong>
                 <small>JSON padronizado</small>
               </div>
               <div>
                 <span>03</span>
-                <strong>Analise IA</strong>
-                <small>Riscos e recomendacoes</small>
+                <strong>Análise IA</strong>
+                <small>Riscos e recomendações</small>
               </div>
               <div>
                 <span>04</span>
-                <strong>Relatorio</strong>
+                <strong>Relatório</strong>
                 <small>Entrega web e WhatsApp</small>
               </div>
             </div>
@@ -428,29 +428,29 @@
             <div class="module-header">
               <div>
                 <p class="eyebrow">Auditoria</p>
-                <h2>Sinais prioritarios</h2>
+                <h2>Sinais prioritários</h2>
               </div>
             </div>
             <ul class="signal-list">
               <li>
                 <span class="severity high"></span>
                 <div>
-                  <strong>Inconsistencia fiscal recorrente</strong>
+                  <strong>Inconsistência fiscal recorrente</strong>
                   <small>Cliente ACME | 2 fontes divergentes</small>
                 </div>
               </li>
               <li>
                 <span class="severity medium"></span>
                 <div>
-                  <strong>Processo judicial com mudanca recente</strong>
-                  <small>Atualizacao detectada ha 14 minutos</small>
+                  <strong>Processo judicial com mudança recente</strong>
+                  <small>Atualização detectada há 14 minutos</small>
                 </div>
               </li>
               <li>
                 <span class="severity low"></span>
                 <div>
-                  <strong>Imovel com pendencia documental</strong>
-                  <small>Recomendacao pronta para revisao</small>
+                  <strong>Imóvel com pendência documental</strong>
+                  <small>Recomendação pronta para revisão</small>
                 </div>
               </li>
             </ul>
@@ -464,18 +464,18 @@
               </div>
             </div>
             <p id="assistantText">
-              Foram encontrados sinais relevantes em 3 fontes. A recomendacao e
-              priorizar a divergencia fiscal, validar documentos do imovel e gerar
-              relatorio executivo para aprovacao.
+              Foram encontrados sinais relevantes em 3 fontes. A recomendação é
+              priorizar a divergência fiscal, validar documentos do imóvel e gerar
+              relatório executivo para aprovação.
             </p>
-            <button class="secondary-action" id="generateReport">Gerar relatorio</button>
+            <button class="secondary-action" id="generateReport">Gerar relatório</button>
           </article>
 
           <article class="module" id="integracoes" data-page="integracoes">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Ecossistema</p>
-                <h2>Integracoes previstas</h2>
+                <h2>Integrações previstas</h2>
               </div>
             </div>
             <div class="integration-grid">

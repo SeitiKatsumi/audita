@@ -24,6 +24,7 @@ const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".png": "image/png",
+  ".svg": "image/svg+xml",
 };
 
 const fallbackDashboard = {
@@ -36,23 +37,23 @@ const fallbackDashboard = {
   },
   signals: [
     {
-      title: "Inconsistencia fiscal recorrente",
+      title: "Inconsistência fiscal recorrente",
       description: "Cliente ACME | 2 fontes divergentes",
       severity: "high",
     },
     {
-      title: "Processo judicial com mudanca recente",
-      description: "Atualizacao detectada ha 14 minutos",
+      title: "Processo judicial com mudança recente",
+      description: "Atualização detectada há 14 minutos",
       severity: "medium",
     },
     {
-      title: "Imovel com pendencia documental",
-      description: "Recomendacao pronta para revisao",
+      title: "Imóvel com pendência documental",
+      description: "Recomendação pronta para revisão",
       severity: "low",
     },
   ],
   assistantSummary:
-    "Foram encontrados sinais relevantes em 3 fontes. A recomendacao e priorizar a divergencia fiscal, validar documentos do imovel e gerar relatorio executivo para aprovacao.",
+    "Foram encontrados sinais relevantes em 3 fontes. A recomendação é priorizar a divergência fiscal, validar documentos do imóvel e gerar relatório executivo para aprovação.",
 };
 
 const fallbackGovernmentModules = [
@@ -64,7 +65,7 @@ const fallbackGovernmentModules = [
     accessMethod: "api",
     authType: "certificate_or_token",
     status: "planned",
-    description: "Consulta cadastral e fiscal de pessoa juridica quando houver credencial autorizada.",
+    description: "Consulta cadastral e fiscal de pessoa jurídica quando houver credencial autorizada.",
   },
   {
     slug: "cnj-processos",
@@ -78,13 +79,13 @@ const fallbackGovernmentModules = [
   },
   {
     slug: "diarios-oficiais",
-    name: "Diarios Oficiais",
+    name: "Diários Oficiais",
     category: "juridico",
     provider: "Fontes oficiais",
     accessMethod: "scraping",
     authType: "none",
     status: "sandbox",
-    description: "Monitoramento de publicacoes oficiais e mencoes relevantes.",
+    description: "Monitoramento de publicações oficiais e menções relevantes.",
   },
 ];
 
@@ -96,7 +97,7 @@ const builtinAssistantSources = [
     agency: "IBGE",
     category: "demografico",
     status: "active",
-    description: "Estados e municipios por UF/codigo oficial.",
+    description: "Estados e municípios por UF/código oficial.",
   },
   {
     id: "builtin:ibge-cnae",
@@ -104,15 +105,15 @@ const builtinAssistantSources = [
     agency: "IBGE",
     category: "economico",
     status: "active",
-    description: "Classes CNAE e atividades economicas.",
+    description: "Classes CNAE e atividades econômicas.",
   },
   {
     id: "builtin:ibge-populacao",
-    name: "IBGE Populacao estimada",
+    name: "IBGE População estimada",
     agency: "IBGE/SIDRA",
     category: "demografico",
     status: "active",
-    description: "Ranking populacional de municipios.",
+    description: "Ranking populacional de municípios.",
   },
 ];
 
@@ -504,7 +505,7 @@ async function createConsultation(request) {
   const simulatedSummary =
     module.status === "active"
       ? `Consulta registrada para ${module.name}.`
-      : `Modulo ${module.name} esta em preparacao; consulta registrada para rastreabilidade.`;
+      : `Módulo ${module.name} está em preparação; consulta registrada para rastreabilidade.`;
 
   const result = await pool.query(
     `INSERT INTO audita_consultation_requests (
@@ -772,7 +773,7 @@ function summarizeGenericApiResult(data, sourceName) {
             : [{ value: data }];
 
   return {
-    answer: `Consultei ${sourceName} e normalizei uma pre-visualizacao com ${records.length} registro(s). Verifique os campos retornados antes de usar em automacoes criticas.`,
+    answer: `Consultei ${sourceName} e normalizei uma pré-visualização com ${records.length} registro(s). Verifique os campos retornados antes de usar em automações críticas.`,
     records,
   };
 }
@@ -817,10 +818,10 @@ async function listAssistantSources(request) {
 function summarizeStates(states) {
   const ordered = [...states].sort((a, b) => a.sigla.localeCompare(b.sigla));
   return {
-    answer: `Encontrei ${ordered.length} UFs na base aberta do IBGE. As primeiras para conferencia sao ${ordered
+    answer: `Encontrei ${ordered.length} UFs na base aberta do IBGE. As primeiras para conferência são ${ordered
       .slice(0, 8)
       .map((state) => `${state.sigla} (${state.nome})`)
-      .join(", ")}. Posso detalhar por regiao ou buscar municipios de uma UF especifica.`,
+      .join(", ")}. Posso detalhar por região ou buscar municípios de uma UF específica.`,
     records: ordered.map((state) => ({
       id: state.id,
       nome: state.nome,
@@ -833,7 +834,7 @@ function summarizeStates(states) {
 function summarizeMunicipalities(uf, municipalities) {
   const ordered = [...municipalities].sort((a, b) => a.nome.localeCompare(b.nome));
   return {
-    answer: `Localizei ${ordered.length} municipios para ${uf.toUpperCase()} na base oficial do IBGE. Alguns exemplos: ${ordered
+    answer: `Localizei ${ordered.length} municípios para ${uf.toUpperCase()} na base oficial do IBGE. Alguns exemplos: ${ordered
       .slice(0, 10)
       .map((city) => city.nome)
       .join(", ")}.`,
@@ -846,13 +847,13 @@ function summarizeMunicipalities(uf, municipalities) {
   };
 }
 
-function summarizeLargestMunicipalities(apiResult, requestedLimit) {
+function extractPopulationSeries(apiResult) {
   const series = apiResult?.[0]?.resultados?.[0]?.series || [];
   const period =
     series[0]?.serie && Object.keys(series[0].serie).length
       ? Object.keys(series[0].serie)[0]
       : "periodo mais recente";
-  const ranked = series
+  const municipalities = series
     .map((item) => {
       const population = Number(String(item.serie?.[period] || "0").replace(/\D/g, ""));
       const [name, uf] = String(item.localidade?.nome || "").split(" - ");
@@ -863,21 +864,107 @@ function summarizeLargestMunicipalities(apiResult, requestedLimit) {
         populacao: population,
       };
     })
-    .filter((item) => item.populacao > 0)
+    .filter((item) => item.populacao > 0);
+
+  return { period, municipalities };
+}
+
+function summarizeLargestMunicipalities(apiResult, requestedLimit) {
+  const { period, municipalities } = extractPopulationSeries(apiResult);
+  const ranked = municipalities
     .sort((a, b) => b.populacao - a.populacao)
     .slice(0, requestedLimit);
 
   return {
-    answer: `Interpretei "maiores" como maior populacao estimada. Segundo a tabela 6579 do IBGE/SIDRA (${period}), os ${ranked.length} maiores municipios sao ${ranked
+    answer: `Interpretei "maiores" como maior população estimada. Segundo a tabela 6579 do IBGE/SIDRA (${period}), os ${ranked.length} maiores municípios são ${ranked
       .map((city, index) => `${index + 1}. ${city.nome}/${city.uf} (${city.populacao.toLocaleString("pt-BR")} habitantes)`)
       .join("; ")}.`,
     records: ranked,
   };
 }
 
+function summarizeSmallestMunicipalities(apiResult, requestedLimit) {
+  const { period, municipalities } = extractPopulationSeries(apiResult);
+  const ranked = municipalities
+    .filter((city) => city.populacao > 0)
+    .sort((a, b) => a.populacao - b.populacao)
+    .slice(0, requestedLimit);
+
+  return {
+    answer: `Interpretei a pergunta como ranking de menor população estimada. Segundo a tabela 6579 do IBGE/SIDRA (${period}), os ${ranked.length} menores municípios são ${ranked
+      .map((city, index) => `${index + 1}. ${city.nome}/${city.uf} (${city.populacao.toLocaleString("pt-BR")} habitantes)`)
+      .join("; ")}.`,
+    records: ranked,
+  };
+}
+
+function summarizeMunicipalityPopulation(apiResult, code, prompt) {
+  const { period, municipalities } = extractPopulationSeries(apiResult);
+  const normalizedCode = normalizeQuestion(code);
+  const normalizedPrompt = normalizeQuestion(prompt);
+  const numericCode = String(code || "").replace(/\D/g, "");
+  const candidates = municipalities.filter((city) => {
+    const normalizedName = normalizeQuestion(city.nome);
+    const normalizedUf = normalizeQuestion(city.uf);
+    const cityWithUf = `${normalizedName} ${normalizedUf}`;
+    return (
+      (numericCode && String(city.id) === numericCode) ||
+      (normalizedCode && (normalizedName === normalizedCode || cityWithUf === normalizedCode)) ||
+      (normalizedPrompt && normalizedName.length >= 4 && normalizedPrompt.includes(normalizedName))
+    );
+  });
+
+  if (!candidates.length) {
+    return {
+      answer:
+        "A pergunta foi considerada, mas não encontrei um município específico nela. Informe o nome do município, UF ou código IBGE, ou pergunte explicitamente por um ranking como '5 maiores municípios'.",
+      records: [],
+    };
+  }
+
+  const selected = candidates.sort((a, b) => b.populacao - a.populacao)[0];
+  return {
+    answer: `Segundo a tabela 6579 do IBGE/SIDRA (${period}), ${selected.nome}/${selected.uf} tem população estimada de ${selected.populacao.toLocaleString("pt-BR")} habitantes.`,
+    records: [selected],
+  };
+}
+
+function summarizePopulationByPrompt(apiResult, code, prompt) {
+  const normalizedPrompt = normalizeQuestion(prompt);
+  const requestedLimit = Math.min(Number(normalizedPrompt.match(/\b(\d{1,2})\b/)?.[1] || 5), 20);
+  const asksRanking =
+    normalizedPrompt.includes("maior") ||
+    normalizedPrompt.includes("ranking") ||
+    normalizedPrompt.includes("top") ||
+    normalizedPrompt.includes("menor");
+  const asksMunicipality =
+    normalizedPrompt.includes("municip") ||
+    normalizedPrompt.includes("cidade") ||
+    normalizedPrompt.includes("popul") ||
+    String(code || "").trim();
+
+  if (normalizedPrompt.includes("menor")) {
+    return summarizeSmallestMunicipalities(apiResult, requestedLimit);
+  }
+
+  if (asksRanking && (normalizedPrompt.includes("maior") || normalizedPrompt.includes("ranking") || normalizedPrompt.includes("top"))) {
+    return summarizeLargestMunicipalities(apiResult, requestedLimit);
+  }
+
+  if (asksMunicipality) {
+    return summarizeMunicipalityPopulation(apiResult, code, prompt);
+  }
+
+  return {
+    answer:
+      "A pergunta foi considerada, mas precisa ser mais específica para esta fonte. Exemplos: 'Quais os 5 maiores municípios do Brasil?' ou 'Qual a população de Salvador?'.",
+    records: [],
+  };
+}
+
 function summarizeCnae(classes) {
   return {
-    answer: `Consultei a classificacao CNAE do IBGE e encontrei ${classes.length} classes. Exemplos: ${classes
+    answer: `Consultei a classificação CNAE do IBGE e encontrei ${classes.length} classes. Exemplos: ${classes
       .slice(0, 6)
       .map((item) => `${item.id} - ${item.descricao}`)
       .join("; ")}.`,
@@ -895,14 +982,43 @@ function summarizeCnaeByCode(code, classes) {
 
   if (!matched) {
     return {
-      answer: `Nao encontrei a classe CNAE ${code} na lista oficial do IBGE. Confirme se o codigo tem 5 digitos ou consulte sem codigo para ver exemplos.`,
+      answer: `Não encontrei a classe CNAE ${code} na lista oficial do IBGE. Confirme se o código tem 5 digitos ou consulte sem código para ver exemplos.`,
       records: [],
     };
   }
 
   return {
-    answer: `Encontrei a classe CNAE ${matched.id}: ${matched.descricao}. Grupo: ${matched.grupo?.descricao || "nao informado"}.`,
+    answer: `Encontrei a classe CNAE ${matched.id}: ${matched.descricao}. Grupo: ${matched.grupo?.descricao || "não informado"}.`,
     records: [matched],
+  };
+}
+
+function summarizeCnaeByPrompt(code, prompt, classes) {
+  const normalizedCode = String(code || prompt || "").replace(/\D/g, "");
+  if (normalizedCode.length >= 4) {
+    return summarizeCnaeByCode(normalizedCode, classes);
+  }
+
+  const terms = normalizeQuestion(`${code} ${prompt}`)
+    .split(/\s+/)
+    .filter((term) => term.length >= 4 && !["qual", "quais", "sobre", "classe", "cnae", "atividade"].includes(term));
+  const matches = classes
+    .filter((item) => {
+      const description = normalizeQuestion(item.descricao);
+      return terms.length && terms.some((term) => description.includes(term));
+    })
+    .slice(0, 12);
+
+  if (!matches.length) {
+    return summarizeCnae(classes);
+  }
+
+  return {
+    answer: `Considerei sua pergunta e encontrei ${matches.length} classe(s) CNAE relacionada(s) aos termos informados. Principais resultados: ${matches
+      .slice(0, 6)
+      .map((item) => `${item.id} - ${item.descricao}`)
+      .join("; ")}.`,
+    records: matches,
   };
 }
 
@@ -910,23 +1026,24 @@ async function runBuiltinAssistantSource(sourceId, code, prompt) {
   const normalizedPrompt = normalizeQuestion(prompt);
   const normalizedCode = normalizeQuestion(code);
   const ufFromCode = normalizedCode.match(/^(ac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|sp|se|to)$/);
-  const requestedLimit = Math.min(Number(normalizedPrompt.match(/\b(\d{1,2})\b/)?.[1] || 5), 20);
+  const ufFromPrompt = normalizedPrompt.match(/\b(ac|al|ap|am|ba|ce|df|es|go|ma|mt|ms|mg|pa|pb|pr|pe|pi|rj|rn|rs|ro|rr|sc|sp|se|to)\b/);
+  const ufMatch = ufFromCode || ufFromPrompt;
   let source = "IBGE Localidades";
   let endpoint = `${ibgeBaseUrl}/v1/localidades/estados`;
   let result;
 
   if (sourceId === "builtin:ibge-populacao") {
-    source = "IBGE SIDRA - Populacao estimada";
+    source = "IBGE SIDRA - População estimada";
     endpoint = `${ibgeBaseUrl}/v3/agregados/6579/periodos/-1/variaveis/9324?localidades=N6[all]`;
-    result = summarizeLargestMunicipalities(await fetchJson(endpoint), requestedLimit);
+    result = summarizePopulationByPrompt(await fetchJson(endpoint), code, prompt);
   } else if (sourceId === "builtin:ibge-cnae") {
     source = "IBGE CNAE";
     endpoint = `${ibgeBaseUrl}/v2/cnae/classes`;
     const classes = await fetchJson(endpoint);
-    result = String(code || "").trim() ? summarizeCnaeByCode(code, classes) : summarizeCnae(classes);
-  } else if (ufFromCode) {
-    endpoint = `${ibgeBaseUrl}/v1/localidades/estados/${ufFromCode[1].toUpperCase()}/municipios`;
-    result = summarizeMunicipalities(ufFromCode[1], await fetchJson(endpoint));
+    result = summarizeCnaeByPrompt(code, prompt, classes);
+  } else if ((normalizedPrompt.includes("municip") || normalizedPrompt.includes("cidade") || normalizedCode) && ufMatch) {
+    endpoint = `${ibgeBaseUrl}/v1/localidades/estados/${ufMatch[1].toUpperCase()}/municipios`;
+    result = summarizeMunicipalities(ufMatch[1], await fetchJson(endpoint));
   } else {
     result = summarizeStates(await fetchJson(endpoint));
   }
@@ -1053,7 +1170,7 @@ async function getAgentSettings(request) {
       model: "gpt-5-mini",
       apiKeySecretRef: "OPENAI_API_KEY",
       systemPrompt:
-        "Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
+        "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
       status: "draft",
       configured: Boolean(process.env.OPENAI_API_KEY),
     };
@@ -1084,7 +1201,7 @@ async function getAgentSettings(request) {
       model: "gpt-5-mini",
       apiKeySecretRef: "OPENAI_API_KEY",
       systemPrompt:
-        "Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
+        "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
       status: "draft",
       updatedAt: null,
     };
@@ -1196,7 +1313,7 @@ async function runAuditaAgent(request) {
     (normalized.includes("municip") || normalized.includes("cidade")) &&
     (normalized.includes("popul") || normalized.includes("brasil") || normalized.includes("habitante"))
   ) {
-    source = "IBGE SIDRA - Populacao estimada";
+    source = "IBGE SIDRA - População estimada";
     endpoint = `${ibgeBaseUrl}/v3/agregados/6579/periodos/-1/variaveis/9324?localidades=N6[all]`;
     result = summarizeLargestMunicipalities(await fetchJson(endpoint), requestedLimit);
   } else if (normalized.includes("cnae") || normalized.includes("atividade economica")) {
