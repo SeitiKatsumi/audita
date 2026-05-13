@@ -226,16 +226,17 @@ a {
   margin-bottom: 42px;
 }
 
-.brand-mark {
-  display: grid;
+.brand-logo {
+  display: block;
   width: 44px;
   height: 44px;
-  place-items: center;
+  padding: 8px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  color: var(--bg);
-  font-weight: 900;
-  background: linear-gradient(135deg, var(--aqua), var(--teal) 52%, var(--blue));
+  object-fit: contain;
+  background:
+    radial-gradient(circle at 45% 15%, rgba(143, 215, 255, 0.28), transparent 58%),
+    linear-gradient(135deg, #03101e, #0a2b4d 56%, #02070d);
   box-shadow: 0 0 30px rgba(73, 169, 255, 0.34);
 }
 
