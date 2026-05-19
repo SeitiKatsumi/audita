@@ -65,6 +65,10 @@ const tjdftFields = document.querySelector("#tjdftFields");
 const auditFirstName = document.querySelector("#auditFirstName");
 const auditMotherName = document.querySelector("#auditMotherName");
 const auditFatherName = document.querySelector("#auditFatherName");
+const fgtsFields = document.querySelector("#fgtsFields");
+const fgtsRegistrationType = document.querySelector("#fgtsRegistrationType");
+const fgtsRegistration = document.querySelector("#fgtsRegistration");
+const fgtsUf = document.querySelector("#fgtsUf");
 const auditAuthorization = document.querySelector("#auditAuthorization");
 const auditError = document.querySelector("#auditError");
 const auditSummary = document.querySelector("#auditSummary");
@@ -135,9 +139,9 @@ const auditSourceConfig = {
   fgts: {
     appliesTo: ["cnpj"],
     documentTypes: ["cnpj"],
-    automatic: false,
-    badge: "manual CNPJ",
-    note: "Voltado a CNPJ/CEI/CAEPF; depende de portal/API autorizada.",
+    automatic: true,
+    badge: "auto portal",
+    note: "Usa o portal oficial da Caixa CRF/FGTS quando o acesso nao estiver bloqueado.",
   },
 };
 
@@ -306,6 +310,9 @@ function validateAuditStep(step) {
     if (selectedAuditViews.includes("tjdft")) {
       requiredFields.push(auditFirstName, auditMotherName, auditFatherName);
     }
+    if (selectedAuditViews.includes("fgts")) {
+      requiredFields.push(fgtsRegistrationType, fgtsRegistration, fgtsUf);
+    }
     const invalidField = requiredFields.find((field) => field && !field.checkValidity());
     if (invalidField) {
       invalidField.reportValidity();
@@ -381,6 +388,7 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
 
   selectedAuditViews = inputs.filter((input) => input.checked && !input.disabled).map((input) => input.value);
   const needsTjdftFields = selectedAuditViews.includes("tjdft");
+  const needsFgtsFields = selectedAuditViews.includes("fgts");
   tjdftFields?.classList.toggle("hidden", !needsTjdftFields);
   [auditFirstName, auditMotherName, auditFatherName].forEach((input) => {
     if (input) {
@@ -390,6 +398,18 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
       }
     }
   });
+  fgtsFields?.classList.toggle("hidden", !needsFgtsFields);
+  [fgtsRegistrationType, fgtsRegistration, fgtsUf].forEach((input) => {
+    if (input) {
+      input.required = needsFgtsFields;
+      if (!needsFgtsFields) {
+        input.value = input === fgtsRegistrationType ? "CNPJ" : "";
+      }
+    }
+  });
+  if (needsFgtsFields && fgtsRegistration && !fgtsRegistration.value) {
+    fgtsRegistration.value = String(auditDocument?.value || "").replace(/\D/g, "");
+  }
 
   if (auditStatusLabel) {
     auditStatusLabel.textContent =
@@ -1523,6 +1543,9 @@ auditForm.addEventListener("submit", async (event) => {
           firstName: auditFirstName?.value || "",
           motherName: auditMotherName?.value || "",
           fatherName: auditFatherName?.value || "",
+          fgtsRegistrationType: fgtsRegistrationType?.value || "",
+          fgtsRegistration: fgtsRegistration?.value || "",
+          fgtsUf: fgtsUf?.value || "",
         },
       }),
     });

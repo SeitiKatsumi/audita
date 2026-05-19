@@ -88,6 +88,9 @@ function normalizeExtraFields(value) {
     firstName: String(value.firstName || value.primeiroNome || "").trim(),
     motherName: String(value.motherName || value.nomeMae || "").trim(),
     fatherName: String(value.fatherName || value.nomePai || "").trim(),
+    fgtsRegistrationType: String(value.fgtsRegistrationType || value.tipoInscricaoFgts || "CNPJ").trim(),
+    fgtsRegistration: String(value.fgtsRegistration || value.inscricaoFgts || "").trim(),
+    fgtsUf: String(value.fgtsUf || value.ufFgts || "").trim().toUpperCase(),
   };
 }
 
