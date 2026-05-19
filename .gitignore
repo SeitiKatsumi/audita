@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+vendor/
+
+# environment
+.env
+.env.*
+!.env.example
+
+# builds
+dist/
+build/
+.next/
+out/
+
+# logs
+*.log
+logs/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# data/dumps
+*.dump
+*.sql
+!db/
+!db/*.sql
+!db/**/*.sql
+*.sqlite
+*.db
+backups/
+storage/
+!storage/.gitkeep

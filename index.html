@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audita | Elevenmind</title>
+    <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
+      <form class="login-panel" id="loginForm">
+        <div class="login-logo-frame">
+          <img src="assets/audita-logo-white.svg" alt="Audita" />
+        </div>
+        <div class="login-heading">
+          <p class="eyebrow" id="loginEyebrow">Acesso seguro</p>
+          <h1 id="loginTitle">Audita</h1>
+          <p>Entre para acessar o ambiente de auditoria da sua organização.</p>
+        </div>
+
+        <label class="hidden" id="loginNameField">
+          Nome
+          <input id="loginName" name="name" type="text" autocomplete="name" />
+        </label>
+
+        <label>
+          E-mail
+          <input id="loginEmail" name="email" type="email" autocomplete="email" required />
+        </label>
+
+        <label>
+          Senha
+          <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+        </label>
+
+        <button class="primary-action" id="loginSubmitButton" type="submit">Entrar</button>
+        <button class="login-toggle" id="loginModeToggle" type="button">Criar uma conta</button>
+        <small class="login-error" id="loginError" role="alert"></small>
+      </form>
+    </section>
+
+    <div class="shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <div class="brand">
+          <img class="brand-logo" src="assets/audita-logo-white.svg" alt="Audita" />
+          <div>
+            <strong>Audita</strong>
+            <small>Elevenmind</small>
+          </div>
+        </div>
+
+        <nav class="nav-list">
+          <a class="active" href="#overview">Visão geral</a>
+          <a href="#assistente">Assistente</a>
+          <a href="#consultas">Consultas</a>
+          <a href="#coletas">Coletas</a>
+          <a href="#riscos">Riscos</a>
+          <a href="#relatorios">Relatórios</a>
+          <a href="#integracoes-admin">Integrações de órgãos</a>
+          <a href="#integracoes">Ecossistema</a>
+        </nav>
+
+        <div class="environment">
+          <span class="pulse"></span>
+          <div>
+            <strong id="environmentName">Local</strong>
+            <small id="environmentDetail">Ambiente Audita</small>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="pageEyebrow">Plataforma de consulta e auditoria</p>
+            <h1 id="pageTitle">Centro de inteligência Audita</h1>
+          </div>
+        <div class="actions">
+            <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
+            <button class="primary-action" id="newQueryButton">Nova consulta</button>
+            <button class="secondary-action" id="loginButton" type="button">Entrar</button>
+            <button class="icon-button hidden" id="logoutButton" aria-label="Sair" title="Sair">S</button>
+          </div>
+        </header>
+
+        <section class="hero-grid" id="overview" data-page="overview">
+          <article class="intel-panel">
+            <div class="panel-copy">
+              <span class="status-chip">IA ativa</span>
+              <h2>Dados Governamentais Brutos transformados em Intelig&ecirc;ncia Competitiva, Contexto e A&ccedil;&otilde;es efetivas</h2>
+              <p>
+                A Audita centraliza fontes judiciais, fiscais, imobiliárias e APIs para
+                gerar explicações claras, alertas e relatórios acionáveis.
+              </p>
+            </div>
+            <canvas id="signalCanvas" width="760" height="360" aria-label="Visualização de sinais analíticos"></canvas>
+          </article>
+
+          <article class="risk-card">
+            <div class="card-heading">
+              <span>Risco consolidado</span>
+              <strong id="riskScore">72</strong>
+            </div>
+            <div class="risk-orbit">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <p>Alta atividade em consultas fiscais e duas anomalias em fontes judiciais.</p>
+          </article>
+        </section>
+
+        <section class="metrics" aria-label="Indicadores" data-page="overview">
+          <article>
+            <small>Consultas hoje</small>
+            <strong>1.284</strong>
+            <span>+18% vs. ontem</span>
+          </article>
+          <article>
+            <small>Fontes conectadas</small>
+            <strong>37</strong>
+            <span>Judicial, fiscal, imóveis e APIs</span>
+          </article>
+          <article>
+            <small>Alertas críticos</small>
+            <strong>9</strong>
+            <span>3 exigem revisão humana</span>
+          </article>
+          <article>
+            <small>Tempo médio</small>
+            <strong>4.8s</strong>
+            <span>Análise preliminar</span>
+          </article>
+        </section>
+
+        <section class="assistant-workbench" id="assistente" data-page="assistente">
+          <article class="module assistant-query-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Assistente Audita</p>
+                <h2>Consultar órgãos por código</h2>
+              </div>
+              <span class="live" id="assistantSourceStatus">Fontes oficiais</span>
+            </div>
+
+            <form class="assistant-query-form" id="assistantQueryForm">
+              <label>
+                Órgão ou fonte
+                <select id="assistantSource" required></select>
+              </label>
+              <label>
+                Código ou identificador
+                <input
+                  id="assistantCode"
+                  type="text"
+                  placeholder="Ex: SP, 3550308, CNPJ, processo ou código da API"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="wide-field">
+                Pergunta
+                <textarea
+                  id="assistantPrompt"
+                  rows="3"
+                  placeholder="Ex: Consulte esse código e resuma os principais dados encontrados."
+                  required
+                ></textarea>
+              </label>
+              <button class="primary-action" type="submit">Consultar assistente</button>
+            </form>
+
+            <small class="consultation-note">
+              Para fontes cadastradas, use uma URL com {codigo} quando a API exigir identificador no endpoint.
+            </small>
+
+            <div class="agent-answer assistant-result" id="assistantResult">
+              <p>Selecione uma fonte, informe o código quando necessário e descreva a consulta.</p>
+            </div>
+          </article>
+        </section>
+
+        <section class="consultation-grid" id="consultas" data-page="consultas">
+          <article class="module agent-panel" data-page="integracoes">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Agente Audita</p>
+                <h2>Pergunte sobre bases oficiais</h2>
+              </div>
+              <span class="live">IBGE aberto</span>
+            </div>
+
+            <form class="agent-form" id="agentForm">
+              <label>
+                Pergunta
+                <textarea
+                  id="agentQuestion"
+                  rows="3"
+                  placeholder="Ex: Liste os estados do Brasil pelo IBGE ou Quais municípios existem em SP?"
+                  required
+                ></textarea>
+              </label>
+              <button class="primary-action" type="submit">Perguntar ao agente</button>
+            </form>
+
+            <div class="prompt-suggestions">
+              <button type="button" data-question="Liste os estados do Brasil pela base do IBGE.">Estados do Brasil</button>
+              <button type="button" data-question="Quais municípios existem em SP segundo o IBGE?">Municípios de SP</button>
+              <button type="button" data-question="Mostre exemplos de classes CNAE do IBGE.">Classes CNAE</button>
+            </div>
+
+            <div class="agent-answer" id="agentAnswer">
+              <p>Faça uma pergunta em linguagem natural. Eu busco na fonte oficial disponível e resumo o resultado.</p>
+            </div>
+          </article>
+
+          <article class="module agent-settings-panel" data-page="integracoes">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">IA generativa</p>
+                <h2>API ChatGPT/OpenAI</h2>
+              </div>
+              <span class="live" id="agentSettingsStatus">Não configurada</span>
+            </div>
+
+            <form class="agent-settings-form" id="agentSettingsForm">
+              <label>
+                Modelo
+                <input id="agentModel" type="text" value="gpt-5-mini" required />
+              </label>
+              <label>
+                Secret da API key
+                <input id="agentApiKeySecretRef" type="text" value="OPENAI_API_KEY" required />
+              </label>
+              <label>
+                Status
+                <select id="agentProviderStatus">
+                  <option value="draft">Rascunho</option>
+                  <option value="testing">Teste</option>
+                  <option value="active">Ativa</option>
+                  <option value="paused">Pausada</option>
+                </select>
+              </label>
+              <label class="wide-field">
+                Prompt base do agente
+                <textarea id="agentSystemPrompt" rows="4" required>Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.</textarea>
+              </label>
+              <button class="primary-action" type="submit">Salvar configuração</button>
+            </form>
+
+            <small class="consultation-note">
+              A chave real deve ficar no CapRover como variável/secret. Aqui salve apenas o nome da variável.
+            </small>
+            <small class="login-error" id="agentSettingsError" role="alert"></small>
+          </article>
+
+          <article class="module audit-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Auditoria basica</p>
+                <h2>CPF/CNPJ completo</h2>
+              </div>
+              <span class="live" id="auditStatusLabel">14 fontes</span>
+            </div>
+
+            <form class="audit-form audit-wizard" id="auditForm">
+              <div class="audit-stepper" aria-label="Etapas da consulta">
+                <button class="active" type="button" data-audit-step-button="1"><span>1</span>Documentos</button>
+                <button type="button" data-audit-step-button="2"><span>2</span>Informacoes</button>
+                <button type="button" data-audit-step-button="3"><span>3</span>Resultados</button>
+              </div>
+
+              <section class="audit-step-panel" data-audit-step-panel="1">
+                <div class="audit-step-copy">
+                  <strong>Escolha os documentos</strong>
+                  <small>Selecione quais certidoes e consultas deseja gerar no resultado.</small>
+                </div>
+                <fieldset class="audit-options">
+                  <legend>Documentos desejados</legend>
+                  <label><input type="checkbox" name="auditView" value="receita_federal" /> Receita/CNPJ</label>
+                  <label><input type="checkbox" name="auditView" value="pgfn" /> PGFN/CND</label>
+                  <label><input type="checkbox" name="auditView" value="cndt" /> CNDT/TST</label>
+                  <label><input type="checkbox" name="auditView" value="trf1" /> TRF1</label>
+                  <label><input type="checkbox" name="auditView" value="tjdft" /> TJDFT</label>
+                  <label><input type="checkbox" name="auditView" value="fgts" /> FGTS/CEF</label>
+                  <label><input type="checkbox" name="auditView" value="portal_transparencia" /> Sancoes/CGU</label>
+                </fieldset>
+              </section>
+
+              <section class="audit-step-panel hidden" data-audit-step-panel="2">
+                <div class="audit-step-copy">
+                  <strong>Preencha os dados necessarios</strong>
+                  <small>O Audita pede CPF ou CNPJ conforme os documentos selecionados.</small>
+                </div>
+                <label class="hidden">
+                  Documento
+                  <select id="auditDocumentType" required>
+                    <option value="cpf">CPF</option>
+                    <option value="cnpj">CNPJ</option>
+                  </select>
+                </label>
+                <label>
+                  <span id="auditDocumentLabel">CPF</span>
+                  <input id="auditDocument" type="text" placeholder="Somente numeros ou formatado" autocomplete="off" required />
+                </label>
+                <fieldset class="audit-extra-fields hidden" id="tjdftFields">
+                  <legend>Dados para TJDFT</legend>
+                  <label>
+                    Primeiro nome
+                    <input id="auditFirstName" type="text" placeholder="Ex: Aparecido" autocomplete="given-name" />
+                  </label>
+                  <label>
+                    Nome da mae
+                    <input id="auditMotherName" type="text" placeholder="Nome completo da mae" autocomplete="off" />
+                  </label>
+                  <label>
+                    Nome do pai
+                    <input id="auditFatherName" type="text" placeholder="Nome completo do pai" autocomplete="off" />
+                  </label>
+                </fieldset>
+                <label class="audit-consent">
+                  <input id="auditAuthorization" type="checkbox" required />
+                  Confirmo autorizacao/base legal para consultar dados pessoais ou empresariais.
+                </label>
+              </section>
+
+              <section class="audit-step-panel audit-results-panel hidden" data-audit-step-panel="3">
+                <div class="module-header">
+                  <div>
+                    <p class="eyebrow">Resultado</p>
+                    <h2>Consulta consolidada</h2>
+                  </div>
+                  <span class="live" id="auditResultStatus">Aguardando</span>
+                </div>
+                <div class="audit-summary" id="auditSummary">
+                  <p class="empty-state">Informe CPF/CNPJ e escolha o que deseja visualizar.</p>
+                </div>
+                <div class="audit-source-list" id="auditSourceList"></div>
+              </section>
+
+              <div class="audit-wizard-actions">
+                <button class="secondary-action" id="auditBackButton" type="button">Voltar</button>
+                <button class="primary-action" id="auditNextButton" type="button">Continuar</button>
+                <button class="primary-action hidden" id="auditSubmitButton" type="submit">Consultar</button>
+              </div>
+            </form>
+
+            <small class="consultation-note">
+              Por enquanto o documento bruto nao e salvo: o Audita usa hash, mascara e mostra apenas os blocos escolhidos.
+            </small>
+            <small class="login-error" id="auditError" role="alert"></small>
+          </article>
+
+          <article class="module audit-history-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Historico</p>
+                <h2>Documentos solicitados</h2>
+              </div>
+              <span class="live">Por usuario</span>
+            </div>
+            <div class="history-list audit-history-list" id="auditHistoryList">
+              <p class="empty-state">Nenhuma auditoria solicitada ainda.</p>
+            </div>
+          </article>
+
+          <article class="module consultation-builder" data-page="integracoes">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Fontes oficiais</p>
+                <h2>Consultas governamentais</h2>
+              </div>
+              <span class="live">API pronta</span>
+            </div>
+
+            <form class="consultation-form" id="consultationForm">
+              <label>
+                Módulo
+                <select id="consultationModule" required></select>
+              </label>
+              <label>
+                Tipo
+                <select id="subjectType" required>
+                  <option value="cnpj">CNPJ</option>
+                  <option value="cpf">CPF</option>
+                  <option value="processo">Processo</option>
+                  <option value="imovel">Imóvel</option>
+                </select>
+              </label>
+              <label>
+                Identificador
+                <input id="subjectIdentifier" type="text" placeholder="Digite o identificador" autocomplete="off" required />
+              </label>
+              <button class="primary-action" type="submit">Registrar consulta</button>
+            </form>
+
+            <small class="consultation-note">
+              Identificadores são mascarados e armazenados como hash para rastreabilidade.
+            </small>
+            <small class="login-error" id="consultationError" role="alert"></small>
+          </article>
+
+          <article class="module">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Catálogo</p>
+                <h2>Módulos previstos</h2>
+              </div>
+            </div>
+            <div class="module-list" id="moduleList"></div>
+          </article>
+
+          <article class="module consultation-history">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Rastreabilidade</p>
+                <h2>Consultas recentes</h2>
+              </div>
+            </div>
+            <div class="history-list" id="consultationHistory"></div>
+          </article>
+        </section>
+
+        <section class="integrations-admin" id="integracoes-admin" data-page="integracoes-admin">
+          <article class="module integration-form-card">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Administração</p>
+                <h2>Integrações de órgãos</h2>
+              </div>
+              <span class="live">Fontes configuráveis</span>
+            </div>
+
+            <form class="source-form" id="sourceForm">
+              <label>
+                Nome da fonte
+                <input id="sourceName" type="text" placeholder="Ex: Receita Federal CNPJ" required />
+              </label>
+              <label>
+                Órgão
+                <input id="sourceAgency" type="text" placeholder="Ex: Receita Federal" required />
+              </label>
+              <label>
+                Categoria
+                <select id="sourceCategory" required>
+                  <option value="fiscal">Fiscal</option>
+                  <option value="judicial">Judicial</option>
+                  <option value="imobiliario">Imobiliário</option>
+                  <option value="juridico">Jurídico</option>
+                  <option value="compliance">Compliance</option>
+                </select>
+              </label>
+              <label>
+                URL base
+                <input id="sourceBaseUrl" type="url" placeholder="https://api.orgao.gov.br" required />
+              </label>
+              <label>
+                Acesso
+                <select id="sourceAccessMethod">
+                  <option value="api">API</option>
+                  <option value="hybrid">Híbrido</option>
+                  <option value="scraping">Coleta controlada</option>
+                  <option value="manual">Manual</option>
+                </select>
+              </label>
+              <label>
+                Autenticação
+                <select id="sourceAuthType">
+                  <option value="none">Sem autenticação</option>
+                  <option value="token">Token</option>
+                  <option value="certificate_or_token">Certificado ou token</option>
+                  <option value="credential">Credencial</option>
+                </select>
+              </label>
+              <label>
+                Referência do secret
+                <input id="sourceSecretRef" type="text" placeholder="Ex: CAPROVER_SECRET_RECEITA_TOKEN" />
+              </label>
+              <label>
+                Status
+                <select id="sourceStatus">
+                  <option value="draft">Rascunho</option>
+                  <option value="testing">Teste</option>
+                  <option value="active">Ativa</option>
+                  <option value="paused">Pausada</option>
+                </select>
+              </label>
+              <label class="wide-field">
+                Observações de normalização
+                <textarea id="sourceSchemaNotes" rows="3" placeholder="Campos esperados, formato de resposta, regras de normalização"></textarea>
+              </label>
+              <button class="primary-action" type="submit">Salvar fonte</button>
+            </form>
+            <small class="consultation-note">
+              Guarde tokens e certificados no CapRover/secrets. Aqui salve apenas a referência do secret.
+            </small>
+            <small class="login-error" id="sourceError" role="alert"></small>
+          </article>
+
+          <article class="module">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Normalização</p>
+                <h2>Fontes cadastradas</h2>
+              </div>
+            </div>
+            <div class="source-list" id="sourceList"></div>
+          </article>
+        </section>
+
+        <section class="operations-grid" id="operationsPages" data-page-container="operations">
+          <article class="module" id="coletas" data-page="coletas">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Pipeline</p>
+                <h2>Coleta e normalização</h2>
+              </div>
+              <span class="live">Tempo real</span>
+            </div>
+            <div class="pipeline">
+              <div>
+                <span>01</span>
+                <strong>Captura</strong>
+                <small>Scraping e APIs externas</small>
+              </div>
+              <div>
+                <span>02</span>
+                <strong>Normalização</strong>
+                <small>JSON padronizado</small>
+              </div>
+              <div>
+                <span>03</span>
+                <strong>Análise IA</strong>
+                <small>Riscos e recomendações</small>
+              </div>
+              <div>
+                <span>04</span>
+                <strong>Relatório</strong>
+                <small>Entrega web e WhatsApp</small>
+              </div>
+            </div>
+          </article>
+
+          <article class="module" id="riscos" data-page="riscos">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Auditoria</p>
+                <h2>Sinais prioritários</h2>
+              </div>
+            </div>
+            <ul class="signal-list">
+              <li>
+                <span class="severity high"></span>
+                <div>
+                  <strong>Inconsistência fiscal recorrente</strong>
+                  <small>Cliente ACME | 2 fontes divergentes</small>
+                </div>
+              </li>
+              <li>
+                <span class="severity medium"></span>
+                <div>
+                  <strong>Processo judicial com mudança recente</strong>
+                  <small>Atualização detectada há 14 minutos</small>
+                </div>
+              </li>
+              <li>
+                <span class="severity low"></span>
+                <div>
+                  <strong>Imóvel com pendência documental</strong>
+                  <small>Recomendação pronta para revisão</small>
+                </div>
+              </li>
+            </ul>
+          </article>
+
+          <article class="module assistant-panel" id="relatorios" data-page="relatorios">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Assistente</p>
+                <h2>Resumo inteligente</h2>
+              </div>
+            </div>
+            <p id="assistantText">
+              Foram encontrados sinais relevantes em 3 fontes. A recomendação é
+              priorizar a divergência fiscal, validar documentos do imóvel e gerar
+              relatório executivo para aprovação.
+            </p>
+            <button class="secondary-action" id="generateReport">Gerar relatório</button>
+          </article>
+
+          <article class="module" id="integracoes" data-page="integracoes">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Ecossistema</p>
+                <h2>Integrações previstas</h2>
+              </div>
+            </div>
+            <div class="integration-grid">
+              <span>Directus</span>
+              <span>OneDash</span>
+              <span>SkillShift</span>
+              <span>AppCenter</span>
+              <span>WhatsApp</span>
+              <span>APIs externas</span>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="app.js?v=20260520-ecosystem-modules"></script>
+  </body>
+</html>

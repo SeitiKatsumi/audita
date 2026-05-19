@@ -1,0 +1,15 @@
+.git
+.github
+docs
+README.md
+CONTRIBUTING.md
+.env
+.env.*
+!.env.example
+node_modules
+package-lock.json
+dist
+build
+logs
+*.log
+backups
