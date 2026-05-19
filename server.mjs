@@ -1,15 +1,16 @@
 import http from "node:http";
 import crypto from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { extname, join, resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, extname, join, resolve } from "node:path";
+import { createAuditService } from "./services/audit.service.mjs";
 
 const root = resolve(".");
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || "0.0.0.0";
 const databaseUrl = process.env.DATABASE_URL;
 const autoMigrate = process.env.AUDITA_AUTO_MIGRATE !== "false";
-const authRequired = process.env.AUDITA_AUTH_REQUIRED === "true";
+const authRequired = process.env.AUDITA_AUTH_REQUIRED !== "false";
 const sessionCookieName = "audita_session";
 const appVersion = process.env.APP_VERSION || "local";
 const appEnv = process.env.APP_ENV || "local";
@@ -18,11 +19,19 @@ let pool;
 let dbReady = false;
 let dbError = null;
 let defaultTenantId = null;
+const fallbackAudits = [];
+const fallbackAuthPath = join(root, "storage", "local-auth.json");
+let fallbackAuthLoaded = false;
+let fallbackUserId = 1;
+const fallbackUsers = new Map();
+const fallbackUsersByEmail = new Map();
+const fallbackSessions = new Map();
 
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".pdf": "application/pdf",
   ".png": "image/png",
   ".svg": "image/svg+xml",
 };
@@ -86,6 +95,193 @@ const fallbackGovernmentModules = [
     authType: "none",
     status: "sandbox",
     description: "Monitoramento de publicações oficiais e menções relevantes.",
+  },
+];
+
+const auditSources = [
+  {
+    id: "brasilapi-cnpj",
+    name: "CNPJ publico",
+    category: "fiscal",
+    scope: "cnpj",
+    mode: "api",
+    officialUrl: "https://brasilapi.com.br/docs#tag/CNPJ",
+    requiredFields: ["document"],
+    optionalFields: [],
+    summary: "Consulta cadastral publica de CNPJ com razao social, CNAE, endereco e situacao cadastral.",
+    manualInstruction: "Consulta automatica por API publica. Se falhar, confira o CNPJ e tente novamente.",
+  },
+  {
+    id: "datajud-cnj",
+    name: "DataJud / CNJ",
+    category: "judicial",
+    scope: "cpf_cnpj",
+    mode: "api",
+    officialUrl: "https://datajud-wiki.cnj.jus.br/api-publica/",
+    requiredFields: ["document"],
+    optionalFields: ["name", "uf"],
+    summary:
+      "API publica de metadados processuais. Nao substitui certidao nada consta e nao garante busca direta por CPF/CNPJ.",
+    manualInstruction:
+      "Quando nao houver numero de processo ou criterio publico consultavel, use a certidao oficial do tribunal como evidencia.",
+  },
+  {
+    id: "tjdft",
+    name: "TJDFT Nada Consta",
+    category: "judicial",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://www.tjdft.jus.br/servicos/certidoes/certidao-nada-consta",
+    requiredFields: ["document", "name"],
+    optionalFields: ["motherName", "birthDate"],
+    summary: "Certidoes civel, criminal, especial e falencia/recuperacao emitidas no portal do TJDFT.",
+    manualInstruction:
+      "Abra a fonte oficial, informe CPF/CNPJ e dados solicitados, resolva a validacao do portal e anexe o PDF ou protocolo emitido.",
+  },
+  {
+    id: "justica-federal",
+    name: "Justica Federal / CJF / TRFs",
+    category: "judicial",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl:
+      "https://www.cjf.jus.br/cjf/noticias/2024/junho/cjf-lancara-sistema-de-certidao-unificada-da-justica-federal-durante-o-encontro-nacional-das-secoes-judiciarias",
+    requiredFields: ["document", "name", "email"],
+    optionalFields: ["uf"],
+    summary: "Certidao unificada de distribuicao da Justica Federal por CPF/CNPJ, quando disponivel.",
+    manualInstruction:
+      "Use a certidao unificada/TRF correspondente, preencha o e-mail quando exigido e salve o PDF ou protocolo retornado.",
+  },
+  {
+    id: "stj",
+    name: "STJ Certidao de Distribuicao",
+    category: "judicial",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://www.stj.jus.br/sites/portalp/Processos/Certidoes",
+    requiredFields: ["document", "name"],
+    optionalFields: [],
+    summary: "Certidao judicial de distribuicao nos processos do Superior Tribunal de Justica.",
+    manualInstruction:
+      "Acesse o portal de certidoes do STJ, informe o documento e salve a certidao emitida.",
+  },
+  {
+    id: "stf",
+    name: "STF Certidoes Judiciais",
+    category: "judicial",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://portal.stf.jus.br/",
+    requiredFields: ["document", "name"],
+    optionalFields: [],
+    summary: "Certidoes judiciais disponiveis no portal do Supremo Tribunal Federal.",
+    manualInstruction:
+      "Use o servico de certidoes do STF, informe os dados exigidos e anexe o PDF ou protocolo.",
+  },
+  {
+    id: "cnib",
+    name: "CNIB Indisponibilidade de Bens",
+    category: "imobiliario",
+    scope: "cpf_cnpj",
+    mode: "restricted",
+    officialUrl:
+      "https://cnbsp.org.br/2024/12/11/cnj-publica-provimento-no-188-2024-que-trata-sobre-o-funcionamento-da-central-nacional-de-indisponibilidade-de-bens-cnib-2-0/",
+    requiredFields: ["document", "name"],
+    optionalFields: [],
+    summary: "Consulta de indisponibilidade de bens, com acesso restrito conforme perfil autorizado.",
+    manualInstruction:
+      "Fonte com restricao de acesso. Registre credencial autorizada ou anexe evidencia obtida por operador habilitado.",
+  },
+  {
+    id: "tst-cndt",
+    name: "TST CNDT",
+    category: "trabalhista",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://www.tst.jus.br/web/acesso-a-informacao/carta-de-servicos-a-cidadania/servicos-processuais/cndt",
+    requiredFields: ["document"],
+    optionalFields: ["name"],
+    summary: "Certidao Negativa de Debitos Trabalhistas para CPF ou CNPJ.",
+    manualInstruction:
+      "Emita a CNDT no portal do TST, resolva o captcha quando exibido e anexe a certidao.",
+  },
+  {
+    id: "ceat-trts",
+    name: "CEAT / TRTs",
+    category: "trabalhista",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://www.csjt.jus.br/web/csjt/certidoes",
+    requiredFields: ["document", "uf"],
+    optionalFields: ["name"],
+    summary: "Certidao Eletronica de Acoes Trabalhistas por TRT/UF.",
+    manualInstruction:
+      "Selecione o TRT/UF de interesse, informe CPF/CNPJ e anexe o PDF retornado.",
+  },
+  {
+    id: "receita-pgfn",
+    name: "Receita Federal / PGFN",
+    category: "fiscal",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://www.gov.br/receitafederal/pt-br/servicos/certidoes/consultar-certidoes-emitidas",
+    requiredFields: ["document"],
+    optionalFields: ["name"],
+    summary: "Certidao conjunta de debitos federais e divida ativa da Uniao para CPF/CNPJ.",
+    manualInstruction:
+      "Consulte ou emita a certidao no portal Receita/PGFN e anexe o PDF ou protocolo.",
+  },
+  {
+    id: "fgts-crf",
+    name: "Caixa FGTS / CRF",
+    category: "fiscal",
+    scope: "cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf",
+    requiredFields: ["document"],
+    optionalFields: ["ceiCaepf"],
+    summary: "Regularidade do FGTS para empregador por CNPJ, CEI ou CAEPF.",
+    manualInstruction:
+      "Fonte aplicavel a empresa/empregador. Use CNPJ, CEI ou CAEPF e anexe o CRF emitido.",
+  },
+  {
+    id: "tse-crimes-eleitorais",
+    name: "TSE Crimes Eleitorais",
+    category: "compliance",
+    scope: "cpf",
+    mode: "manual_guided",
+    officialUrl: "https://www.tse.jus.br/eleitor/certidoes/certidoes",
+    requiredFields: ["document", "name", "motherName", "birthDate"],
+    optionalFields: [],
+    summary: "Certidao de crimes eleitorais para pessoa fisica.",
+    manualInstruction:
+      "Informe CPF, nome, data de nascimento e filiacao conforme exigido pelo TSE, depois anexe a certidao.",
+  },
+  {
+    id: "portal-transparencia",
+    name: "Portal da Transparencia / CGU",
+    category: "compliance",
+    scope: "cpf_cnpj",
+    mode: "api",
+    officialUrl: "https://www.portaltransparencia.gov.br/sancoes",
+    requiredFields: ["document"],
+    optionalFields: [],
+    summary: "Consulta CEIS, CNEP, CEAF e acordos de leniencia por CPF/CNPJ.",
+    manualInstruction:
+      "Configure PORTAL_TRANSPARENCIA_API_KEY para consultar automaticamente pela API de dados da CGU.",
+  },
+  {
+    id: "cenprot",
+    name: "CENPROT Protestos",
+    category: "compliance",
+    scope: "cpf_cnpj",
+    mode: "manual_guided",
+    officialUrl: "https://www.cenprot.com/",
+    requiredFields: ["document"],
+    optionalFields: ["name"],
+    summary: "Consulta gratuita de existencia de protestos; certidao detalhada pode ter custo.",
+    manualInstruction:
+      "Consulte CPF/CNPJ no CENPROT. Anexe a tela/protocolo gratuito ou certidao detalhada quando contratada.",
   },
 ];
 
@@ -174,6 +370,77 @@ function verifyPassword(password, storedValue) {
   return storedBuffer.length === calculatedHash.length && crypto.timingSafeEqual(storedBuffer, calculatedHash);
 }
 
+async function loadFallbackAuth() {
+  if (fallbackAuthLoaded) {
+    return;
+  }
+  fallbackAuthLoaded = true;
+  try {
+    const data = JSON.parse(await readFile(fallbackAuthPath, "utf-8"));
+    fallbackUserId = Number(data.nextUserId) || 1;
+    fallbackUsers.clear();
+    fallbackUsersByEmail.clear();
+    fallbackSessions.clear();
+
+    for (const user of Array.isArray(data.users) ? data.users : []) {
+      fallbackUsers.set(user.id, user);
+      fallbackUsersByEmail.set(String(user.email || "").toLowerCase(), user.id);
+    }
+    for (const session of Array.isArray(data.sessions) ? data.sessions : []) {
+      if (session.tokenHash && session.expiresAt > Date.now()) {
+        fallbackSessions.set(session.tokenHash, {
+          userId: session.userId,
+          expiresAt: session.expiresAt,
+        });
+      }
+    }
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.warn("[audita] local auth fallback unavailable:", error.message);
+    }
+  }
+}
+
+async function saveFallbackAuth() {
+  await mkdir(dirname(fallbackAuthPath), { recursive: true });
+  const payload = {
+    nextUserId: fallbackUserId,
+    users: [...fallbackUsers.values()],
+    sessions: [...fallbackSessions.entries()].map(([tokenHash, session]) => ({
+      tokenHash,
+      userId: session.userId,
+      expiresAt: session.expiresAt,
+    })),
+  };
+  await writeFile(fallbackAuthPath, `${JSON.stringify(payload, null, 2)}\n`);
+}
+
+function createFallbackUser({ email, name, password, role = "member" }) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (fallbackUsersByEmail.has(normalizedEmail)) {
+    return null;
+  }
+  const user = {
+    id: fallbackUserId++,
+    tenant_id: "local",
+    tenant_name: "Local",
+    tenant_slug: "local",
+    email: normalizedEmail,
+    name,
+    role,
+    password_hash: hashPassword(password),
+    status: "active",
+  };
+  fallbackUsers.set(user.id, user);
+  fallbackUsersByEmail.set(normalizedEmail, user.id);
+  return user;
+}
+
+function getFallbackUserByEmail(email) {
+  const id = fallbackUsersByEmail.get(String(email || "").trim().toLowerCase());
+  return id ? fallbackUsers.get(id) : null;
+}
+
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -191,6 +458,489 @@ function maskIdentifier(identifier) {
   const first = cleaned.slice(0, 3);
   const last = cleaned.slice(-2);
   return `${first}${"*".repeat(Math.min(cleaned.length - 5, 12))}${last}`;
+}
+
+function normalizeDocument(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function validateCpf(value) {
+  const cpf = normalizeDocument(value);
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) {
+    return false;
+  }
+
+  const calculateDigit = (base) => {
+    const sum = base
+      .split("")
+      .map(Number)
+      .reduce((total, digit, index) => total + digit * (base.length + 1 - index), 0);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  return calculateDigit(cpf.slice(0, 9)) === Number(cpf[9]) && calculateDigit(cpf.slice(0, 10)) === Number(cpf[10]);
+}
+
+function validateCnpj(value) {
+  const cnpj = normalizeDocument(value);
+  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) {
+    return false;
+  }
+
+  const calculateDigit = (base, weights) => {
+    const sum = base
+      .split("")
+      .map(Number)
+      .reduce((total, digit, index) => total + digit * weights[index], 0);
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const firstWeights = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const secondWeights = [6, ...firstWeights];
+  return (
+    calculateDigit(cnpj.slice(0, 12), firstWeights) === Number(cnpj[12]) &&
+    calculateDigit(cnpj.slice(0, 13), secondWeights) === Number(cnpj[13])
+  );
+}
+
+function isValidDocument(documentType, documentValue) {
+  return documentType === "cpf" ? validateCpf(documentValue) : validateCnpj(documentValue);
+}
+
+function formatDocument(documentType, documentValue) {
+  const digits = normalizeDocument(documentValue);
+  if (documentType === "cpf" && digits.length === 11) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  }
+  if (documentType === "cnpj" && digits.length === 14) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
+  return documentValue;
+}
+
+function formatAuditFieldLabel(field) {
+  const labels = {
+    document: "documento",
+    name: "nome/razao social",
+    motherName: "nome da mae",
+    birthDate: "data de nascimento",
+    email: "e-mail",
+    uf: "UF/TRT",
+    ceiCaepf: "CEI/CAEPF",
+  };
+  return labels[field] || field;
+}
+
+function isSourceApplicable(source, documentType) {
+  return source.scope === "cpf_cnpj" || source.scope === documentType;
+}
+
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = { raw: text.slice(0, 1000) };
+    }
+    if (!response.ok) {
+      const error = new Error(`Fonte retornou HTTP ${response.status}`);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function summarizeBrasilApiCnpj(data) {
+  if (data.company || data.taxId) {
+    const address = data.address
+      ? [data.address.street, data.address.number, data.address.district, data.address.city, data.address.state].filter(Boolean).join(", ")
+      : "";
+    return [
+      `CNPJ localizado na base publica: ${data.company?.name || data.alias || "nome nao informado"}.`,
+      data.alias ? `Nome fantasia: ${data.alias}.` : "",
+      `Situacao: ${data.status?.text || "nao informada"}.`,
+      data.mainActivity?.text ? `Atividade principal: ${data.mainActivity.text}.` : "",
+      address ? `Endereco: ${address}.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  const address = [data.descricao_tipo_de_logradouro, data.logradouro, data.numero, data.bairro, data.municipio, data.uf]
+    .filter(Boolean)
+    .join(", ");
+  const cnae = data.cnae_fiscal_descricao || data.cnae_fiscal || "CNAE nao informado";
+  return [
+    `CNPJ localizado na consulta cadastral publica: ${data.razao_social || data.nome_fantasia || "nome nao informado"}.`,
+    `Situacao: ${data.descricao_situacao_cadastral || "nao informada"}.`,
+    `CNAE: ${cnae}.`,
+    address ? `Endereco: ${address}.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+async function runBrasilApiCnpj(input) {
+  if (input.documentType !== "cnpj") {
+    return { status: "not_applicable", summary: "Consulta cadastral CNPJ nao se aplica a CPF.", evidence: [] };
+  }
+  const endpoints = [
+    `https://brasilapi.com.br/api/cnpj/v1/${input.document}`,
+    `https://open.cnpja.com/office/${input.document}`,
+  ];
+  let data = null;
+  let endpoint = "";
+  let lastError = null;
+  for (const candidate of endpoints) {
+    try {
+      data = await fetchJsonWithTimeout(candidate, {
+        headers: {
+          accept: "application/json",
+          "user-agent": "Audita/0.1 cnpj-public-audit",
+        },
+      });
+      endpoint = candidate;
+      break;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (!data) {
+    throw lastError || new Error("Nenhuma API publica de CNPJ respondeu");
+  }
+  const normalizedSummary = summarizeBrasilApiCnpj(data);
+  return {
+    status: "completed",
+    summary: normalizedSummary,
+    evidence: [
+      { type: "summary", title: "Dados cadastrais CNPJ", value: normalizedSummary },
+      { type: "official_url", title: "Endpoint consultado", value: endpoint },
+      {
+        type: "summary",
+        title: "Campos normalizados",
+        value: JSON.stringify({
+          razaoSocial: data.razao_social || data.company?.name,
+          nomeFantasia: data.nome_fantasia || data.alias,
+          situacao: data.descricao_situacao_cadastral || data.status?.text,
+          cnae: data.cnae_fiscal_descricao || data.mainActivity?.text,
+          municipio: data.municipio || data.address?.city,
+          uf: data.uf || data.address?.state,
+        }),
+      },
+    ],
+  };
+}
+
+async function runPortalTransparencia(input) {
+  const apiKey = process.env.PORTAL_TRANSPARENCIA_API_KEY || process.env.CGU_API_KEY || "";
+  if (!apiKey) {
+    return {
+      status: "blocked",
+      summary:
+        "Portal da Transparencia tem API publica, mas exige chave gratuita. Configure PORTAL_TRANSPARENCIA_API_KEY para consulta automatica.",
+      evidence: [
+        {
+          type: "manual_step",
+          title: "Chave de API pendente",
+          value:
+            "Cadastre uma chave no Portal da Transparencia e configure PORTAL_TRANSPARENCIA_API_KEY no ambiente do servidor.",
+        },
+      ],
+    };
+  }
+
+  const headers = {
+    accept: "application/json",
+    "chave-api-dados": apiKey,
+    "user-agent": "Audita/0.1 public-api-audit",
+  };
+  const bases = [
+    ["CEIS", "https://api.portaldatransparencia.gov.br/api-de-dados/ceis"],
+    ["CNEP", "https://api.portaldatransparencia.gov.br/api-de-dados/cnep"],
+    ["CEAF", "https://api.portaldatransparencia.gov.br/api-de-dados/ceaf"],
+    ["Acordos de leniencia", "https://api.portaldatransparencia.gov.br/api-de-dados/acordos-leniencia"],
+  ];
+  const results = [];
+  for (const [label, baseUrl] of bases) {
+    const endpoint = `${baseUrl}?cpfCnpj=${encodeURIComponent(input.document)}&pagina=1`;
+    try {
+      const data = await fetchJsonWithTimeout(endpoint, { headers });
+      results.push({ label, endpoint, data: Array.isArray(data) ? data : data ? [data] : [] });
+    } catch (error) {
+      results.push({ label, endpoint, error: error.message });
+    }
+  }
+
+  const total = results.reduce((sum, result) => sum + (Array.isArray(result.data) ? result.data.length : 0), 0);
+  const failed = results.filter((result) => result.error);
+  const summary =
+    failed.length === results.length
+      ? "Nao foi possivel consultar a API do Portal da Transparencia agora. Verifique a chave e tente novamente."
+      : `Portal da Transparencia consultado em ${results.length - failed.length} base(s). Registros encontrados: ${total}.`;
+
+  return {
+    status: failed.length === results.length ? "failed" : "completed",
+    summary,
+    evidence: [
+      { type: "summary", title: "Resultado CGU", value: summary },
+      ...results.map((result) => ({
+        type: result.error ? "manual_step" : "summary",
+        title: result.label,
+        value: result.error
+          ? `${result.error}. Endpoint: ${result.endpoint}`
+          : `${result.data.length} registro(s). Endpoint: ${result.endpoint}`,
+      })),
+    ],
+  };
+}
+
+async function runDataJud(input) {
+  const processNumber = String(input.processNumber || "").replace(/\D/g, "");
+  if (!processNumber) {
+    return {
+      status: "blocked",
+      summary:
+        "DataJud/CNJ e uma API publica de metadados processuais, mas nao oferece certidao por CPF/CNPJ neste fluxo. Informe numero de processo em futura versao ou use certidao oficial como evidencia.",
+      evidence: [
+        {
+          type: "manual_step",
+          title: "Criterio publico insuficiente",
+          value:
+            "CPF/CNPJ nao e criterio confiavel/publico para esta consulta automatica. A API DataJud deve ser usada para metadados processuais publicos.",
+        },
+      ],
+    };
+  }
+
+  const endpoint = "https://api-publica.datajud.cnj.jus.br/api_publica_stj/_search";
+  const apiKey =
+    process.env.DATAJUD_API_KEY ||
+    "cDZHYzlZa0JadVREZDJCendQbXY6SkJlTzNjLV9TRENyQk1RdnFKZGRQdw==";
+  const data = await fetchJsonWithTimeout(endpoint, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/json",
+      Authorization: `APIKey ${apiKey}`,
+      "user-agent": "Audita/0.1 datajud-audit",
+    },
+    body: JSON.stringify({
+      query: { match: { numeroProcesso: processNumber } },
+      size: 10,
+    }),
+  });
+  const total = data?.hits?.total?.value || data?.hits?.hits?.length || 0;
+  return {
+    status: "completed",
+    summary: `DataJud consultado para o processo informado. Registros encontrados: ${total}.`,
+    evidence: [
+      { type: "summary", title: "DataJud/CNJ", value: `Registros encontrados: ${total}` },
+      { type: "official_url", title: "Endpoint consultado", value: endpoint },
+    ],
+  };
+}
+
+async function runApiAuditSource(source, input) {
+  try {
+    if (source.id === "brasilapi-cnpj") {
+      return await runBrasilApiCnpj(input);
+    }
+    if (source.id === "portal-transparencia") {
+      return await runPortalTransparencia(input);
+    }
+    if (source.id === "datajud-cnj") {
+      return await runDataJud(input);
+    }
+  } catch (error) {
+    return {
+      status: error.status === 404 ? "not_applicable" : "failed",
+      summary: `${source.name}: ${error.message || "falha na consulta da API"}.`,
+      evidence: [
+        {
+          type: "manual_step",
+          title: "Falha na API",
+          value: "Tente novamente mais tarde ou use a fonte oficial manualmente.",
+        },
+      ],
+    };
+  }
+  return null;
+}
+
+async function buildAuditExecution(source, input) {
+  if (!isSourceApplicable(source, input.documentType)) {
+    return {
+      sourceId: source.id,
+      sourceName: source.name,
+      category: source.category,
+      mode: source.mode,
+      status: "not_applicable",
+      summary: `${source.name} nao se aplica a ${input.documentType.toUpperCase()} neste fluxo.`,
+      officialUrl: source.officialUrl,
+      missingFields: [],
+      manualInstruction: "",
+      evidence: [],
+    };
+  }
+
+  const apiResult = source.mode === "api" ? await runApiAuditSource(source, input) : null;
+  if (apiResult) {
+    return {
+      sourceId: source.id,
+      sourceName: source.name,
+      category: source.category,
+      mode: source.mode,
+      status: apiResult.status,
+      summary: apiResult.summary,
+      officialUrl: source.officialUrl,
+      missingFields: [],
+      manualInstruction: apiResult.status === "completed" ? "" : source.manualInstruction,
+      evidence: [
+        {
+          type: "summary",
+          title: source.name,
+          value: source.summary,
+        },
+        {
+          type: "official_url",
+          title: "Fonte oficial",
+          value: source.officialUrl,
+        },
+        ...(apiResult.evidence || []),
+      ],
+    };
+  }
+
+  const missingFields = source.requiredFields
+    .filter((field) => field !== "document")
+    .filter((field) => !String(input[field] || "").trim());
+  const status = missingFields.length || source.mode !== "api" ? "manual_required" : "completed";
+  const evidence = [
+    {
+      type: "summary",
+      title: source.name,
+      value: source.summary,
+    },
+    {
+      type: "official_url",
+      title: "Fonte oficial",
+      value: source.officialUrl,
+    },
+  ];
+
+  if (status === "manual_required") {
+    evidence.push({
+      type: "manual_step",
+      title: missingFields.length ? "Campos pendentes" : "Acao manual guiada",
+      value: missingFields.length
+        ? `Preencha antes de emitir: ${missingFields.map(formatAuditFieldLabel).join(", ")}.`
+        : source.manualInstruction,
+    });
+  }
+
+  return {
+    sourceId: source.id,
+    sourceName: source.name,
+    category: source.category,
+    mode: source.mode,
+    status,
+    summary:
+      status === "completed"
+        ? `${source.name} concluida pela integracao configurada.`
+        : `${source.name}: ${source.manualInstruction}`,
+    officialUrl: source.officialUrl,
+    missingFields,
+    manualInstruction: source.manualInstruction,
+    evidence,
+  };
+}
+
+function summarizeAuditStatus(executions) {
+  const actionable = executions.filter((execution) => execution.status !== "not_applicable");
+  if (actionable.some((execution) => execution.status === "failed")) {
+    return "failed";
+  }
+  if (actionable.some((execution) => execution.status === "manual_required" || execution.status === "blocked")) {
+    return "manual_required";
+  }
+  if (actionable.length && actionable.every((execution) => execution.status === "completed")) {
+    return "completed";
+  }
+  return "queued";
+}
+
+function publicAudit(row, executions = []) {
+  return {
+    id: row.id,
+    documentType: row.document_type || row.documentType,
+    documentMasked: row.document_masked || row.documentMasked,
+    subjectName: row.subject_name || row.subjectName,
+    status: row.status,
+    authorizationConfirmed: row.authorization_confirmed ?? row.authorizationConfirmed,
+    createdAt: row.created_at || row.createdAt,
+    updatedAt: row.updated_at || row.updatedAt,
+    executions,
+  };
+}
+
+function mapAuditExecution(row, evidence = []) {
+  return {
+    id: row.id,
+    sourceId: row.source_id || row.sourceId,
+    sourceName: row.source_name || row.sourceName,
+    category: row.category,
+    mode: row.mode,
+    status: row.status,
+    summary: row.summary,
+    officialUrl: row.official_url || row.officialUrl,
+    missingFields: row.missing_fields || row.missingFields || [],
+    manualInstruction: row.manual_instruction || row.manualInstruction,
+    evidence,
+    createdAt: row.created_at || row.createdAt,
+    updatedAt: row.updated_at || row.updatedAt,
+  };
+}
+
+async function createFallbackAudit(input, authContext) {
+  const documentHash = hashSubjectIdentifier(authContext.tenantId || "demo", input.document);
+  const builtExecutions = await Promise.all(auditSources.map((source) => buildAuditExecution(source, input)));
+  const executions = builtExecutions.map((execution, index) => ({
+      id: `${Date.now()}-${index + 1}`,
+      ...execution,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+  const audit = {
+    id: String(Date.now()),
+    tenantId: authContext.tenantId || "demo",
+    userId: authContext.user?.id || null,
+    documentType: input.documentType,
+    documentHash,
+    documentMasked: maskIdentifier(formatDocument(input.documentType, input.document)),
+    subjectName: input.name,
+    status: summarizeAuditStatus(executions),
+    authorizationConfirmed: true,
+    metadata: input,
+    executions,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  fallbackAudits.unshift(audit);
+  return publicAudit(audit, executions);
 }
 
 async function bootstrapAdminUser() {
@@ -280,7 +1030,7 @@ async function readJsonBody(request) {
 
   for await (const chunk of request) {
     body += chunk;
-    if (body.length > 1024 * 20) {
+    if (body.length > 1024 * 1024 * 3) {
       throw new Error("Request body too large");
     }
   }
@@ -297,12 +1047,21 @@ function sendJson(response, statusCode, payload) {
 }
 
 async function getSessionUser(request) {
-  if (!pool || !dbReady) {
-    return null;
-  }
-
   const cookies = parseCookies(request);
   const token = cookies[sessionCookieName];
+
+  if (!pool || !dbReady) {
+    await loadFallbackAuth();
+    if (!token) {
+      return null;
+    }
+    const session = fallbackSessions.get(hashToken(token));
+    if (!session || session.expiresAt <= Date.now()) {
+      return null;
+    }
+    return fallbackUsers.get(session.userId) || null;
+  }
+
   if (!token) {
     return null;
   }
@@ -355,6 +1114,17 @@ async function createSession(response, request, userId) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashToken(token);
 
+  if (!pool || !dbReady) {
+    await loadFallbackAuth();
+    fallbackSessions.set(tokenHash, {
+      userId,
+      expiresAt: Date.now() + 12 * 60 * 60 * 1000,
+    });
+    await saveFallbackAuth();
+    setSessionCookie(request, response, token);
+    return;
+  }
+
   await pool.query(
     "INSERT INTO audita_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '12 hours')",
     [userId, tokenHash],
@@ -375,6 +1145,11 @@ async function getTenantIdForRequest(request) {
     unauthorized: false,
   };
 }
+
+const auditService = createAuditService({
+  getDb: () => ({ pool, dbReady }),
+  getAuthContext: getTenantIdForRequest,
+});
 
 async function getDashboard(request) {
   if (!pool || !dbReady) {
@@ -550,6 +1325,336 @@ async function createConsultation(request) {
   );
 
   return result.rows[0];
+}
+
+async function listAudits(request) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  if (!pool || !dbReady) {
+    return fallbackAudits.slice(0, 8).map((audit) => publicAudit(audit, audit.executions));
+  }
+
+  const result = await pool.query(
+    `SELECT
+       id,
+       document_type,
+       document_masked,
+       subject_name,
+       status,
+       authorization_confirmed,
+       created_at,
+       updated_at
+     FROM audita_audits
+     WHERE tenant_id = $1
+     ORDER BY created_at DESC
+     LIMIT 8`,
+    [authContext.tenantId],
+  );
+
+  return result.rows.map((audit) => publicAudit(audit));
+}
+
+async function getAudit(request, auditId) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  if (!pool || !dbReady) {
+    const audit = fallbackAudits.find((item) => String(item.id) === String(auditId));
+    return audit ? publicAudit(audit, audit.executions) : { notFound: true };
+  }
+
+  const auditResult = await pool.query(
+    `SELECT
+       id,
+       document_type,
+       document_masked,
+       subject_name,
+       status,
+       authorization_confirmed,
+       created_at,
+       updated_at
+     FROM audita_audits
+     WHERE tenant_id = $1 AND id = $2
+     LIMIT 1`,
+    [authContext.tenantId, auditId],
+  );
+  const audit = auditResult.rows[0];
+  if (!audit) {
+    return { notFound: true };
+  }
+
+  const executionResult = await pool.query(
+    `SELECT
+       id,
+       source_id,
+       source_name,
+       category,
+       mode,
+       status,
+       summary,
+       official_url,
+       missing_fields AS "missingFields",
+       manual_instruction,
+       created_at,
+       updated_at
+     FROM audita_audit_executions
+     WHERE audit_id = $1
+     ORDER BY id`,
+    [audit.id],
+  );
+  const evidenceResult = await pool.query(
+    `SELECT
+       id,
+       audit_execution_id,
+       evidence_type AS type,
+       title,
+       value,
+       file_name AS "fileName",
+       content_base64 AS "contentBase64",
+       created_at AS "createdAt"
+     FROM audita_audit_evidence
+     WHERE audit_id = $1
+     ORDER BY created_at`,
+    [audit.id],
+  );
+  const evidenceByExecution = evidenceResult.rows.reduce((grouped, evidence) => {
+    const key = String(evidence.audit_execution_id);
+    grouped[key] = grouped[key] || [];
+    grouped[key].push(evidence);
+    return grouped;
+  }, {});
+  const executions = executionResult.rows.map((execution) =>
+    mapAuditExecution(execution, evidenceByExecution[String(execution.id)] || []),
+  );
+
+  return publicAudit(audit, executions);
+}
+
+async function createAudit(request) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const body = await readJsonBody(request);
+  const documentType = String(body.documentType || "").trim().toLowerCase();
+  const document = normalizeDocument(body.document);
+  const input = {
+    documentType,
+    document,
+    name: String(body.name || "").trim(),
+    motherName: String(body.motherName || "").trim(),
+    birthDate: String(body.birthDate || "").trim(),
+    email: String(body.email || "").trim(),
+    uf: String(body.uf || "").trim().toUpperCase(),
+    ceiCaepf: String(body.ceiCaepf || "").trim(),
+  };
+
+  if (!["cpf", "cnpj"].includes(documentType) || !isValidDocument(documentType, document) || !body.authorizationConfirmed) {
+    return { invalid: true };
+  }
+
+  if (!pool || !dbReady) {
+    return await createFallbackAudit(input, authContext);
+  }
+
+  const documentHash = hashSubjectIdentifier(authContext.tenantId, document);
+  const documentMasked = maskIdentifier(formatDocument(documentType, document));
+  const executions = await Promise.all(auditSources.map((source) => buildAuditExecution(source, input)));
+  const status = summarizeAuditStatus(executions);
+
+  const auditResult = await pool.query(
+    `INSERT INTO audita_audits (
+       tenant_id,
+       requested_by_user_id,
+       document_type,
+       document_hash,
+       document_masked,
+       subject_name,
+       status,
+       authorization_confirmed,
+       request_payload
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8)
+     RETURNING id, document_type, document_masked, subject_name, status, authorization_confirmed, created_at, updated_at`,
+    [
+      authContext.tenantId,
+      authContext.user?.id || null,
+      documentType,
+      documentHash,
+      documentMasked,
+      input.name,
+      status,
+      JSON.stringify({
+        documentType,
+        nameProvided: Boolean(input.name),
+        motherNameProvided: Boolean(input.motherName),
+        birthDateProvided: Boolean(input.birthDate),
+        emailProvided: Boolean(input.email),
+        uf: input.uf,
+        ceiCaepfProvided: Boolean(input.ceiCaepf),
+      }),
+    ],
+  );
+  const audit = auditResult.rows[0];
+  const persistedExecutions = [];
+
+  for (const execution of executions) {
+    const executionResult = await pool.query(
+      `INSERT INTO audita_audit_executions (
+         audit_id,
+         source_id,
+         source_name,
+         category,
+         mode,
+         status,
+         summary,
+         official_url,
+         missing_fields,
+         manual_instruction
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, source_id, source_name, category, mode, status, summary, official_url, missing_fields AS "missingFields", manual_instruction, created_at, updated_at`,
+      [
+        audit.id,
+        execution.sourceId,
+        execution.sourceName,
+        execution.category,
+        execution.mode,
+        execution.status,
+        execution.summary,
+        execution.officialUrl,
+        execution.missingFields,
+        execution.manualInstruction,
+      ],
+    );
+    const persistedExecution = executionResult.rows[0];
+    for (const evidence of execution.evidence) {
+      await pool.query(
+        `INSERT INTO audita_audit_evidence (
+           audit_id,
+           audit_execution_id,
+           evidence_type,
+           title,
+           value
+         )
+         VALUES ($1, $2, $3, $4, $5)`,
+        [audit.id, persistedExecution.id, evidence.type, evidence.title, evidence.value],
+      );
+    }
+    persistedExecutions.push(mapAuditExecution(persistedExecution, execution.evidence));
+  }
+
+  await pool.query(
+    `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+     VALUES ($1, 'audit.created', $2)`,
+    [
+      authContext.tenantId,
+      JSON.stringify({
+        auditId: audit.id,
+        documentType,
+        documentMasked,
+        status,
+        sources: executions.length,
+      }),
+    ],
+  );
+
+  return publicAudit(audit, persistedExecutions);
+}
+
+async function addAuditEvidence(request, auditId) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const body = await readJsonBody(request);
+  const executionId = String(body.executionId || "").trim();
+  const evidenceType = String(body.evidenceType || "").trim();
+  const title = String(body.title || "").trim();
+  const value = String(body.value || "").trim();
+  const fileName = String(body.fileName || "").trim();
+  const contentBase64 = String(body.contentBase64 || "").trim();
+
+  if (!executionId || !["summary", "official_url", "protocol", "pdf", "manual_step"].includes(evidenceType) || !title) {
+    return { invalid: true };
+  }
+
+  if (!pool || !dbReady) {
+    const audit = fallbackAudits.find((item) => String(item.id) === String(auditId));
+    const execution = audit?.executions.find((item) => String(item.id) === executionId);
+    if (!audit || !execution) {
+      return { notFound: true };
+    }
+    const evidence = {
+      id: String(Date.now()),
+      type: evidenceType,
+      title,
+      value,
+      fileName,
+      contentBase64,
+      createdAt: new Date().toISOString(),
+    };
+    execution.evidence.push(evidence);
+    execution.status = "completed";
+    execution.summary = value || `${title} anexado.`;
+    execution.updatedAt = new Date().toISOString();
+    audit.status = summarizeAuditStatus(audit.executions);
+    audit.updatedAt = new Date().toISOString();
+    return { evidence, audit: publicAudit(audit, audit.executions) };
+  }
+
+  const executionResult = await pool.query(
+    `SELECT ae.id, ae.audit_id
+     FROM audita_audit_executions ae
+     JOIN audita_audits a ON a.id = ae.audit_id
+     WHERE a.tenant_id = $1 AND a.id = $2 AND ae.id = $3
+     LIMIT 1`,
+    [authContext.tenantId, auditId, executionId],
+  );
+  const execution = executionResult.rows[0];
+  if (!execution) {
+    return { notFound: true };
+  }
+
+  const evidenceResult = await pool.query(
+    `INSERT INTO audita_audit_evidence (
+       audit_id,
+       audit_execution_id,
+       evidence_type,
+       title,
+       value,
+       file_name,
+       content_base64
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING id, evidence_type AS type, title, value, file_name AS "fileName", content_base64 AS "contentBase64", created_at AS "createdAt"`,
+    [auditId, executionId, evidenceType, title, value, fileName || null, contentBase64 || null],
+  );
+
+  await pool.query(
+    `UPDATE audita_audit_executions
+     SET status = 'completed',
+         summary = COALESCE(NULLIF($2, ''), summary),
+         updated_at = NOW()
+     WHERE id = $1`,
+    [executionId, value],
+  );
+
+  const statusResult = await pool.query(
+    `SELECT status FROM audita_audit_executions WHERE audit_id = $1`,
+    [auditId],
+  );
+  const newStatus = summarizeAuditStatus(statusResult.rows);
+  await pool.query("UPDATE audita_audits SET status = $1, updated_at = NOW() WHERE id = $2", [newStatus, auditId]);
+
+  return { evidence: evidenceResult.rows[0], audit: await getAudit(request, auditId) };
 }
 
 async function listApiSources(request) {
@@ -1353,6 +2458,67 @@ async function runAuditaAgent(request) {
 }
 
 async function handleApi(request, response, pathname) {
+  if (pathname === "/audit" && request.method === "GET") {
+    try {
+      const history = await auditService.listAuditHistory(request);
+      if (history.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, history);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audit_history_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/audit" && request.method === "POST") {
+    try {
+      request.body = await readJsonBody(request);
+      const result = await auditService.startAudit(request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_audit_request" });
+        return true;
+      }
+      sendJson(response, 202, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audit_start_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const publicAuditMatch = pathname.match(/^\/audit\/([0-9a-fA-F-]{36})$/);
+  if (publicAuditMatch && request.method === "GET") {
+    try {
+      const audit = await auditService.findAudit(publicAuditMatch[1], request);
+      if (audit?.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (!audit) {
+        sendJson(response, 404, { error: "audit_not_found" });
+        return true;
+      }
+      sendJson(response, 200, audit);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audit_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/health") {
     sendJson(response, 200, {
       status: "ok",
@@ -1388,15 +2554,23 @@ async function handleApi(request, response, pathname) {
   }
 
   if (pathname === "/api/auth/login" && request.method === "POST") {
-    if (!pool || !dbReady) {
-      sendJson(response, 503, { error: "database_unavailable" });
-      return true;
-    }
-
     try {
       const body = await readJsonBody(request);
       const email = String(body.email || "").trim().toLowerCase();
       const password = String(body.password || "");
+
+      if (!pool || !dbReady) {
+        await loadFallbackAuth();
+        const user = getFallbackUserByEmail(email);
+        if (!user || !verifyPassword(password, user.password_hash)) {
+          sendJson(response, 401, { error: "invalid_credentials" });
+          return true;
+        }
+        await createSession(response, request, user.id);
+        sendJson(response, 200, { ok: true, localOnly: true });
+        return true;
+      }
+
       await ensureBootstrapUserForLogin(email, password);
       const result = await pool.query(
         `SELECT id, password_hash
@@ -1423,11 +2597,79 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/auth/register" && request.method === "POST") {
+    try {
+      const body = await readJsonBody(request);
+      const email = String(body.email || "").trim().toLowerCase();
+      const password = String(body.password || "");
+      const name = String(body.name || "").trim();
+
+      if (!name || name.length < 2) {
+        sendJson(response, 400, { error: "invalid_name" });
+        return true;
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        sendJson(response, 400, { error: "invalid_email" });
+        return true;
+      }
+      if (password.length < 8) {
+        sendJson(response, 400, { error: "weak_password" });
+        return true;
+      }
+
+      if (!pool || !dbReady) {
+        await loadFallbackAuth();
+        const user = createFallbackUser({ email, name, password });
+        if (!user) {
+          sendJson(response, 409, { error: "email_already_registered" });
+          return true;
+        }
+        await saveFallbackAuth();
+        await createSession(response, request, user.id);
+        sendJson(response, 201, { ok: true, localOnly: true });
+        return true;
+      }
+
+      if (!defaultTenantId) {
+        await cacheDefaultTenant();
+      }
+      if (!defaultTenantId) {
+        sendJson(response, 503, { error: "tenant_unavailable" });
+        return true;
+      }
+
+      const result = await pool.query(
+        `INSERT INTO audita_users (tenant_id, email, name, role, password_hash, status)
+         VALUES ($1, $2, $3, 'member', $4, 'active')
+         RETURNING id`,
+        [defaultTenantId, email, name, hashPassword(password)],
+      );
+
+      await createSession(response, request, result.rows[0].id);
+      sendJson(response, 201, { ok: true });
+    } catch (error) {
+      if (error?.code === "23505") {
+        sendJson(response, 409, { error: "email_already_registered" });
+        return true;
+      }
+      sendJson(response, 400, {
+        error: "register_failed",
+        message: error instanceof Error ? error.message : "Invalid request",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/auth/logout" && request.method === "POST") {
     const cookies = parseCookies(request);
     const token = cookies[sessionCookieName];
-    if (pool && token) {
+    if (pool && dbReady && token) {
       await pool.query("DELETE FROM audita_sessions WHERE token_hash = $1", [hashToken(token)]);
+    }
+    if (token) {
+      await loadFallbackAuth();
+      fallbackSessions.delete(hashToken(token));
+      await saveFallbackAuth();
     }
     clearSessionCookie(request, response);
     sendJson(response, 200, { ok: true });
@@ -1609,6 +2851,92 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "agent_settings_save_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/audits" && request.method === "GET") {
+    try {
+      const audits = await listAudits(request);
+      if (audits.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, { audits });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audits_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/audits" && request.method === "POST") {
+    try {
+      const audit = await createAudit(request);
+      if (audit.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (audit.invalid) {
+        sendJson(response, 400, { error: "invalid_audit_request" });
+        return true;
+      }
+      sendJson(response, 201, { audit });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audit_create_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const auditEvidenceMatch = pathname.match(/^\/api\/audits\/(\d+|[A-Za-z0-9_-]+)\/evidence$/);
+  if (auditEvidenceMatch && request.method === "POST") {
+    try {
+      const result = await addAuditEvidence(request, auditEvidenceMatch[1]);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_audit_evidence" });
+        return true;
+      }
+      if (result.notFound) {
+        sendJson(response, 404, { error: "audit_execution_not_found" });
+        return true;
+      }
+      sendJson(response, 201, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audit_evidence_create_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const auditMatch = pathname.match(/^\/api\/audits\/(\d+|[A-Za-z0-9_-]+)$/);
+  if (auditMatch && request.method === "GET") {
+    try {
+      const audit = await getAudit(request, auditMatch[1]);
+      if (audit.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (audit.notFound) {
+        sendJson(response, 404, { error: "audit_not_found" });
+        return true;
+      }
+      sendJson(response, 200, { audit });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audit_query_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

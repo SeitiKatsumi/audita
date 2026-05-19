@@ -43,6 +43,7 @@ A stack final da aplicacao deve ser confirmada em ADR antes da primeira implemen
 - [Ambientes](docs/environments.md)
 - [Banco de dados](docs/database.md)
 - [Consultas governamentais](docs/government-consultations.md)
+- [Modulo de auditoria CPF/CNPJ](docs/audit-module.md)
 - [Deploy](docs/deployment.md)
 - [Seguranca](docs/security.md)
 - [Operacoes](docs/operations.md)

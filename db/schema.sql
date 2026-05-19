@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS audita_tenants (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -132,6 +134,72 @@ CREATE TABLE IF NOT EXISTS audita_consultation_requests (
   completed_at TIMESTAMPTZ
 );
 
+CREATE TABLE IF NOT EXISTS audita_audits (
+  id BIGSERIAL PRIMARY KEY,
+  public_id UUID UNIQUE,
+  tenant_id BIGINT,
+  requested_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  document_type TEXT NOT NULL CHECK (document_type IN ('cpf', 'cnpj')),
+  tipo_documento TEXT,
+  document_hash TEXT NOT NULL,
+  documento_hash TEXT,
+  document_masked TEXT NOT NULL,
+  subject_name TEXT,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'pending', 'running', 'partial', 'manual_required', 'success', 'completed', 'failed', 'blocked')),
+  score_nivel TEXT NOT NULL DEFAULT 'indefinido',
+  score_motivos JSONB NOT NULL DEFAULT '[]'::jsonb,
+  authorization_confirmed BOOLEAN NOT NULL DEFAULT false,
+  request_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_audit_executions (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES audita_audits(id) ON DELETE CASCADE,
+  source_id TEXT NOT NULL,
+  fonte TEXT,
+  source_name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('api', 'manual_guided', 'restricted', 'collector')),
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'pending', 'running', 'manual_required', 'success', 'completed', 'failed', 'blocked', 'not_applicable', 'unavailable')),
+  resultado TEXT NOT NULL DEFAULT 'indisponivel' CHECK (resultado IN ('nada_consta', 'consta', 'indisponivel', 'erro')),
+  dados_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  summary TEXT NOT NULL,
+  official_url TEXT,
+  pdf_path TEXT,
+  raw_text TEXT,
+  error_message TEXT,
+  missing_fields TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  manual_instruction TEXT,
+  started_at TIMESTAMPTZ,
+  finished_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_audit_evidence (
+  id BIGSERIAL PRIMARY KEY,
+  audit_id BIGINT NOT NULL REFERENCES audita_audits(id) ON DELETE CASCADE,
+  audit_execution_id BIGINT NOT NULL REFERENCES audita_audit_executions(id) ON DELETE CASCADE,
+  evidence_type TEXT NOT NULL CHECK (evidence_type IN ('summary', 'official_url', 'protocol', 'pdf', 'manual_step')),
+  title TEXT NOT NULL,
+  value TEXT,
+  file_name TEXT,
+  content_base64 TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_job_logs (
+  id BIGSERIAL PRIMARY KEY,
+  audit_query_id BIGINT REFERENCES audita_audits(id) ON DELETE CASCADE,
+  fonte TEXT,
+  level TEXT NOT NULL DEFAULT 'info',
+  message TEXT NOT NULL,
+  meta_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 ALTER TABLE audita_sources ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_audit_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_reports ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
@@ -139,6 +207,56 @@ ALTER TABLE audita_app_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_api_sources ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_agent_settings ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
 ALTER TABLE audita_consultation_requests ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
+ALTER TABLE audita_audits ADD COLUMN IF NOT EXISTS tenant_id BIGINT;
+ALTER TABLE audita_audits ADD COLUMN IF NOT EXISTS public_id UUID;
+ALTER TABLE audita_audits ADD COLUMN IF NOT EXISTS tipo_documento TEXT;
+ALTER TABLE audita_audits ADD COLUMN IF NOT EXISTS documento_hash TEXT;
+ALTER TABLE audita_audits ADD COLUMN IF NOT EXISTS score_nivel TEXT NOT NULL DEFAULT 'indefinido';
+ALTER TABLE audita_audits ADD COLUMN IF NOT EXISTS score_motivos JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS fonte TEXT;
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS resultado TEXT NOT NULL DEFAULT 'indisponivel';
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS dados_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS pdf_path TEXT;
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS raw_text TEXT;
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS error_message TEXT;
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE audita_audit_executions ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
+
+UPDATE audita_audits
+SET public_id = gen_random_uuid()
+WHERE public_id IS NULL;
+
+UPDATE audita_audits
+SET tipo_documento = document_type
+WHERE tipo_documento IS NULL;
+
+UPDATE audita_audits
+SET documento_hash = document_hash
+WHERE documento_hash IS NULL;
+
+UPDATE audita_audit_executions
+SET fonte = source_id
+WHERE fonte IS NULL;
+
+ALTER TABLE audita_audits DROP CONSTRAINT IF EXISTS audita_audits_status_check;
+ALTER TABLE audita_audits
+  ADD CONSTRAINT audita_audits_status_check
+  CHECK (status IN ('queued', 'pending', 'running', 'partial', 'manual_required', 'success', 'completed', 'failed', 'blocked'));
+
+ALTER TABLE audita_audit_executions DROP CONSTRAINT IF EXISTS audita_audit_executions_mode_check;
+ALTER TABLE audita_audit_executions
+  ADD CONSTRAINT audita_audit_executions_mode_check
+  CHECK (mode IN ('api', 'manual_guided', 'restricted', 'collector'));
+
+ALTER TABLE audita_audit_executions DROP CONSTRAINT IF EXISTS audita_audit_executions_status_check;
+ALTER TABLE audita_audit_executions
+  ADD CONSTRAINT audita_audit_executions_status_check
+  CHECK (status IN ('queued', 'pending', 'running', 'manual_required', 'success', 'completed', 'failed', 'blocked', 'not_applicable', 'unavailable'));
+
+ALTER TABLE audita_audit_executions DROP CONSTRAINT IF EXISTS audita_audit_executions_resultado_check;
+ALTER TABLE audita_audit_executions
+  ADD CONSTRAINT audita_audit_executions_resultado_check
+  CHECK (resultado IN ('nada_consta', 'consta', 'indisponivel', 'erro'));
 
 UPDATE audita_sources
 SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
@@ -168,6 +286,10 @@ UPDATE audita_consultation_requests
 SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
 WHERE tenant_id IS NULL;
 
+UPDATE audita_audits
+SET tenant_id = (SELECT id FROM audita_tenants WHERE slug = 'elevenmind-staging')
+WHERE tenant_id IS NULL;
+
 ALTER TABLE audita_sources ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_audit_events ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_reports ALTER COLUMN tenant_id SET NOT NULL;
@@ -175,6 +297,7 @@ ALTER TABLE audita_app_events ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_api_sources ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_agent_settings ALTER COLUMN tenant_id SET NOT NULL;
 ALTER TABLE audita_consultation_requests ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE audita_audits ALTER COLUMN tenant_id SET NOT NULL;
 
 DO $$
 BEGIN
@@ -232,6 +355,14 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
+DO $$
+BEGIN
+  ALTER TABLE audita_audits
+    ADD CONSTRAINT audita_audits_tenant_fk
+    FOREIGN KEY (tenant_id) REFERENCES audita_tenants(id) ON DELETE RESTRICT;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 CREATE INDEX IF NOT EXISTS audita_sources_tenant_idx ON audita_sources(tenant_id);
 CREATE INDEX IF NOT EXISTS audita_audit_events_tenant_idx ON audita_audit_events(tenant_id, status, severity);
 CREATE INDEX IF NOT EXISTS audita_reports_tenant_idx ON audita_reports(tenant_id, created_at DESC);
@@ -240,6 +371,12 @@ CREATE INDEX IF NOT EXISTS audita_consultation_requests_tenant_idx ON audita_con
 CREATE INDEX IF NOT EXISTS audita_consultation_requests_subject_idx ON audita_consultation_requests(tenant_id, subject_identifier_hash);
 CREATE INDEX IF NOT EXISTS audita_api_sources_tenant_idx ON audita_api_sources(tenant_id, status, category);
 CREATE INDEX IF NOT EXISTS audita_agent_settings_tenant_idx ON audita_agent_settings(tenant_id, status);
+CREATE INDEX IF NOT EXISTS audita_audits_tenant_idx ON audita_audits(tenant_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS audita_audits_public_id_idx ON audita_audits(public_id);
+CREATE INDEX IF NOT EXISTS audita_audits_document_idx ON audita_audits(tenant_id, document_hash);
+CREATE INDEX IF NOT EXISTS audita_audit_executions_audit_idx ON audita_audit_executions(audit_id, status);
+CREATE INDEX IF NOT EXISTS audita_audit_evidence_audit_idx ON audita_audit_evidence(audit_id, audit_execution_id);
+CREATE INDEX IF NOT EXISTS audita_job_logs_audit_idx ON audita_job_logs(audit_query_id, created_at DESC);
 
 DO $$
 BEGIN

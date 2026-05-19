@@ -14,10 +14,15 @@
           <img src="assets/audita-logo-white.svg" alt="Audita" />
         </div>
         <div class="login-heading">
-          <p class="eyebrow">Acesso seguro</p>
-          <h1>Audita</h1>
+          <p class="eyebrow" id="loginEyebrow">Acesso seguro</p>
+          <h1 id="loginTitle">Audita</h1>
           <p>Entre para acessar o ambiente de auditoria da sua organização.</p>
         </div>
+
+        <label class="hidden" id="loginNameField">
+          Nome
+          <input id="loginName" name="name" type="text" autocomplete="name" />
+        </label>
 
         <label>
           E-mail
@@ -29,7 +34,10 @@
           <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
         </label>
 
-        <button class="primary-action" type="submit">Entrar</button>
+        <div class="login-actions">
+          <button class="primary-action" id="loginSubmitButton" type="submit">Entrar</button>
+          <button class="login-toggle" id="loginModeToggle" type="button">Criar uma conta</button>
+        </div>
         <small class="login-error" id="loginError" role="alert"></small>
       </form>
     </section>
@@ -73,6 +81,7 @@
         <div class="actions">
             <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
             <button class="primary-action" id="newQueryButton">Nova consulta</button>
+            <button class="secondary-action" id="loginButton" type="button">Entrar</button>
             <button class="icon-button hidden" id="logoutButton" aria-label="Sair" title="Sair">S</button>
           </div>
         </header>
@@ -174,7 +183,7 @@
         </section>
 
         <section class="consultation-grid" id="consultas" data-page="consultas">
-          <article class="module agent-panel">
+          <article class="module agent-panel" data-page="integracoes">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Agente Audita</p>
@@ -207,7 +216,7 @@
             </div>
           </article>
 
-          <article class="module agent-settings-panel">
+          <article class="module agent-settings-panel" data-page="integracoes">
             <div class="module-header">
               <div>
                 <p class="eyebrow">IA generativa</p>
@@ -247,7 +256,164 @@
             <small class="login-error" id="agentSettingsError" role="alert"></small>
           </article>
 
-          <article class="module consultation-builder">
+          <article class="module audit-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Auditoria basica</p>
+                <h2>CPF/CNPJ completo</h2>
+              </div>
+              <span class="live" id="auditStatusLabel">14 fontes</span>
+            </div>
+
+            <form class="audit-form audit-wizard" id="auditForm">
+              <div class="audit-stepper" aria-label="Etapas da consulta">
+                <button class="active" type="button" data-audit-step-button="1"><span>1</span>Documentos</button>
+                <button type="button" data-audit-step-button="2"><span>2</span>Informacoes</button>
+                <button type="button" data-audit-step-button="3"><span>3</span>Resultados</button>
+              </div>
+
+              <section class="audit-step-panel" data-audit-step-panel="1">
+                <div class="audit-step-copy">
+                  <strong>Escolha os documentos</strong>
+                  <small>Selecione quais certidoes e consultas deseja gerar no resultado.</small>
+                </div>
+                <fieldset class="audit-options">
+                  <legend>Documentos desejados</legend>
+                  <label><input type="checkbox" name="auditView" value="receita_federal" /> Receita/CNPJ</label>
+                  <label><input type="checkbox" name="auditView" value="pgfn" /> PGFN/CND</label>
+                  <label><input type="checkbox" name="auditView" value="cndt" /> CNDT/TST</label>
+                  <label><input type="checkbox" name="auditView" value="trf1" /> TRF1</label>
+                  <label><input type="checkbox" name="auditView" value="tjdft" /> TJDFT</label>
+                  <label><input type="checkbox" name="auditView" value="fgts" /> FGTS/CEF</label>
+                  <label><input type="checkbox" name="auditView" value="portal_transparencia" /> Sancoes/CGU</label>
+                </fieldset>
+              </section>
+
+              <section class="audit-step-panel hidden" data-audit-step-panel="2">
+                <div class="audit-step-copy">
+                  <strong>Preencha os dados necessarios</strong>
+                  <small>O Audita pede CPF ou CNPJ conforme os documentos selecionados.</small>
+                </div>
+                <label class="hidden">
+                  Documento
+                  <select id="auditDocumentType" required>
+                    <option value="cpf">CPF</option>
+                    <option value="cnpj">CNPJ</option>
+                  </select>
+                </label>
+                <label>
+                  <span id="auditDocumentLabel">CPF</span>
+                  <input id="auditDocument" type="text" placeholder="Somente numeros ou formatado" autocomplete="off" required />
+                </label>
+                <fieldset class="audit-extra-fields hidden" id="tjdftFields">
+                  <legend>Dados para TJDFT</legend>
+                  <label>
+                    Primeiro nome
+                    <input id="auditFirstName" type="text" placeholder="Ex: Aparecido" autocomplete="given-name" />
+                  </label>
+                  <label>
+                    Nome da mae
+                    <input id="auditMotherName" type="text" placeholder="Nome completo da mae" autocomplete="off" />
+                  </label>
+                  <label>
+                    Nome do pai
+                    <input id="auditFatherName" type="text" placeholder="Nome completo do pai" autocomplete="off" />
+                  </label>
+                </fieldset>
+                <fieldset class="audit-extra-fields hidden" id="fgtsFields">
+                  <legend>Dados para FGTS/CRF</legend>
+                  <label>
+                    Tipo de inscricao
+                    <select id="fgtsRegistrationType">
+                      <option value="CNPJ">CNPJ</option>
+                      <option value="CEI">CEI</option>
+                    </select>
+                  </label>
+                  <label>
+                    Inscricao
+                    <input id="fgtsRegistration" type="text" placeholder="Somente numeros" autocomplete="off" />
+                  </label>
+                  <label>
+                    UF
+                    <select id="fgtsUf">
+                      <option value="">Selecione</option>
+                      <option value="AC">AC</option>
+                      <option value="AL">AL</option>
+                      <option value="AP">AP</option>
+                      <option value="AM">AM</option>
+                      <option value="BA">BA</option>
+                      <option value="CE">CE</option>
+                      <option value="DF">DF</option>
+                      <option value="ES">ES</option>
+                      <option value="GO">GO</option>
+                      <option value="MA">MA</option>
+                      <option value="MT">MT</option>
+                      <option value="MS">MS</option>
+                      <option value="MG">MG</option>
+                      <option value="PA">PA</option>
+                      <option value="PB">PB</option>
+                      <option value="PR">PR</option>
+                      <option value="PE">PE</option>
+                      <option value="PI">PI</option>
+                      <option value="RJ">RJ</option>
+                      <option value="RN">RN</option>
+                      <option value="RS">RS</option>
+                      <option value="RO">RO</option>
+                      <option value="RR">RR</option>
+                      <option value="SC">SC</option>
+                      <option value="SP">SP</option>
+                      <option value="SE">SE</option>
+                      <option value="TO">TO</option>
+                    </select>
+                  </label>
+                </fieldset>
+                <label class="audit-consent">
+                  <input id="auditAuthorization" type="checkbox" required />
+                  Confirmo autorizacao/base legal para consultar dados pessoais ou empresariais.
+                </label>
+              </section>
+
+              <section class="audit-step-panel audit-results-panel hidden" data-audit-step-panel="3">
+                <div class="module-header">
+                  <div>
+                    <p class="eyebrow">Resultado</p>
+                    <h2>Consulta consolidada</h2>
+                  </div>
+                  <span class="live" id="auditResultStatus">Aguardando</span>
+                </div>
+                <div class="audit-summary" id="auditSummary">
+                  <p class="empty-state">Informe CPF/CNPJ e escolha o que deseja visualizar.</p>
+                </div>
+                <div class="audit-source-list" id="auditSourceList"></div>
+              </section>
+
+              <div class="audit-wizard-actions">
+                <button class="secondary-action" id="auditBackButton" type="button">Voltar</button>
+                <button class="primary-action" id="auditNextButton" type="button">Continuar</button>
+                <button class="primary-action hidden" id="auditSubmitButton" type="submit">Consultar</button>
+              </div>
+            </form>
+
+            <small class="consultation-note">
+              Por enquanto o documento bruto nao e salvo: o Audita usa hash, mascara e mostra apenas os blocos escolhidos.
+            </small>
+            <small class="login-error" id="auditError" role="alert"></small>
+          </article>
+
+          <article class="module audit-history-panel">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Historico</p>
+                <h2>Documentos solicitados</h2>
+              </div>
+              <span class="live">Por usuario</span>
+            </div>
+            <div class="history-list audit-history-list" id="auditHistoryList">
+              <p class="empty-state">Nenhuma auditoria solicitada ainda.</p>
+            </div>
+          </article>
+
+          <article class="module consultation-builder" data-page="integracoes">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Fontes oficiais</p>
@@ -491,6 +657,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=20260520-ecosystem-modules"></script>
   </body>
 </html>

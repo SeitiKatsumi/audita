@@ -32,3 +32,5 @@ Thumbs.db
 *.sqlite
 *.db
 backups/
+storage/
+!storage/.gitkeep

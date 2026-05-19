@@ -7,10 +7,17 @@ const metricCards = document.querySelectorAll(".metrics article");
 const signalList = document.querySelector(".signal-list");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
+const loginNameField = document.querySelector("#loginNameField");
+const loginName = document.querySelector("#loginName");
 const loginEmail = document.querySelector("#loginEmail");
 const loginPassword = document.querySelector("#loginPassword");
 const loginError = document.querySelector("#loginError");
+const loginSubmitButton = document.querySelector("#loginSubmitButton");
+const loginModeToggle = document.querySelector("#loginModeToggle");
+const loginEyebrow = document.querySelector("#loginEyebrow");
+const loginTitle = document.querySelector("#loginTitle");
 const logoutButton = document.querySelector("#logoutButton");
+const loginButton = document.querySelector("#loginButton");
 const newQueryButton = document.querySelector("#newQueryButton");
 const environmentName = document.querySelector("#environmentName");
 const environmentDetail = document.querySelector("#environmentDetail");
@@ -26,6 +33,7 @@ const subjectIdentifier = document.querySelector("#subjectIdentifier");
 const consultationError = document.querySelector("#consultationError");
 const moduleList = document.querySelector("#moduleList");
 const consultationHistory = document.querySelector("#consultationHistory");
+const auditHistoryList = document.querySelector("#auditHistoryList");
 const sourceForm = document.querySelector("#sourceForm");
 const sourceName = document.querySelector("#sourceName");
 const sourceAgency = document.querySelector("#sourceAgency");
@@ -49,6 +57,31 @@ const agentProviderStatus = document.querySelector("#agentProviderStatus");
 const agentSystemPrompt = document.querySelector("#agentSystemPrompt");
 const agentSettingsStatus = document.querySelector("#agentSettingsStatus");
 const agentSettingsError = document.querySelector("#agentSettingsError");
+const auditForm = document.querySelector("#auditForm");
+const auditDocumentType = document.querySelector("#auditDocumentType");
+const auditDocument = document.querySelector("#auditDocument");
+const auditDocumentLabel = document.querySelector("#auditDocumentLabel");
+const tjdftFields = document.querySelector("#tjdftFields");
+const auditFirstName = document.querySelector("#auditFirstName");
+const auditMotherName = document.querySelector("#auditMotherName");
+const auditFatherName = document.querySelector("#auditFatherName");
+const fgtsFields = document.querySelector("#fgtsFields");
+const fgtsRegistrationType = document.querySelector("#fgtsRegistrationType");
+const fgtsRegistration = document.querySelector("#fgtsRegistration");
+const fgtsUf = document.querySelector("#fgtsUf");
+const auditAuthorization = document.querySelector("#auditAuthorization");
+const auditError = document.querySelector("#auditError");
+const auditSummary = document.querySelector("#auditSummary");
+const auditSourceList = document.querySelector("#auditSourceList");
+const auditResultStatus = document.querySelector("#auditResultStatus");
+const auditStatusLabel = document.querySelector("#auditStatusLabel");
+const auditResultsPanel = document.querySelector(".audit-results-panel");
+const auditStepButtons = document.querySelectorAll("[data-audit-step-button]");
+const auditStepPanels = document.querySelectorAll("[data-audit-step-panel]");
+const auditBackButton = document.querySelector("#auditBackButton");
+const auditNextButton = document.querySelector("#auditNextButton");
+const auditSubmitButton = document.querySelector("#auditSubmitButton");
+let selectedAuditViews = [];
 const assistantQueryForm = document.querySelector("#assistantQueryForm");
 const assistantSource = document.querySelector("#assistantSource");
 const assistantCode = document.querySelector("#assistantCode");
@@ -57,6 +90,60 @@ const assistantResult = document.querySelector("#assistantResult");
 const assistantSourceStatus = document.querySelector("#assistantSourceStatus");
 
 let phase = 0;
+let auditWizardStep = 1;
+let loginMode = "login";
+
+const auditSourceConfig = {
+  receita_federal: {
+    appliesTo: ["cnpj"],
+    documentTypes: ["cnpj"],
+    automatic: true,
+    badge: "auto CNPJ",
+    note: "Automatico para dados cadastrais de CNPJ via APIs publicas.",
+  },
+  portal_transparencia: {
+    appliesTo: ["cpf", "cnpj"],
+    documentTypes: ["cpf", "cnpj"],
+    automatic: true,
+    badge: "auto com chave",
+    note: "Automatico por CPF/CNPJ quando PORTAL_TRANSPARENCIA_API_KEY estiver configurada.",
+  },
+  pgfn: {
+    appliesTo: ["cpf", "cnpj"],
+    documentTypes: ["cpf", "cnpj"],
+    automatic: false,
+    badge: "credencial",
+    note: "Exige adesao/credenciais Conecta Gov antes de automatizar.",
+  },
+  cndt: {
+    appliesTo: ["cpf", "cnpj"],
+    documentTypes: ["cpf", "cnpj"],
+    automatic: false,
+    badge: "manual",
+    note: "Fluxo oficial possui captcha/formulario; nao esta automatico neste MVP.",
+  },
+  trf1: {
+    appliesTo: ["cpf", "cnpj"],
+    documentTypes: ["cpf", "cnpj"],
+    automatic: false,
+    badge: "mapear",
+    note: "Precisa mapear endpoint oficial da certidao antes de automatizar.",
+  },
+  tjdft: {
+    appliesTo: ["cpf"],
+    documentTypes: ["cpf"],
+    automatic: true,
+    badge: "auto",
+    note: "Usa o wizard oficial cnc.tjdft.jus.br para baixar as 4 certidoes.",
+  },
+  fgts: {
+    appliesTo: ["cnpj"],
+    documentTypes: ["cnpj"],
+    automatic: true,
+    badge: "auto portal",
+    note: "Usa o portal oficial da Caixa CRF/FGTS quando o acesso nao estiver bloqueado.",
+  },
+};
 
 const pageMeta = {
   overview: {
@@ -117,6 +204,217 @@ function setActivePage(page) {
   navLinks.forEach((link) => {
     link.classList.toggle("active", link.getAttribute("href") === `#${activePage}`);
   });
+}
+
+function moveEcosystemModules() {
+  const ecosystemPanel = document.querySelector("#integracoes");
+  const parent = ecosystemPanel?.parentElement;
+  if (!parent) {
+    return;
+  }
+
+  const modules = [
+    document.querySelector(".agent-panel"),
+    document.querySelector(".consultation-builder"),
+    document.querySelector(".agent-settings-panel"),
+  ].filter(Boolean);
+
+  for (const module of modules.reverse()) {
+    parent.insertBefore(module, ecosystemPanel);
+  }
+}
+
+function setAuditWizardStep(step) {
+  auditWizardStep = Math.min(3, Math.max(1, step));
+  auditStepPanels.forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.auditStepPanel !== String(auditWizardStep));
+  });
+  auditStepButtons.forEach((button) => {
+    const buttonStep = Number(button.dataset.auditStepButton);
+    button.classList.toggle("active", buttonStep === auditWizardStep);
+    button.classList.toggle("done", buttonStep < auditWizardStep);
+  });
+
+  auditBackButton?.classList.toggle("hidden", auditWizardStep === 1);
+  auditNextButton?.classList.toggle("hidden", auditWizardStep !== 1);
+  auditSubmitButton?.classList.toggle("hidden", auditWizardStep !== 2);
+  auditResultsPanel?.classList.toggle("hidden", auditWizardStep !== 3);
+}
+
+function getSelectedAuditDocumentTypes() {
+  const selectedInputs = [...auditForm.querySelectorAll("input[name='auditView']:checked")];
+  const types = new Set();
+  selectedInputs.forEach((input) => {
+    const config = auditSourceConfig[input.value];
+    (config?.documentTypes || config?.appliesTo || ["cpf", "cnpj"]).forEach((type) => types.add(type));
+  });
+  return [...types];
+}
+
+function getExclusiveAuditDocumentType(sourceId) {
+  const config = auditSourceConfig[sourceId];
+  const types = config?.documentTypes || config?.appliesTo || ["cpf", "cnpj"];
+  return types.length === 1 ? types[0] : null;
+}
+
+function keepCompatibleAuditSelection(changedInput) {
+  if (!changedInput?.checked) {
+    return;
+  }
+  const exclusiveType = getExclusiveAuditDocumentType(changedInput.value);
+  if (!exclusiveType) {
+    return;
+  }
+  auditForm.querySelectorAll("input[name='auditView']:checked").forEach((input) => {
+    const inputExclusiveType = getExclusiveAuditDocumentType(input.value);
+    if (input !== changedInput && inputExclusiveType && inputExclusiveType !== exclusiveType) {
+      input.checked = false;
+    }
+  });
+}
+
+function updateAuditDocumentTypeOptions() {
+  const exclusiveTypes = new Set(
+    [...auditForm.querySelectorAll("input[name='auditView']:checked")]
+      .map((input) => getExclusiveAuditDocumentType(input.value))
+      .filter(Boolean),
+  );
+  const selectedTypes = exclusiveTypes.size === 1 ? [...exclusiveTypes] : getSelectedAuditDocumentTypes();
+  [...auditDocumentType.options].forEach((option) => {
+    option.hidden = selectedTypes.length > 0 && !selectedTypes.includes(option.value);
+    option.disabled = selectedTypes.length > 0 && !selectedTypes.includes(option.value);
+  });
+  if (selectedTypes.length && !selectedTypes.includes(auditDocumentType.value)) {
+    auditDocumentType.value = selectedTypes[0];
+  }
+  if (selectedTypes.length === 1) {
+    auditDocumentType.value = selectedTypes[0];
+  }
+}
+
+function validateAuditStep(step) {
+  auditError.textContent = "";
+  updateAuditSourceAvailability({ resetSelection: false });
+
+  if (step === 1) {
+    if (!selectedAuditViews.length) {
+      auditError.textContent = "Selecione pelo menos um documento para continuar.";
+      return false;
+    }
+    updateAuditDocumentTypeOptions();
+    return true;
+  }
+
+  if (step === 2) {
+    const requiredFields = [auditDocument, auditAuthorization];
+    if (selectedAuditViews.includes("tjdft")) {
+      requiredFields.push(auditFirstName, auditMotherName, auditFatherName);
+    }
+    if (selectedAuditViews.includes("fgts")) {
+      requiredFields.push(fgtsRegistrationType, fgtsRegistration, fgtsUf);
+    }
+    const invalidField = requiredFields.find((field) => field && !field.checkValidity());
+    if (invalidField) {
+      invalidField.reportValidity();
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function updateAuditSourceAvailability({ resetSelection = true } = {}) {
+  if (!auditForm || !auditDocumentType) {
+    return;
+  }
+
+  const tipoDocumento = auditDocumentType.value;
+  updateAuditDocumentTypeOptions();
+  const documentCopy = {
+    cpf: {
+      label: "CPF",
+      placeholder: "Digite o CPF",
+      inputMode: "numeric",
+      maxLength: 14,
+    },
+    cnpj: {
+      label: "CNPJ",
+      placeholder: "Digite o CNPJ",
+      inputMode: "numeric",
+      maxLength: 18,
+    },
+  }[tipoDocumento];
+
+  if (documentCopy && auditDocument) {
+    if (auditDocumentLabel) {
+      auditDocumentLabel.textContent = documentCopy.label;
+    }
+    auditDocument.placeholder = documentCopy.placeholder;
+    auditDocument.inputMode = documentCopy.inputMode;
+    auditDocument.maxLength = documentCopy.maxLength;
+  }
+
+  const inputs = [...auditForm.querySelectorAll("input[name='auditView']")];
+  inputs.forEach((input) => {
+    const config = auditSourceConfig[input.value] || {
+      appliesTo: ["cpf", "cnpj"],
+      documentTypes: ["cpf", "cnpj"],
+      automatic: false,
+      badge: "manual",
+      note: "Fonte ainda nao esta automatica.",
+    };
+    const label = input.closest("label");
+    const applies = config.appliesTo.includes(tipoDocumento);
+    const sourceDocumentTypes = config.documentTypes || config.appliesTo;
+    const documentCompatible = sourceDocumentTypes.includes(tipoDocumento);
+    const selectableInCurrentStep = auditWizardStep === 1 || documentCompatible;
+    const enabled = applies && config.automatic;
+
+    input.disabled = !selectableInCurrentStep;
+    if (!selectableInCurrentStep) {
+      input.checked = false;
+    }
+    label?.classList.toggle("audit-option-hidden", auditWizardStep === 2 && !input.checked);
+    label?.classList.toggle("audit-option-disabled", !selectableInCurrentStep);
+    label?.classList.toggle("audit-option-auto", input.checked && selectableInCurrentStep);
+    if (label) {
+      label.title = selectableInCurrentStep
+        ? config.note
+        : `Nao se aplica a ${tipoDocumento.toUpperCase()} nesta consulta.`;
+      label.querySelector(".audit-option-badge")?.remove();
+    }
+
+  });
+
+  selectedAuditViews = inputs.filter((input) => input.checked && !input.disabled).map((input) => input.value);
+  const needsTjdftFields = selectedAuditViews.includes("tjdft");
+  const needsFgtsFields = selectedAuditViews.includes("fgts");
+  tjdftFields?.classList.toggle("hidden", !needsTjdftFields);
+  [auditFirstName, auditMotherName, auditFatherName].forEach((input) => {
+    if (input) {
+      input.required = needsTjdftFields;
+      if (!needsTjdftFields) {
+        input.value = "";
+      }
+    }
+  });
+  fgtsFields?.classList.toggle("hidden", !needsFgtsFields);
+  [fgtsRegistrationType, fgtsRegistration, fgtsUf].forEach((input) => {
+    if (input) {
+      input.required = needsFgtsFields;
+      if (!needsFgtsFields) {
+        input.value = input === fgtsRegistrationType ? "CNPJ" : "";
+      }
+    }
+  });
+  if (needsFgtsFields && fgtsRegistration && !fgtsRegistration.value) {
+    fgtsRegistration.value = String(auditDocument?.value || "").replace(/\D/g, "");
+  }
+
+  if (auditStatusLabel) {
+    auditStatusLabel.textContent =
+      selectedAuditViews.length === 1 ? "1 selecionado" : `${selectedAuditViews.length} selecionados`;
+  }
 }
 
 function drawSignal() {
@@ -210,9 +508,37 @@ function formatStatusLabel(value) {
     completed: "Concluída",
     planned: "Planejada",
     sandbox: "Sandbox",
+    manual_required: "Manual guiada",
+    not_applicable: "Nao aplicavel",
+    blocked: "Bloqueada",
+    pending: "Pendente",
+    running: "Consultando",
+    success: "Concluida",
+    failed: "Falhou",
+    unavailable: "Indisponivel",
+    api: "Automatica",
+    manual_guided: "Manual guiada",
+    restricted: "Restrita",
+    summary: "Resumo",
+    official_url: "Fonte",
+    protocol: "Protocolo",
+    pdf: "PDF",
+    manual_step: "Passo manual",
   };
 
   return labels[value] || value;
+}
+
+function formatAuditFieldLabel(field) {
+  const labels = {
+    name: "nome/razao social",
+    motherName: "nome da mae",
+    birthDate: "data de nascimento",
+    email: "e-mail",
+    uf: "UF/TRT",
+    ceiCaepf: "CEI/CAEPF",
+  };
+  return labels[field] || field;
 }
 
 function escapeHtml(value) {
@@ -302,6 +628,377 @@ function renderConsultations(consultations) {
       `,
     )
     .join("");
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "";
+  }
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return String(value);
+  }
+}
+
+function renderAuditHistory(audits) {
+  if (!auditHistoryList) {
+    return;
+  }
+  if (!Array.isArray(audits) || audits.length === 0) {
+    auditHistoryList.innerHTML = `<p class="empty-state">Nenhuma auditoria solicitada ainda.</p>`;
+    return;
+  }
+
+  auditHistoryList.innerHTML = audits
+    .map((audit) => {
+      const pdfs = Array.isArray(audit.pdfs) ? audit.pdfs.filter((pdf) => pdf.url) : [];
+      const sourceCount = Array.isArray(audit.fontes) ? audit.fontes.length : 0;
+      return `
+        <article class="history-item audit-history-item">
+          <div>
+            <strong>${escapeHtml((audit.tipoDocumento || "").toUpperCase())} ${escapeHtml(audit.documento || "")}</strong>
+            <small>${escapeHtml(formatDateTime(audit.createdAt))} | ${sourceCount} fonte${sourceCount === 1 ? "" : "s"}</small>
+          </div>
+          <span class="module-status ${escapeHtml(audit.status || "")}">${escapeHtml(formatStatusLabel(audit.status || ""))}</span>
+          <p>Risco: ${escapeHtml(audit.scoreRisco?.nivel || "indefinido")}</p>
+          ${
+            pdfs.length
+              ? `<div class="history-pdf-list">${pdfs
+                  .map(
+                    (pdf) =>
+                      `<a href="${escapeHtml(pdf.url)}" target="_blank" rel="noreferrer">${escapeHtml(pdf.titulo || "PDF")}</a>`,
+                  )
+                  .join("")}</div>`
+              : `<small class="audit-warning">Nenhum PDF disponivel ainda para esta consulta.</small>`
+          }
+        </article>
+      `;
+    })
+    .join("");
+}
+
+async function loadAuditHistory() {
+  if (!auditHistoryList) {
+    return;
+  }
+  try {
+    const response = await fetch("/audit", { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      renderAuditHistory([]);
+      return;
+    }
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    renderAuditHistory(data.audits || []);
+  } catch {
+    renderAuditHistory([]);
+  }
+}
+
+function renderAudit(audit) {
+  if (!audit) {
+    auditResultStatus.textContent = "Aguardando";
+    auditSummary.innerHTML = `<p class="empty-state">Informe CPF/CNPJ e escolha o que deseja visualizar.</p>`;
+    auditSourceList.innerHTML = "";
+    return;
+  }
+
+  const contractMode = Array.isArray(audit.resultados);
+  const executions = contractMode
+    ? audit.resultados.map((result) => ({
+        id: result.fonte,
+        sourceId: result.fonte,
+        sourceName: formatAuditSourceName(result.fonte),
+        category: "audit",
+        mode: "collector",
+        status: result.status,
+        summary: result.erro || result.dados?.resumo || summarizeAuditResult(result),
+        officialUrl: result.dados?.officialUrl || getAuditOfficialUrl(result.fonte),
+        missingFields: [],
+        evidence: buildAuditEvidence(result),
+      }))
+    : Array.isArray(audit.executions)
+      ? audit.executions
+      : [];
+  const documentType = audit.documentType || audit.tipoDocumento;
+  const documentMasked = audit.documentMasked || audit.documento;
+  const visibleExecutions = executions.filter((execution) => shouldShowAuditExecution(execution, documentType));
+  const totals = executions.reduce(
+    (counts, execution) => {
+      counts[execution.status] = (counts[execution.status] || 0) + 1;
+      return counts;
+    },
+    {},
+  );
+  auditResultStatus.textContent = visibleExecutions.some((execution) => ["completed", "success"].includes(execution.status))
+    ? "Resultado"
+    : formatStatusLabel(audit.status);
+  auditSummary.innerHTML = `
+    <div class="audit-summary-grid">
+      <span><strong>${escapeHtml(documentType?.toUpperCase() || "")}</strong><small>${escapeHtml(documentMasked || "")}</small></span>
+      <span><strong>${visibleExecutions.length}</strong><small>blocos selecionados</small></span>
+      <span><strong>${visibleExecutions.filter((item) => ["completed", "success"].includes(item.status)).length}</strong><small>automaticos</small></span>
+      <span><strong>${visibleExecutions.filter((item) => ["manual_required", "blocked"].includes(item.status)).length}</strong><small>pendentes</small></span>
+      <span><strong>${totals.not_applicable || 0}</strong><small>nao aplicaveis</small></span>
+    </div>
+  `;
+
+  if (!visibleExecutions.length) {
+    auditSourceList.innerHTML = `<p class="empty-state">Nenhum bloco selecionado para este documento.</p>`;
+    return;
+  }
+
+  auditSourceList.innerHTML = visibleExecutions
+    .map((execution) => {
+      const missingFields = Array.isArray(execution.missingFields) ? execution.missingFields : [];
+      const evidence = Array.isArray(execution.evidence) ? execution.evidence : [];
+      const normalizedEvidence = evidence
+        .filter((item) => item.type !== "official_url")
+        .filter((item) => item.type !== "manual_step" || !["completed", "success"].includes(execution.status));
+      return `
+        <article class="audit-source-item">
+          <div class="audit-source-head">
+            <div>
+              <strong>${escapeHtml(execution.sourceName)}</strong>
+              <small>${escapeHtml(execution.category)} | ${escapeHtml(formatStatusLabel(execution.mode))}</small>
+            </div>
+            <span class="module-status ${escapeHtml(execution.status)}">${escapeHtml(formatStatusLabel(execution.status))}</span>
+          </div>
+          <p>${escapeHtml(execution.summary || "")}</p>
+          ${
+            missingFields.length
+              ? `<small class="audit-warning">Campos pendentes: ${escapeHtml(missingFields.map(formatAuditFieldLabel).join(", "))}</small>`
+              : ""
+          }
+          ${["pending", "running"].includes(execution.status) ? `<div class="audit-loading" aria-label="Consulta em andamento"><span></span><span></span><span></span><small>Consultando fonte...</small></div>` : ""}
+          ${
+            normalizedEvidence.length
+              ? `<div class="audit-evidence-list">${normalizedEvidence
+                  .map(
+                    (item) => `
+                      <span>
+                        <strong>${escapeHtml(item.title || formatStatusLabel(item.type))}</strong>
+                        ${item.value ? `<small>${escapeHtml(item.value)}</small>` : ""}
+                        ${item.href ? `<a href="${escapeHtml(item.href)}" target="_blank" rel="noreferrer">Baixar PDF</a>` : ""}
+                      </span>
+                    `,
+                  )
+                  .join("")}</div>`
+              : ""
+          }
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function buildAuditEvidence(result) {
+  const dados = result.dados || {};
+  if (result.fonte === "tjdft") {
+    const items = [
+      {
+        type: "summary",
+        title: "Certidões",
+        value: `${dados.certidoesBaixadas || 0}/${dados.totalCertidoes || 4} PDFs baixados`,
+      },
+    ];
+
+    const certificates = Array.isArray(dados.certidoes) ? dados.certidoes : [];
+    items.push(
+      ...certificates.map((certificate) => ({
+        type: "pdf",
+        title: certificate.tipo || "Certidao TJDFT",
+        value: certificate.pdfPath ? "PDF baixado" : certificate.errorMessage || "PDF nao disponivel",
+        href: toPdfPublicUrl(certificate.pdfPath),
+      })),
+    );
+
+    if (Array.isArray(dados.certidoesComAnalisePendente) && dados.certidoesComAnalisePendente.length) {
+      items.push({
+        type: "summary",
+        title: "Análise",
+        value: "OCR/leitura do PDF pendente",
+      });
+    }
+
+    if (Array.isArray(dados.certidoesComApontamento) && dados.certidoesComApontamento.length) {
+      items.push({
+        type: "summary",
+        title: "Apontamentos",
+        value: dados.certidoesComApontamento.join(", "),
+      });
+    }
+
+    if (Array.isArray(dados.certidoesComFalha) && dados.certidoesComFalha.length) {
+      items.push({
+        type: "summary",
+        title: "Falhas",
+        value: dados.certidoesComFalha.join(", "),
+      });
+    }
+
+    return items;
+  }
+
+  return Object.entries(dados)
+    .filter(([key]) => key !== "officialUrl")
+    .slice(0, 4)
+    .map(([key, value]) => ({
+      type: "summary",
+      title: formatAuditDataKey(key),
+      value: typeof value === "object" ? JSON.stringify(value).slice(0, 220) : String(value),
+    }));
+}
+
+function formatAuditDataKey(key) {
+  const labels = {
+    totalCertidoes: "Certidões",
+    certidoesBaixadas: "PDFs baixados",
+    certidoesComAnalisePendente: "Análise pendente",
+    certidoesComApontamento: "Apontamentos",
+    certidoesComFalha: "Falhas",
+    resumo: "Resumo",
+  };
+  return labels[key] || key;
+}
+
+function toPdfPublicUrl(pdfPath) {
+  if (!pdfPath) {
+    return "";
+  }
+  const fileName = String(pdfPath).split(/[\\/]/).pop();
+  return fileName ? `/storage/pdfs/${encodeURIComponent(fileName)}` : "";
+}
+
+function getAuditOfficialUrl(sourceId) {
+  const urls = {
+    receita_federal: "https://brasilapi.com.br/docs#tag/CNPJ",
+    pgfn: "https://www.gov.br/receitafederal/pt-br/servicos/certidoes/consultar-certidoes-emitidas",
+    cndt: "https://www.tst.jus.br/certidao1",
+    trf1: "https://sistemas.trf1.jus.br/certidao/",
+    tjdft: "https://cnc.tjdft.jus.br/solicitacao-externa",
+    fgts: "https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf",
+    portal_transparencia: "https://www.portaltransparencia.gov.br/sancoes",
+  };
+  return urls[sourceId] || "";
+}
+
+function formatAuditSourceName(sourceId) {
+  const names = {
+    receita_federal: "Receita Federal / CNPJ",
+    pgfn: "PGFN / Certidao Conjunta",
+    cndt: "CNDT / TST",
+    trf1: "TRF1 / Certidao",
+    tjdft: "TJDFT / Certidoes",
+    fgts: "CEF / Regularidade FGTS",
+    portal_transparencia: "Portal da Transparencia / CGU",
+  };
+  return names[sourceId] || sourceId;
+}
+
+function summarizeAuditResult(result) {
+  if (result.status === "pending" || result.status === "running") {
+    return "Consulta em andamento.";
+  }
+  if (result.resultado === "consta") {
+    return "Foram encontrados registros nesta fonte.";
+  }
+  if (result.resultado === "nada_consta") {
+    return "Nada consta nesta fonte.";
+  }
+  if (result.status === "success" && result.resultado === "indisponivel") {
+    return "Consulta concluida; analise automatica do conteudo pendente.";
+  }
+  return "Fonte indisponivel ou pendente de integracao real.";
+}
+
+function shouldShowAuditExecution(execution, documentType) {
+  if (!selectedAuditViews.length) {
+    return false;
+  }
+
+  const sourceId = execution.sourceId || "";
+  const legacyMap = {
+    "brasilapi-cnpj": "receita_federal",
+    "portal-transparencia": "portal_transparencia",
+    "receita-pgfn": "pgfn",
+    "tst-cndt": "cndt",
+    "fgts-crf": "fgts",
+  };
+  return selectedAuditViews.includes(sourceId) || selectedAuditViews.includes(legacyMap[sourceId]);
+}
+
+async function loadAudits() {
+  if (!auditSourceList) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/audits", { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      renderAudit(null);
+      return;
+    }
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    const latest = Array.isArray(data.audits) ? data.audits[0] : null;
+    if (!latest) {
+      renderAudit(null);
+      return;
+    }
+
+    const detail = await fetch(`/api/audits/${latest.id}`, { headers: { accept: "application/json" } });
+    if (!detail.ok) {
+      renderAudit(latest);
+      return;
+    }
+    const detailData = await detail.json();
+    renderAudit(detailData.audit);
+  } catch {
+    renderAudit(null);
+  }
+}
+
+async function loadAuditResult(consultaId, attempts = 180) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const response = await fetch(`/audit/${consultaId}`, { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      return;
+    }
+    const audit = await response.json();
+    renderAudit(audit);
+    if (!["pending", "running", "partial"].includes(audit.status)) {
+      await loadAuditHistory();
+      return;
+    }
+    if (attempt === attempts - 1) {
+      auditResultStatus.textContent = "Ainda processando";
+      await loadAuditHistory();
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve("");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 function renderSources(sources) {
@@ -479,16 +1176,43 @@ async function loadSources() {
   }
 }
 
-function showLogin(message = "") {
+function setLoginMode(mode) {
+  loginMode = mode === "register" ? "register" : "login";
+  const isRegister = loginMode === "register";
+  loginNameField?.classList.toggle("hidden", !isRegister);
+  if (loginName) {
+    loginName.required = isRegister;
+  }
+  if (loginPassword) {
+    loginPassword.autocomplete = isRegister ? "new-password" : "current-password";
+  }
+  if (loginEyebrow) {
+    loginEyebrow.textContent = isRegister ? "Cadastro seguro" : "Acesso seguro";
+  }
+  if (loginTitle) {
+    loginTitle.textContent = isRegister ? "Criar conta" : "Audita";
+  }
+  if (loginSubmitButton) {
+    loginSubmitButton.textContent = isRegister ? "Cadastrar e entrar" : "Entrar";
+  }
+  if (loginModeToggle) {
+    loginModeToggle.textContent = isRegister ? "Ja tenho uma conta" : "Criar uma conta";
+  }
+}
+
+function showLogin(message = "", mode = loginMode) {
+  setLoginMode(mode);
   loginScreen.classList.remove("hidden");
   loginError.textContent = message;
+  loginButton?.classList.add("hidden");
   logoutButton.classList.add("hidden");
-  loginEmail.focus();
+  (loginMode === "register" ? loginName : loginEmail)?.focus();
 }
 
 function hideLogin() {
   loginScreen.classList.add("hidden");
   loginError.textContent = "";
+  loginButton?.classList.add("hidden");
 }
 
 function renderAgentSettings(settings) {
@@ -576,29 +1300,59 @@ async function loadDashboard() {
   }
 }
 
+loginModeToggle?.addEventListener("click", () => {
+  loginError.textContent = "";
+  setLoginMode(loginMode === "register" ? "login" : "register");
+});
+
+loginButton?.addEventListener("click", () => {
+  showLogin("", "login");
+});
+
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   loginError.textContent = "";
 
   try {
-    const response = await fetch("/api/auth/login", {
+    const payload = {
+      email: loginEmail.value,
+      password: loginPassword.value,
+    };
+    if (loginMode === "register") {
+      payload.name = loginName.value;
+    }
+
+    const response = await fetch(loginMode === "register" ? "/api/auth/register" : "/api/auth/login", {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        email: loginEmail.value,
-        password: loginPassword.value,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
-      showLogin("E-mail ou senha invalidos.");
+      const messages = {
+        invalid_name: "Informe seu nome para criar a conta.",
+        invalid_email: "Informe um e-mail valido.",
+        weak_password: "Use uma senha com pelo menos 8 caracteres.",
+        email_already_registered: "Este e-mail ja tem cadastro. Entre com sua senha.",
+      };
+      let message = loginMode === "register" ? "Nao foi possivel criar a conta." : "E-mail ou senha invalidos.";
+      try {
+        const data = await response.json();
+        message = messages[data.error] || message;
+      } catch {
+        // Keep the friendly default message.
+      }
+      showLogin(message, loginMode);
       return;
     }
 
+    loginName.value = "";
     loginPassword.value = "";
     hideLogin();
     logoutButton.classList.remove("hidden");
     await loadDashboard();
+    await loadAudits();
+    await loadAuditHistory();
     await loadConsultations();
     await loadSources();
     await loadAgentSettings();
@@ -760,6 +1514,146 @@ assistantQueryForm.addEventListener("submit", async (event) => {
   }
 });
 
+auditForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!validateAuditStep(2)) {
+    return;
+  }
+
+  auditError.textContent = "";
+  auditResultStatus.textContent = "Criando";
+  setAuditWizardStep(3);
+
+  try {
+    selectedAuditViews = [...auditForm.querySelectorAll("input[name='auditView']:checked:not(:disabled)")].map((input) => input.value);
+    if (selectedAuditViews.length === 0) {
+      auditError.textContent = "Nenhuma fonte automatica aplicavel foi selecionada para este documento.";
+      auditResultStatus.textContent = "Aguardando";
+      return;
+    }
+
+    const response = await fetch("/audit", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        tipoDocumento: auditDocumentType.value,
+        documento: auditDocument.value,
+        fontes: selectedAuditViews,
+        extraFields: {
+          firstName: auditFirstName?.value || "",
+          motherName: auditMotherName?.value || "",
+          fatherName: auditFatherName?.value || "",
+          fgtsRegistrationType: fgtsRegistrationType?.value || "",
+          fgtsRegistration: fgtsRegistration?.value || "",
+          fgtsUf: fgtsUf?.value || "",
+        },
+      }),
+    });
+
+    if (response.status === 401) {
+      showLogin("Entre para criar auditorias.");
+      return;
+    }
+
+    if (!response.ok) {
+      auditError.textContent = "Confira CPF/CNPJ e tente novamente.";
+      auditResultStatus.textContent = "Falhou";
+      return;
+    }
+
+    const data = await response.json();
+    auditSummary.innerHTML = `<p class="empty-state">Consulta ${escapeHtml(data.consultaId)} criada. Coletando fontes selecionadas...</p>`;
+    await loadAuditResult(data.consultaId);
+  } catch {
+    auditError.textContent = "Falha ao comunicar com a API de auditoria.";
+    auditResultStatus.textContent = "Falhou";
+  }
+});
+
+auditNextButton?.addEventListener("click", () => {
+  if (validateAuditStep(1)) {
+    setAuditWizardStep(2);
+  }
+});
+
+auditBackButton?.addEventListener("click", () => {
+  setAuditWizardStep(Math.max(1, auditWizardStep - 1));
+});
+
+auditStepButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const targetStep = Number(button.dataset.auditStepButton);
+    if (targetStep === 3) {
+      setAuditWizardStep(3);
+      return;
+    }
+    if (targetStep <= auditWizardStep || validateAuditStep(auditWizardStep)) {
+      setAuditWizardStep(targetStep);
+    }
+  });
+});
+
+auditForm.querySelectorAll("input[name='auditView']").forEach((input) => {
+  input.addEventListener("change", () => {
+    keepCompatibleAuditSelection(input);
+    updateAuditDocumentTypeOptions();
+    updateAuditSourceAvailability({ resetSelection: false });
+  });
+});
+
+auditDocumentType?.addEventListener("change", () => {
+  if (auditDocument) {
+    auditDocument.value = "";
+  }
+  auditError.textContent = "";
+  renderAudit(null);
+  updateAuditSourceAvailability();
+  setAuditWizardStep(1);
+});
+
+auditSourceList.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".audit-evidence-form");
+  if (!form) {
+    return;
+  }
+
+  event.preventDefault();
+  auditError.textContent = "";
+
+  const file = form.elements.file.files[0];
+  const contentBase64 = await readFileAsBase64(file);
+
+  try {
+    const response = await fetch(`/api/audits/${form.dataset.auditId}/evidence`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        executionId: form.dataset.executionId,
+        evidenceType: form.elements.evidenceType.value,
+        title: form.elements.title.value,
+        value: form.elements.value.value,
+        fileName: file?.name || "",
+        contentBase64,
+      }),
+    });
+
+    if (response.status === 401) {
+      showLogin("Entre para anexar evidencias.");
+      return;
+    }
+
+    if (!response.ok) {
+      auditError.textContent = "Nao foi possivel anexar a evidencia.";
+      return;
+    }
+
+    const data = await response.json();
+    renderAudit(data.audit);
+  } catch {
+    auditError.textContent = "Falha ao anexar evidencia.";
+  }
+});
+
 consultationForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   consultationError.textContent = "";
@@ -808,7 +1702,10 @@ window.addEventListener("hashchange", () => {
 setInterval(rotateRisk, 1400);
 drawSignal();
 
+moveEcosystemModules();
 setActivePage(getActivePage());
+updateAuditSourceAvailability();
+setAuditWizardStep(1);
 await loadAppConfig();
 await loadModules();
 const authState = await loadAuthState();
@@ -817,8 +1714,13 @@ if (authState.authRequired && !authState.user) {
 } else {
   if (authState.user) {
     logoutButton.classList.remove("hidden");
+    loginButton?.classList.add("hidden");
+  } else {
+    loginButton?.classList.remove("hidden");
   }
   await loadDashboard();
+  await loadAudits();
+  await loadAuditHistory();
   await loadConsultations();
   await loadSources();
   await loadAgentSettings();

@@ -1,16 +1,19 @@
-FROM node:20-alpine
+FROM mcr.microsoft.com/playwright:v1.53.0-jammy
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package*.json ./
+RUN npm ci --omit=dev
 
 COPY index.html styles.css app.js server.mjs ./
 COPY assets ./assets
 COPY db ./db
+COPY collectors ./collectors
+COPY services ./services
+COPY docs ./docs
 
 EXPOSE 8080
 
