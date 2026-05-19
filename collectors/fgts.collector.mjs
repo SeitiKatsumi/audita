@@ -36,7 +36,7 @@ async function withTimeout(promise, timeoutMs, message) {
 export async function collect(input) {
   const extra = input.extraFields || {};
   const registrationType = String(extra.fgtsRegistrationType || extra.tipoInscricaoFgts || "CNPJ").trim().toUpperCase();
-  const registration = String(extra.fgtsRegistration || extra.inscricaoFgts || input.documento || "").replace(/\D/g, "");
+  const registration = String(extra.fgtsRegistration || extra.inscricaoFgts || extra.cnpjDocument || input.documento || "").replace(/\D/g, "");
   const uf = String(extra.fgtsUf || extra.ufFgts || "").trim().toUpperCase();
   const missingFields = [];
 

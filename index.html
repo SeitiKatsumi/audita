@@ -80,7 +80,6 @@
           </div>
         <div class="actions">
             <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
-            <button class="primary-action" id="newQueryButton">Nova consulta</button>
             <button class="secondary-action" id="loginButton" type="button">Entrar</button>
             <button class="icon-button hidden" id="logoutButton" aria-label="Sair" title="Sair">S</button>
           </div>
@@ -259,7 +258,7 @@
           <article class="module audit-panel">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Auditoria basica</p>
+                <p class="eyebrow">Auditoria básica</p>
                 <h2>CPF/CNPJ completo</h2>
               </div>
               <span class="live" id="auditStatusLabel">14 fontes</span>
@@ -268,14 +267,14 @@
             <form class="audit-form audit-wizard" id="auditForm">
               <div class="audit-stepper" aria-label="Etapas da consulta">
                 <button class="active" type="button" data-audit-step-button="1"><span>1</span>Documentos</button>
-                <button type="button" data-audit-step-button="2"><span>2</span>Informacoes</button>
+                <button type="button" data-audit-step-button="2"><span>2</span>Informações</button>
                 <button type="button" data-audit-step-button="3"><span>3</span>Resultados</button>
               </div>
 
               <section class="audit-step-panel" data-audit-step-panel="1">
                 <div class="audit-step-copy">
                   <strong>Escolha os documentos</strong>
-                  <small>Selecione quais certidoes e consultas deseja gerar no resultado.</small>
+                  <small>Selecione quais certidões e consultas deseja gerar no resultado.</small>
                 </div>
                 <fieldset class="audit-options">
                   <legend>Documentos desejados</legend>
@@ -285,13 +284,13 @@
                   <label><input type="checkbox" name="auditView" value="trf1" /> TRF1</label>
                   <label><input type="checkbox" name="auditView" value="tjdft" /> TJDFT</label>
                   <label><input type="checkbox" name="auditView" value="fgts" /> FGTS/CEF</label>
-                  <label><input type="checkbox" name="auditView" value="portal_transparencia" /> Sancoes/CGU</label>
+                  <label><input type="checkbox" name="auditView" value="portal_transparencia" /> Sanções/CGU</label>
                 </fieldset>
               </section>
 
               <section class="audit-step-panel hidden" data-audit-step-panel="2">
                 <div class="audit-step-copy">
-                  <strong>Preencha os dados necessarios</strong>
+                  <strong>Preencha os dados necessários</strong>
                   <small>O Audita pede CPF ou CNPJ conforme os documentos selecionados.</small>
                 </div>
                 <label class="hidden">
@@ -301,9 +300,17 @@
                     <option value="cnpj">CNPJ</option>
                   </select>
                 </label>
-                <label>
-                  <span id="auditDocumentLabel">CPF</span>
-                  <input id="auditDocument" type="text" placeholder="Somente numeros ou formatado" autocomplete="off" required />
+                <label class="hidden">
+                  <span id="auditDocumentLabel">Documento principal</span>
+                  <input id="auditDocument" type="text" autocomplete="off" />
+                </label>
+                <label id="auditCpfField">
+                  CPF
+                  <input id="auditCpfDocument" type="text" placeholder="Digite o CPF" inputmode="numeric" maxlength="14" autocomplete="off" />
+                </label>
+                <label id="auditCnpjField" class="hidden">
+                  CNPJ
+                  <input id="auditCnpjDocument" type="text" placeholder="Digite o CNPJ" inputmode="numeric" maxlength="18" autocomplete="off" />
                 </label>
                 <fieldset class="audit-extra-fields hidden" id="tjdftFields">
                   <legend>Dados para TJDFT</legend>
@@ -312,26 +319,56 @@
                     <input id="auditFirstName" type="text" placeholder="Ex: Aparecido" autocomplete="given-name" />
                   </label>
                   <label>
-                    Nome da mae
-                    <input id="auditMotherName" type="text" placeholder="Nome completo da mae" autocomplete="off" />
+                    Nome da mãe
+                    <input id="auditMotherName" type="text" placeholder="Nome completo da mãe" autocomplete="off" />
                   </label>
                   <label>
                     Nome do pai
                     <input id="auditFatherName" type="text" placeholder="Nome completo do pai" autocomplete="off" />
                   </label>
                 </fieldset>
+                <fieldset class="audit-extra-fields hidden" id="trf1Fields">
+                  <legend>Dados para TRF1/CJF</legend>
+                  <label>
+                    Tipo de certidão
+                    <select id="trf1CertificateType">
+                      <option value="Criminal">Criminal</option>
+                      <option value="Cível">Cível</option>
+                    </select>
+                  </label>
+                  <label>
+                    Órgãos
+                    <select id="trf1Orgaos">
+                      <option value="Todos os 4 órgãos selecionados">Todos os 4 órgãos selecionados</option>
+                      <option value="TRF1">TRF1</option>
+                      <option value="TRF2">TRF2</option>
+                      <option value="TRF3">TRF3</option>
+                      <option value="TRF4">TRF4</option>
+                      <option value="TRF5">TRF5</option>
+                      <option value="TRF6">TRF6</option>
+                    </select>
+                  </label>
+                  <label>
+                    E-mail
+                    <input id="trf1Email" type="email" placeholder="E-mail para receber a certidão" autocomplete="email" />
+                  </label>
+                  <label>
+                    Nome social
+                    <input id="trf1SocialName" type="text" placeholder="Opcional" autocomplete="off" />
+                  </label>
+                </fieldset>
                 <fieldset class="audit-extra-fields hidden" id="fgtsFields">
                   <legend>Dados para FGTS/CRF</legend>
                   <label>
-                    Tipo de inscricao
+                    Tipo de inscrição
                     <select id="fgtsRegistrationType">
                       <option value="CNPJ">CNPJ</option>
                       <option value="CEI">CEI</option>
                     </select>
                   </label>
                   <label>
-                    Inscricao
-                    <input id="fgtsRegistration" type="text" placeholder="Somente numeros" autocomplete="off" />
+                    Inscrição
+                    <input id="fgtsRegistration" type="text" placeholder="Somente números" autocomplete="off" />
                   </label>
                   <label>
                     UF
@@ -369,7 +406,7 @@
                 </fieldset>
                 <label class="audit-consent">
                   <input id="auditAuthorization" type="checkbox" required />
-                  Confirmo autorizacao/base legal para consultar dados pessoais ou empresariais.
+                  Confirmo autorização/base legal para consultar dados pessoais ou empresariais.
                 </label>
               </section>
 
@@ -395,7 +432,7 @@
             </form>
 
             <small class="consultation-note">
-              Por enquanto o documento bruto nao e salvo: o Audita usa hash, mascara e mostra apenas os blocos escolhidos.
+              Por enquanto o documento bruto não é salvo: o Audita usa hash, máscara e mostra apenas os blocos escolhidos.
             </small>
             <small class="login-error" id="auditError" role="alert"></small>
           </article>
@@ -403,10 +440,10 @@
           <article class="module audit-history-panel">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Historico</p>
+                <p class="eyebrow">Histórico</p>
                 <h2>Documentos solicitados</h2>
               </div>
-              <span class="live">Por usuario</span>
+              <span class="live">Por usuário</span>
             </div>
             <div class="history-list audit-history-list" id="auditHistoryList">
               <p class="empty-state">Nenhuma auditoria solicitada ainda.</p>
@@ -447,16 +484,6 @@
               Identificadores são mascarados e armazenados como hash para rastreabilidade.
             </small>
             <small class="login-error" id="consultationError" role="alert"></small>
-          </article>
-
-          <article class="module">
-            <div class="module-header">
-              <div>
-                <p class="eyebrow">Catálogo</p>
-                <h2>Módulos previstos</h2>
-              </div>
-            </div>
-            <div class="module-list" id="moduleList"></div>
           </article>
 
           <article class="module consultation-history">

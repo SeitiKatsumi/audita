@@ -572,6 +572,10 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.audit-history-panel {
+  grid-column: 1 / -1;
+}
+
 .agent-form,
 .assistant-query-form {
   display: grid;

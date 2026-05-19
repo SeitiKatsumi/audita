@@ -198,7 +198,7 @@ const auditSources = [
     category: "trabalhista",
     scope: "cpf_cnpj",
     mode: "manual_guided",
-    officialUrl: "https://www.tst.jus.br/web/acesso-a-informacao/carta-de-servicos-a-cidadania/servicos-processuais/cndt",
+    officialUrl: "https://cndt-certidao.tst.jus.br/inicio.faces",
     requiredFields: ["document"],
     optionalFields: ["name"],
     summary: "Certidao Negativa de Debitos Trabalhistas para CPF ou CNPJ.",

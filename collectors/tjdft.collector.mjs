@@ -41,7 +41,8 @@ export function discoverIntegrationStrategy() {
 }
 
 export async function collect(input) {
-  if (input.tipoDocumento !== "cpf") {
+  const cpfDocument = String(input.extraFields?.cpfDocument || input.documento || "").replace(/\D/g, "");
+  if (input.tipoDocumento !== "cpf" && !input.extraFields?.cpfDocument) {
     return unavailableResult(fonte, "TJDFT Nada Consta neste fluxo esta mapeado para CPF.", {
       officialUrl: OFFICIAL_URL,
       integrationStrategy: discoverIntegrationStrategy(),
@@ -88,7 +89,7 @@ export async function collect(input) {
   try {
     const collectorTimeoutMs = envNumber("TJDFT_COLLECTOR_TIMEOUT_MS", 180000);
     const results = await withTimeout(
-      collectAllCertificates({ context, input, firstName, motherName, fatherName }),
+      collectAllCertificates({ context, input: { ...input, documento: cpfDocument }, firstName, motherName, fatherName }),
       collectorTimeoutMs,
       `TJDFT excedeu o tempo maximo de ${Math.round(collectorTimeoutMs / 1000)}s.`,
     );

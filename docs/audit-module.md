@@ -39,10 +39,10 @@ Retorna documento mascarado, status geral, resultados por fonte e score de risco
 - `receita_federal`: real para CNPJ cadastral usando API publica; Conecta Gov fica preparado por env.
 - `portal_transparencia`: real quando `PORTAL_TRANSPARENCIA_API_KEY` estiver configurada.
 - `pgfn`: skeleton para API oficial Conecta Gov CND.
-- `cndt`: skeleton porque o fluxo oficial pode exigir captcha.
-- `trf1`: skeleton aguardando mapeamento do endpoint oficial.
-- `tjdft`: skeleton aguardando mapeamento do endpoint oficial.
-- `fgts`: skeleton/manual para CRF Caixa.
+- `cndt`: collector real de investigacao do portal oficial. Preenche CPF/CNPJ e para ao detectar captcha/reCAPTCHA; nao burla validacao humana.
+- `trf1`: collector Playwright para a Certidão Unificada/CJF. Preenche tipo de certidão, órgãos, CPF/CNPJ, e-mail e nome social opcional; depende do portal estar acessível pela rede de execução.
+- `tjdft`: real via wizard oficial, com download de PDFs quando o portal permite.
+- `fgts`: real via portal oficial da Caixa quando o acesso nao estiver bloqueado por protecao anti-bot.
 
 ## Variaveis De Ambiente
 
@@ -50,6 +50,13 @@ Retorna documento mascarado, status geral, resultados por fonte e score de risco
 AUDIT_CACHE_TTL_SECONDS=900
 AUDIT_COLLECTOR_TIMEOUT_MS=12000
 AUDIT_COLLECTOR_RETRIES=1
+CNDT_HEADLESS=true
+CNDT_COLLECTOR_TIMEOUT_MS=60000
+CNDT_STEP_TIMEOUT_MS=30000
+TRF1_HEADLESS=true
+TRF1_COLLECTOR_TIMEOUT_MS=120000
+TRF1_STEP_TIMEOUT_MS=45000
+TRF1_NETWORK_IDLE_TIMEOUT_MS=20000
 PORTAL_TRANSPARENCIA_API_KEY=...
 CONECTA_GOV_CNPJ_TOKEN=...
 CONECTA_GOV_CND_TOKEN=...
@@ -70,6 +77,7 @@ Nunca versionar credenciais reais.
 ## Limitações E Riscos
 
 - Captcha, login gov.br, certificado digital e pagamento impedem automacao direta confiavel.
+- CNDT/TST exige captcha/reCAPTCHA no portal de emissao; a evolucao correta e uma etapa assistida para o usuario resolver a validacao e o app continuar o download na mesma sessao.
 - Mudancas de layout e bloqueio de IP podem quebrar fluxos baseados em portal.
 - Consultas por CPF/CNPJ exigem base legal, rastreabilidade e cuidado com LGPD.
 - Fontes skeleton devem retornar `unavailable` em vez de simular sucesso.

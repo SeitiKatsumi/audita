@@ -61,10 +61,19 @@ const auditForm = document.querySelector("#auditForm");
 const auditDocumentType = document.querySelector("#auditDocumentType");
 const auditDocument = document.querySelector("#auditDocument");
 const auditDocumentLabel = document.querySelector("#auditDocumentLabel");
+const auditCpfField = document.querySelector("#auditCpfField");
+const auditCpfDocument = document.querySelector("#auditCpfDocument");
+const auditCnpjField = document.querySelector("#auditCnpjField");
+const auditCnpjDocument = document.querySelector("#auditCnpjDocument");
 const tjdftFields = document.querySelector("#tjdftFields");
 const auditFirstName = document.querySelector("#auditFirstName");
 const auditMotherName = document.querySelector("#auditMotherName");
 const auditFatherName = document.querySelector("#auditFatherName");
+const trf1Fields = document.querySelector("#trf1Fields");
+const trf1CertificateType = document.querySelector("#trf1CertificateType");
+const trf1Orgaos = document.querySelector("#trf1Orgaos");
+const trf1Email = document.querySelector("#trf1Email");
+const trf1SocialName = document.querySelector("#trf1SocialName");
 const fgtsFields = document.querySelector("#fgtsFields");
 const fgtsRegistrationType = document.querySelector("#fgtsRegistrationType");
 const fgtsRegistration = document.querySelector("#fgtsRegistration");
@@ -99,49 +108,49 @@ const auditSourceConfig = {
     documentTypes: ["cnpj"],
     automatic: true,
     badge: "auto CNPJ",
-    note: "Automatico para dados cadastrais de CNPJ via APIs publicas.",
+    note: "Automático para dados cadastrais de CNPJ via APIs públicas.",
   },
   portal_transparencia: {
     appliesTo: ["cpf", "cnpj"],
     documentTypes: ["cpf", "cnpj"],
     automatic: true,
     badge: "auto com chave",
-    note: "Automatico por CPF/CNPJ quando PORTAL_TRANSPARENCIA_API_KEY estiver configurada.",
+    note: "Automático por CPF/CNPJ quando PORTAL_TRANSPARENCIA_API_KEY estiver configurada.",
   },
   pgfn: {
     appliesTo: ["cpf", "cnpj"],
     documentTypes: ["cpf", "cnpj"],
     automatic: false,
     badge: "credencial",
-    note: "Exige adesao/credenciais Conecta Gov antes de automatizar.",
+    note: "Exige adesão/credenciais Conecta Gov antes de automatizar.",
   },
   cndt: {
     appliesTo: ["cpf", "cnpj"],
     documentTypes: ["cpf", "cnpj"],
     automatic: false,
     badge: "manual",
-    note: "Fluxo oficial possui captcha/formulario; nao esta automatico neste MVP.",
+    note: "Fluxo oficial possui captcha/formulário; não está automático neste MVP.",
   },
   trf1: {
     appliesTo: ["cpf", "cnpj"],
     documentTypes: ["cpf", "cnpj"],
     automatic: false,
     badge: "mapear",
-    note: "Precisa mapear endpoint oficial da certidao antes de automatizar.",
+    note: "Precisa mapear endpoint oficial da certidão antes de automatizar.",
   },
   tjdft: {
     appliesTo: ["cpf"],
     documentTypes: ["cpf"],
     automatic: true,
     badge: "auto",
-    note: "Usa o wizard oficial cnc.tjdft.jus.br para baixar as 4 certidoes.",
+    note: "Usa o wizard oficial cnc.tjdft.jus.br para baixar as 4 certidões.",
   },
   fgts: {
     appliesTo: ["cnpj"],
     documentTypes: ["cnpj"],
     automatic: true,
     badge: "auto portal",
-    note: "Usa o portal oficial da Caixa CRF/FGTS quando o acesso nao estiver bloqueado.",
+    note: "Usa o portal oficial da Caixa CRF/FGTS quando o acesso não estiver bloqueado.",
   },
 };
 
@@ -251,6 +260,51 @@ function getSelectedAuditDocumentTypes() {
   return [...types];
 }
 
+function getAuditDocumentRequirements() {
+  const selectedInputs = [...auditForm.querySelectorAll("input[name='auditView']:checked")];
+  const requiredTypes = new Set();
+  let hasFlexibleSource = false;
+  selectedInputs.forEach((input) => {
+    const config = auditSourceConfig[input.value];
+    const sourceTypes = config?.documentTypes || config?.appliesTo || ["cpf", "cnpj"];
+    if (sourceTypes.length === 1) {
+      requiredTypes.add(sourceTypes[0]);
+    } else {
+      hasFlexibleSource = true;
+    }
+  });
+
+  if (requiredTypes.size === 0 && hasFlexibleSource) {
+    requiredTypes.add("cpf");
+  }
+
+  return {
+    needsCpf: selectedInputs.length === 0 || requiredTypes.has("cpf"),
+    needsCnpj: requiredTypes.has("cnpj"),
+  };
+}
+
+function syncAuditPrimaryDocument() {
+  const { needsCpf, needsCnpj } = getAuditDocumentRequirements();
+  const cpfValue = auditCpfDocument?.value || "";
+  const cnpjValue = auditCnpjDocument?.value || "";
+  const primaryType = needsCpf ? "cpf" : "cnpj";
+  const primaryValue = primaryType === "cpf" ? cpfValue : cnpjValue;
+
+  if (auditDocumentType) {
+    auditDocumentType.value = primaryType;
+  }
+  if (auditDocument) {
+    auditDocument.value = primaryValue;
+  }
+
+  if (needsCnpj && fgtsRegistration && !fgtsRegistration.value) {
+    fgtsRegistration.value = cnpjValue.replace(/\D/g, "");
+  }
+
+  return { primaryType, primaryValue, cpfValue, cnpjValue, needsCpf, needsCnpj };
+}
+
 function getExclusiveAuditDocumentType(sourceId) {
   const config = auditSourceConfig[sourceId];
   const types = config?.documentTypes || config?.appliesTo || ["cpf", "cnpj"];
@@ -258,31 +312,14 @@ function getExclusiveAuditDocumentType(sourceId) {
 }
 
 function keepCompatibleAuditSelection(changedInput) {
-  if (!changedInput?.checked) {
-    return;
-  }
-  const exclusiveType = getExclusiveAuditDocumentType(changedInput.value);
-  if (!exclusiveType) {
-    return;
-  }
-  auditForm.querySelectorAll("input[name='auditView']:checked").forEach((input) => {
-    const inputExclusiveType = getExclusiveAuditDocumentType(input.value);
-    if (input !== changedInput && inputExclusiveType && inputExclusiveType !== exclusiveType) {
-      input.checked = false;
-    }
-  });
+  return changedInput;
 }
 
 function updateAuditDocumentTypeOptions() {
-  const exclusiveTypes = new Set(
-    [...auditForm.querySelectorAll("input[name='auditView']:checked")]
-      .map((input) => getExclusiveAuditDocumentType(input.value))
-      .filter(Boolean),
-  );
-  const selectedTypes = exclusiveTypes.size === 1 ? [...exclusiveTypes] : getSelectedAuditDocumentTypes();
+  const selectedTypes = getSelectedAuditDocumentTypes();
   [...auditDocumentType.options].forEach((option) => {
-    option.hidden = selectedTypes.length > 0 && !selectedTypes.includes(option.value);
-    option.disabled = selectedTypes.length > 0 && !selectedTypes.includes(option.value);
+    option.hidden = false;
+    option.disabled = false;
   });
   if (selectedTypes.length && !selectedTypes.includes(auditDocumentType.value)) {
     auditDocumentType.value = selectedTypes[0];
@@ -306,9 +343,20 @@ function validateAuditStep(step) {
   }
 
   if (step === 2) {
-    const requiredFields = [auditDocument, auditAuthorization];
+    syncAuditPrimaryDocument();
+    const { needsCpf, needsCnpj } = getAuditDocumentRequirements();
+    const requiredFields = [auditAuthorization];
+    if (needsCpf) {
+      requiredFields.push(auditCpfDocument);
+    }
+    if (needsCnpj) {
+      requiredFields.push(auditCnpjDocument);
+    }
     if (selectedAuditViews.includes("tjdft")) {
       requiredFields.push(auditFirstName, auditMotherName, auditFatherName);
+    }
+    if (selectedAuditViews.includes("trf1")) {
+      requiredFields.push(trf1CertificateType, trf1Orgaos, trf1Email);
     }
     if (selectedAuditViews.includes("fgts")) {
       requiredFields.push(fgtsRegistrationType, fgtsRegistration, fgtsUf);
@@ -328,31 +376,27 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
     return;
   }
 
-  const tipoDocumento = auditDocumentType.value;
-  updateAuditDocumentTypeOptions();
-  const documentCopy = {
-    cpf: {
-      label: "CPF",
-      placeholder: "Digite o CPF",
-      inputMode: "numeric",
-      maxLength: 14,
-    },
-    cnpj: {
-      label: "CNPJ",
-      placeholder: "Digite o CNPJ",
-      inputMode: "numeric",
-      maxLength: 18,
-    },
-  }[tipoDocumento];
-
-  if (documentCopy && auditDocument) {
-    if (auditDocumentLabel) {
-      auditDocumentLabel.textContent = documentCopy.label;
-    }
-    auditDocument.placeholder = documentCopy.placeholder;
-    auditDocument.inputMode = documentCopy.inputMode;
-    auditDocument.maxLength = documentCopy.maxLength;
+  const { needsCpf, needsCnpj } = getAuditDocumentRequirements();
+  const tipoDocumento = needsCpf ? "cpf" : "cnpj";
+  if (auditDocumentType) {
+    auditDocumentType.value = tipoDocumento;
   }
+  updateAuditDocumentTypeOptions();
+  auditCpfField?.classList.toggle("hidden", !needsCpf);
+  auditCnpjField?.classList.toggle("hidden", !needsCnpj);
+  if (auditCpfDocument) {
+    auditCpfDocument.required = needsCpf;
+    if (!needsCpf) {
+      auditCpfDocument.value = "";
+    }
+  }
+  if (auditCnpjDocument) {
+    auditCnpjDocument.required = needsCnpj;
+    if (!needsCnpj) {
+      auditCnpjDocument.value = "";
+    }
+  }
+  syncAuditPrimaryDocument();
 
   const inputs = [...auditForm.querySelectorAll("input[name='auditView']")];
   inputs.forEach((input) => {
@@ -361,33 +405,29 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
       documentTypes: ["cpf", "cnpj"],
       automatic: false,
       badge: "manual",
-      note: "Fonte ainda nao esta automatica.",
+      note: "Fonte ainda não está automática.",
     };
     const label = input.closest("label");
-    const applies = config.appliesTo.includes(tipoDocumento);
     const sourceDocumentTypes = config.documentTypes || config.appliesTo;
     const documentCompatible = sourceDocumentTypes.includes(tipoDocumento);
-    const selectableInCurrentStep = auditWizardStep === 1 || documentCompatible;
-    const enabled = applies && config.automatic;
+    const selectableInCurrentStep = true;
 
-    input.disabled = !selectableInCurrentStep;
-    if (!selectableInCurrentStep) {
-      input.checked = false;
-    }
+    input.disabled = false;
     label?.classList.toggle("audit-option-hidden", auditWizardStep === 2 && !input.checked);
-    label?.classList.toggle("audit-option-disabled", !selectableInCurrentStep);
-    label?.classList.toggle("audit-option-auto", input.checked && selectableInCurrentStep);
+    label?.classList.toggle("audit-option-disabled", false);
+    label?.classList.toggle("audit-option-auto", input.checked);
     if (label) {
-      label.title = selectableInCurrentStep
+      label.title = documentCompatible
         ? config.note
-        : `Nao se aplica a ${tipoDocumento.toUpperCase()} nesta consulta.`;
+        : `${config.note} O Audita pedirá o documento compatível quando necessário.`;
       label.querySelector(".audit-option-badge")?.remove();
     }
 
   });
 
-  selectedAuditViews = inputs.filter((input) => input.checked && !input.disabled).map((input) => input.value);
+  selectedAuditViews = inputs.filter((input) => input.checked).map((input) => input.value);
   const needsTjdftFields = selectedAuditViews.includes("tjdft");
+  const needsTrf1Fields = selectedAuditViews.includes("trf1");
   const needsFgtsFields = selectedAuditViews.includes("fgts");
   tjdftFields?.classList.toggle("hidden", !needsTjdftFields);
   [auditFirstName, auditMotherName, auditFatherName].forEach((input) => {
@@ -398,6 +438,18 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
       }
     }
   });
+  trf1Fields?.classList.toggle("hidden", !needsTrf1Fields);
+  [trf1CertificateType, trf1Orgaos, trf1Email].forEach((input) => {
+    if (input) {
+      input.required = needsTrf1Fields;
+      if (!needsTrf1Fields) {
+        input.value = input === trf1CertificateType ? "Criminal" : input === trf1Orgaos ? "Todos os 4 órgãos selecionados" : "";
+      }
+    }
+  });
+  if (trf1SocialName && !needsTrf1Fields) {
+    trf1SocialName.value = "";
+  }
   fgtsFields?.classList.toggle("hidden", !needsFgtsFields);
   [fgtsRegistrationType, fgtsRegistration, fgtsUf].forEach((input) => {
     if (input) {
@@ -408,7 +460,7 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
     }
   });
   if (needsFgtsFields && fgtsRegistration && !fgtsRegistration.value) {
-    fgtsRegistration.value = String(auditDocument?.value || "").replace(/\D/g, "");
+    fgtsRegistration.value = String(auditCnpjDocument?.value || auditDocument?.value || "").replace(/\D/g, "");
   }
 
   if (auditStatusLabel) {
@@ -509,14 +561,14 @@ function formatStatusLabel(value) {
     planned: "Planejada",
     sandbox: "Sandbox",
     manual_required: "Manual guiada",
-    not_applicable: "Nao aplicavel",
+    not_applicable: "Não aplicável",
     blocked: "Bloqueada",
     pending: "Pendente",
     running: "Consultando",
-    success: "Concluida",
+    success: "Concluída",
     failed: "Falhou",
-    unavailable: "Indisponivel",
-    api: "Automatica",
+    unavailable: "Indisponível",
+    api: "Automática",
     manual_guided: "Manual guiada",
     restricted: "Restrita",
     summary: "Resumo",
@@ -531,8 +583,8 @@ function formatStatusLabel(value) {
 
 function formatAuditFieldLabel(field) {
   const labels = {
-    name: "nome/razao social",
-    motherName: "nome da mae",
+    name: "nome/razão social",
+    motherName: "nome da mãe",
     birthDate: "data de nascimento",
     email: "e-mail",
     uf: "UF/TRT",
@@ -591,6 +643,10 @@ function renderModules(modules) {
   consultationModule.innerHTML = modules
     .map((module) => `<option value="${escapeHtml(module.slug)}">${escapeHtml(module.name)}</option>`)
     .join("");
+
+  if (!moduleList) {
+    return;
+  }
 
   moduleList.innerHTML = modules
     .map(
@@ -673,7 +729,7 @@ function renderAuditHistory(audits) {
                       `<a href="${escapeHtml(pdf.url)}" target="_blank" rel="noreferrer">${escapeHtml(pdf.titulo || "PDF")}</a>`,
                   )
                   .join("")}</div>`
-              : `<small class="audit-warning">Nenhum PDF disponivel ainda para esta consulta.</small>`
+              : `<small class="audit-warning">Nenhum PDF disponível ainda para esta consulta.</small>`
           }
         </article>
       `;
@@ -743,9 +799,9 @@ function renderAudit(audit) {
     <div class="audit-summary-grid">
       <span><strong>${escapeHtml(documentType?.toUpperCase() || "")}</strong><small>${escapeHtml(documentMasked || "")}</small></span>
       <span><strong>${visibleExecutions.length}</strong><small>blocos selecionados</small></span>
-      <span><strong>${visibleExecutions.filter((item) => ["completed", "success"].includes(item.status)).length}</strong><small>automaticos</small></span>
+      <span><strong>${visibleExecutions.filter((item) => ["completed", "success"].includes(item.status)).length}</strong><small>automáticos</small></span>
       <span><strong>${visibleExecutions.filter((item) => ["manual_required", "blocked"].includes(item.status)).length}</strong><small>pendentes</small></span>
-      <span><strong>${totals.not_applicable || 0}</strong><small>nao aplicaveis</small></span>
+      <span><strong>${totals.not_applicable || 0}</strong><small>não aplicáveis</small></span>
     </div>
   `;
 
@@ -813,8 +869,8 @@ function buildAuditEvidence(result) {
     items.push(
       ...certificates.map((certificate) => ({
         type: "pdf",
-        title: certificate.tipo || "Certidao TJDFT",
-        value: certificate.pdfPath ? "PDF baixado" : certificate.errorMessage || "PDF nao disponivel",
+        title: certificate.tipo || "Certidão TJDFT",
+        value: certificate.pdfPath ? "PDF baixado" : certificate.errorMessage || "PDF não disponível",
         href: toPdfPublicUrl(certificate.pdfPath),
       })),
     );
@@ -881,7 +937,7 @@ function getAuditOfficialUrl(sourceId) {
     receita_federal: "https://brasilapi.com.br/docs#tag/CNPJ",
     pgfn: "https://www.gov.br/receitafederal/pt-br/servicos/certidoes/consultar-certidoes-emitidas",
     cndt: "https://www.tst.jus.br/certidao1",
-    trf1: "https://sistemas.trf1.jus.br/certidao/",
+    trf1: "https://certidao-unificada.cjf.jus.br/#/solicitacao-certidao",
     tjdft: "https://cnc.tjdft.jus.br/solicitacao-externa",
     fgts: "https://consulta-crf.caixa.gov.br/consultacrf/pages/consultaEmpregador.jsf",
     portal_transparencia: "https://www.portaltransparencia.gov.br/sancoes",
@@ -892,12 +948,12 @@ function getAuditOfficialUrl(sourceId) {
 function formatAuditSourceName(sourceId) {
   const names = {
     receita_federal: "Receita Federal / CNPJ",
-    pgfn: "PGFN / Certidao Conjunta",
+    pgfn: "PGFN / Certidão Conjunta",
     cndt: "CNDT / TST",
-    trf1: "TRF1 / Certidao",
-    tjdft: "TJDFT / Certidoes",
+    trf1: "TRF1/CJF / Certidão Unificada",
+    tjdft: "TJDFT / Certidões",
     fgts: "CEF / Regularidade FGTS",
-    portal_transparencia: "Portal da Transparencia / CGU",
+    portal_transparencia: "Portal da Transparência / CGU",
   };
   return names[sourceId] || sourceId;
 }
@@ -913,9 +969,9 @@ function summarizeAuditResult(result) {
     return "Nada consta nesta fonte.";
   }
   if (result.status === "success" && result.resultado === "indisponivel") {
-    return "Consulta concluida; analise automatica do conteudo pendente.";
+    return "Consulta concluída; análise automática do conteúdo pendente.";
   }
-  return "Fonte indisponivel ou pendente de integracao real.";
+  return "Fonte indisponível ou pendente de integração real.";
 }
 
 function shouldShowAuditExecution(execution, documentType) {
@@ -1097,7 +1153,7 @@ function renderAssistantResult(result) {
   const records = Array.isArray(result.records) ? result.records.slice(0, 10) : [];
   assistantResult.innerHTML = `
     <strong>${escapeHtml(result.source || "Fonte consultada")}</strong>
-    <p>${escapeHtml(result.answer || "Consulta concluida.")}</p>
+    <p>${escapeHtml(result.answer || "Consulta concluída.")}</p>
     ${
       records.length
         ? `<div class="agent-records">${records
@@ -1138,7 +1194,9 @@ async function loadModules() {
     const data = await response.json();
     renderModules(data.modules || []);
   } catch {
-    moduleList.innerHTML = `<p class="empty-state">Não foi possível carregar os módulos.</p>`;
+    if (moduleList) {
+      moduleList.innerHTML = `<p class="empty-state">Não foi possível carregar os módulos.</p>`;
+    }
   }
 }
 
@@ -1335,7 +1393,7 @@ loginForm.addEventListener("submit", async (event) => {
         weak_password: "Use uma senha com pelo menos 8 caracteres.",
         email_already_registered: "Este e-mail ja tem cadastro. Entre com sua senha.",
       };
-      let message = loginMode === "register" ? "Nao foi possivel criar a conta." : "E-mail ou senha invalidos.";
+      let message = loginMode === "register" ? "Não foi possível criar a conta." : "E-mail ou senha inválidos.";
       try {
         const data = await response.json();
         message = messages[data.error] || message;
@@ -1525,9 +1583,10 @@ auditForm.addEventListener("submit", async (event) => {
   setAuditWizardStep(3);
 
   try {
-    selectedAuditViews = [...auditForm.querySelectorAll("input[name='auditView']:checked:not(:disabled)")].map((input) => input.value);
+    const documentState = syncAuditPrimaryDocument();
+    selectedAuditViews = [...auditForm.querySelectorAll("input[name='auditView']:checked")].map((input) => input.value);
     if (selectedAuditViews.length === 0) {
-      auditError.textContent = "Nenhuma fonte automatica aplicavel foi selecionada para este documento.";
+      auditError.textContent = "Nenhuma fonte automática aplicável foi selecionada para este documento.";
       auditResultStatus.textContent = "Aguardando";
       return;
     }
@@ -1536,13 +1595,19 @@ auditForm.addEventListener("submit", async (event) => {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
-        tipoDocumento: auditDocumentType.value,
-        documento: auditDocument.value,
+        tipoDocumento: documentState.primaryType,
+        documento: documentState.primaryValue,
         fontes: selectedAuditViews,
         extraFields: {
+          cpfDocument: documentState.cpfValue,
+          cnpjDocument: documentState.cnpjValue,
           firstName: auditFirstName?.value || "",
           motherName: auditMotherName?.value || "",
           fatherName: auditFatherName?.value || "",
+          trf1CertificateType: trf1CertificateType?.value || "",
+          trf1Orgaos: trf1Orgaos?.value || "",
+          trf1Email: trf1Email?.value || "",
+          trf1SocialName: trf1SocialName?.value || "",
           fgtsRegistrationType: fgtsRegistrationType?.value || "",
           fgtsRegistration: fgtsRegistration?.value || "",
           fgtsUf: fgtsUf?.value || "",
@@ -1611,6 +1676,15 @@ auditDocumentType?.addEventListener("change", () => {
   setAuditWizardStep(1);
 });
 
+[auditCpfDocument, auditCnpjDocument].forEach((input) => {
+  input?.addEventListener("input", () => {
+    syncAuditPrimaryDocument();
+    if (input === auditCnpjDocument && fgtsRegistration && selectedAuditViews.includes("fgts")) {
+      fgtsRegistration.value = input.value.replace(/\D/g, "");
+    }
+  });
+});
+
 auditSourceList.addEventListener("submit", async (event) => {
   const form = event.target.closest(".audit-evidence-form");
   if (!form) {
@@ -1638,19 +1712,19 @@ auditSourceList.addEventListener("submit", async (event) => {
     });
 
     if (response.status === 401) {
-      showLogin("Entre para anexar evidencias.");
+      showLogin("Entre para anexar evidências.");
       return;
     }
 
     if (!response.ok) {
-      auditError.textContent = "Nao foi possivel anexar a evidencia.";
+      auditError.textContent = "Não foi possível anexar a evidência.";
       return;
     }
 
     const data = await response.json();
     renderAudit(data.audit);
   } catch {
-    auditError.textContent = "Falha ao anexar evidencia.";
+    auditError.textContent = "Falha ao anexar evidência.";
   }
 });
 
@@ -1691,7 +1765,7 @@ logoutButton.addEventListener("click", async () => {
   showLogin("Sessão encerrada.");
 });
 
-newQueryButton.addEventListener("click", () => {
+newQueryButton?.addEventListener("click", () => {
   window.location.hash = "assistente";
 });
 

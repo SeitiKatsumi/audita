@@ -41,13 +41,14 @@ function summarize(data) {
 }
 
 export async function collect(input) {
-  if (input.tipoDocumento !== "cnpj") {
+  const cnpj = String(input.extraFields?.cnpjDocument || input.documento || "").replace(/\D/g, "");
+  if (input.tipoDocumento !== "cnpj" && !input.extraFields?.cnpjDocument) {
     return unavailableResult(fonte, "Consulta cadastral da Receita/CNPJ nao se aplica a CPF neste MVP.");
   }
 
   const endpoints = [
-    `https://brasilapi.com.br/api/cnpj/v1/${input.documento}`,
-    `https://open.cnpja.com/office/${input.documento}`,
+    `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`,
+    `https://open.cnpja.com/office/${cnpj}`,
   ];
 
   let lastError;
