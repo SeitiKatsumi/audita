@@ -7,7 +7,6 @@ CONTRIBUTING.md
 .env.*
 !.env.example
 node_modules
-package-lock.json
 dist
 build
 logs

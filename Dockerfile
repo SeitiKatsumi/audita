@@ -13,7 +13,6 @@ COPY assets ./assets
 COPY db ./db
 COPY collectors ./collectors
 COPY services ./services
-COPY docs ./docs
 
 EXPOSE 8080
 
