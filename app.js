@@ -494,7 +494,7 @@ function drawSignal() {
 
   const gradients = [
     ["rgba(51, 204, 255, 0.95)", 64, 0.9],
-    ["rgba(143, 215, 255, 0.82)", 104, 0.7],
+    ["rgba(116, 255, 154, 0.84)", 104, 0.7],
     ["rgba(41, 119, 255, 0.74)", 145, 0.54],
   ];
 
@@ -525,7 +525,12 @@ function drawSignal() {
     const radius = 2 + ((i + Math.floor(phase / 10)) % 3);
 
     ctx.beginPath();
-    ctx.fillStyle = i % 5 === 0 ? "rgba(255, 99, 125, 0.86)" : "rgba(143, 215, 255, 0.84)";
+    ctx.fillStyle =
+      i % 7 === 0
+        ? "rgba(116, 255, 154, 0.9)"
+        : i % 5 === 0
+          ? "rgba(255, 99, 125, 0.86)"
+          : "rgba(143, 215, 255, 0.84)";
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
   }

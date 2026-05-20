@@ -10,6 +10,9 @@
   --teal: #33ccff;
   --aqua: #8fd7ff;
   --blue: #2977ff;
+  --lime: #74ff9a;
+  --lime-strong: #31f78f;
+  --lime-soft: rgba(116, 255, 154, 0.16);
   --warning: #ffd166;
   --danger: #ff637d;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
@@ -34,6 +37,7 @@ body {
     sans-serif;
   background:
     radial-gradient(circle at 10% 20%, rgba(41, 119, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 64% 18%, rgba(49, 247, 143, 0.11), transparent 27%),
     radial-gradient(circle at 80% 5%, rgba(51, 204, 255, 0.14), transparent 30%),
     linear-gradient(140deg, #030b15 0%, #06111f 44%, #0a213b 100%);
 }
@@ -51,12 +55,14 @@ body {
 ::-webkit-scrollbar-thumb {
   border: 3px solid #050f1c;
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--aqua), var(--blue));
-  box-shadow: inset 0 0 8px rgba(143, 215, 255, 0.36);
+  background: linear-gradient(180deg, var(--aqua), var(--blue) 58%, var(--lime-strong));
+  box-shadow:
+    inset 0 0 8px rgba(143, 215, 255, 0.36),
+    0 0 14px rgba(49, 247, 143, 0.24);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #b8e7ff, var(--teal));
+  background: linear-gradient(180deg, #b8e7ff, var(--teal), var(--lime));
 }
 
 .hidden {
@@ -257,9 +263,12 @@ a {
   border-radius: 8px;
   object-fit: contain;
   background:
+    radial-gradient(circle at 85% 20%, rgba(116, 255, 154, 0.26), transparent 42%),
     radial-gradient(circle at 45% 15%, rgba(143, 215, 255, 0.28), transparent 58%),
     linear-gradient(135deg, #03101e, #0a2b4d 56%, #02070d);
-  box-shadow: 0 0 30px rgba(73, 169, 255, 0.34);
+  box-shadow:
+    0 0 30px rgba(73, 169, 255, 0.34),
+    0 0 18px rgba(49, 247, 143, 0.2);
 }
 
 .brand strong,
@@ -293,7 +302,15 @@ a {
 .nav-list a.active {
   border-color: var(--line);
   color: var(--text);
-  background: rgba(41, 119, 255, 0.12);
+  background:
+    linear-gradient(90deg, rgba(49, 247, 143, 0.12), transparent 52%),
+    rgba(41, 119, 255, 0.12);
+}
+
+.nav-list a.active {
+  box-shadow:
+    inset 3px 0 0 var(--lime-strong),
+    0 0 22px rgba(49, 247, 143, 0.08);
 }
 
 .environment {
@@ -312,8 +329,10 @@ a {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--aqua);
-  box-shadow: 0 0 0 7px rgba(73, 169, 255, 0.14);
+  background: var(--lime);
+  box-shadow:
+    0 0 0 7px rgba(73, 169, 255, 0.14),
+    0 0 20px rgba(49, 247, 143, 0.34);
 }
 
 .workspace {
@@ -329,7 +348,8 @@ a {
 
 .eyebrow {
   margin: 0 0 8px;
-  color: var(--teal);
+  color: var(--lime);
+  text-shadow: 0 0 14px rgba(49, 247, 143, 0.18);
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -380,7 +400,8 @@ h2 {
   padding: 0 16px;
   color: #031517;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--aqua), var(--teal), var(--blue));
+  background: linear-gradient(135deg, var(--aqua), var(--teal) 44%, var(--blue) 76%, var(--lime-strong));
+  box-shadow: 0 0 22px rgba(49, 247, 143, 0.18);
 }
 
 .secondary-action {
@@ -404,10 +425,30 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.intel-panel:hover,
+.risk-card:hover,
+.metrics article:hover,
+.module:hover {
+  border-color: rgba(116, 255, 154, 0.34);
+  box-shadow:
+    var(--shadow),
+    0 0 26px rgba(49, 247, 143, 0.08);
+}
+
 .intel-panel {
   position: relative;
   min-height: 390px;
   overflow: hidden;
+}
+
+.intel-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent 0 68%, rgba(116, 255, 154, 0.08) 82%, transparent 100%),
+    radial-gradient(circle at 86% 28%, rgba(49, 247, 143, 0.14), transparent 28%);
 }
 
 .panel-copy {
@@ -436,12 +477,15 @@ h2 {
   width: fit-content;
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid rgba(143, 215, 255, 0.36);
+  border: 1px solid rgba(116, 255, 154, 0.4);
   border-radius: 999px;
-  color: var(--aqua);
+  color: var(--lime);
   font-size: 0.78rem;
   font-weight: 800;
-  background: rgba(73, 169, 255, 0.12);
+  background:
+    linear-gradient(90deg, rgba(116, 255, 154, 0.12), rgba(73, 169, 255, 0.08)),
+    rgba(3, 13, 28, 0.6);
+  box-shadow: 0 0 18px rgba(49, 247, 143, 0.12);
 }
 
 #signalCanvas {
@@ -468,8 +512,9 @@ h2 {
 }
 
 .card-heading strong {
-  color: var(--aqua);
+  color: var(--lime);
   font-size: 3rem;
+  text-shadow: 0 0 20px rgba(49, 247, 143, 0.26);
 }
 
 .risk-orbit {
@@ -480,8 +525,11 @@ h2 {
   border: 1px solid var(--line-strong);
   border-radius: 50%;
   background:
-    radial-gradient(circle, rgba(143, 215, 255, 0.26) 0 12%, transparent 13%),
+    radial-gradient(circle, rgba(116, 255, 154, 0.26) 0 12%, transparent 13%),
     radial-gradient(circle, transparent 0 48%, rgba(73, 169, 255, 0.14) 49% 50%, transparent 51%);
+  box-shadow:
+    inset 0 0 34px rgba(73, 169, 255, 0.12),
+    0 0 24px rgba(49, 247, 143, 0.12);
 }
 
 .risk-orbit span {
@@ -489,8 +537,8 @@ h2 {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--teal);
-  box-shadow: 0 0 24px var(--teal);
+  background: var(--lime);
+  box-shadow: 0 0 24px var(--lime);
 }
 
 .risk-orbit span:nth-child(1) {
