@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260522-state-courts" />
+    <link rel="stylesheet" href="styles.css?v=20260522-state-courts-picker" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -287,6 +287,11 @@
                   <strong>Escolha os documentos</strong>
                   <small>Selecione quais certidões e consultas deseja gerar no resultado.</small>
                 </div>
+                <label class="state-court-picker hidden" id="stateCourtPicker">
+                  Estado do tribunal
+                  <select id="stateCourtUf"></select>
+                  <small id="stateCourtHint">DF usa automação TJDFT. Outros estados abrem o portal oficial mapeado.</small>
+                </label>
                 <fieldset class="audit-options">
                   <legend>Documentos desejados</legend>
                   <label><input type="checkbox" name="auditView" value="receita_federal" /> Receita/CNPJ</label>
@@ -782,6 +787,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260522-state-courts"></script>
+    <script type="module" src="app.js?v=20260522-state-courts-picker"></script>
   </body>
 </html>

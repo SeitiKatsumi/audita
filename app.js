@@ -72,6 +72,9 @@ const auditCpfDocument = document.querySelector("#auditCpfDocument");
 const auditCnpjField = document.querySelector("#auditCnpjField");
 const auditCnpjDocument = document.querySelector("#auditCnpjDocument");
 const tjdftFields = document.querySelector("#tjdftFields");
+const stateCourtPicker = document.querySelector("#stateCourtPicker");
+const stateCourtUf = document.querySelector("#stateCourtUf");
+const stateCourtHint = document.querySelector("#stateCourtHint");
 const tjdftPersonTypeLabel = document.querySelector("#tjdftPersonTypeLabel");
 const tjdftCourtUf = document.querySelector("#tjdftCourtUf");
 const tjdftCourtLabel = document.querySelector("#tjdftCourtLabel");
@@ -421,17 +424,42 @@ function getTjdftPersonType() {
 }
 
 function getSelectedStateCourt() {
-  return stateCourtDirectory.find((court) => court.uf === tjdftCourtUf?.value) || stateCourtDirectory.find((court) => court.uf === "DF");
+  const selectedUf = stateCourtUf?.value || tjdftCourtUf?.value;
+  return stateCourtDirectory.find((court) => court.uf === selectedUf) || stateCourtDirectory.find((court) => court.uf === "DF");
+}
+
+function stateCourtOptionsHtml() {
+  return stateCourtDirectory
+    .map((court) => `<option value="${escapeHtml(court.uf)}">${escapeHtml(court.uf)} - ${escapeHtml(court.court)} (${escapeHtml(court.name)})</option>`)
+    .join("");
 }
 
 function populateStateCourtSelect() {
-  if (!tjdftCourtUf) {
-    return;
+  const options = stateCourtOptionsHtml();
+  if (stateCourtUf) {
+    stateCourtUf.innerHTML = options;
+    stateCourtUf.value = "DF";
   }
-  tjdftCourtUf.innerHTML = stateCourtDirectory
-    .map((court) => `<option value="${escapeHtml(court.uf)}">${escapeHtml(court.uf)} - ${escapeHtml(court.court)} (${escapeHtml(court.name)})</option>`)
-    .join("");
-  tjdftCourtUf.value = "DF";
+  if (tjdftCourtUf) {
+    tjdftCourtUf.innerHTML = options;
+    tjdftCourtUf.value = "DF";
+  }
+}
+
+function syncStateCourtSelection(source) {
+  const value = source?.value || "DF";
+  if (stateCourtUf && stateCourtUf !== source) {
+    stateCourtUf.value = value;
+  }
+  if (tjdftCourtUf && tjdftCourtUf !== source) {
+    tjdftCourtUf.value = value;
+  }
+  const selectedCourt = getSelectedStateCourt();
+  if (stateCourtHint && selectedCourt) {
+    stateCourtHint.textContent = selectedCourt.automatic
+      ? `${selectedCourt.court} está com automação ativa.`
+      : `${selectedCourt.court} está em modo portal oficial enquanto o collector automático é implementado.`;
+  }
 }
 
 function updateTjdftPersonFields() {
@@ -635,6 +663,7 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
   const needsTrf1Fields = selectedAuditViews.includes("trf1");
   const needsFgtsFields = selectedAuditViews.includes("fgts");
   tjdftFields?.classList.toggle("hidden", !needsTjdftFields);
+  stateCourtPicker?.classList.toggle("hidden", !needsTjdftFields);
   updateTjdftPersonFields();
   trf1Fields?.classList.toggle("hidden", !needsTrf1Fields);
   [trf1CertificateType, trf1Orgaos, trf1Email].forEach((input) => {
@@ -2124,6 +2153,12 @@ auditDocumentType?.addEventListener("change", () => {
 });
 
 tjdftCourtUf?.addEventListener("change", () => {
+  syncStateCourtSelection(tjdftCourtUf);
+  updateTjdftPersonFields();
+});
+
+stateCourtUf?.addEventListener("change", () => {
+  syncStateCourtSelection(stateCourtUf);
   updateTjdftPersonFields();
 });
 
@@ -2220,6 +2255,7 @@ drawSignal();
 
 moveEcosystemModules();
 populateStateCourtSelect();
+syncStateCourtSelection(stateCourtUf || tjdftCourtUf);
 setActivePage(getActivePage());
 updateAuditSourceAvailability();
 setAuditWizardStep(1);
