@@ -42,6 +42,19 @@ export function discoverIntegrationStrategy() {
 
 export async function collect(input) {
   const extra = input.extraFields || {};
+  const stateCourtUf = String(extra.stateCourtUf || "DF").trim().toUpperCase();
+  const stateCourtName = String(extra.stateCourtName || "TJDFT").trim();
+  const stateCourtUrl = String(extra.stateCourtUrl || OFFICIAL_URL).trim();
+  if (stateCourtUf && stateCourtUf !== "DF") {
+    return unavailableResult(fonte, `${stateCourtName || `TJ${stateCourtUf}`} ainda estÃ¡ em modo portal oficial. Abra o site indicado para emitir a certidÃ£o enquanto o collector automÃ¡tico deste estado Ã© implementado.`, {
+      officialUrl: stateCourtUrl,
+      tribunal: stateCourtName || `TJ${stateCourtUf}`,
+      uf: stateCourtUf,
+      modo: "portal_oficial",
+      proximoPasso: "Mapear campos, captcha e fluxo de PDF deste tribunal estadual.",
+      integrationStrategy: discoverIntegrationStrategy(),
+    });
+  }
   const documentType = input.tipoDocumento === "cnpj" || extra.tjdftPersonType === "pj" ? "cnpj" : "cpf";
   const documentValue = String(
     documentType === "cnpj" ? extra.cnpjDocument || input.documento || "" : extra.cpfDocument || input.documento || "",

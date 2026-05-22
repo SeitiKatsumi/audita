@@ -90,6 +90,9 @@ function normalizeExtraFields(value) {
     fatherName: String(value.fatherName || value.nomePai || "").trim(),
     cpfDocument: String(value.cpfDocument || value.cpf || "").trim(),
     cnpjDocument: String(value.cnpjDocument || value.cnpj || "").trim(),
+    stateCourtUf: String(value.stateCourtUf || value.ufTribunal || "DF").trim().toUpperCase(),
+    stateCourtName: String(value.stateCourtName || value.nomeTribunal || "").trim(),
+    stateCourtUrl: String(value.stateCourtUrl || value.urlTribunal || "").trim(),
     tjdftPersonType: String(value.tjdftPersonType || value.tipoPessoaTjdft || "").trim(),
     tjdftCompanyName: String(value.tjdftCompanyName || value.razaoSocialTjdft || "").trim(),
     tjdftCertificateTypes: Array.isArray(value.tjdftCertificateTypes)

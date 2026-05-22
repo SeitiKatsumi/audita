@@ -73,6 +73,8 @@ const auditCnpjField = document.querySelector("#auditCnpjField");
 const auditCnpjDocument = document.querySelector("#auditCnpjDocument");
 const tjdftFields = document.querySelector("#tjdftFields");
 const tjdftPersonTypeLabel = document.querySelector("#tjdftPersonTypeLabel");
+const tjdftCourtUf = document.querySelector("#tjdftCourtUf");
+const tjdftCourtLabel = document.querySelector("#tjdftCourtLabel");
 const tjdftPfFields = document.querySelectorAll(".tjdft-pf-field");
 const tjdftPjFields = document.querySelectorAll(".tjdft-pj-field");
 const tjdftCompanyName = document.querySelector("#tjdftCompanyName");
@@ -111,6 +113,36 @@ const auditNextButton = document.querySelector("#auditNextButton");
 const auditSubmitButton = document.querySelector("#auditSubmitButton");
 let selectedAuditViews = [];
 let currentDocumentAiContext = null;
+
+const stateCourtDirectory = [
+  { uf: "AC", court: "TJAC", name: "Acre", url: "https://www.tjac.jus.br/servicos/certidoes/" },
+  { uf: "AL", court: "TJAL", name: "Alagoas", url: "https://www.tjal.jus.br/certidoes/" },
+  { uf: "AP", court: "TJAP", name: "Amapá", url: "https://www.tjap.jus.br/portal/servicos/certidoes.html" },
+  { uf: "AM", court: "TJAM", name: "Amazonas", url: "https://consultasaj.tjam.jus.br/sco/abrirCadastro.do" },
+  { uf: "BA", court: "TJBA", name: "Bahia", url: "https://esaj.tjba.jus.br/sco/abrirCadastro.do" },
+  { uf: "CE", court: "TJCE", name: "Ceará", url: "https://esaj.tjce.jus.br/sco/abrirCadastro.do" },
+  { uf: "DF", court: "TJDFT", name: "Distrito Federal", url: "https://cnc.tjdft.jus.br/solicitacao-externa", automatic: true },
+  { uf: "ES", court: "TJES", name: "Espírito Santo", url: "https://sistemas.tjes.jus.br/certidaonegativa/" },
+  { uf: "GO", court: "TJGO", name: "Goiás", url: "https://projudi.tjgo.jus.br/CertidaoNegativaPositivaPublica" },
+  { uf: "MA", court: "TJMA", name: "Maranhão", url: "https://jurisconsult.tjma.jus.br/#/certidao-negativa" },
+  { uf: "MT", court: "TJMT", name: "Mato Grosso", url: "https://sec.tjmt.jus.br/" },
+  { uf: "MS", court: "TJMS", name: "Mato Grosso do Sul", url: "https://esaj.tjms.jus.br/sco/abrirCadastro.do" },
+  { uf: "MG", court: "TJMG", name: "Minas Gerais", url: "https://www.tjmg.jus.br/portal-tjmg/processos/certidao-judicial/" },
+  { uf: "PA", court: "TJPA", name: "Pará", url: "https://www.tjpa.jus.br/PortalExterno/institucional/Certidoes.xhtml" },
+  { uf: "PB", court: "TJPB", name: "Paraíba", url: "https://app.tjpb.jus.br/certo/" },
+  { uf: "PR", court: "TJPR", name: "Paraná", url: "https://www.tjpr.jus.br/certidoes" },
+  { uf: "PE", court: "TJPE", name: "Pernambuco", url: "https://www.tjpe.jus.br/certidaopje/xhtml/main.xhtml" },
+  { uf: "PI", court: "TJPI", name: "Piauí", url: "https://www.tjpi.jus.br/certidao-negativa/" },
+  { uf: "RJ", court: "TJRJ", name: "Rio de Janeiro", url: "https://www4.tjrj.jus.br/Portal-Extrajudicial/certidao/judicial/solicitar" },
+  { uf: "RN", court: "TJRN", name: "Rio Grande do Norte", url: "https://certidao.tjrn.jus.br/" },
+  { uf: "RS", court: "TJRS", name: "Rio Grande do Sul", url: "https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/emissao-de-certidoes/" },
+  { uf: "RO", court: "TJRO", name: "Rondônia", url: "https://www.tjro.jus.br/certidaoonline/" },
+  { uf: "RR", court: "TJRR", name: "Roraima", url: "https://projudi.tjrr.jus.br/projudi/certidao" },
+  { uf: "SC", court: "TJSC", name: "Santa Catarina", url: "https://certidoes.tjsc.jus.br/" },
+  { uf: "SP", court: "TJSP", name: "São Paulo", url: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do" },
+  { uf: "SE", court: "TJSE", name: "Sergipe", url: "https://www.tjse.jus.br/portal/servicos/certidao-online" },
+  { uf: "TO", court: "TJTO", name: "Tocantins", url: "https://eproc1.tjto.jus.br/eprocV2_prod_1grau/externo_controlador.php?acao=certidao_negativa" },
+];
 const assistantQueryForm = document.querySelector("#assistantQueryForm");
 const assistantSource = document.querySelector("#assistantSource");
 const assistantCode = document.querySelector("#assistantCode");
@@ -210,15 +242,15 @@ const pageMeta = {
     eyebrow: "Certidões e documentações oficiais",
   },
   "consulta-tjdft": {
-    title: "TJDFT PF",
+    title: "Tribunal estadual PF",
     eyebrow: "Assistente de Consultas",
   },
   "consulta-tjdft-pf": {
-    title: "TJDFT PF",
+    title: "Tribunal estadual PF",
     eyebrow: "Assistente de Consultas",
   },
   "consulta-tjdft-pj": {
-    title: "TJDFT PJ",
+    title: "Tribunal estadual PJ",
     eyebrow: "Assistente de Consultas",
   },
   "consulta-receita": {
@@ -388,10 +420,28 @@ function getTjdftPersonType() {
   return routeDocumentType === "cnpj" ? "pj" : "pf";
 }
 
+function getSelectedStateCourt() {
+  return stateCourtDirectory.find((court) => court.uf === tjdftCourtUf?.value) || stateCourtDirectory.find((court) => court.uf === "DF");
+}
+
+function populateStateCourtSelect() {
+  if (!tjdftCourtUf) {
+    return;
+  }
+  tjdftCourtUf.innerHTML = stateCourtDirectory
+    .map((court) => `<option value="${escapeHtml(court.uf)}">${escapeHtml(court.uf)} - ${escapeHtml(court.court)} (${escapeHtml(court.name)})</option>`)
+    .join("");
+  tjdftCourtUf.value = "DF";
+}
+
 function updateTjdftPersonFields() {
   const isTjdftSelected = selectedAuditViews.includes("tjdft");
   const personType = getTjdftPersonType();
   const isPf = personType === "pf";
+  const selectedCourt = getSelectedStateCourt();
+  if (tjdftCourtLabel && selectedCourt) {
+    tjdftCourtLabel.textContent = `${selectedCourt.court} - ${selectedCourt.name}${selectedCourt.automatic ? " (automático)" : " (portal oficial)"}`;
+  }
   tjdftPersonTypeLabel.textContent = isPf ? "Pessoa física" : "Pessoa jurídica";
   tjdftPfFields.forEach((field) => field.classList.toggle("hidden", !isPf));
   tjdftPjFields.forEach((field) => field.classList.toggle("hidden", isPf));
@@ -992,6 +1042,7 @@ function renderAudit(audit) {
             <span class="module-status ${escapeHtml(execution.status)}">${escapeHtml(formatStatusLabel(execution.status))}</span>
           </div>
           <p>${escapeHtml(execution.summary || "")}</p>
+          ${execution.officialUrl ? `<a class="audit-official-link" href="${escapeHtml(execution.officialUrl)}" target="_blank" rel="noreferrer">Abrir portal oficial</a>` : ""}
           ${
             missingFields.length
               ? `<small class="audit-warning">Campos pendentes: ${escapeHtml(missingFields.map(formatAuditFieldLabel).join(", "))}</small>`
@@ -1083,7 +1134,7 @@ function buildDocumentAiContext(audit, executions) {
   const hasFinding =
     tjdftExecution.resultado === "consta" ||
     (Array.isArray(data.certidoesComApontamento) && data.certidoesComApontamento.length > 0) ||
-    /consta|apontamento|processo|a[çc][ãa]o|fal[êe]ncia|recupera[çc][ãa]o|criminal/i.test(rawText);
+    /consta(m)?\s+(registro|apontamento|distribui[?c][?a]o|processo)|certid[?a]o\s+positiva|apontamento\s+encontrado|exist(e|em)\s+(a[?c][?a]o|processo|distribui[?c][?a]o)/i.test(rawText);
   const riskLevel = hasFinding ? "alto" : hasFailure || hasPendingText || !rawText ? "médio" : "baixo";
   const risks = [];
   if (hasFinding) {
@@ -1980,6 +2031,9 @@ auditForm.addEventListener("submit", async (event) => {
         extraFields: {
           cpfDocument: documentState.cpfValue,
           cnpjDocument: documentState.cnpjValue,
+          stateCourtUf: tjdftCourtUf?.value || "DF",
+          stateCourtName: getSelectedStateCourt()?.court || "TJDFT",
+          stateCourtUrl: getSelectedStateCourt()?.url || "",
           tjdftPersonType: getTjdftPersonType(),
           tjdftCompanyName: tjdftCompanyName?.value || "",
           tjdftCertificateTypes: [...tjdftCertificateTypeInputs]
@@ -2067,6 +2121,10 @@ auditDocumentType?.addEventListener("change", () => {
       fgtsRegistration.value = input.value.replace(/\D/g, "");
     }
   });
+});
+
+tjdftCourtUf?.addEventListener("change", () => {
+  updateTjdftPersonFields();
 });
 
 auditSourceList.addEventListener("submit", async (event) => {
@@ -2161,6 +2219,7 @@ setInterval(rotateRisk, 1400);
 drawSignal();
 
 moveEcosystemModules();
+populateStateCourtSelect();
 setActivePage(getActivePage());
 updateAuditSourceAvailability();
 setAuditWizardStep(1);

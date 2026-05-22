@@ -96,7 +96,7 @@ test("encaminha campos TJDFT para collector", async () => {
   let receivedExtraFields = null;
   const service = createAuditService({
     getDb: () => ({ pool: null, dbReady: false }),
-    getAuthContext: async () => ({ tenantId: 1, user: null, unauthorized: false }),
+    getAuthContext: async () => ({ tenantId: 2, user: null, unauthorized: false }),
     customCollectors: {
       tjdft: {
         collect: async (input) => {
@@ -131,5 +131,46 @@ test("encaminha campos TJDFT para collector", async () => {
   assert.equal(Boolean(started.consultaId), true);
   assert.equal(receivedExtraFields.tjdftPersonType, "pf");
   assert.deepEqual(receivedExtraFields.tjdftCertificateTypes, ["criminal", "civil"]);
+});
+
+test("encaminha tribunal estadual selecionado para collector", async () => {
+  let receivedExtraFields = null;
+  const service = createAuditService({
+    getDb: () => ({ pool: null, dbReady: false }),
+    getAuthContext: async () => ({ tenantId: 1, user: null, unauthorized: false }),
+    customCollectors: {
+      tjdft: {
+        collect: async (input) => {
+          receivedExtraFields = input.extraFields;
+          return {
+            fonte: "tjdft",
+            status: "unavailable",
+            resultado: "indisponivel",
+            dados: { officialUrl: input.extraFields.stateCourtUrl },
+          };
+        },
+      },
+    },
+  });
+
+  const started = await service.startAudit({
+    body: {
+      documento: "52998224725",
+      tipoDocumento: "cpf",
+      fontes: ["tjdft"],
+      extraFields: {
+        stateCourtUf: "SP",
+        stateCourtName: "TJSP",
+        stateCourtUrl: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do",
+      },
+    },
+  });
+
+  assert.equal(started.status, "pending");
+  for (let index = 0; index < 10 && !receivedExtraFields; index += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
+  assert.equal(receivedExtraFields.stateCourtUf, "SP");
+  assert.equal(receivedExtraFields.stateCourtName, "TJSP");
 });
 

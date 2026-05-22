@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260522-document-ai-fix" />
+    <link rel="stylesheet" href="styles.css?v=20260522-state-courts" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -60,7 +60,7 @@
           <details class="nav-group" open>
             <summary>Assistente de Consultas</summary>
             <details class="nav-subgroup" open>
-              <summary>TJDFT</summary>
+              <summary>Tribunais estaduais</summary>
               <a class="nav-grandchild" href="#consulta-tjdft-pf">Pessoa física</a>
               <a class="nav-grandchild" href="#consulta-tjdft-pj">Pessoa jurídica</a>
             </details>
@@ -324,8 +324,16 @@
                   <input id="auditCnpjDocument" type="text" placeholder="Digite o CNPJ" inputmode="numeric" maxlength="18" autocomplete="off" />
                 </label>
                 <fieldset class="audit-extra-fields hidden" id="tjdftFields">
-                  <legend>Dados para TJDFT</legend>
-                  <div class="tjdft-person-type" aria-label="Tipo de pessoa TJDFT">
+                  <legend>Dados para tribunal estadual</legend>
+                  <div class="tjdft-person-type" aria-label="Tribunal estadual selecionado">
+                    <span>Tribunal</span>
+                    <strong id="tjdftCourtLabel">TJDFT</strong>
+                  </div>
+                  <label class="tjdft-court-field">
+                    Estado
+                    <select id="tjdftCourtUf"></select>
+                  </label>
+                  <div class="tjdft-person-type" aria-label="Tipo de pessoa">
                     <span>Tipo de pessoa</span>
                     <strong id="tjdftPersonTypeLabel">Pessoa física</strong>
                   </div>
@@ -774,6 +782,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260522-document-ai-fix"></script>
+    <script type="module" src="app.js?v=20260522-state-courts"></script>
   </body>
 </html>

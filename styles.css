@@ -1354,6 +1354,7 @@ h2 {
 }
 
 .tjdft-person-type,
+.tjdft-court-field,
 .tjdft-certificate-options {
   grid-column: 1 / -1;
 }
