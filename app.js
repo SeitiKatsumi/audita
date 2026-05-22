@@ -253,6 +253,7 @@ function getActivePage() {
 
 function setActivePage(page) {
   const activePage = pageMeta[page] ? page : "home";
+  document.body.dataset.activePage = activePage;
   const activeMeta = pageMeta[activePage];
 
   pageTitle.textContent = activeMeta.title;

@@ -457,9 +457,52 @@ body.sidebar-collapsed .brand-logo {
 }
 
 .topbar {
+  position: relative;
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 26px;
+}
+
+.topbar > * {
+  position: relative;
+  z-index: 1;
+}
+
+body[data-active-page^="consulta"] .topbar {
+  min-height: 178px;
+  margin: -28px -28px 26px;
+  padding: 28px;
+  overflow: hidden;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  background:
+    linear-gradient(90deg, rgba(3, 9, 18, 0.98), rgba(4, 17, 32, 0.86) 46%, rgba(4, 17, 32, 0.42)),
+    rgba(4, 17, 32, 0.92);
+}
+
+body[data-active-page^="consulta"] .topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(3, 9, 18, 0.98) 0%, rgba(4, 17, 32, 0.88) 38%, rgba(4, 17, 32, 0.42) 66%, rgba(4, 17, 32, 0.18) 100%),
+    linear-gradient(180deg, rgba(4, 17, 32, 0.08), rgba(4, 17, 32, 0.42)),
+    url("assets/audita-consulting-bg.png") center right / cover no-repeat;
+  opacity: 0.86;
+}
+
+body[data-active-page^="consulta"] .topbar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(73, 169, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(73, 169, 255, 0.035) 1px, transparent 1px);
+  background-size: 46px 46px;
 }
 
 .eyebrow {
@@ -542,7 +585,7 @@ h2 {
   background:
     linear-gradient(90deg, rgba(3, 9, 18, 0.98) 0%, rgba(4, 17, 32, 0.9) 34%, rgba(4, 17, 32, 0.28) 66%, rgba(4, 17, 32, 0.08) 100%),
     linear-gradient(180deg, rgba(4, 17, 32, 0.06), rgba(4, 17, 32, 0.42)),
-    url("assets/audita-home-bg.png") center right / cover no-repeat;
+    url("assets/audita-consulting-bg.png") center right / cover no-repeat;
   box-shadow: var(--shadow);
 }
 
@@ -2014,6 +2057,19 @@ h2 {
     flex-direction: column;
   }
 
+  body[data-active-page^="consulta"] .topbar {
+    min-height: 210px;
+    background:
+      linear-gradient(180deg, rgba(3, 9, 18, 0.98), rgba(4, 17, 32, 0.78)),
+      rgba(4, 17, 32, 0.92);
+  }
+
+  body[data-active-page^="consulta"] .topbar::before {
+    background:
+      linear-gradient(180deg, rgba(3, 9, 18, 0.98) 0%, rgba(4, 17, 32, 0.84) 58%, rgba(4, 17, 32, 0.42) 100%),
+      url("assets/audita-consulting-bg.png") center right / cover no-repeat;
+  }
+
   .nav-list,
   .metrics,
   .home-hero-features,
@@ -2040,7 +2096,7 @@ h2 {
     min-height: 680px;
     background:
       linear-gradient(180deg, rgba(3, 9, 18, 0.98) 0%, rgba(4, 17, 32, 0.88) 50%, rgba(4, 17, 32, 0.28) 100%),
-      url("assets/audita-home-bg.png") center bottom / cover no-repeat;
+      url("assets/audita-consulting-bg.png") center bottom / cover no-repeat;
   }
 
   .home-hero-copy {
