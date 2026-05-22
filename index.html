@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260522-home-consultas" />
+    <link rel="stylesheet" href="styles.css?v=20260522-menu-tjdft" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -43,7 +43,9 @@
     </section>
 
     <div class="shell">
-      <aside class="sidebar" aria-label="Navegação principal">
+      <button class="mobile-menu-button" id="mobileMenuButton" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
+      <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher menu" title="Recolher menu">‹</button>
         <div class="brand">
           <img class="brand-logo" src="assets/audita-logo-white.svg" alt="Audita" />
           <div>
@@ -55,15 +57,20 @@
 
         <nav class="nav-list">
           <a class="active" href="#home">Home</a>
-          <div class="nav-group" aria-label="Assistente de Consultas">
-            <a href="#consultas">Assistente de Consultas</a>
-            <a class="nav-child" href="#consulta-tjdft">TJDFT</a>
+          <details class="nav-group" open>
+            <summary>Assistente de Consultas</summary>
+            <a class="nav-child" href="#consultas">Todos os órgãos</a>
+            <details class="nav-subgroup" open>
+              <summary>TJDFT</summary>
+              <a class="nav-grandchild" href="#consulta-tjdft-pf">Pessoa física</a>
+              <a class="nav-grandchild" href="#consulta-tjdft-pj">Pessoa jurídica</a>
+            </details>
             <a class="nav-child" href="#consulta-receita">Receita/CNPJ</a>
             <a class="nav-child" href="#consulta-pgfn">PGFN/CND</a>
             <a class="nav-child" href="#consulta-cndt">CNDT/TST</a>
             <a class="nav-child" href="#consulta-trf1">TRF1</a>
             <a class="nav-child" href="#consulta-fgts">FGTS/CEF</a>
-          </div>
+          </details>
           <a href="#historico">Histórico de consultas</a>
           <a href="#meu-painel">Meu painel</a>
         </nav>
@@ -100,10 +107,10 @@
                 <em>decisões mais seguras</em>.
               </h2>
               <div class="home-hero-features" aria-label="Recursos principais">
-                <span>Certidões e documentações</span>
-                <span>Análise inteligente</span>
-                <span>Laudos completos</span>
-                <span>Linguagem simples</span>
+                <span><i aria-hidden="true">□</i>Certidões e documentações</span>
+                <span><i aria-hidden="true">◇</i>Análise inteligente</span>
+                <span><i aria-hidden="true">✓</i>Laudos completos</span>
+                <span><i aria-hidden="true">○</i>Linguagem simples</span>
               </div>
             </div>
             <canvas id="signalCanvas" width="760" height="360" aria-label="Visualização de sinais analíticos"></canvas>
@@ -170,7 +177,7 @@
             </form>
 
             <small class="consultation-note">
-              Para fontes cadastradas, use uma URL com {codigo} quando a API exigir identificador no endpoint.
+              Para fontes cadastradas, use o marcador {codigo} na URL quando a API exigir identificador no endpoint.
             </small>
 
             <div class="agent-answer assistant-result" id="assistantResult">
@@ -182,7 +189,7 @@
         <section
           class="consultation-grid"
           id="consultas"
-          data-page="consultas consulta-tjdft consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts historico"
+          data-page="consultas consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts historico"
         >
           <article class="module agent-panel" data-page="integracoes">
             <div class="module-header">
@@ -259,7 +266,7 @@
 
           <article
             class="module audit-panel"
-            data-page="consultas consulta-tjdft consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts"
+            data-page="consultas consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts"
           >
             <div class="module-header">
               <div>
@@ -319,17 +326,32 @@
                 </label>
                 <fieldset class="audit-extra-fields hidden" id="tjdftFields">
                   <legend>Dados para TJDFT</legend>
-                  <label>
+                  <div class="tjdft-person-type" aria-label="Tipo de pessoa TJDFT">
+                    <span>Tipo de pessoa</span>
+                    <strong id="tjdftPersonTypeLabel">Pessoa física</strong>
+                  </div>
+                  <fieldset class="tjdft-certificate-options">
+                    <legend>Certidões TJDFT</legend>
+                    <label><input type="checkbox" name="tjdftCertificateType" value="criminal" checked /> Criminal</label>
+                    <label><input type="checkbox" name="tjdftCertificateType" value="civil" checked /> Cível</label>
+                    <label><input type="checkbox" name="tjdftCertificateType" value="falencia" checked /> Falência e Recuperação Judicial</label>
+                    <label><input type="checkbox" name="tjdftCertificateType" value="especial" checked /> Especial (Cível e Criminal)</label>
+                  </fieldset>
+                  <label class="tjdft-pf-field">
                     Primeiro nome
                     <input id="auditFirstName" type="text" placeholder="Ex: Aparecido" autocomplete="given-name" />
                   </label>
-                  <label>
+                  <label class="tjdft-pf-field">
                     Nome da mãe
                     <input id="auditMotherName" type="text" placeholder="Nome completo da mãe" autocomplete="off" />
                   </label>
-                  <label>
+                  <label class="tjdft-pf-field">
                     Nome do pai
                     <input id="auditFatherName" type="text" placeholder="Nome completo do pai" autocomplete="off" />
+                  </label>
+                  <label class="tjdft-pj-field hidden">
+                    Razão social
+                    <input id="tjdftCompanyName" type="text" placeholder="Nome da empresa, se solicitado" autocomplete="organization" />
                   </label>
                 </fieldset>
                 <fieldset class="audit-extra-fields hidden" id="trf1Fields">
@@ -727,6 +749,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260522-home-consultas"></script>
+    <script type="module" src="app.js?v=20260522-menu-tjdft"></script>
   </body>
 </html>

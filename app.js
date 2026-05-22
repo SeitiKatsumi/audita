@@ -18,6 +18,8 @@ const loginEyebrow = document.querySelector("#loginEyebrow");
 const loginTitle = document.querySelector("#loginTitle");
 const logoutButton = document.querySelector("#logoutButton");
 const loginButton = document.querySelector("#loginButton");
+const sidebarToggle = document.querySelector("#sidebarToggle");
+const mobileMenuButton = document.querySelector("#mobileMenuButton");
 const newQueryButton = document.querySelector("#newQueryButton");
 const environmentName = document.querySelector("#environmentName");
 const environmentDetail = document.querySelector("#environmentDetail");
@@ -70,6 +72,11 @@ const auditCpfDocument = document.querySelector("#auditCpfDocument");
 const auditCnpjField = document.querySelector("#auditCnpjField");
 const auditCnpjDocument = document.querySelector("#auditCnpjDocument");
 const tjdftFields = document.querySelector("#tjdftFields");
+const tjdftPersonTypeLabel = document.querySelector("#tjdftPersonTypeLabel");
+const tjdftPfFields = document.querySelectorAll(".tjdft-pf-field");
+const tjdftPjFields = document.querySelectorAll(".tjdft-pj-field");
+const tjdftCompanyName = document.querySelector("#tjdftCompanyName");
+const tjdftCertificateTypeInputs = document.querySelectorAll("input[name='tjdftCertificateType']");
 const auditFirstName = document.querySelector("#auditFirstName");
 const auditMotherName = document.querySelector("#auditMotherName");
 const auditFatherName = document.querySelector("#auditFatherName");
@@ -144,11 +151,11 @@ const auditSourceConfig = {
     note: "Precisa mapear endpoint oficial da certidão antes de automatizar.",
   },
   tjdft: {
-    appliesTo: ["cpf"],
-    documentTypes: ["cpf"],
+    appliesTo: ["cpf", "cnpj"],
+    documentTypes: ["cpf", "cnpj"],
     automatic: true,
     badge: "auto",
-    note: "Usa o wizard oficial cnc.tjdft.jus.br para baixar as 4 certidões.",
+    note: "Usa o wizard oficial cnc.tjdft.jus.br para baixar certidões Criminal, Cível, Falência/Recuperação Judicial e Especial.",
   },
   fgts: {
     appliesTo: ["cnpj"],
@@ -161,11 +168,19 @@ const auditSourceConfig = {
 
 const auditRouteSources = {
   "consulta-tjdft": "tjdft",
+  "consulta-tjdft-pf": "tjdft",
+  "consulta-tjdft-pj": "tjdft",
   "consulta-receita": "receita_federal",
   "consulta-pgfn": "pgfn",
   "consulta-cndt": "cndt",
   "consulta-trf1": "trf1",
   "consulta-fgts": "fgts",
+};
+
+const auditRouteDocumentType = {
+  "consulta-tjdft": "cpf",
+  "consulta-tjdft-pf": "cpf",
+  "consulta-tjdft-pj": "cnpj",
 };
 
 const auditSourceLabels = {
@@ -187,7 +202,15 @@ const pageMeta = {
     eyebrow: "Certidões e documentações oficiais",
   },
   "consulta-tjdft": {
-    title: "TJDFT",
+    title: "TJDFT PF",
+    eyebrow: "Assistente de Consultas",
+  },
+  "consulta-tjdft-pf": {
+    title: "TJDFT PF",
+    eyebrow: "Assistente de Consultas",
+  },
+  "consulta-tjdft-pj": {
+    title: "TJDFT PJ",
     eyebrow: "Assistente de Consultas",
   },
   "consulta-receita": {
@@ -249,6 +272,8 @@ function setActivePage(page) {
   });
 
   applyAuditRouteDefaults(activePage);
+  document.body.classList.remove("menu-open");
+  mobileMenuButton?.setAttribute("aria-expanded", "false");
 }
 
 function moveEcosystemModules() {
@@ -298,6 +323,14 @@ function getSelectedAuditDocumentTypes() {
 
 function getAuditDocumentRequirements() {
   const selectedInputs = [...auditForm.querySelectorAll("input[name='auditView']:checked")];
+  const routeDocumentType = auditRouteDocumentType[getActivePage()];
+  if (routeDocumentType) {
+    return {
+      needsCpf: routeDocumentType === "cpf",
+      needsCnpj: routeDocumentType === "cnpj",
+    };
+  }
+
   const requiredTypes = new Set();
   let hasFlexibleSource = false;
   selectedInputs.forEach((input) => {
@@ -341,6 +374,40 @@ function syncAuditPrimaryDocument() {
   return { primaryType, primaryValue, cpfValue, cnpjValue, needsCpf, needsCnpj };
 }
 
+function getTjdftPersonType() {
+  const routeDocumentType = auditRouteDocumentType[getActivePage()];
+  return routeDocumentType === "cnpj" ? "pj" : "pf";
+}
+
+function updateTjdftPersonFields() {
+  const isTjdftSelected = selectedAuditViews.includes("tjdft");
+  const personType = getTjdftPersonType();
+  const isPf = personType === "pf";
+  tjdftPersonTypeLabel.textContent = isPf ? "Pessoa física" : "Pessoa jurídica";
+  tjdftPfFields.forEach((field) => field.classList.toggle("hidden", !isPf));
+  tjdftPjFields.forEach((field) => field.classList.toggle("hidden", isPf));
+  [auditFirstName, auditMotherName, auditFatherName].forEach((input) => {
+    if (input) {
+      input.required = isTjdftSelected && isPf;
+      if (!isTjdftSelected || !isPf) {
+        input.value = "";
+      }
+    }
+  });
+  if (tjdftCompanyName) {
+    tjdftCompanyName.required = false;
+    if (!isTjdftSelected || isPf) {
+      tjdftCompanyName.value = "";
+    }
+  }
+  const hasSelectedCertificate = [...tjdftCertificateTypeInputs].some((input) => input.checked);
+  tjdftCertificateTypeInputs.forEach((input) => {
+    if (isTjdftSelected && !hasSelectedCertificate) {
+      input.checked = true;
+    }
+  });
+}
+
 function getExclusiveAuditDocumentType(sourceId) {
   const config = auditSourceConfig[sourceId];
   const types = config?.documentTypes || config?.appliesTo || ["cpf", "cnpj"];
@@ -357,6 +424,7 @@ function applyAuditRouteDefaults(page) {
   }
 
   const routeSource = auditRouteSources[page] || "";
+  const routeDocumentType = auditRouteDocumentType[page] || "";
   const inputs = [...auditForm.querySelectorAll("input[name='auditView']")];
   auditForm.classList.toggle("audit-single-source", Boolean(routeSource));
   if (auditPanelTitle) {
@@ -374,6 +442,9 @@ function applyAuditRouteDefaults(page) {
 
   if (routeSource) {
     selectedAuditViews = [routeSource];
+    if (routeDocumentType && auditDocumentType) {
+      auditDocumentType.value = routeDocumentType;
+    }
     setAuditWizardStep(1);
   }
 
@@ -419,7 +490,14 @@ function validateAuditStep(step) {
       requiredFields.push(auditCnpjDocument);
     }
     if (selectedAuditViews.includes("tjdft")) {
-      requiredFields.push(auditFirstName, auditMotherName, auditFatherName);
+      const selectedTjdftCertificates = [...tjdftCertificateTypeInputs].filter((input) => input.checked);
+      if (!selectedTjdftCertificates.length) {
+        auditError.textContent = "Selecione pelo menos uma certidão do TJDFT.";
+        return false;
+      }
+      if (getTjdftPersonType() === "pf") {
+        requiredFields.push(auditFirstName, auditMotherName, auditFatherName);
+      }
     }
     if (selectedAuditViews.includes("trf1")) {
       requiredFields.push(trf1CertificateType, trf1Orgaos, trf1Email);
@@ -498,14 +576,7 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
   const needsTrf1Fields = selectedAuditViews.includes("trf1");
   const needsFgtsFields = selectedAuditViews.includes("fgts");
   tjdftFields?.classList.toggle("hidden", !needsTjdftFields);
-  [auditFirstName, auditMotherName, auditFatherName].forEach((input) => {
-    if (input) {
-      input.required = needsTjdftFields;
-      if (!needsTjdftFields) {
-        input.value = "";
-      }
-    }
-  });
+  updateTjdftPersonFields();
   trf1Fields?.classList.toggle("hidden", !needsTrf1Fields);
   [trf1CertificateType, trf1Orgaos, trf1Email].forEach((input) => {
     if (input) {
@@ -1334,7 +1405,7 @@ function setLoginMode(mode) {
     loginSubmitButton.textContent = isRegister ? "Cadastrar e entrar" : "Entrar";
   }
   if (loginModeToggle) {
-    loginModeToggle.textContent = isRegister ? "Ja tenho uma conta" : "Criar uma conta";
+    loginModeToggle.textContent = isRegister ? "Já tenho uma conta" : "Criar uma conta";
   }
 }
 
@@ -1612,6 +1683,18 @@ promptSuggestions.forEach((button) => {
   });
 });
 
+sidebarToggle?.addEventListener("click", () => {
+  const collapsed = document.body.classList.toggle("sidebar-collapsed");
+  sidebarToggle.textContent = collapsed ? "›" : "‹";
+  sidebarToggle.setAttribute("aria-label", collapsed ? "Expandir menu" : "Recolher menu");
+  sidebarToggle.title = collapsed ? "Expandir menu" : "Recolher menu";
+});
+
+mobileMenuButton?.addEventListener("click", () => {
+  const open = document.body.classList.toggle("menu-open");
+  mobileMenuButton.setAttribute("aria-expanded", String(open));
+});
+
 agentForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   agentAnswer.innerHTML = `<p>Consultando a fonte oficial...</p>`;
@@ -1708,6 +1791,11 @@ auditForm.addEventListener("submit", async (event) => {
         extraFields: {
           cpfDocument: documentState.cpfValue,
           cnpjDocument: documentState.cnpjValue,
+          tjdftPersonType: getTjdftPersonType(),
+          tjdftCompanyName: tjdftCompanyName?.value || "",
+          tjdftCertificateTypes: [...tjdftCertificateTypeInputs]
+            .filter((input) => input.checked)
+            .map((input) => input.value),
           firstName: auditFirstName?.value || "",
           motherName: auditMotherName?.value || "",
           fatherName: auditFatherName?.value || "",

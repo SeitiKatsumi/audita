@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAuditService, validateCnpj, validateCpf } from "../services/audit.service.mjs";
 import { calculateRiskScore } from "../services/risk-score.service.mjs";
+import { getCertificateTypesForInput } from "../collectors/tjdft.collector.mjs";
 
 test("valida CPF e CNPJ", () => {
   assert.equal(validateCpf("529.982.247-25"), true);
@@ -76,5 +77,18 @@ test("collector falhando nao derruba consulta", async () => {
   const audit = await service.findAudit(started.consultaId);
   assert.equal(audit.resultados[0].status, "failed");
   assert.equal(audit.status, "failed");
+});
+
+test("filtra certidoes TJDFT selecionadas", () => {
+  const certificates = getCertificateTypesForInput({
+    extraFields: {
+      tjdftCertificateTypes: ["criminal", "especial"],
+    },
+  });
+
+  assert.deepEqual(
+    certificates.map((certificate) => certificate.id),
+    ["criminal", "especial"],
+  );
 });
 

@@ -6,9 +6,9 @@ export const fonte = "tjdft";
 const OFFICIAL_URL = "https://cnc.tjdft.jus.br/solicitacao-externa";
 const CERTIFICATE_TYPES = [
   { id: "criminal", label: "Criminal", radioIndex: 0 },
-  { id: "civil", label: "Civel", radioIndex: 1 },
-  { id: "falencia", label: "de Falencia e Recuperacao Judicial", radioIndex: 2 },
-  { id: "especial", label: "Especial (Civel e Criminal)", radioIndex: 3 },
+  { id: "civil", label: "Cível", radioIndex: 1 },
+  { id: "falencia", label: "Falência e Recuperação Judicial", radioIndex: 2 },
+  { id: "especial", label: "Especial (Cível e Criminal)", radioIndex: 3 },
 ];
 
 function envNumber(name, fallback) {
@@ -41,26 +41,32 @@ export function discoverIntegrationStrategy() {
 }
 
 export async function collect(input) {
-  const cpfDocument = String(input.extraFields?.cpfDocument || input.documento || "").replace(/\D/g, "");
-  if (input.tipoDocumento !== "cpf" && !input.extraFields?.cpfDocument) {
-    return unavailableResult(fonte, "TJDFT Nada Consta neste fluxo esta mapeado para CPF.", {
+  const extra = input.extraFields || {};
+  const documentType = input.tipoDocumento === "cnpj" || extra.tjdftPersonType === "pj" ? "cnpj" : "cpf";
+  const documentValue = String(
+    documentType === "cnpj" ? extra.cnpjDocument || input.documento || "" : extra.cpfDocument || input.documento || "",
+  ).replace(/\D/g, "");
+
+  if (!documentValue) {
+    return unavailableResult(fonte, "TJDFT Nada Consta exige CPF para pessoa física ou CNPJ para pessoa jurídica.", {
       officialUrl: OFFICIAL_URL,
       integrationStrategy: discoverIntegrationStrategy(),
     });
   }
 
-  const extra = input.extraFields || {};
   const firstName = String(extra.firstName || extra.primeiroNome || "").trim();
   const motherName = String(extra.motherName || extra.nomeMae || "").trim();
   const fatherName = String(extra.fatherName || extra.nomePai || "").trim();
   const missingFields = [];
 
-  if (!firstName) missingFields.push("firstName");
-  if (!motherName) missingFields.push("motherName");
-  if (!fatherName) missingFields.push("fatherName");
+  if (documentType === "cpf") {
+    if (!firstName) missingFields.push("firstName");
+    if (!motherName) missingFields.push("motherName");
+    if (!fatherName) missingFields.push("fatherName");
+  }
 
   if (missingFields.length) {
-    return unavailableResult(fonte, "Informe primeiro nome, nome da mae e nome do pai para automatizar o TJDFT.", {
+    return unavailableResult(fonte, "Informe primeiro nome, nome da mãe e nome do pai para automatizar o TJDFT PF.", {
       officialUrl: OFFICIAL_URL,
       missingFields,
       integrationStrategy: discoverIntegrationStrategy(),
@@ -89,7 +95,13 @@ export async function collect(input) {
   try {
     const collectorTimeoutMs = envNumber("TJDFT_COLLECTOR_TIMEOUT_MS", 180000);
     const results = await withTimeout(
-      collectAllCertificates({ context, input: { ...input, documento: cpfDocument }, firstName, motherName, fatherName }),
+      collectAllCertificates({
+        context,
+        input: { ...input, documento: documentValue, tipoDocumento: documentType },
+        firstName,
+        motherName,
+        fatherName,
+      }),
       collectorTimeoutMs,
       `TJDFT excedeu o tempo maximo de ${Math.round(collectorTimeoutMs / 1000)}s.`,
     );
@@ -131,10 +143,23 @@ export async function collect(input) {
 
 async function collectAllCertificates({ context, input, firstName, motherName, fatherName }) {
   const results = [];
-  for (const certificateType of CERTIFICATE_TYPES) {
+  for (const certificateType of getCertificateTypesForInput(input)) {
     results.push(await collectCertificate({ context, input, firstName, motherName, fatherName, certificateType }));
   }
   return results;
+}
+
+export function getCertificateTypesForInput(input) {
+  const selected = Array.isArray(input.extraFields?.tjdftCertificateTypes)
+    ? input.extraFields.tjdftCertificateTypes.map((value) => String(value).trim()).filter(Boolean)
+    : [];
+  if (!selected.length) {
+    return CERTIFICATE_TYPES;
+  }
+
+  const selectedSet = new Set(selected);
+  const filtered = CERTIFICATE_TYPES.filter((certificateType) => selectedSet.has(certificateType.id));
+  return filtered.length ? filtered : CERTIFICATE_TYPES;
 }
 
 async function collectCertificate({ context, input, firstName, motherName, fatherName, certificateType }) {
@@ -202,18 +227,32 @@ async function collectCertificate({ context, input, firstName, motherName, fathe
 async function fillFirstStep(page, documento, firstName, certificateType) {
   const stepTimeoutMs = envNumber("TJDFT_STEP_TIMEOUT_MS", 30000);
   const textInputs = page.locator("input[type='text']");
-  await textInputs.nth(0).fill(formatCpf(documento));
-  await textInputs.nth(1).fill(firstName);
+  await textInputs.nth(0).fill(formatDocument(documento));
+  if (firstName) {
+    await textInputs.nth(1).fill(firstName);
+  }
   await chooseCertificateType(page, certificateType);
   await page.getByRole("button", { name: "Próximo" }).click();
-  await page.waitForFunction(() => document.body.innerText.includes("Nome da Mãe"), null, { timeout: stepTimeoutMs });
+  await page.waitForFunction(
+    () => document.body.innerText.includes("Nome da Mãe") || document.body.innerText.includes("DOWNLOAD") || document.body.innerText.includes("Download"),
+    null,
+    { timeout: stepTimeoutMs },
+  );
 }
 
 async function fillSecondStep(page, motherName, fatherName) {
   const stepTimeoutMs = envNumber("TJDFT_STEP_TIMEOUT_MS", 45000);
+  if (!motherName && !fatherName) {
+    return;
+  }
+
   const textInputs = page.locator("input[type='text']");
-  await textInputs.nth(2).fill(motherName);
-  await textInputs.nth(3).fill(fatherName);
+  if (motherName) {
+    await textInputs.nth(2).fill(motherName);
+  }
+  if (fatherName) {
+    await textInputs.nth(3).fill(fatherName);
+  }
   await page.getByRole("button", { name: "Próximo" }).click();
   await page.waitForFunction(
     () => document.body.innerText.includes("DOWNLOAD") || document.body.innerText.includes("Download"),
@@ -306,12 +345,15 @@ function maskSignedUrl(url) {
   }
 }
 
-function formatCpf(value) {
+function formatDocument(value) {
   const digits = String(value || "").replace(/\D/g, "");
-  if (digits.length !== 11) {
-    return digits;
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
   }
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+  if (digits.length === 14) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
+  return digits;
 }
 
 function normalize(value) {
