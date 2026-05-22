@@ -4,6 +4,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=8080
+ARG CAPROVER_GIT_COMMIT_SHA=local
+ENV APP_VERSION=${CAPROVER_GIT_COMMIT_SHA}
 
 COPY package*.json ./
 RUN npm ci --omit=dev

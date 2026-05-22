@@ -21,6 +21,7 @@ const loginButton = document.querySelector("#loginButton");
 const newQueryButton = document.querySelector("#newQueryButton");
 const environmentName = document.querySelector("#environmentName");
 const environmentDetail = document.querySelector("#environmentDetail");
+const deployVersion = document.querySelector("#deployVersion");
 const pageTitle = document.querySelector("#pageTitle");
 const pageEyebrow = document.querySelector("#pageEyebrow");
 const profileName = document.querySelector("#profileName");
@@ -1433,6 +1434,21 @@ async function loadAppConfig() {
   }
 }
 
+async function loadDeployVersion() {
+  try {
+    const response = await fetch("/api/health", { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      return;
+    }
+
+    const health = await response.json();
+    const version = String(health.version || "local");
+    deployVersion.textContent = version.length > 12 ? `versão ${version.slice(0, 7)}` : `versão ${version}`;
+  } catch {
+    deployVersion.textContent = "versão local";
+  }
+}
+
 async function loadDashboard() {
   try {
     const response = await fetch("/api/dashboard", { headers: { accept: "application/json" } });
@@ -1872,6 +1888,7 @@ setActivePage(getActivePage());
 updateAuditSourceAvailability();
 setAuditWizardStep(1);
 await loadAppConfig();
+await loadDeployVersion();
 await loadModules();
 const authState = await loadAuthState();
 renderProfile(authState.user);

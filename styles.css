@@ -285,6 +285,13 @@ a {
   color: var(--muted);
 }
 
+.brand .deploy-version {
+  margin-top: 4px;
+  color: rgba(153, 185, 212, 0.62);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
 .nav-list {
   display: grid;
   gap: 8px;
