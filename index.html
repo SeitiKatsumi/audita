@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260522-document-ai" />
+    <link rel="stylesheet" href="styles.css?v=20260522-document-ai-fix" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -459,7 +459,7 @@
                   <div class="document-ai-content" id="documentAiContent">
                     <p class="empty-state">Após a análise dos PDFs, o parecer aparecerá aqui.</p>
                   </div>
-                  <form class="document-ai-question" id="documentAiQuestionForm">
+                  <div class="document-ai-question" id="documentAiQuestionForm">
                     <label>
                       Pergunte sobre os documentos
                       <textarea
@@ -468,8 +468,8 @@
                         placeholder="Ex: Existe algum risco relevante? A certidão criminal retornou nada consta? O que devo explicar ao cliente?"
                       ></textarea>
                     </label>
-                    <button class="primary-action" type="submit">Perguntar sobre os PDFs</button>
-                  </form>
+                    <button class="primary-action" id="documentAiQuestionButton" type="button">Perguntar sobre os PDFs</button>
+                  </div>
                   <div class="document-ai-answer" id="documentAiAnswer">
                     <p>Faça uma pergunta para cruzar o conteúdo das certidões com o parecer e os riscos.</p>
                   </div>
@@ -774,6 +774,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260522-document-ai"></script>
+    <script type="module" src="app.js?v=20260522-document-ai-fix"></script>
   </body>
 </html>

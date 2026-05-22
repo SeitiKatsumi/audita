@@ -98,6 +98,7 @@ const documentAiRisk = document.querySelector("#documentAiRisk");
 const documentAiContent = document.querySelector("#documentAiContent");
 const documentAiQuestionForm = document.querySelector("#documentAiQuestionForm");
 const documentAiQuestion = document.querySelector("#documentAiQuestion");
+const documentAiQuestionButton = document.querySelector("#documentAiQuestionButton");
 const documentAiAnswer = document.querySelector("#documentAiAnswer");
 const auditPanelTitle = document.querySelector("#auditPanelTitle");
 const auditResultStatus = document.querySelector("#auditResultStatus");
@@ -1936,8 +1937,7 @@ assistantQueryForm.addEventListener("submit", async (event) => {
   }
 });
 
-documentAiQuestionForm?.addEventListener("submit", (event) => {
-  event.preventDefault();
+documentAiQuestionButton?.addEventListener("click", () => {
   const question = documentAiQuestion?.value.trim() || "";
   if (!question) {
     documentAiAnswer.innerHTML = `<p>Digite uma pergunta sobre as certidões ou os riscos encontrados.</p>`;
