@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260522-home-consultas" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -53,14 +53,18 @@
         </div>
 
         <nav class="nav-list">
-          <a class="active" href="#overview">Visão geral</a>
-          <a href="#assistente">Assistente</a>
-          <a href="#consultas">Consultas</a>
-          <a href="#coletas">Coletas</a>
-          <a href="#riscos">Riscos</a>
-          <a href="#relatorios">Relatórios</a>
-          <a href="#integracoes-admin">Integrações de órgãos</a>
-          <a href="#integracoes">Ecossistema</a>
+          <a class="active" href="#home">Home</a>
+          <div class="nav-group" aria-label="Assistente de Consultas">
+            <a href="#consultas">Assistente de Consultas</a>
+            <a class="nav-child" href="#consulta-tjdft">TJDFT</a>
+            <a class="nav-child" href="#consulta-receita">Receita/CNPJ</a>
+            <a class="nav-child" href="#consulta-pgfn">PGFN/CND</a>
+            <a class="nav-child" href="#consulta-cndt">CNDT/TST</a>
+            <a class="nav-child" href="#consulta-trf1">TRF1</a>
+            <a class="nav-child" href="#consulta-fgts">FGTS/CEF</a>
+          </div>
+          <a href="#historico">Histórico de consultas</a>
+          <a href="#meu-painel">Meu painel</a>
         </nav>
 
         <div class="environment">
@@ -76,7 +80,7 @@
         <header class="topbar">
           <div>
             <p class="eyebrow" id="pageEyebrow">Plataforma de consulta e auditoria</p>
-            <h1 id="pageTitle">Centro de inteligência Audita</h1>
+            <h1 id="pageTitle">Audita</h1>
           </div>
         <div class="actions">
             <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
@@ -85,34 +89,27 @@
           </div>
         </header>
 
-        <section class="hero-grid" id="overview" data-page="overview">
-          <article class="intel-panel">
-            <div class="panel-copy">
-              <span class="status-chip">IA ativa</span>
-              <h2>Dados Governamentais Brutos transformados em Intelig&ecirc;ncia Competitiva, Contexto e A&ccedil;&otilde;es efetivas</h2>
-              <p>
-                A Audita centraliza fontes judiciais, fiscais, imobiliárias e APIs para
-                gerar explicações claras, alertas e relatórios acionáveis.
-              </p>
+        <section class="home-hero" id="home" data-page="home">
+          <article class="home-hero-panel">
+            <div class="home-hero-copy">
+              <span class="hero-pill"><span></span>Inteligência Jurídica</span>
+              <h2>
+                Certidões e documentações com
+                <em>análise inteligente</em>, laudos completos e uma linguagem simples para
+                <em>decisões mais seguras</em>.
+              </h2>
+              <div class="home-hero-features" aria-label="Recursos principais">
+                <span>Certidões e documentações</span>
+                <span>Análise inteligente</span>
+                <span>Laudos completos</span>
+                <span>Linguagem simples</span>
+              </div>
             </div>
             <canvas id="signalCanvas" width="760" height="360" aria-label="Visualização de sinais analíticos"></canvas>
           </article>
-
-          <article class="risk-card">
-            <div class="card-heading">
-              <span>Risco consolidado</span>
-              <strong id="riskScore">72</strong>
-            </div>
-            <div class="risk-orbit">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <p>Alta atividade em consultas fiscais e duas anomalias em fontes judiciais.</p>
-          </article>
         </section>
 
-        <section class="metrics" aria-label="Indicadores" data-page="overview">
+        <section class="metrics" aria-label="Indicadores" data-page="home">
           <article>
             <small>Consultas hoje</small>
             <strong>1.284</strong>
@@ -181,7 +178,11 @@
           </article>
         </section>
 
-        <section class="consultation-grid" id="consultas" data-page="consultas">
+        <section
+          class="consultation-grid"
+          id="consultas"
+          data-page="consultas consulta-tjdft consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts historico"
+        >
           <article class="module agent-panel" data-page="integracoes">
             <div class="module-header">
               <div>
@@ -255,11 +256,14 @@
             <small class="login-error" id="agentSettingsError" role="alert"></small>
           </article>
 
-          <article class="module audit-panel">
+          <article
+            class="module audit-panel"
+            data-page="consultas consulta-tjdft consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts"
+          >
             <div class="module-header">
               <div>
                 <p class="eyebrow">Auditoria básica</p>
-                <h2>CPF/CNPJ completo</h2>
+                <h2 id="auditPanelTitle">CPF/CNPJ completo</h2>
               </div>
               <span class="live" id="auditStatusLabel">14 fontes</span>
             </div>
@@ -437,7 +441,7 @@
             <small class="login-error" id="auditError" role="alert"></small>
           </article>
 
-          <article class="module audit-history-panel">
+          <article class="module audit-history-panel" data-page="historico">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Histórico</p>
@@ -486,7 +490,7 @@
             <small class="login-error" id="consultationError" role="alert"></small>
           </article>
 
-          <article class="module consultation-history">
+          <article class="module consultation-history hidden">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Rastreabilidade</p>
@@ -494,6 +498,44 @@
               </div>
             </div>
             <div class="history-list" id="consultationHistory"></div>
+          </article>
+        </section>
+
+        <section class="profile-grid" id="meu-painel" data-page="meu-painel">
+          <article class="module profile-card">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Conta</p>
+                <h2>Meu painel</h2>
+              </div>
+              <span class="live">Super admin</span>
+            </div>
+            <div class="profile-fields">
+              <div>
+                <small>Nome</small>
+                <strong id="profileName">Super Admin</strong>
+              </div>
+              <div>
+                <small>E-mail</small>
+                <strong id="profileEmail">Não informado</strong>
+              </div>
+              <div>
+                <small>CPF</small>
+                <strong>Não informado</strong>
+              </div>
+              <div>
+                <small>RG</small>
+                <strong>Não informado</strong>
+              </div>
+              <div class="wide-profile-field">
+                <small>Endereço</small>
+                <strong>Não informado</strong>
+              </div>
+              <div>
+                <small>Plano</small>
+                <strong id="profilePlan">Ilimitado</strong>
+              </div>
+            </div>
           </article>
         </section>
 
@@ -684,6 +726,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260520-ecosystem-modules"></script>
+    <script type="module" src="app.js?v=20260522-home-consultas"></script>
   </body>
 </html>

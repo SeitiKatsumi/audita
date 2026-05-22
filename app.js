@@ -1,5 +1,5 @@
 const canvas = document.querySelector("#signalCanvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas?.getContext("2d");
 const riskScore = document.querySelector("#riskScore");
 const assistantText = document.querySelector("#assistantText");
 const reportButton = document.querySelector("#generateReport");
@@ -23,6 +23,9 @@ const environmentName = document.querySelector("#environmentName");
 const environmentDetail = document.querySelector("#environmentDetail");
 const pageTitle = document.querySelector("#pageTitle");
 const pageEyebrow = document.querySelector("#pageEyebrow");
+const profileName = document.querySelector("#profileName");
+const profileEmail = document.querySelector("#profileEmail");
+const profilePlan = document.querySelector("#profilePlan");
 const navLinks = document.querySelectorAll(".nav-list a[href^='#']");
 const pageBlocks = document.querySelectorAll("[data-page]");
 const operationsPages = document.querySelector("#operationsPages");
@@ -82,6 +85,7 @@ const auditAuthorization = document.querySelector("#auditAuthorization");
 const auditError = document.querySelector("#auditError");
 const auditSummary = document.querySelector("#auditSummary");
 const auditSourceList = document.querySelector("#auditSourceList");
+const auditPanelTitle = document.querySelector("#auditPanelTitle");
 const auditResultStatus = document.querySelector("#auditResultStatus");
 const auditStatusLabel = document.querySelector("#auditStatusLabel");
 const auditResultsPanel = document.querySelector(".audit-results-panel");
@@ -154,65 +158,96 @@ const auditSourceConfig = {
   },
 };
 
+const auditRouteSources = {
+  "consulta-tjdft": "tjdft",
+  "consulta-receita": "receita_federal",
+  "consulta-pgfn": "pgfn",
+  "consulta-cndt": "cndt",
+  "consulta-trf1": "trf1",
+  "consulta-fgts": "fgts",
+};
+
+const auditSourceLabels = {
+  receita_federal: "Receita/CNPJ",
+  pgfn: "PGFN/CND",
+  cndt: "CNDT/TST",
+  trf1: "TRF1",
+  tjdft: "TJDFT",
+  fgts: "FGTS/CEF",
+};
+
 const pageMeta = {
-  overview: {
-    title: "Centro de inteligência Audita",
-    eyebrow: "Plataforma de consulta e auditoria",
-  },
-  assistente: {
-    title: "Assistente Audita",
-    eyebrow: "Consulta inteligente em fontes oficiais",
+  home: {
+    title: "Audita",
+    eyebrow: "Plataforma de certidões inteligentes",
   },
   consultas: {
-    title: "Consultas governamentais",
-    eyebrow: "Registro, catálogo e rastreabilidade",
+    title: "Assistente de Consultas",
+    eyebrow: "Certidões e documentações oficiais",
   },
-  coletas: {
-    title: "Coleta e normalização",
-    eyebrow: "Pipeline de dados oficiais",
+  "consulta-tjdft": {
+    title: "TJDFT",
+    eyebrow: "Assistente de Consultas",
   },
-  riscos: {
-    title: "Sinais prioritários",
-    eyebrow: "Auditoria e classificação de risco",
+  "consulta-receita": {
+    title: "Receita/CNPJ",
+    eyebrow: "Assistente de Consultas",
   },
-  relatorios: {
-    title: "Relatórios inteligentes",
-    eyebrow: "Resumo executivo e recomendações",
+  "consulta-pgfn": {
+    title: "PGFN/CND",
+    eyebrow: "Assistente de Consultas",
   },
-  "integracoes-admin": {
-    title: "Integrações de órgãos",
-    eyebrow: "Administração de fontes oficiais",
+  "consulta-cndt": {
+    title: "CNDT/TST",
+    eyebrow: "Assistente de Consultas",
   },
-  integracoes: {
-    title: "Ecossistema Audita",
-    eyebrow: "Conectores e integrações previstas",
+  "consulta-trf1": {
+    title: "TRF1",
+    eyebrow: "Assistente de Consultas",
+  },
+  "consulta-fgts": {
+    title: "FGTS/CEF",
+    eyebrow: "Assistente de Consultas",
+  },
+  historico: {
+    title: "Histórico de consultas",
+    eyebrow: "Execuções anteriores do usuário",
+  },
+  "meu-painel": {
+    title: "Meu painel",
+    eyebrow: "Dados da conta",
   },
 };
 
 function getActivePage() {
   const hash = window.location.hash.replace("#", "");
-  return pageMeta[hash] ? hash : "overview";
+  if (hash === "overview") {
+    return "home";
+  }
+  return pageMeta[hash] ? hash : "home";
 }
 
 function setActivePage(page) {
-  const activePage = pageMeta[page] ? page : "overview";
+  const activePage = pageMeta[page] ? page : "home";
   const activeMeta = pageMeta[activePage];
 
   pageTitle.textContent = activeMeta.title;
   pageEyebrow.textContent = activeMeta.eyebrow;
 
   pageBlocks.forEach((block) => {
-    block.classList.toggle("page-hidden", block.dataset.page !== activePage);
+    const pages = (block.dataset.page || "").split(/\s+/).filter(Boolean);
+    block.classList.toggle("page-hidden", !pages.includes(activePage));
   });
 
-  const operationPages = ["coletas", "riscos", "relatorios", "integracoes"];
   if (operationsPages) {
-    operationsPages.classList.toggle("page-hidden", !operationPages.includes(activePage));
+    operationsPages.classList.add("page-hidden");
   }
 
   navLinks.forEach((link) => {
     link.classList.toggle("active", link.getAttribute("href") === `#${activePage}`);
   });
+
+  applyAuditRouteDefaults(activePage);
 }
 
 function moveEcosystemModules() {
@@ -315,6 +350,36 @@ function keepCompatibleAuditSelection(changedInput) {
   return changedInput;
 }
 
+function applyAuditRouteDefaults(page) {
+  if (!auditForm) {
+    return;
+  }
+
+  const routeSource = auditRouteSources[page] || "";
+  const inputs = [...auditForm.querySelectorAll("input[name='auditView']")];
+  auditForm.classList.toggle("audit-single-source", Boolean(routeSource));
+  if (auditPanelTitle) {
+    auditPanelTitle.textContent = routeSource ? `Consulta ${auditSourceLabels[routeSource]}` : "CPF/CNPJ completo";
+  }
+
+  inputs.forEach((input) => {
+    const isRouteSource = input.value === routeSource;
+    const label = input.closest("label");
+    label?.classList.toggle("audit-option-hidden", Boolean(routeSource) && !isRouteSource);
+    if (routeSource) {
+      input.checked = isRouteSource;
+    }
+  });
+
+  if (routeSource) {
+    selectedAuditViews = [routeSource];
+    setAuditWizardStep(1);
+  }
+
+  updateAuditDocumentTypeOptions();
+  updateAuditSourceAvailability({ resetSelection: false });
+}
+
 function updateAuditDocumentTypeOptions() {
   const selectedTypes = getSelectedAuditDocumentTypes();
   [...auditDocumentType.options].forEach((option) => {
@@ -399,6 +464,7 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
   syncAuditPrimaryDocument();
 
   const inputs = [...auditForm.querySelectorAll("input[name='auditView']")];
+  const activeRouteSource = auditRouteSources[getActivePage()] || "";
   inputs.forEach((input) => {
     const config = auditSourceConfig[input.value] || {
       appliesTo: ["cpf", "cnpj"],
@@ -413,7 +479,8 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
     const selectableInCurrentStep = true;
 
     input.disabled = false;
-    label?.classList.toggle("audit-option-hidden", auditWizardStep === 2 && !input.checked);
+    const outsideRouteSource = Boolean(activeRouteSource) && input.value !== activeRouteSource;
+    label?.classList.toggle("audit-option-hidden", outsideRouteSource || (auditWizardStep === 2 && !input.checked));
     label?.classList.toggle("audit-option-disabled", false);
     label?.classList.toggle("audit-option-auto", input.checked);
     if (label) {
@@ -470,6 +537,10 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
 }
 
 function drawSignal() {
+  if (!canvas || !ctx) {
+    return;
+  }
+
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
@@ -540,11 +611,14 @@ function drawSignal() {
 }
 
 function rotateRisk() {
+  if (!riskScore) {
+    return;
+  }
   const base = 68 + Math.round(Math.sin(Date.now() / 1800) * 6);
   riskScore.textContent = String(base);
 }
 
-reportButton.addEventListener("click", () => {
+reportButton?.addEventListener("click", () => {
   assistantText.textContent =
     "Relatório executivo preparado: 9 alertas consolidados, 3 prioridades críticas, 4 fontes verificadas e recomendação de revisão fiscal imediata antes da aprovação final.";
 });
@@ -1320,6 +1394,18 @@ async function loadAuthState() {
   }
 }
 
+function renderProfile(user) {
+  if (profileName) {
+    profileName.textContent = user?.name || "Super Admin";
+  }
+  if (profileEmail) {
+    profileEmail.textContent = user?.email || "Não informado";
+  }
+  if (profilePlan) {
+    profilePlan.textContent = "Ilimitado";
+  }
+}
+
 function formatEnvironmentName(environment) {
   const names = {
     local: "Local",
@@ -1788,6 +1874,7 @@ setAuditWizardStep(1);
 await loadAppConfig();
 await loadModules();
 const authState = await loadAuthState();
+renderProfile(authState.user);
 if (authState.authRequired && !authState.user) {
   showLogin();
 } else {
