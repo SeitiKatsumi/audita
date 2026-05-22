@@ -1472,6 +1472,116 @@ h2 {
   gap: 10px;
 }
 
+.document-ai-panel {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid rgba(116, 255, 154, 0.26);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(116, 255, 154, 0.09), transparent 38%),
+    linear-gradient(90deg, rgba(51, 204, 255, 0.1), rgba(41, 119, 255, 0.055)),
+    rgba(3, 13, 28, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 28px rgba(49, 247, 143, 0.08);
+}
+
+.document-ai-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.95fr 1fr;
+  gap: 12px;
+}
+
+.document-ai-grid article,
+.document-ai-answer {
+  padding: 14px;
+  border: 1px solid rgba(73, 169, 255, 0.24);
+  border-radius: 8px;
+  background: rgba(3, 13, 28, 0.46);
+}
+
+.document-ai-grid small {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--aqua);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.document-ai-grid p,
+.document-ai-answer p {
+  margin: 0;
+  color: #d9edff;
+  line-height: 1.6;
+}
+
+.document-ai-grid ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: #d9edff;
+}
+
+.document-ai-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.document-ai-chips span {
+  display: inline-grid;
+  gap: 2px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid rgba(51, 204, 255, 0.28);
+  border-radius: 8px;
+  color: var(--text);
+  background: rgba(41, 119, 255, 0.1);
+}
+
+.document-ai-chips small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: none;
+}
+
+.document-ai-question {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.document-ai-question label {
+  display: grid;
+  gap: 7px;
+  color: #cde7ff;
+  font-weight: 800;
+}
+
+.document-ai-question textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 12px 13px;
+  border: 1px solid rgba(73, 169, 255, 0.28);
+  border-radius: 8px;
+  color: var(--text);
+  background:
+    linear-gradient(90deg, rgba(41, 119, 255, 0.1), transparent 28%),
+    rgba(3, 13, 28, 0.78);
+  outline: none;
+}
+
+.document-ai-question textarea:focus {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 3px rgba(73, 169, 255, 0.14);
+}
+
 .audit-source-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2014,7 +2124,9 @@ h2 {
   .audit-step-panel,
   .audit-summary-grid,
   .audit-actions,
-  .audit-evidence-form {
+  .audit-evidence-form,
+  .document-ai-grid,
+  .document-ai-question {
     grid-template-columns: 1fr;
   }
 
@@ -2084,6 +2196,8 @@ h2 {
   .audit-summary-grid,
   .audit-actions,
   .audit-evidence-form,
+  .document-ai-grid,
+  .document-ai-question,
   .agent-form,
   .assistant-query-form,
   .agent-settings-form,

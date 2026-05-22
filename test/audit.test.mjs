@@ -92,3 +92,44 @@ test("filtra certidoes TJDFT selecionadas", () => {
   );
 });
 
+test("encaminha campos TJDFT para collector", async () => {
+  let receivedExtraFields = null;
+  const service = createAuditService({
+    getDb: () => ({ pool: null, dbReady: false }),
+    getAuthContext: async () => ({ tenantId: 1, user: null, unauthorized: false }),
+    customCollectors: {
+      tjdft: {
+        collect: async (input) => {
+          receivedExtraFields = input.extraFields;
+          return {
+            fonte: "tjdft",
+            status: "success",
+            resultado: "nada_consta",
+            dados: { ok: true },
+          };
+        },
+      },
+    },
+  });
+
+  const started = await service.startAudit({
+    body: {
+      documento: "52998224725",
+      tipoDocumento: "cpf",
+      fontes: ["tjdft"],
+      extraFields: {
+        tjdftPersonType: "pf",
+        tjdftCertificateTypes: ["criminal", "civil"],
+        firstName: "Maria",
+        motherName: "Ana",
+        fatherName: "Jose",
+      },
+    },
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  assert.equal(Boolean(started.consultaId), true);
+  assert.equal(receivedExtraFields.tjdftPersonType, "pf");
+  assert.deepEqual(receivedExtraFields.tjdftCertificateTypes, ["criminal", "civil"]);
+});
+

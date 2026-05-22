@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260522-consulting-bg" />
+    <link rel="stylesheet" href="styles.css?v=20260522-document-ai" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -448,6 +448,32 @@
                   <p class="empty-state">Informe CPF/CNPJ e escolha o que deseja visualizar.</p>
                 </div>
                 <div class="audit-source-list" id="auditSourceList"></div>
+                <section class="document-ai-panel hidden" id="documentAiPanel" aria-label="Parecer inteligente sobre as certidões">
+                  <div class="module-header">
+                    <div>
+                      <p class="eyebrow">Inteligência documental</p>
+                      <h2>Parecer de IA sobre as certidões</h2>
+                    </div>
+                    <span class="live" id="documentAiRisk">Aguardando PDFs</span>
+                  </div>
+                  <div class="document-ai-content" id="documentAiContent">
+                    <p class="empty-state">Após a análise dos PDFs, o parecer aparecerá aqui.</p>
+                  </div>
+                  <form class="document-ai-question" id="documentAiQuestionForm">
+                    <label>
+                      Pergunte sobre os documentos
+                      <textarea
+                        id="documentAiQuestion"
+                        rows="3"
+                        placeholder="Ex: Existe algum risco relevante? A certidão criminal retornou nada consta? O que devo explicar ao cliente?"
+                      ></textarea>
+                    </label>
+                    <button class="primary-action" type="submit">Perguntar sobre os PDFs</button>
+                  </form>
+                  <div class="document-ai-answer" id="documentAiAnswer">
+                    <p>Faça uma pergunta para cruzar o conteúdo das certidões com o parecer e os riscos.</p>
+                  </div>
+                </section>
               </section>
 
               <div class="audit-wizard-actions">
@@ -748,6 +774,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260522-consulting-bg"></script>
+    <script type="module" src="app.js?v=20260522-document-ai"></script>
   </body>
 </html>

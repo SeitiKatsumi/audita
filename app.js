@@ -93,6 +93,12 @@ const auditAuthorization = document.querySelector("#auditAuthorization");
 const auditError = document.querySelector("#auditError");
 const auditSummary = document.querySelector("#auditSummary");
 const auditSourceList = document.querySelector("#auditSourceList");
+const documentAiPanel = document.querySelector("#documentAiPanel");
+const documentAiRisk = document.querySelector("#documentAiRisk");
+const documentAiContent = document.querySelector("#documentAiContent");
+const documentAiQuestionForm = document.querySelector("#documentAiQuestionForm");
+const documentAiQuestion = document.querySelector("#documentAiQuestion");
+const documentAiAnswer = document.querySelector("#documentAiAnswer");
 const auditPanelTitle = document.querySelector("#auditPanelTitle");
 const auditResultStatus = document.querySelector("#auditResultStatus");
 const auditStatusLabel = document.querySelector("#auditStatusLabel");
@@ -103,6 +109,7 @@ const auditBackButton = document.querySelector("#auditBackButton");
 const auditNextButton = document.querySelector("#auditNextButton");
 const auditSubmitButton = document.querySelector("#auditSubmitButton");
 let selectedAuditViews = [];
+let currentDocumentAiContext = null;
 const assistantQueryForm = document.querySelector("#assistantQueryForm");
 const assistantSource = document.querySelector("#assistantSource");
 const assistantCode = document.querySelector("#assistantCode");
@@ -914,6 +921,7 @@ function renderAudit(audit) {
     auditResultStatus.textContent = "Aguardando";
     auditSummary.innerHTML = `<p class="empty-state">Informe CPF/CNPJ e escolha o que deseja visualizar.</p>`;
     auditSourceList.innerHTML = "";
+    renderDocumentAiPanel(null, []);
     return;
   }
 
@@ -926,8 +934,11 @@ function renderAudit(audit) {
         category: "audit",
         mode: "collector",
         status: result.status,
+        resultado: result.resultado,
         summary: result.erro || result.dados?.resumo || summarizeAuditResult(result),
         officialUrl: result.dados?.officialUrl || getAuditOfficialUrl(result.fonte),
+        data: result.dados || {},
+        rawText: result.rawText || "",
         missingFields: [],
         evidence: buildAuditEvidence(result),
       }))
@@ -959,6 +970,7 @@ function renderAudit(audit) {
 
   if (!visibleExecutions.length) {
     auditSourceList.innerHTML = `<p class="empty-state">Nenhum bloco selecionado para este documento.</p>`;
+    renderDocumentAiPanel(audit, visibleExecutions);
     return;
   }
 
@@ -1004,6 +1016,167 @@ function renderAudit(audit) {
       `;
     })
     .join("");
+  renderDocumentAiPanel(audit, visibleExecutions);
+}
+
+function renderDocumentAiPanel(audit, executions) {
+  if (!documentAiPanel) {
+    return;
+  }
+  const context = buildDocumentAiContext(audit, executions);
+  currentDocumentAiContext = context;
+  documentAiPanel.classList.toggle("hidden", !context);
+  if (!context) {
+    documentAiContent.innerHTML = `<p class="empty-state">Após a análise dos PDFs, o parecer aparecerá aqui.</p>`;
+    documentAiAnswer.innerHTML = `<p>Faça uma pergunta para cruzar o conteúdo das certidões com o parecer e os riscos.</p>`;
+    if (documentAiRisk) {
+      documentAiRisk.textContent = "Aguardando PDFs";
+    }
+    return;
+  }
+
+  if (documentAiRisk) {
+    documentAiRisk.textContent = `Risco ${context.riskLevel}`;
+  }
+  documentAiContent.innerHTML = `
+    <div class="document-ai-grid">
+      <article>
+        <small>Parecer preliminar</small>
+        <p>${escapeHtml(context.opinion)}</p>
+      </article>
+      <article>
+        <small>Riscos identificados</small>
+        <ul>${context.risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("")}</ul>
+      </article>
+      <article>
+        <small>Certidões analisadas</small>
+        <div class="document-ai-chips">
+          ${context.certificates
+            .map(
+              (certificate) =>
+                `<span>${escapeHtml(certificate.tipo)}<small>${escapeHtml(certificate.status)}</small></span>`,
+            )
+            .join("")}
+        </div>
+      </article>
+    </div>
+    <small class="consultation-note">${escapeHtml(context.disclaimer)}</small>
+  `;
+  documentAiAnswer.innerHTML = `<p>Use o campo acima para perguntar sobre riscos, apontamentos, certidões específicas ou próximos passos.</p>`;
+}
+
+function buildDocumentAiContext(audit, executions) {
+  const tjdftExecution = executions.find((execution) => (execution.sourceId || execution.id) === "tjdft");
+  if (!audit || !tjdftExecution) {
+    return null;
+  }
+
+  const data = tjdftExecution.data || {};
+  const rawText = [tjdftExecution.rawText, data.rawText]
+    .concat(Array.isArray(data.certidoes) ? data.certidoes.map((certificate) => certificate.rawText || certificate.pageText || "") : [])
+    .filter(Boolean)
+    .join("\n\n");
+  const certificates = normalizeTjdftCertificates(tjdftExecution);
+  const hasPendingText = Array.isArray(data.certidoesComAnalisePendente) && data.certidoesComAnalisePendente.length > 0;
+  const hasFailure = Array.isArray(data.certidoesComFalha) && data.certidoesComFalha.length > 0;
+  const hasFinding =
+    tjdftExecution.resultado === "consta" ||
+    (Array.isArray(data.certidoesComApontamento) && data.certidoesComApontamento.length > 0) ||
+    /consta|apontamento|processo|a[çc][ãa]o|fal[êe]ncia|recupera[çc][ãa]o|criminal/i.test(rawText);
+  const riskLevel = hasFinding ? "alto" : hasFailure || hasPendingText || !rawText ? "médio" : "baixo";
+  const risks = [];
+  if (hasFinding) {
+    risks.push("Há indicação de apontamento ou termo sensível nas certidões. Recomenda-se revisão humana antes de qualquer decisão.");
+  }
+  if (hasFailure) {
+    risks.push(`Nem todas as certidões foram emitidas ou baixadas: ${data.certidoesComFalha.join(", ")}.`);
+  }
+  if (hasPendingText || !rawText) {
+    risks.push("A leitura automática do PDF ainda está limitada. O parecer usa metadados, status e textos extraídos disponíveis.");
+  }
+  if (!risks.length) {
+    risks.push("Nenhum apontamento relevante foi identificado nos textos disponíveis das certidões analisadas.");
+  }
+
+  const opinion = createDocumentOpinion({ riskLevel, certificates, rawText, data });
+  return {
+    auditId: audit.consultaId || audit.id,
+    document: audit.documento || audit.documentMasked || "",
+    documentType: audit.tipoDocumento || audit.documentType || "",
+    riskLevel,
+    risks,
+    certificates,
+    rawText,
+    opinion,
+    disclaimer: "Parecer automatizado de apoio. Use a certidão oficial em PDF como evidência principal e valide pontos sensíveis manualmente.",
+  };
+}
+
+function normalizeTjdftCertificates(execution) {
+  const data = execution.data || {};
+  const certificates = Array.isArray(data.certidoes) ? data.certidoes : [];
+  if (certificates.length) {
+    return certificates.map((certificate) => ({
+      tipo: certificate.tipo || "Certidão TJDFT",
+      status: certificate.pdfPath ? "PDF baixado" : certificate.errorMessage || "pendente",
+      rawText: certificate.rawText || certificate.pageText || "",
+    }));
+  }
+  return (execution.evidence || [])
+    .filter((item) => item.type === "pdf")
+    .map((item) => ({
+      tipo: item.title || "Certidão TJDFT",
+      status: item.value || "PDF disponível",
+      rawText: "",
+    }));
+}
+
+function createDocumentOpinion({ riskLevel, certificates, rawText, data }) {
+  const analyzed = certificates.length ? certificates.map((certificate) => certificate.tipo).join(", ") : "certidões TJDFT";
+  if (riskLevel === "alto") {
+    return `Foram analisados os blocos ${analyzed}. O conjunto indica risco alto porque há possível apontamento, termo sensível ou inconsistência que exige revisão humana antes de liberar o caso.`;
+  }
+  if (riskLevel === "médio") {
+    return `Foram analisados os blocos ${analyzed}. O risco é médio porque a análise depende de PDFs/textos incompletos ou de certidões com falha de leitura. Baixe os PDFs e valide manualmente os itens pendentes.`;
+  }
+  const summary = data.resumo || (rawText ? "Os textos extraídos não indicaram apontamentos relevantes." : "");
+  return `Foram analisados os blocos ${analyzed}. O risco preliminar é baixo. ${summary}`;
+}
+
+function answerDocumentQuestion(question, context) {
+  const normalized = question.toLowerCase();
+  const rawText = context.rawText || "";
+  const matchingCertificates = context.certificates.filter((certificate) =>
+    normalized.includes(certificate.tipo.toLowerCase().split(" ")[0]),
+  );
+
+  if (/risco|perigo|problema|apontamento|restri[çc][ãa]o/.test(normalized)) {
+    return `${context.opinion} Principais riscos: ${context.risks.join(" ")}`;
+  }
+  if (/pdf|baixar|download|certid[ãa]o|certidoes|certidões/.test(normalized)) {
+    return `Foram considerados estes documentos: ${context.certificates
+      .map((certificate) => `${certificate.tipo} (${certificate.status})`)
+      .join("; ")}. Use os PDFs oficiais baixados como evidência primária.`;
+  }
+  if (matchingCertificates.length) {
+    return matchingCertificates
+      .map((certificate) => `${certificate.tipo}: ${certificate.rawText ? summarizeTextForAnswer(certificate.rawText) : certificate.status}`)
+      .join(" ");
+  }
+  if (/cliente|explicar|parecer|resumo|conclus[ãa]o/.test(normalized)) {
+    return `${context.opinion} Em linguagem simples: o usuário deve considerar o risco ${context.riskLevel} e revisar os documentos oficiais quando houver pendência, falha ou apontamento.`;
+  }
+  if (!rawText) {
+    return "Ainda não há texto extraído suficiente dos PDFs para responder com profundidade. O parecer atual usa status, metadados e links dos documentos baixados.";
+  }
+  return `Com base nos textos disponíveis: ${summarizeTextForAnswer(rawText)} Para uma conclusão formal, confira o PDF oficial anexado ao resultado.`;
+}
+
+function summarizeTextForAnswer(text) {
+  return String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 520);
 }
 
 function buildAuditEvidence(result) {
@@ -1761,6 +1934,21 @@ assistantQueryForm.addEventListener("submit", async (event) => {
   } catch {
     assistantResult.innerHTML = `<p>Falha ao comunicar com o assistente.</p>`;
   }
+});
+
+documentAiQuestionForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const question = documentAiQuestion?.value.trim() || "";
+  if (!question) {
+    documentAiAnswer.innerHTML = `<p>Digite uma pergunta sobre as certidões ou os riscos encontrados.</p>`;
+    documentAiQuestion?.focus();
+    return;
+  }
+  if (!currentDocumentAiContext) {
+    documentAiAnswer.innerHTML = `<p>Execute uma consulta TJDFT para liberar a inteligência documental.</p>`;
+    return;
+  }
+  documentAiAnswer.innerHTML = `<p>${escapeHtml(answerDocumentQuestion(question, currentDocumentAiContext))}</p>`;
 });
 
 auditForm.addEventListener("submit", async (event) => {
