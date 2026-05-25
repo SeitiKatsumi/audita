@@ -660,10 +660,11 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
 
   selectedAuditViews = inputs.filter((input) => input.checked).map((input) => input.value);
   const needsTjdftFields = selectedAuditViews.includes("tjdft");
+  const needsStateCourtPicker = needsTjdftFields || activeRouteSource === "tjdft";
   const needsTrf1Fields = selectedAuditViews.includes("trf1");
   const needsFgtsFields = selectedAuditViews.includes("fgts");
   tjdftFields?.classList.toggle("hidden", !needsTjdftFields);
-  stateCourtPicker?.classList.toggle("hidden", !needsTjdftFields);
+  stateCourtPicker?.classList.toggle("hidden", !needsStateCourtPicker);
   updateTjdftPersonFields();
   trf1Fields?.classList.toggle("hidden", !needsTrf1Fields);
   [trf1CertificateType, trf1Orgaos, trf1Email].forEach((input) => {
@@ -2060,7 +2061,7 @@ auditForm.addEventListener("submit", async (event) => {
         extraFields: {
           cpfDocument: documentState.cpfValue,
           cnpjDocument: documentState.cnpjValue,
-          stateCourtUf: tjdftCourtUf?.value || "DF",
+          stateCourtUf: stateCourtUf?.value || tjdftCourtUf?.value || "DF",
           stateCourtName: getSelectedStateCourt()?.court || "TJDFT",
           stateCourtUrl: getSelectedStateCourt()?.url || "",
           tjdftPersonType: getTjdftPersonType(),

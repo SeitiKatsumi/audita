@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260522-state-courts-picker" />
+    <link rel="stylesheet" href="styles.css?v=20260525-state-filter" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -287,8 +287,8 @@
                   <strong>Escolha os documentos</strong>
                   <small>Selecione quais certidões e consultas deseja gerar no resultado.</small>
                 </div>
-                <label class="state-court-picker hidden" id="stateCourtPicker">
-                  Estado do tribunal
+                <label class="state-court-picker" id="stateCourtPicker">
+                  Filtrar por estado
                   <select id="stateCourtUf"></select>
                   <small id="stateCourtHint">DF usa automação TJDFT. Outros estados abrem o portal oficial mapeado.</small>
                 </label>
@@ -298,7 +298,7 @@
                   <label><input type="checkbox" name="auditView" value="pgfn" /> PGFN/CND</label>
                   <label><input type="checkbox" name="auditView" value="cndt" /> CNDT/TST</label>
                   <label><input type="checkbox" name="auditView" value="trf1" /> TRF1</label>
-                  <label><input type="checkbox" name="auditView" value="tjdft" /> TJDFT</label>
+                  <label><input type="checkbox" name="auditView" value="tjdft" /> Tribunais estaduais</label>
                   <label><input type="checkbox" name="auditView" value="fgts" /> FGTS/CEF</label>
                   <label><input type="checkbox" name="auditView" value="portal_transparencia" /> Sanções/CGU</label>
                 </fieldset>
@@ -787,6 +787,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260522-state-courts-picker"></script>
+    <script type="module" src="app.js?v=20260525-state-filter"></script>
   </body>
 </html>
