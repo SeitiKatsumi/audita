@@ -169,13 +169,27 @@ function aggregateStatus(results) {
   return "partial";
 }
 
-function cacheKey({ tenantId, documentoHash, fonte }) {
-  return `${tenantId || "public"}:${documentoHash}:${fonte}`;
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function cacheKey({ tenantId, documentoHash, fonte, extraFields }) {
+  const scopeHash = crypto.createHash("sha256").update(stableStringify(extraFields || {})).digest("hex");
+  return `${tenantId || "public"}:${documentoHash}:${fonte}:${scopeHash}`;
 }
 
 async function runCollectorWithCache({ collector, fonte, input, documentoHash, tenantId }) {
   const ttlMs = envNumber("AUDIT_CACHE_TTL_SECONDS", 900) * 1000;
-  const key = cacheKey({ tenantId, documentoHash, fonte });
+  const key = cacheKey({ tenantId, documentoHash, fonte, extraFields: input.extraFields });
   const cached = resultCache.get(key);
   if (cached && Date.now() - cached.createdAt < ttlMs) {
     return { ...cached.result, dados: { ...cached.result.dados, cacheHit: true } };

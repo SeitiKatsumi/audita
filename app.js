@@ -231,7 +231,7 @@ const auditSourceLabels = {
   pgfn: "PGFN/CND",
   cndt: "CNDT/TST",
   trf1: "TRF1",
-  tjdft: "TJDFT",
+  tjdft: "Tribunais estaduais",
   fgts: "FGTS/CEF",
 };
 
@@ -1011,7 +1011,10 @@ function renderAudit(audit) {
     ? audit.resultados.map((result) => ({
         id: result.fonte,
         sourceId: result.fonte,
-        sourceName: formatAuditSourceName(result.fonte),
+        sourceName:
+          result.fonte === "tjdft" && result.dados?.tribunal
+            ? `${result.dados.tribunal} / Certidões`
+            : formatAuditSourceName(result.fonte),
         category: "audit",
         mode: "collector",
         status: result.status,

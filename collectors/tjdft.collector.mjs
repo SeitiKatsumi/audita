@@ -46,14 +46,28 @@ export async function collect(input) {
   const stateCourtName = String(extra.stateCourtName || "TJDFT").trim();
   const stateCourtUrl = String(extra.stateCourtUrl || OFFICIAL_URL).trim();
   if (stateCourtUf && stateCourtUf !== "DF") {
-    return unavailableResult(fonte, `${stateCourtName || `TJ${stateCourtUf}`} ainda estÃ¡ em modo portal oficial. Abra o site indicado para emitir a certidÃ£o enquanto o collector automÃ¡tico deste estado Ã© implementado.`, {
-      officialUrl: stateCourtUrl,
-      tribunal: stateCourtName || `TJ${stateCourtUf}`,
-      uf: stateCourtUf,
-      modo: "portal_oficial",
-      proximoPasso: "Mapear campos, captcha e fluxo de PDF deste tribunal estadual.",
-      integrationStrategy: discoverIntegrationStrategy(),
-    });
+    const tribunal = stateCourtName || `TJ${stateCourtUf}`;
+    return {
+      fonte,
+      status: "manual_required",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      dados: {
+        officialUrl: stateCourtUrl,
+        tribunal,
+        uf: stateCourtUf,
+        modo: "portal_oficial",
+        resumo: `${tribunal} selecionado. A emissão automática desse estado ainda não está ativa; use o portal oficial mapeado para emitir a certidão.`,
+        certidoes: getCertificateTypesForInput(input).map((certificateType) => ({
+          tipo: certificateType.label,
+          status: "portal_oficial",
+          errorMessage: "Emissão pelo portal oficial do tribunal.",
+        })),
+        proximoPasso: "Mapear campos, captcha e fluxo de PDF deste tribunal estadual.",
+        integrationStrategy: discoverIntegrationStrategy(),
+      },
+      rawText: "",
+      errorMessage: "",
+    };
   }
   const documentType = input.tipoDocumento === "cnpj" || extra.tjdftPersonType === "pj" ? "cnpj" : "cpf";
   const documentValue = String(
@@ -137,7 +151,9 @@ export async function collect(input) {
         : SOURCE_RESULT.NADA_CONSTA;
 
     return successResult(fonte, resultadoGeral, {
-      officialUrl: OFFICIAL_URL,
+      officialUrl: stateCourtUrl || OFFICIAL_URL,
+      tribunal: stateCourtName || "TJDFT",
+      uf: stateCourtUf || "DF",
       certidoes: results,
       totalCertidoes: results.length,
       certidoesBaixadas: results.filter((result) => result.pdfPath).length,

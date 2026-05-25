@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAuditService, validateCnpj, validateCpf } from "../services/audit.service.mjs";
 import { calculateRiskScore } from "../services/risk-score.service.mjs";
-import { getCertificateTypesForInput } from "../collectors/tjdft.collector.mjs";
+import { collect as collectTjdft, getCertificateTypesForInput } from "../collectors/tjdft.collector.mjs";
 
 test("valida CPF e CNPJ", () => {
   assert.equal(validateCpf("529.982.247-25"), true);
@@ -172,5 +172,81 @@ test("encaminha tribunal estadual selecionado para collector", async () => {
   }
   assert.equal(receivedExtraFields.stateCourtUf, "SP");
   assert.equal(receivedExtraFields.stateCourtName, "TJSP");
+});
+
+test("tribunal estadual fora do DF retorna portal oficial guiado", async () => {
+  const result = await collectTjdft({
+    documento: "25308218870",
+    tipoDocumento: "cpf",
+    extraFields: {
+      stateCourtUf: "SP",
+      stateCourtName: "TJSP",
+      stateCourtUrl: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do",
+      tjdftCertificateTypes: ["criminal", "civil"],
+      firstName: "Aparecido Seiti Katsumi",
+      motherName: "Nadir Oliveira Katsumi",
+      fatherName: "Hisashi Katsumi",
+    },
+  });
+
+  assert.equal(result.status, "manual_required");
+  assert.equal(result.resultado, "indisponivel");
+  assert.equal(result.dados.tribunal, "TJSP");
+  assert.equal(result.dados.uf, "SP");
+  assert.equal(result.dados.certidoes.length, 2);
+  assert.match(result.dados.resumo, /TJSP selecionado/);
+});
+
+test("cache considera tribunal estadual selecionado", async () => {
+  const service = createAuditService({
+    getDb: () => ({ pool: null, dbReady: false }),
+    getAuthContext: async () => ({ tenantId: 1, user: null, unauthorized: false }),
+    customCollectors: {
+      tjdft: {
+        collect: async (input) => ({
+          fonte: "tjdft",
+          status: "manual_required",
+          resultado: "indisponivel",
+          dados: {
+            tribunal: input.extraFields.stateCourtName,
+            uf: input.extraFields.stateCourtUf,
+          },
+        }),
+      },
+    },
+  });
+
+  const baseBody = {
+    documento: "25308218870",
+    tipoDocumento: "cpf",
+    fontes: ["tjdft"],
+    extraFields: {
+      firstName: "Aparecido Seiti Katsumi",
+      motherName: "Nadir Oliveira Katsumi",
+      fatherName: "Hisashi Katsumi",
+      tjdftPersonType: "pf",
+      tjdftCertificateTypes: ["criminal"],
+    },
+  };
+
+  const ac = await service.startAudit({
+    body: {
+      ...baseBody,
+      extraFields: { ...baseBody.extraFields, stateCourtUf: "AC", stateCourtName: "TJAC" },
+    },
+  });
+  const sp = await service.startAudit({
+    body: {
+      ...baseBody,
+      extraFields: { ...baseBody.extraFields, stateCourtUf: "SP", stateCourtName: "TJSP" },
+    },
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const auditAc = await service.findAudit(ac.consultaId);
+  const auditSp = await service.findAudit(sp.consultaId);
+
+  assert.equal(auditAc.resultados[0].dados.tribunal, "TJAC");
+  assert.equal(auditSp.resultados[0].dados.tribunal, "TJSP");
 });
 
