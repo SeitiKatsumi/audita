@@ -75,6 +75,9 @@ const tjdftFields = document.querySelector("#tjdftFields");
 const stateCourtPicker = document.querySelector("#stateCourtPicker");
 const stateCourtUf = document.querySelector("#stateCourtUf");
 const stateCourtHint = document.querySelector("#stateCourtHint");
+const stateCourtPortalTitle = document.querySelector("#stateCourtPortalTitle");
+const stateCourtRequiredFields = document.querySelector("#stateCourtRequiredFields");
+const stateCourtPortalLink = document.querySelector("#stateCourtPortalLink");
 const tjdftPersonTypeLabel = document.querySelector("#tjdftPersonTypeLabel");
 const tjdftCourtUf = document.querySelector("#tjdftCourtUf");
 const tjdftCourtLabel = document.querySelector("#tjdftCourtLabel");
@@ -457,9 +460,22 @@ function syncStateCourtSelection(source) {
   const selectedCourt = getSelectedStateCourt();
   if (stateCourtHint && selectedCourt) {
     stateCourtHint.textContent = selectedCourt.automatic
-      ? `${selectedCourt.court} está com automação ativa.`
-      : `${selectedCourt.court} está em modo portal oficial enquanto o collector automático é implementado.`;
+      ? `${selectedCourt.court} est? com automa??o ativa.`
+      : `${selectedCourt.court} est? em modo portal oficial enquanto o collector autom?tico ? implementado.`;
   }
+  if (stateCourtPortalTitle && selectedCourt) {
+    stateCourtPortalTitle.textContent = `Emiss?o oficial ${selectedCourt.court} - ${selectedCourt.name}`;
+  }
+  if (stateCourtRequiredFields && selectedCourt) {
+    stateCourtRequiredFields.textContent = selectedCourt.automatic
+      ? "Automa??o ativa: CPF/CNPJ, primeiro nome, nome da m?e, nome do pai e tipo de certid?o."
+      : "Portal oficial: o tribunal pode solicitar CPF/CNPJ, nome completo, filia??o, e-mail, nascimento, comarca e valida??o/captcha.";
+  }
+  if (stateCourtPortalLink && selectedCourt) {
+    stateCourtPortalLink.href = selectedCourt.url;
+    stateCourtPortalLink.textContent = selectedCourt.automatic ? "Abrir portal TJDFT" : `Abrir emiss?o ${selectedCourt.court}`;
+  }
+  updateTjdftPersonFields();
 }
 
 function updateTjdftPersonFields() {
@@ -1202,7 +1218,7 @@ function normalizeTjdftCertificates(execution) {
   const certificates = Array.isArray(data.certidoes) ? data.certidoes : [];
   if (certificates.length) {
     return certificates.map((certificate) => ({
-      tipo: certificate.tipo || "Certidão TJDFT",
+      tipo: certificate.tipo || "Certidão estadual",
       status: certificate.pdfPath ? "PDF baixado" : certificate.errorMessage || "pendente",
       rawText: certificate.rawText || certificate.pageText || "",
     }));
@@ -1210,7 +1226,7 @@ function normalizeTjdftCertificates(execution) {
   return (execution.evidence || [])
     .filter((item) => item.type === "pdf")
     .map((item) => ({
-      tipo: item.title || "Certidão TJDFT",
+      tipo: item.title || "Certidão estadual",
       status: item.value || "PDF disponível",
       rawText: "",
     }));
@@ -1267,20 +1283,27 @@ function summarizeTextForAnswer(text) {
 function buildAuditEvidence(result) {
   const dados = result.dados || {};
   if (result.fonte === "tjdft") {
+    const isOfficialPortalMode = dados.modo === "portal_oficial";
+    const certificates = Array.isArray(dados.certidoes) ? dados.certidoes : [];
     const items = [
       {
         type: "summary",
-        title: "Certidões",
-        value: `${dados.certidoesBaixadas || 0}/${dados.totalCertidoes || 4} PDFs baixados`,
+        title: "Certid?es",
+        value: isOfficialPortalMode
+          ? `${certificates.length || dados.totalCertidoes || 4} certid?es no portal oficial`
+          : `${dados.certidoesBaixadas || 0}/${dados.totalCertidoes || 4} PDFs baixados`,
       },
     ];
 
-    const certificates = Array.isArray(dados.certidoes) ? dados.certidoes : [];
     items.push(
       ...certificates.map((certificate) => ({
         type: "pdf",
-        title: certificate.tipo || "Certidão TJDFT",
-        value: certificate.pdfPath ? "PDF baixado" : certificate.errorMessage || "PDF não disponível",
+        title: certificate.tipo || "Certidão",
+        value: isOfficialPortalMode
+          ? "Emitir no portal oficial"
+          : certificate.pdfPath
+            ? "PDF baixado"
+            : certificate.errorMessage || "PDF não disponível",
         href: toPdfPublicUrl(certificate.pdfPath),
       })),
     );
@@ -1361,7 +1384,7 @@ function formatAuditSourceName(sourceId) {
     pgfn: "PGFN / Certidão Conjunta",
     cndt: "CNDT / TST",
     trf1: "TRF1/CJF / Certidão Unificada",
-    tjdft: "TJDFT / Certidões",
+    tjdft: "Tribunal estadual / Certid?es",
     fgts: "CEF / Regularidade FGTS",
     portal_transparencia: "Portal da Transparência / CGU",
   };
@@ -2029,7 +2052,7 @@ documentAiQuestionButton?.addEventListener("click", () => {
     return;
   }
   if (!currentDocumentAiContext) {
-    documentAiAnswer.innerHTML = `<p>Execute uma consulta TJDFT para liberar a inteligência documental.</p>`;
+    documentAiAnswer.innerHTML = `<p>Execute uma consulta estadual para liberar a intelig?ncia documental.</p>`;
     return;
   }
   documentAiAnswer.innerHTML = `<p>${escapeHtml(answerDocumentQuestion(question, currentDocumentAiContext))}</p>`;

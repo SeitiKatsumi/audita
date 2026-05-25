@@ -1387,6 +1387,7 @@ h2 {
 
 .tjdft-person-type,
 .tjdft-court-field,
+.state-court-portal,
 .tjdft-certificate-options {
   grid-column: 1 / -1;
 }
@@ -1408,6 +1409,43 @@ h2 {
 
 .tjdft-person-type strong {
   color: var(--lime);
+}
+
+.state-court-portal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid rgba(79, 218, 255, 0.32);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(18, 84, 122, 0.32), rgba(5, 22, 45, 0.68));
+}
+
+.state-court-portal strong,
+.state-court-portal small {
+  display: block;
+}
+
+.state-court-portal strong {
+  color: var(--text);
+}
+
+.state-court-portal small {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.state-court-portal a {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  border: 1px solid rgba(116, 255, 154, 0.34);
+  border-radius: 8px;
+  color: var(--ink);
+  background: linear-gradient(135deg, #80f3ea, #2c92ff);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .tjdft-certificate-options {
