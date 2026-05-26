@@ -93,6 +93,11 @@ function normalizeExtraFields(value) {
     stateCourtUf: String(value.stateCourtUf || value.ufTribunal || "DF").trim().toUpperCase(),
     stateCourtName: String(value.stateCourtName || value.nomeTribunal || "").trim(),
     stateCourtUrl: String(value.stateCourtUrl || value.urlTribunal || "").trim(),
+    stateCourtProfileId: String(value.stateCourtProfileId || value.perfilTribunal || "").trim(),
+    stateCourtFields: value.stateCourtFields && typeof value.stateCourtFields === "object" ? value.stateCourtFields : {},
+    stateCourtCertificateTypes: Array.isArray(value.stateCourtCertificateTypes)
+      ? value.stateCourtCertificateTypes.map((item) => String(item).trim()).filter(Boolean)
+      : [],
     tjdftPersonType: String(value.tjdftPersonType || value.tipoPessoaTjdft || "").trim(),
     tjdftCompanyName: String(value.tjdftCompanyName || value.razaoSocialTjdft || "").trim(),
     tjdftCertificateTypes: Array.isArray(value.tjdftCertificateTypes)
@@ -158,7 +163,7 @@ function extractPdfEvidence(result) {
 
 function aggregateStatus(results) {
   if (!results.length || results.some((result) => ["pending", "running"].includes(result.status))) {
-    return results.some((result) => ["success", "failed", "unavailable"].includes(result.status)) ? "partial" : "pending";
+    return results.some((result) => ["success", "failed", "unavailable", "manual_required", "waiting_user_action"].includes(result.status)) ? "partial" : "pending";
   }
   if (results.every((result) => result.status === "success")) {
     return "success";

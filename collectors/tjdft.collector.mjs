@@ -1,5 +1,17 @@
-import { failedResult, successResult, unavailableResult, SOURCE_RESULT } from "./base.collector.mjs";
+import {
+  failedResult,
+  manualRequiredResult,
+  successResult,
+  unavailableResult,
+  waitingUserActionResult,
+  SOURCE_RESULT,
+} from "./base.collector.mjs";
 import { saveAndExtractPdfBuffer } from "../services/pdf.service.mjs";
+import {
+  findStateCourtProfile,
+  getStateCourtCertificateLabel,
+  getStateCourtFieldLabel,
+} from "../services/state-courts.service.mjs";
 
 export const fonte = "tjdft";
 
@@ -43,31 +55,11 @@ export function discoverIntegrationStrategy() {
 export async function collect(input) {
   const extra = input.extraFields || {};
   const stateCourtUf = String(extra.stateCourtUf || "DF").trim().toUpperCase();
-  const stateCourtName = String(extra.stateCourtName || "TJDFT").trim();
-  const stateCourtUrl = String(extra.stateCourtUrl || OFFICIAL_URL).trim();
+  const stateCourtProfile = findStateCourtProfile(stateCourtUf);
+  const stateCourtName = String(extra.stateCourtName || stateCourtProfile?.court || "TJDFT").trim();
+  const stateCourtUrl = String(extra.stateCourtUrl || stateCourtProfile?.url || OFFICIAL_URL).trim();
   if (stateCourtUf && stateCourtUf !== "DF") {
-    const tribunal = stateCourtName || `TJ${stateCourtUf}`;
-    return {
-      fonte,
-      status: "manual_required",
-      resultado: SOURCE_RESULT.INDISPONIVEL,
-      dados: {
-        officialUrl: stateCourtUrl,
-        tribunal,
-        uf: stateCourtUf,
-        modo: "portal_oficial",
-        resumo: `${tribunal} selecionado. A emissão automática desse estado ainda não está ativa; use o portal oficial mapeado para emitir a certidão.`,
-        certidoes: getCertificateTypesForInput(input).map((certificateType) => ({
-          tipo: certificateType.label,
-          status: "portal_oficial",
-          errorMessage: "Emissão pelo portal oficial do tribunal.",
-        })),
-        proximoPasso: "Mapear campos, captcha e fluxo de PDF deste tribunal estadual.",
-        integrationStrategy: discoverIntegrationStrategy(),
-      },
-      rawText: "",
-      errorMessage: "",
-    };
+    return collectStateCourtPortal({ input, profile: stateCourtProfile, stateCourtName, stateCourtUrl });
   }
   const documentType = input.tipoDocumento === "cnpj" || extra.tjdftPersonType === "pj" ? "cnpj" : "cpf";
   const documentValue = String(
@@ -167,6 +159,133 @@ export async function collect(input) {
     });
   } finally {
     await browser.close();
+  }
+}
+
+async function collectStateCourtPortal({ input, profile, stateCourtName, stateCourtUrl }) {
+  const requestedCertificates = getStateCertificateTypesForInput(input, profile);
+  const missingFields = getMissingStateCourtFields(input, profile);
+  const baseData = {
+    officialUrl: stateCourtUrl,
+    tribunal: stateCourtName,
+    uf: profile?.uf || input.extraFields?.stateCourtUf || "",
+    stateName: profile?.stateName || "",
+    platform: profile?.platform || "manual",
+    automationStatus: profile?.automationStatus || "needs_mapping",
+    captchaMode: profile?.captchaMode || "manual",
+    requiredFields: profile?.requiredFields || [],
+    optionalFields: profile?.optionalFields || [],
+    missingFields,
+    modo: "portal_oficial",
+    certidoes: requestedCertificates.map((certificateType) => ({
+      tipo: certificateType.label,
+      status: "portal_oficial",
+      errorMessage: "Emissao pelo portal oficial do tribunal.",
+    })),
+    integrationStrategy: discoverIntegrationStrategy(),
+  };
+
+  if (missingFields.length) {
+    return unavailableResult(
+      fonte,
+      `${stateCourtName} exige campos adicionais antes da emissao: ${missingFields.map(getStateCourtFieldLabel).join(", ")}.`,
+      {
+        ...baseData,
+        resumo: "Preencha os campos solicitados para continuar a emissao estadual.",
+      },
+    );
+  }
+
+  if (profile?.automationStatus === "mapped" && ["esaj", "projudi", "eproc"].includes(profile.platform)) {
+    const portal = await inspectStateCourtPortal(profile);
+    return waitingUserActionResult(
+      fonte,
+      `${stateCourtName} usa portal com validacao assistida. O Audita abriu o fluxo e precisa da etapa humana quando houver captcha/login.`,
+      {
+        ...baseData,
+        modo: "assistido",
+        resumo: `${stateCourtName} mapeado em modo assistido. Portal carregado: ${portal.loaded ? "sim" : "nao"}.`,
+        portalInspection: portal,
+        proximoPasso: "Resolver validacao/captcha no portal oficial ou concluir mapeamento do adapter para persistir o PDF.",
+      },
+    );
+  }
+
+  return manualRequiredResult(
+    fonte,
+    `${stateCourtName} ainda nao tem adapter Playwright ativo. Use o portal oficial com os campos listados.`,
+    {
+      ...baseData,
+      resumo: `${stateCourtName} cadastrado no catalogo. Automacao ainda em mapeamento para este tribunal.`,
+      proximoPasso: "Mapear campos, captcha, botao de emissao e fluxo de download do PDF deste tribunal.",
+    },
+  );
+}
+
+function getMissingStateCourtFields(input, profile) {
+  const fields = profile?.requiredFields || [];
+  const provided = input.extraFields?.stateCourtFields || {};
+  return fields.filter((field) => {
+    if (field === "document") {
+      const documentValue = input.tipoDocumento === "cnpj" ? input.extraFields?.cnpjDocument || input.documento : input.extraFields?.cpfDocument || input.documento;
+      return !String(documentValue || "").replace(/\D/g, "");
+    }
+    if (field === "firstName") return !String(input.extraFields?.firstName || input.extraFields?.primeiroNome || provided.firstName || "").trim();
+    if (field === "motherName") return !String(input.extraFields?.motherName || input.extraFields?.nomeMae || provided.motherName || "").trim();
+    if (field === "fatherName") return !String(input.extraFields?.fatherName || input.extraFields?.nomePai || provided.fatherName || "").trim();
+    if (field === "companyName") return !String(input.extraFields?.tjdftCompanyName || provided.companyName || "").trim();
+    return !String(provided[field] || "").trim();
+  });
+}
+
+function getStateCertificateTypesForInput(input, profile) {
+  const available = Array.isArray(profile?.certificateTypes) && profile.certificateTypes.length ? profile.certificateTypes : ["civil", "criminal"];
+  const selected = Array.isArray(input.extraFields?.stateCourtCertificateTypes)
+    ? input.extraFields.stateCourtCertificateTypes.map((value) => String(value).trim()).filter(Boolean)
+    : [];
+  const selectedSet = new Set(selected.length ? selected : available);
+  return available
+    .filter((certificateId) => selectedSet.has(certificateId))
+    .map((certificateId) => ({ id: certificateId, label: getStateCourtCertificateLabel(certificateId) }));
+}
+
+async function inspectStateCourtPortal(profile) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return {
+      loaded: false,
+      errorMessage: "Playwright nao esta instalado neste ambiente.",
+    };
+  }
+
+  const browser = await chromium.launch({ headless: process.env.STATE_COURT_HEADLESS !== "false" });
+  const context = await browser.newContext({ userAgent: "Audita/0.1 state-court-discovery" });
+  const page = await context.newPage();
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", 12000));
+    await page.goto(profile.url, { waitUntil: "domcontentloaded", timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 20000) });
+    const title = await page.title().catch(() => "");
+    const bodyText = await page.locator("body").innerText().catch(() => "");
+    const normalized = normalize(bodyText);
+    return {
+      loaded: true,
+      title,
+      captchaDetected: /captcha|recaptcha|caracteres exibidos|codigo de seguranca|c[oó]digo de seguran[çc]a/i.test(bodyText),
+      loginDetected: /login|entrar|senha|certificado digital/i.test(bodyText),
+      downloadDetected: /download|baixar|pdf|certidao|certidão/i.test(bodyText),
+      textSample: normalized.slice(0, 500),
+    };
+  } catch (error) {
+    return {
+      loaded: false,
+      errorMessage: error.message,
+    };
+  } finally {
+    await page.close().catch(() => {});
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
   }
 }
 

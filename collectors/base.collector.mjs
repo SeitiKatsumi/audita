@@ -2,6 +2,8 @@ export const SOURCE_STATUS = {
   SUCCESS: "success",
   FAILED: "failed",
   UNAVAILABLE: "unavailable",
+  MANUAL_REQUIRED: "manual_required",
+  WAITING_USER_ACTION: "waiting_user_action",
 };
 
 export const SOURCE_RESULT = {
@@ -15,6 +17,28 @@ export function unavailableResult(fonte, errorMessage, dados = {}) {
   return {
     fonte,
     status: SOURCE_STATUS.UNAVAILABLE,
+    resultado: SOURCE_RESULT.INDISPONIVEL,
+    dados,
+    rawText: "",
+    errorMessage,
+  };
+}
+
+export function manualRequiredResult(fonte, errorMessage, dados = {}) {
+  return {
+    fonte,
+    status: SOURCE_STATUS.MANUAL_REQUIRED,
+    resultado: SOURCE_RESULT.INDISPONIVEL,
+    dados,
+    rawText: "",
+    errorMessage,
+  };
+}
+
+export function waitingUserActionResult(fonte, errorMessage, dados = {}) {
+  return {
+    fonte,
+    status: SOURCE_STATUS.WAITING_USER_ACTION,
     resultado: SOURCE_RESULT.INDISPONIVEL,
     dados,
     rawText: "",

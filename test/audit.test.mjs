@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createAuditService, validateCnpj, validateCpf } from "../services/audit.service.mjs";
 import { calculateRiskScore } from "../services/risk-score.service.mjs";
+import { listStateCourtProfiles } from "../services/state-courts.service.mjs";
 import { collect as collectTjdft, getCertificateTypesForInput } from "../collectors/tjdft.collector.mjs";
 
 test("valida CPF e CNPJ", () => {
@@ -92,6 +93,20 @@ test("filtra certidoes TJDFT selecionadas", () => {
   );
 });
 
+test("catalogo de tribunais estaduais contem 27 UFs validas", () => {
+  const profiles = listStateCourtProfiles();
+  const ufs = profiles.map((profile) => profile.uf);
+  assert.equal(profiles.length, 27);
+  assert.equal(new Set(ufs).size, 27);
+  for (const profile of profiles) {
+    assert.equal(Boolean(profile.url), true);
+    assert.equal(Boolean(profile.platform), true);
+    assert.equal(Array.isArray(profile.requiredFields), true);
+    assert.equal(Array.isArray(profile.certificateTypes), true);
+    assert.equal(profile.certificateTypes.length > 0, true);
+  }
+});
+
 test("encaminha campos TJDFT para collector", async () => {
   let receivedExtraFields = null;
   const service = createAuditService({
@@ -174,27 +189,27 @@ test("encaminha tribunal estadual selecionado para collector", async () => {
   assert.equal(receivedExtraFields.stateCourtName, "TJSP");
 });
 
-test("tribunal estadual fora do DF retorna portal oficial guiado", async () => {
+test("tribunal estadual sem adapter ativo retorna portal oficial guiado", async () => {
   const result = await collectTjdft({
     documento: "25308218870",
     tipoDocumento: "cpf",
     extraFields: {
-      stateCourtUf: "SP",
-      stateCourtName: "TJSP",
-      stateCourtUrl: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do",
-      tjdftCertificateTypes: ["criminal", "civil"],
-      firstName: "Aparecido Seiti Katsumi",
-      motherName: "Nadir Oliveira Katsumi",
-      fatherName: "Hisashi Katsumi",
+      stateCourtUf: "AC",
+      stateCourtName: "TJAC",
+      stateCourtUrl: "https://www.tjac.jus.br/servicos/certidoes/",
+      stateCourtFields: {
+        fullName: "Aparecido Seiti Katsumi",
+      },
+      stateCourtCertificateTypes: ["criminal", "civil"],
     },
   });
 
   assert.equal(result.status, "manual_required");
   assert.equal(result.resultado, "indisponivel");
-  assert.equal(result.dados.tribunal, "TJSP");
-  assert.equal(result.dados.uf, "SP");
+  assert.equal(result.dados.tribunal, "TJAC");
+  assert.equal(result.dados.uf, "AC");
   assert.equal(result.dados.certidoes.length, 2);
-  assert.match(result.dados.resumo, /TJSP selecionado/);
+  assert.match(result.dados.resumo, /TJAC cadastrado/);
 });
 
 test("cache considera tribunal estadual selecionado", async () => {

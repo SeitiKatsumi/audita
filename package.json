@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "PORT=3001 node server.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "discover:state-courts": "node scripts/discover-state-courts.mjs"
   },
   "dependencies": {
     "pdf-parse": "1.1.1",

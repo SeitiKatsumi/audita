@@ -12,6 +12,7 @@ RUN npm ci --omit=dev
 
 COPY index.html styles.css app.js server.mjs ./
 COPY assets ./assets
+COPY data ./data
 COPY db ./db
 COPY collectors ./collectors
 COPY services ./services

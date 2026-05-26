@@ -9,7 +9,7 @@ export function calculateRiskScore(results) {
 
   const importantSources = new Set(["receita_federal", "pgfn", "cndt", "trf1", "tjdft", "portal_transparencia"]);
   const importantFailures = relevantResults.filter(
-    (result) => importantSources.has(result.fonte) && ["failed", "unavailable"].includes(result.status),
+    (result) => importantSources.has(result.fonte) && ["failed", "unavailable", "manual_required", "waiting_user_action"].includes(result.status),
   );
   if (importantFailures.length) {
     motivos.push(`Fontes importantes indisponiveis: ${importantFailures.map((result) => result.fonte).join(", ")}.`);

@@ -1,6 +1,6 @@
 import http from "node:http";
 import crypto from "node:crypto";
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { createAuditService } from "./services/audit.service.mjs";
@@ -12,7 +12,7 @@ const databaseUrl = process.env.DATABASE_URL;
 const autoMigrate = process.env.AUDITA_AUTO_MIGRATE !== "false";
 const authRequired = process.env.AUDITA_AUTH_REQUIRED !== "false";
 const sessionCookieName = "audita_session";
-const appVersion = process.env.APP_VERSION || "local";
+const appVersion = process.env.APP_VERSION || resolveGitVersion() || "local";
 const appEnv = process.env.APP_ENV || "local";
 const appUrl = process.env.APP_URL || "";
 let pool;
@@ -27,10 +27,34 @@ const fallbackUsers = new Map();
 const fallbackUsersByEmail = new Map();
 const fallbackSessions = new Map();
 
+function resolveGitVersion() {
+  try {
+    const gitDir = join(root, ".git");
+    const head = readFileSync(join(gitDir, "HEAD"), "utf-8").trim();
+    if (!head) return "";
+    if (!head.startsWith("ref:")) return head.slice(0, 7);
+
+    const ref = head.slice(5).trim();
+    const refPath = join(gitDir, ...ref.split("/"));
+    if (existsSync(refPath)) {
+      return readFileSync(refPath, "utf-8").trim().slice(0, 7);
+    }
+
+    const packedRefsPath = join(gitDir, "packed-refs");
+    if (!existsSync(packedRefsPath)) return "";
+    const packedRefs = readFileSync(packedRefsPath, "utf-8").split(/\r?\n/);
+    const packedMatch = packedRefs.find((line) => line.endsWith(` ${ref}`));
+    return packedMatch ? packedMatch.split(" ")[0].slice(0, 7) : "";
+  } catch {
+    return "";
+  }
+}
+
 const contentTypes = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
   ".pdf": "application/pdf",
   ".png": "image/png",
   ".svg": "image/svg+xml",

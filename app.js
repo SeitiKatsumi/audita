@@ -78,11 +78,13 @@ const stateCourtHint = document.querySelector("#stateCourtHint");
 const stateCourtPortalTitle = document.querySelector("#stateCourtPortalTitle");
 const stateCourtRequiredFields = document.querySelector("#stateCourtRequiredFields");
 const stateCourtPortalLink = document.querySelector("#stateCourtPortalLink");
+const stateCourtDynamicFields = document.querySelector("#stateCourtDynamicFields");
 const tjdftPersonTypeLabel = document.querySelector("#tjdftPersonTypeLabel");
 const tjdftCourtUf = document.querySelector("#tjdftCourtUf");
 const tjdftCourtLabel = document.querySelector("#tjdftCourtLabel");
 const tjdftPfFields = document.querySelectorAll(".tjdft-pf-field");
 const tjdftPjFields = document.querySelectorAll(".tjdft-pj-field");
+const tjdftCertificateOptions = document.querySelector(".tjdft-certificate-options");
 const tjdftCompanyName = document.querySelector("#tjdftCompanyName");
 const tjdftCertificateTypeInputs = document.querySelectorAll("input[name='tjdftCertificateType']");
 const auditFirstName = document.querySelector("#auditFirstName");
@@ -120,7 +122,7 @@ const auditSubmitButton = document.querySelector("#auditSubmitButton");
 let selectedAuditViews = [];
 let currentDocumentAiContext = null;
 
-const stateCourtDirectory = [
+let stateCourtDirectory = [
   { uf: "AC", court: "TJAC", name: "Acre", url: "https://www.tjac.jus.br/servicos/certidoes/" },
   { uf: "AL", court: "TJAL", name: "Alagoas", url: "https://www.tjal.jus.br/certidoes/" },
   { uf: "AP", court: "TJAP", name: "Amapá", url: "https://www.tjap.jus.br/portal/servicos/certidoes.html" },
@@ -149,6 +151,24 @@ const stateCourtDirectory = [
   { uf: "SE", court: "TJSE", name: "Sergipe", url: "https://www.tjse.jus.br/portal/servicos/certidao-online" },
   { uf: "TO", court: "TJTO", name: "Tocantins", url: "https://eproc1.tjto.jus.br/eprocV2_prod_1grau/externo_controlador.php?acao=certidao_negativa" },
 ];
+const stateCourtFieldLabels = {
+  document: "CPF/CNPJ",
+  fullName: "Nome completo / razão social",
+  firstName: "Primeiro nome",
+  motherName: "Nome da mãe",
+  fatherName: "Nome do pai",
+  birthDate: "Data de nascimento",
+  rg: "RG",
+  email: "E-mail",
+  comarca: "Comarca",
+  companyName: "Razão social",
+};
+const stateCourtCertificateLabels = {
+  criminal: "Criminal",
+  civil: "Cível",
+  falencia: "Falência e Recuperação Judicial",
+  especial: "Especial (Cível e Criminal)",
+};
 const assistantQueryForm = document.querySelector("#assistantQueryForm");
 const assistantSource = document.querySelector("#assistantSource");
 const assistantCode = document.querySelector("#assistantCode");
@@ -431,9 +451,40 @@ function getSelectedStateCourt() {
   return stateCourtDirectory.find((court) => court.uf === selectedUf) || stateCourtDirectory.find((court) => court.uf === "DF");
 }
 
+function getStateCourtStateName(court) {
+  return court?.stateName || court?.name || "";
+}
+
+function isStateCourtActive(court) {
+  return Boolean(court?.automatic || court?.automationStatus === "active");
+}
+
+function formatStateCourtFieldLabel(fieldId) {
+  return stateCourtFieldLabels[fieldId] || fieldId;
+}
+
+function formatStateCourtCertificateLabel(certificateId) {
+  return stateCourtCertificateLabels[certificateId] || certificateId;
+}
+
+async function loadStateCourtCatalog() {
+  try {
+    const response = await fetch("/data/state-courts.json", { headers: { accept: "application/json" } });
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    if (Array.isArray(data.profiles) && data.profiles.length) {
+      stateCourtDirectory = data.profiles;
+    }
+  } catch {
+    // Keep the embedded fallback directory when the catalog cannot be loaded.
+  }
+}
+
 function stateCourtOptionsHtml() {
   return stateCourtDirectory
-    .map((court) => `<option value="${escapeHtml(court.uf)}">${escapeHtml(court.uf)} - ${escapeHtml(court.court)} (${escapeHtml(court.name)})</option>`)
+    .map((court) => `<option value="${escapeHtml(court.uf)}">${escapeHtml(court.uf)} - ${escapeHtml(court.court)} (${escapeHtml(getStateCourtStateName(court))})</option>`)
     .join("");
 }
 
@@ -458,24 +509,82 @@ function syncStateCourtSelection(source) {
     tjdftCourtUf.value = value;
   }
   const selectedCourt = getSelectedStateCourt();
+  const useTjdftAdapter = isStateCourtActive(selectedCourt);
   if (stateCourtHint && selectedCourt) {
-    stateCourtHint.textContent = selectedCourt.automatic
-      ? `${selectedCourt.court} est? com automa??o ativa.`
-      : `${selectedCourt.court} est? em modo portal oficial enquanto o collector autom?tico ? implementado.`;
+    stateCourtHint.textContent = isStateCourtActive(selectedCourt)
+      ? `${selectedCourt.court} está com automação ativa.`
+      : `${selectedCourt.court} está em modo ${selectedCourt.captchaMode === "assisted" ? "assistido" : "portal oficial"}.`;
   }
   if (stateCourtPortalTitle && selectedCourt) {
-    stateCourtPortalTitle.textContent = `Emiss?o oficial ${selectedCourt.court} - ${selectedCourt.name}`;
+    stateCourtPortalTitle.textContent = `Emissão oficial ${selectedCourt.court} - ${getStateCourtStateName(selectedCourt)}`;
   }
   if (stateCourtRequiredFields && selectedCourt) {
-    stateCourtRequiredFields.textContent = selectedCourt.automatic
-      ? "Automa??o ativa: CPF/CNPJ, primeiro nome, nome da m?e, nome do pai e tipo de certid?o."
-      : "Portal oficial: o tribunal pode solicitar CPF/CNPJ, nome completo, filia??o, e-mail, nascimento, comarca e valida??o/captcha.";
+    const required = (selectedCourt.requiredFields || ["document"]).map(formatStateCourtFieldLabel).join(", ");
+    stateCourtRequiredFields.textContent = `Campos deste tribunal: ${required}.`;
   }
   if (stateCourtPortalLink && selectedCourt) {
     stateCourtPortalLink.href = selectedCourt.url;
-    stateCourtPortalLink.textContent = selectedCourt.automatic ? "Abrir portal TJDFT" : `Abrir emiss?o ${selectedCourt.court}`;
+    stateCourtPortalLink.textContent = isStateCourtActive(selectedCourt) ? `Abrir portal ${selectedCourt.court}` : `Abrir emissão ${selectedCourt.court}`;
   }
+  renderStateCourtDynamicFields();
   updateTjdftPersonFields();
+}
+
+function getStateCourtDynamicFieldIds(court = getSelectedStateCourt()) {
+  if (!court || isStateCourtActive(court)) {
+    return [];
+  }
+  const fields = [...(court.requiredFields || []), ...(court.optionalFields || [])];
+  return [...new Set(fields)].filter((field) => field !== "document");
+}
+
+function renderStateCourtDynamicFields() {
+  if (!stateCourtDynamicFields) {
+    return;
+  }
+  const selectedCourt = getSelectedStateCourt();
+  const fields = getStateCourtDynamicFieldIds(selectedCourt);
+  if (!fields.length) {
+    stateCourtDynamicFields.innerHTML = "";
+    stateCourtDynamicFields.classList.add("hidden");
+    return;
+  }
+
+  const required = new Set(selectedCourt.requiredFields || []);
+  stateCourtDynamicFields.classList.remove("hidden");
+  stateCourtDynamicFields.innerHTML = `
+    <fieldset class="state-court-profile-fields">
+      <legend>Campos solicitados por ${escapeHtml(selectedCourt.court)}</legend>
+      ${fields
+        .map((field) => {
+          const type = field === "email" ? "email" : field === "birthDate" ? "date" : "text";
+          return `
+            <label>
+              ${escapeHtml(formatStateCourtFieldLabel(field))}
+              <input data-state-court-field="${escapeHtml(field)}" type="${type}" autocomplete="off" ${required.has(field) ? "required" : ""} />
+            </label>
+          `;
+        })
+        .join("")}
+    </fieldset>
+  `;
+}
+
+function getStateCourtFieldsPayload() {
+  const fields = {};
+  stateCourtDynamicFields?.querySelectorAll("[data-state-court-field]").forEach((input) => {
+    fields[input.dataset.stateCourtField] = input.value || "";
+  });
+  return fields;
+}
+
+function getStateCourtCertificateTypesPayload() {
+  const selectedCourt = getSelectedStateCourt();
+  if (!selectedCourt || isStateCourtActive(selectedCourt)) {
+    return [...tjdftCertificateTypeInputs].filter((input) => input.checked).map((input) => input.value);
+  }
+  const available = Array.isArray(selectedCourt.certificateTypes) ? selectedCourt.certificateTypes : [];
+  return available.length ? available : ["civil", "criminal"];
 }
 
 function updateTjdftPersonFields() {
@@ -483,34 +592,35 @@ function updateTjdftPersonFields() {
   const personType = getTjdftPersonType();
   const isPf = personType === "pf";
   const selectedCourt = getSelectedStateCourt();
+  const useTjdftAdapter = isStateCourtActive(selectedCourt);
   if (tjdftCourtLabel && selectedCourt) {
-    tjdftCourtLabel.textContent = `${selectedCourt.court} - ${selectedCourt.name}${selectedCourt.automatic ? " (automático)" : " (portal oficial)"}`;
+    tjdftCourtLabel.textContent = `${selectedCourt.court} - ${getStateCourtStateName(selectedCourt)}${useTjdftAdapter ? " (automático)" : " (assistido/manual)"}`;
   }
   tjdftPersonTypeLabel.textContent = isPf ? "Pessoa física" : "Pessoa jurídica";
-  tjdftPfFields.forEach((field) => field.classList.toggle("hidden", !isPf));
-  tjdftPjFields.forEach((field) => field.classList.toggle("hidden", isPf));
+  tjdftCertificateOptions?.classList.toggle("hidden", !useTjdftAdapter);
+  tjdftPfFields.forEach((field) => field.classList.toggle("hidden", !useTjdftAdapter || !isPf));
+  tjdftPjFields.forEach((field) => field.classList.toggle("hidden", !useTjdftAdapter || isPf));
   [auditFirstName, auditMotherName, auditFatherName].forEach((input) => {
     if (input) {
-      input.required = isTjdftSelected && isPf;
-      if (!isTjdftSelected || !isPf) {
+      input.required = isTjdftSelected && useTjdftAdapter && isPf;
+      if (!isTjdftSelected || !useTjdftAdapter || !isPf) {
         input.value = "";
       }
     }
   });
   if (tjdftCompanyName) {
     tjdftCompanyName.required = false;
-    if (!isTjdftSelected || isPf) {
+    if (!isTjdftSelected || !useTjdftAdapter || isPf) {
       tjdftCompanyName.value = "";
     }
   }
   const hasSelectedCertificate = [...tjdftCertificateTypeInputs].some((input) => input.checked);
   tjdftCertificateTypeInputs.forEach((input) => {
-    if (isTjdftSelected && !hasSelectedCertificate) {
+    if (isTjdftSelected && useTjdftAdapter && !hasSelectedCertificate) {
       input.checked = true;
     }
   });
 }
-
 function getExclusiveAuditDocumentType(sourceId) {
   const config = auditSourceConfig[sourceId];
   const types = config?.documentTypes || config?.appliesTo || ["cpf", "cnpj"];
@@ -593,16 +703,20 @@ function validateAuditStep(step) {
       requiredFields.push(auditCnpjDocument);
     }
     if (selectedAuditViews.includes("tjdft")) {
-      const selectedTjdftCertificates = [...tjdftCertificateTypeInputs].filter((input) => input.checked);
-      if (!selectedTjdftCertificates.length) {
-        auditError.textContent = "Selecione pelo menos uma certidão do TJDFT.";
-        return false;
+      const selectedCourt = getSelectedStateCourt();
+      if (isStateCourtActive(selectedCourt)) {
+        const selectedTjdftCertificates = [...tjdftCertificateTypeInputs].filter((input) => input.checked);
+        if (!selectedTjdftCertificates.length) {
+          auditError.textContent = "Selecione pelo menos uma certidao estadual.";
+          return false;
+        }
+        if (getTjdftPersonType() === "pf") {
+          requiredFields.push(auditFirstName, auditMotherName, auditFatherName);
+        }
+      } else {
+        requiredFields.push(...[...(stateCourtDynamicFields?.querySelectorAll("[data-state-court-field][required]") || [])]);
       }
-      if (getTjdftPersonType() === "pf") {
-        requiredFields.push(auditFirstName, auditMotherName, auditFatherName);
-      }
-    }
-    if (selectedAuditViews.includes("trf1")) {
+    }    if (selectedAuditViews.includes("trf1")) {
       requiredFields.push(trf1CertificateType, trf1Orgaos, trf1Email);
     }
     if (selectedAuditViews.includes("fgts")) {
@@ -817,6 +931,7 @@ function formatStatusLabel(value) {
     planned: "Planejada",
     sandbox: "Sandbox",
     manual_required: "Manual guiada",
+    waiting_user_action: "Aguardando acao",
     not_applicable: "Não aplicável",
     blocked: "Bloqueada",
     pending: "Pendente",
@@ -1063,7 +1178,7 @@ function renderAudit(audit) {
       <span><strong>${escapeHtml(documentType?.toUpperCase() || "")}</strong><small>${escapeHtml(documentMasked || "")}</small></span>
       <span><strong>${visibleExecutions.length}</strong><small>blocos selecionados</small></span>
       <span><strong>${visibleExecutions.filter((item) => ["completed", "success"].includes(item.status)).length}</strong><small>automáticos</small></span>
-      <span><strong>${visibleExecutions.filter((item) => ["manual_required", "blocked"].includes(item.status)).length}</strong><small>pendentes</small></span>
+      <span><strong>${visibleExecutions.filter((item) => ["manual_required", "waiting_user_action", "blocked"].includes(item.status)).length}</strong><small>pendentes</small></span>
       <span><strong>${totals.not_applicable || 0}</strong><small>não aplicáveis</small></span>
     </div>
   `;
@@ -2090,6 +2205,9 @@ auditForm.addEventListener("submit", async (event) => {
           stateCourtUf: stateCourtUf?.value || tjdftCourtUf?.value || "DF",
           stateCourtName: getSelectedStateCourt()?.court || "TJDFT",
           stateCourtUrl: getSelectedStateCourt()?.url || "",
+          stateCourtProfileId: getSelectedStateCourt()?.uf || "DF",
+          stateCourtFields: getStateCourtFieldsPayload(),
+          stateCourtCertificateTypes: getStateCourtCertificateTypesPayload(),
           tjdftPersonType: getTjdftPersonType(),
           tjdftCompanyName: tjdftCompanyName?.value || "",
           tjdftCertificateTypes: [...tjdftCertificateTypeInputs]
@@ -2281,6 +2399,7 @@ setInterval(rotateRisk, 1400);
 drawSignal();
 
 moveEcosystemModules();
+await loadStateCourtCatalog();
 populateStateCourtSelect();
 syncStateCourtSelection(stateCourtUf || tjdftCourtUf);
 setActivePage(getActivePage());

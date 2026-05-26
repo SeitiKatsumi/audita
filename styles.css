@@ -1388,6 +1388,7 @@ h2 {
 .tjdft-person-type,
 .tjdft-court-field,
 .state-court-portal,
+.state-court-dynamic-fields,
 .tjdft-certificate-options {
   grid-column: 1 / -1;
 }
@@ -1480,6 +1481,16 @@ h2 {
   min-height: 16px;
   padding: 0;
   accent-color: var(--lime);
+}
+
+.state-court-profile-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(116, 255, 154, 0.18);
+  border-radius: 8px;
+  background: rgba(116, 255, 154, 0.045);
 }
 
 .audit-extra-fields legend {
