@@ -6,6 +6,7 @@ import {
   waitingUserActionResult,
   SOURCE_RESULT,
 } from "./base.collector.mjs";
+import { readFile } from "node:fs/promises";
 import { saveAndExtractPdfBuffer } from "../services/pdf.service.mjs";
 import {
   findStateCourtProfile,
@@ -196,6 +197,22 @@ async function collectStateCourtPortal({ input, profile, stateCourtName, stateCo
     );
   }
 
+  if (profile?.uf === "GO" && profile?.automationStatus === "active") {
+    return collectGoStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+  }
+
+  if (profile?.uf === "ES" && profile?.automationStatus === "active") {
+    return collectEsTjesStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+  }
+
+  if (profile?.uf === "SP" && profile?.platform === "esaj") {
+    return collectSpEsajStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+  }
+
+  if (profile?.uf === "BA") {
+    return collectBaTjbaStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+  }
+
   if (profile?.automationStatus === "mapped" && ["esaj", "projudi", "eproc"].includes(profile.platform)) {
     const portal = await inspectStateCourtPortal(profile);
     return waitingUserActionResult(
@@ -286,6 +303,710 @@ async function inspectStateCourtPortal(profile) {
     await page.close().catch(() => {});
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
+  }
+}
+
+async function collectGoStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+  if (input.tipoDocumento !== "cpf") {
+    return unavailableResult(fonte, "TJGO/Projudi emite certidão pública automatizada apenas para pessoa física neste adapter.", {
+      ...baseData,
+      resultado: "Pessoa jurídica deve usar fluxo próprio do portal quando disponível.",
+    });
+  }
+
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJGO/Projudi.", {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({ headless: process.env.STATE_COURT_HEADLESS !== "false" });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    userAgent: "Audita/0.1 TJGO certificate collector",
+  });
+
+  try {
+    const collectorTimeoutMs = envNumber("STATE_COURT_COLLECTOR_TIMEOUT_MS", 120000);
+    const results = await withTimeout(
+      collectGoCertificates({ context, input, requestedCertificates }),
+      collectorTimeoutMs,
+      `TJGO excedeu o tempo máximo de ${Math.round(collectorTimeoutMs / 1000)}s.`,
+    );
+
+    if (results.every((result) => result.status !== "success")) {
+      return failedResult(fonte, "Não foi possível emitir nenhuma certidão TJGO.", {
+        ...baseData,
+        certidoes: results,
+      });
+    }
+
+    const encontrados = results.filter((result) => result.resultado === SOURCE_RESULT.CONSTA);
+    const pendentes = results.filter((result) => result.resultado === SOURCE_RESULT.INDISPONIVEL);
+    const resultadoGeral = encontrados.length
+      ? SOURCE_RESULT.CONSTA
+      : pendentes.length
+        ? SOURCE_RESULT.INDISPONIVEL
+        : SOURCE_RESULT.NADA_CONSTA;
+
+    return successResult(fonte, resultadoGeral, {
+      ...baseData,
+      modo: "automatico",
+      automationStatus: "active",
+      officialUrl: stateCourtUrl || profile.url,
+      tribunal: stateCourtName || profile.court,
+      uf: "GO",
+      certidoes: results,
+      totalCertidoes: results.length,
+      certidoesBaixadas: results.filter((result) => result.pdfPath).length,
+      certidoesComApontamento: encontrados.map((result) => result.tipo),
+      certidoesComAnalisePendente: pendentes.map((result) => result.tipo),
+      resumo: encontrados.length
+        ? "Uma ou mais certidões TJGO indicaram possível apontamento."
+        : "TJGO consultado automaticamente pelo Projudi.",
+    }, {
+      rawText: results.map((result) => result.rawText || result.pageText || "").filter(Boolean).join("\n\n---\n\n"),
+      pdfPath: results.find((result) => result.pdfPath)?.pdfPath || "",
+    });
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+}
+
+async function collectSpEsajStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJSP/ESAJ.", {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({ headless: process.env.STATE_COURT_HEADLESS !== "false" });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    userAgent: "Audita/0.1 TJSP ESAJ certificate collector",
+  });
+
+  try {
+    const results = [];
+    for (const certificateType of requestedCertificates) {
+      results.push(await fillSpEsajCertificate({ context, input, certificateType }));
+    }
+
+    const completed = results.filter((result) => result.status === "success");
+    const waiting = results.filter((result) => result.status === "waiting_user_action");
+    if (completed.length) {
+      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+        ...baseData,
+        modo: waiting.length ? "automatico_com_validacao" : "automatico",
+        tribunal: stateCourtName,
+        uf: "SP",
+        certidoes: results,
+        totalCertidoes: results.length,
+        certidoesBaixadas: results.filter((result) => result.pdfPath).length,
+        resumo: waiting.length
+          ? "TJSP foi preenchido automaticamente, mas algumas certidões exigem validação oficial."
+          : "TJSP consultado automaticamente pelo ESAJ.",
+      }, {
+        rawText: results.map((result) => result.rawText || result.pageText || "").filter(Boolean).join("\n\n---\n\n"),
+        pdfPath: results.find((result) => result.pdfPath)?.pdfPath || "",
+      });
+    }
+
+    return waitingUserActionResult(
+      fonte,
+      "TJSP/ESAJ foi preenchido automaticamente, mas o portal exige reCAPTCHA/validação oficial antes de emitir.",
+      {
+        ...baseData,
+        modo: "automatico_com_validacao",
+        tribunal: stateCourtName,
+        uf: "SP",
+        certidoes: results,
+        proximoPasso: "Resolver a validação oficial no portal para permitir o envio e o download.",
+      },
+    );
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+}
+
+async function collectEsTjesStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJES.", {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({ headless: process.env.STATE_COURT_HEADLESS !== "false" });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    userAgent: "Audita/0.1 TJES certificate collector",
+  });
+
+  try {
+    const results = [];
+    for (const certificateType of requestedCertificates) {
+      results.push(await collectEsTjesCertificate({ context, input, certificateType }));
+    }
+
+    if (results.every((result) => result.status !== "success")) {
+      return failedResult(fonte, "Não foi possível emitir nenhuma certidão TJES.", {
+        ...baseData,
+        certidoes: results,
+      });
+    }
+
+    const encontrados = results.filter((result) => result.resultado === SOURCE_RESULT.CONSTA);
+    const pendentes = results.filter((result) => result.resultado === SOURCE_RESULT.INDISPONIVEL);
+    const resultadoGeral = encontrados.length
+      ? SOURCE_RESULT.CONSTA
+      : pendentes.length
+        ? SOURCE_RESULT.INDISPONIVEL
+        : SOURCE_RESULT.NADA_CONSTA;
+
+    return successResult(fonte, resultadoGeral, {
+      ...baseData,
+      modo: "automatico",
+      tribunal: stateCourtName || "TJES",
+      uf: "ES",
+      certidoes: results,
+      totalCertidoes: results.length,
+      certidoesBaixadas: results.filter((result) => result.pdfPath).length,
+      certidoesComApontamento: encontrados.map((result) => result.tipo),
+      certidoesComAnalisePendente: pendentes.map((result) => result.tipo),
+      resumo: "TJES consultado automaticamente pelo portal de Certidão Negativa.",
+    }, {
+      rawText: results.map((result) => result.rawText || result.pageText || "").filter(Boolean).join("\n\n---\n\n"),
+      pdfPath: results.find((result) => result.pdfPath)?.pdfPath || "",
+    });
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+}
+
+async function collectBaTjbaStateCourt({ input, stateCourtName, requestedCertificates, baseData }) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJBA.", {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({ headless: process.env.STATE_COURT_HEADLESS !== "false" });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    userAgent: "Audita/0.1 TJBA certificate collector",
+  });
+
+  try {
+    const results = [];
+    for (const certificateType of requestedCertificates) {
+      results.push(await fillBaTjbaCertificate({ context, input, certificateType }));
+    }
+
+    return waitingUserActionResult(
+      fonte,
+      "TJBA foi preenchido automaticamente até a validação oficial. O portal possui reCAPTCHA, então exige ação do usuário.",
+      {
+        ...baseData,
+        modo: "automatico_com_validacao",
+        tribunal: stateCourtName || "TJBA",
+        uf: "BA",
+        certidoes: results,
+        totalCertidoes: results.length,
+        proximoPasso: "Resolver a validação oficial no portal do TJBA para continuar a emissão.",
+      },
+    );
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+}
+
+async function fillBaTjbaCertificate({ context, input, certificateType }) {
+  const page = await context.newPage();
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
+    const fields = input.extraFields?.stateCourtFields || {};
+    await page.goto("https://portalcertidoes.tjba.jus.br/#/primeirograu", {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+    await page.waitForTimeout(2500);
+    await page.locator(input.tipoDocumento === "cnpj" ? "#radioJuridica" : "#radioFisica").check({ force: true }).catch(() => {});
+    await page.locator("#selectModelo").selectOption(baModelValue(certificateType.id));
+    await page.locator(baParticipationSelector(fields.participation)).check({ force: true }).catch(() => {});
+
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    return {
+      tipo: certificateType.label,
+      status: "waiting_user_action",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      pageText,
+      errorMessage: "TJBA possui reCAPTCHA oficial antes do avanço da solicitação.",
+      resumo: "Tipo de pessoa, modelo e participação preenchidos; validação oficial pendente.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      errorMessage: error.message,
+    };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function collectEsTjesCertificate({ context, input, certificateType }) {
+  const page = await context.newPage();
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
+    const fields = input.extraFields?.stateCourtFields || {};
+    const documentValue = String(
+      input.tipoDocumento === "cnpj" ? input.extraFields?.cnpjDocument || input.documento : input.extraFields?.cpfDocument || input.documento,
+    ).replace(/\D/g, "");
+    await page.goto("https://sistemas.tjes.jus.br/certidaonegativa/sistemas/certidao/CERTIDAOPESQUISA.cfm", {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+
+    await page.locator("#cbInstancia").selectOption(esInstanceValue(fields.instance));
+    await page.waitForTimeout(500);
+    await page.locator("#cbNatureza").selectOption(esNatureValue(certificateType.id)).catch(() => {});
+    await page.locator(input.tipoDocumento === "cnpj" ? "#rbPessoaJ" : "#rbPessoaF").check({ force: true }).catch(() => {});
+    await safeFill(page, input.tipoDocumento === "cnpj" ? "#edCnpj" : "#edCpf", documentValue);
+    await safeFill(page, "#edRg", fields.rg);
+    await safeFill(page, "#edTitEleitor", fields.voterTitle);
+    await safeFill(page, "#edCtpsNumero", fields.ctpsNumber);
+    await safeFill(page, "#edCtpsSerie", fields.ctpsSeries);
+    await safeFill(page, "#edNome", fields.fullName);
+    await safeFill(page, "#edMae", fields.motherName);
+    await safeFill(page, "#edPai", fields.fatherName);
+    await safeFill(page, "#edNascimento", formatBrazilianDate(fields.birthDate));
+    await selectByTextOrValue(page, "#cbNacionalidade", fields.nationality || "BRASILEIRO");
+    await selectByTextOrValue(page, "#cbEstadoCivil", fields.civilStatus);
+    await safeFill(page, "input[name='edProfissao']", fields.profession);
+    await selectByTextOrValue(page, "#cbMunicipioInfo", fields.city);
+    await safeFill(page, "#edBairro", fields.neighborhood);
+    await safeFill(page, "#edRua", fields.address);
+    await safeFill(page, "#edNumero", fields.addressNumber);
+    await safeFill(page, "#edComplemento", fields.addressComplement);
+    await safeFill(page, "#edCep", fields.cep);
+    await safeFill(page, "#edEmail", fields.email);
+    await safeFill(page, "#edTelFixo", fields.phone);
+    await safeFill(page, "#edTelCelular", fields.mobile);
+
+    const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 25000) }).catch(() => null);
+    await page.locator("#btnSolicitar").click();
+    const download = await downloadPromise;
+    await page.waitForLoadState("domcontentloaded", { timeout: envNumber("STATE_COURT_STEP_TIMEOUT_MS", 30000) }).catch(() => {});
+    await page.waitForTimeout(1500);
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    const captchaDetected = /captcha|recaptcha|c[oó]digo de seguran[çc]a|caracteres exibidos/i.test(pageText);
+    if (captchaDetected) {
+      return {
+        tipo: certificateType.label,
+        status: "waiting_user_action",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        pageText,
+        errorMessage: "TJES solicitou validação/captcha durante a emissão.",
+      };
+    }
+
+    if (download) {
+      const downloadPath = await download.path();
+      const buffer = Buffer.from(await readFile(downloadPath));
+      const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+        consultaId: input.consultaId,
+        fonte,
+        fileName: `tjes-${certificateType.id}.pdf`,
+        buffer,
+      });
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(rawText || pageText),
+        pdfPath,
+        rawText,
+        pageText,
+        resumo: summarizeCertificateText(rawText || pageText),
+      };
+    }
+
+    const pdfLink = await findPdfLink(page);
+    if (pdfLink) {
+      const pdfResponse = await fetch(pdfLink);
+      if (pdfResponse.ok) {
+        const buffer = Buffer.from(await pdfResponse.arrayBuffer());
+        const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+          consultaId: input.consultaId,
+          fonte,
+          fileName: `tjes-${certificateType.id}.pdf`,
+          buffer,
+        });
+        return {
+          tipo: certificateType.label,
+          status: "success",
+          resultado: classifyCertificateText(rawText || pageText),
+          pdfPath,
+          rawText,
+          pageText,
+          downloadUrl: maskSignedUrl(pdfLink),
+          resumo: summarizeCertificateText(rawText || pageText),
+        };
+      }
+    }
+
+    if (hasCertificateResultSignal(pageText)) {
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(pageText),
+        rawText: pageText,
+        pageText,
+        resumo: summarizeCertificateText(pageText),
+      };
+    }
+
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      pageText,
+      errorMessage: "TJES não retornou PDF nem texto conclusivo de certidão.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      errorMessage: error.message,
+    };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function fillSpEsajCertificate({ context, input, certificateType }) {
+  const page = await context.newPage();
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
+    const fields = input.extraFields?.stateCourtFields || {};
+    const cpf = String(input.extraFields?.cpfDocument || input.documento || "").replace(/\D/g, "");
+    await page.goto("https://esaj.tjsp.jus.br/sco/abrirCadastro.do", {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+    await page.locator("#cdModelo").selectOption(spEsajModelValue(certificateType.id));
+    await page.waitForTimeout(700);
+
+    const personType = input.tipoDocumento === "cnpj" ? "J" : "F";
+    await page.locator(`input[name="entity.tpPessoa"][value="${personType}"]`).check({ force: true });
+    await safeFill(page, "#nmCadastroF", fields.fullName);
+    await safeFill(page, "#nmCadastroJ", fields.fullName);
+    await safeFill(page, "#identity\\.nuCpfFormatado", formatDocument(cpf));
+    await safeFill(page, "#identity\\.nuRgFormatado", fields.rg);
+    await safeFill(page, "#identity\\.nuCnpjFormatado", String(input.extraFields?.cnpjDocument || input.documento || ""));
+    await safeFill(page, "#nmMaeCadastro", fields.motherName);
+    await safeFill(page, "#nmPaiCadastro", fields.fatherName);
+    await safeFill(page, "#dataNascimento", formatBrazilianDate(fields.birthDate));
+    await setRadioValue(page, "entity.flGenero", fields.gender);
+    await safeFill(page, "#entity\\.nacionalidade\\.deNacionalidade", fields.nationality || "Brasileira");
+    await safeFill(page, "#entity\\.naturalidade\\.nmMunicipio", fields.naturality);
+    await selectByTextOrValue(page, "#id_sco\\.pedido\\.label\\.cdEstadocivil", fields.civilStatus);
+    await safeFill(page, "#entity\\.deProfissao", fields.profession);
+    await safeFill(page, "#identity\\.endNomePesq\\.deEndereco", fields.address);
+    await safeFill(page, "#identity\\.endNomePesq\\.deComplemento", fields.addressComplement);
+    await safeFill(page, "#identity\\.endNomePesq\\.nuCep", fields.cep);
+    await safeFill(page, "#identity\\.endNomePesq\\.deBairro", fields.neighborhood);
+    await safeFill(page, "#entity\\.endNomePesq\\.municipio\\.nmMunicipio", fields.city);
+    await safeFill(page, "#identity\\.solicitante\\.deEmail", fields.email);
+    await page.locator("#confirmacaoInformacoes").check({ force: true }).catch(() => {});
+
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    const recaptchaPresent = await page.locator("[name='g-recaptcha-response'], iframe[src*='recaptcha']").count().catch(() => 0);
+    if (recaptchaPresent) {
+      return {
+        tipo: certificateType.label,
+        status: "waiting_user_action",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        pageText,
+        errorMessage: "TJSP/ESAJ possui reCAPTCHA oficial antes do envio.",
+        resumo: "Campos preenchidos; validação oficial pendente.",
+      };
+    }
+
+    return {
+      tipo: certificateType.label,
+      status: "waiting_user_action",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      pageText,
+      errorMessage: "TJSP/ESAJ preenchido; envio final requer confirmação no portal oficial.",
+      resumo: "Campos preenchidos; ação final do usuário pendente.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      errorMessage: error.message,
+    };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function collectGoCertificates({ context, input, requestedCertificates }) {
+  const results = [];
+  for (const certificateType of requestedCertificates) {
+    results.push(await collectGoCertificate({ context, input, certificateType }));
+  }
+  return results;
+}
+
+async function collectGoCertificate({ context, input, certificateType }) {
+  const page = await context.newPage();
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
+    const url = goCertificateUrl(certificateType.id);
+    const fields = input.extraFields?.stateCourtFields || {};
+    const cpf = String(input.extraFields?.cpfDocument || input.documento || "").replace(/\D/g, "");
+    const fullName = String(fields.fullName || input.extraFields?.fullName || "").trim();
+    const motherName = String(fields.motherName || input.extraFields?.motherName || "").trim();
+    const birthDate = String(fields.birthDate || input.extraFields?.birthDate || "").trim();
+
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000) });
+    await page.locator("#Nome").fill(fullName);
+    await page.locator("#Cpf").fill(cpf);
+    await page.locator("#NomeMae").fill(motherName);
+    await page.locator("#DataNascimento").fill(formatBrazilianDate(birthDate));
+
+    const submit = page.locator("input[name='imgSubmeter']");
+    const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 25000) }).catch(() => null);
+    await submit.click();
+    const download = await downloadPromise;
+    await page.waitForLoadState("domcontentloaded", { timeout: envNumber("STATE_COURT_STEP_TIMEOUT_MS", 30000) }).catch(() => {});
+    await page.waitForTimeout(1500);
+
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    const captchaDetected = /captcha|recaptcha|c[oó]digo de seguran[çc]a|caracteres exibidos/i.test(pageText);
+    if (captchaDetected) {
+      return {
+        tipo: certificateType.label,
+        status: "waiting_user_action",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        pageText,
+        errorMessage: "TJGO solicitou validação/captcha durante a emissão.",
+      };
+    }
+
+    if (download) {
+      const downloadPath = await download.path();
+      const buffer = Buffer.from(await readFile(downloadPath));
+      const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+        consultaId: input.consultaId,
+        fonte,
+        fileName: `tjgo-${certificateType.id}.pdf`,
+        buffer,
+      });
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(rawText || pageText),
+        pdfPath,
+        rawText,
+        pageText,
+        resumo: summarizeCertificateText(rawText || pageText),
+      };
+    }
+
+    const pdfLink = await findPdfLink(page);
+    if (pdfLink) {
+      const pdfResponse = await fetch(pdfLink);
+      if (pdfResponse.ok) {
+        const buffer = Buffer.from(await pdfResponse.arrayBuffer());
+        const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+          consultaId: input.consultaId,
+          fonte,
+          fileName: `tjgo-${certificateType.id}.pdf`,
+          buffer,
+        });
+        return {
+          tipo: certificateType.label,
+          status: "success",
+          resultado: classifyCertificateText(rawText || pageText),
+          pdfPath,
+          rawText,
+          pageText,
+          downloadUrl: maskSignedUrl(pdfLink),
+          resumo: summarizeCertificateText(rawText || pageText),
+        };
+      }
+    }
+
+    if (hasCertificateResultSignal(pageText)) {
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(pageText),
+        pageText,
+        rawText: pageText,
+        resumo: summarizeCertificateText(pageText),
+      };
+    }
+
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      pageText,
+      errorMessage: "TJGO não retornou PDF nem texto conclusivo de certidão.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      errorMessage: error.message,
+    };
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+function goCertificateUrl(certificateId) {
+  if (certificateId === "criminal") {
+    return "https://projudi.tjgo.jus.br/CertidaoNegativaPositivaPublica?PaginaAtual=1&TipoArea=2&InteressePessoal=S";
+  }
+  return "https://projudi.tjgo.jus.br/CertidaoNegativaPositivaPublica?PaginaAtual=1&TipoArea=1&InteressePessoal=&Territorio=&Finalidade=";
+}
+
+function spEsajModelValue(certificateId) {
+  const values = {
+    falencia: "58",
+    criminal: "6",
+    civil: "52",
+  };
+  return values[certificateId] || values.civil;
+}
+
+function esInstanceValue(value) {
+  const normalized = normalize(value);
+  if (normalized.includes("2") || normalized.includes("segunda")) {
+    return "2";
+  }
+  return "1";
+}
+
+function esNatureValue(certificateId) {
+  const values = {
+    civil: "1",
+    criminal: "5",
+    falencia: "11",
+  };
+  return values[certificateId] || "99";
+}
+
+function baModelValue(certificateId) {
+  const values = {
+    civil: "1",
+    criminal: "2",
+    inventario: "3",
+    insolvencia: "5",
+    interdicao: "10",
+  };
+  return values[certificateId] || values.civil;
+}
+
+function baParticipationSelector(value) {
+  const normalized = normalize(value);
+  if (normalized.includes("ativa")) return "#radioAtiva";
+  if (normalized.includes("ambas")) return "#radioAmbas";
+  return "#radioPassiva";
+}
+
+async function safeFill(page, selector, value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return;
+  }
+  const locator = page.locator(selector);
+  if (await locator.count().catch(() => 0)) {
+    await locator.fill(text, { timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+  }
+}
+
+async function setRadioValue(page, name, value) {
+  const normalized = normalize(value);
+  let radioValue = "";
+  if (["m", "masculino"].includes(normalized)) radioValue = "M";
+  if (["f", "feminino"].includes(normalized)) radioValue = "F";
+  if (!radioValue) {
+    return;
+  }
+  await page.locator(`input[name="${name}"][value="${radioValue}"]`).check({ force: true }).catch(() => {});
+}
+
+async function selectByTextOrValue(page, selector, value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return;
+  }
+  const locator = page.locator(selector);
+  if (!(await locator.count().catch(() => 0))) {
+    return;
+  }
+  const selected = await locator.evaluate((select, rawValue) => {
+    const normalized = String(rawValue || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const option = [...select.options].find((item) => {
+      const text = String(item.text || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      return item.value === rawValue || text === normalized || text.includes(normalized);
+    });
+    if (!option) return false;
+    select.value = option.value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    return true;
+  }, raw).catch(() => false);
+  return selected;
+}
+
+async function findPdfLink(page) {
+  const href = await page
+    .locator("a[href*='.pdf'], a[href*='Download'], a[href*='download'], a[href*='Certidao']")
+    .first()
+    .getAttribute("href")
+    .catch(() => "");
+  if (!href) {
+    return "";
+  }
+  try {
+    return new URL(href, page.url()).toString();
+  } catch {
+    return "";
   }
 }
 
@@ -480,6 +1201,33 @@ function summarizeCertificateText(text) {
     return "Certidao existente localizada e PDF disponibilizado pelo TJDFT.";
   }
   return "PDF baixado; revisar texto extraido para confirmar apontamentos.";
+}
+
+function hasCertificateResultSignal(text) {
+  const normalized = normalize(text);
+  return (
+    hasPositiveCertificateSignal(text) ||
+    hasNegativeCertificateSignal(text) ||
+    normalized.includes("certidao nada consta") ||
+    normalized.includes("certidao positiva") ||
+    normalized.includes("certidao emitida")
+  );
+}
+
+function formatBrazilianDate(value) {
+  const raw = String(value || "").trim();
+  const digits = raw.replace(/\D/g, "");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [year, month, day] = raw.split("-");
+    return `${day}/${month}/${year}`;
+  }
+  if (digits.length === 8) {
+    if (raw.includes("/")) {
+      return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    }
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  }
+  return raw;
 }
 
 function maskSignedUrl(url) {

@@ -153,13 +153,32 @@ let stateCourtDirectory = [
 ];
 const stateCourtFieldLabels = {
   document: "CPF/CNPJ",
+  instance: "Instância",
+  certificateKind: "Tipo de certidão",
+  participation: "Tipo de participação",
   fullName: "Nome completo / razão social",
   firstName: "Primeiro nome",
   motherName: "Nome da mãe",
   fatherName: "Nome do pai",
   birthDate: "Data de nascimento",
   rg: "RG",
+  voterTitle: "Título de eleitor",
+  ctpsNumber: "CTPS número",
+  ctpsSeries: "CTPS série",
+  gender: "Gênero",
+  nationality: "Nacionalidade",
+  naturality: "Naturalidade",
+  civilStatus: "Estado civil",
+  profession: "Profissão",
+  address: "Endereço",
+  addressNumber: "Número",
+  addressComplement: "Complemento",
+  cep: "CEP",
+  neighborhood: "Bairro",
+  city: "Município",
   email: "E-mail",
+  phone: "Telefone fixo",
+  mobile: "Telefone celular",
   comarca: "Comarca",
   companyName: "Razão social",
 };
@@ -168,6 +187,9 @@ const stateCourtCertificateLabels = {
   civil: "Cível",
   falencia: "Falência e Recuperação Judicial",
   especial: "Especial (Cível e Criminal)",
+  inventario: "Inventário / Arrolamento",
+  insolvencia: "Insolvência",
+  interdicao: "Interdição / Curatela",
 };
 const assistantQueryForm = document.querySelector("#assistantQueryForm");
 const assistantSource = document.querySelector("#assistantSource");
@@ -459,6 +481,10 @@ function isStateCourtActive(court) {
   return Boolean(court?.automatic || court?.automationStatus === "active");
 }
 
+function usesLegacyTjdftAdapter(court) {
+  return court?.platform === "tjdft" || court?.uf === "DF" || court?.automatic;
+}
+
 function formatStateCourtFieldLabel(fieldId) {
   return stateCourtFieldLabels[fieldId] || fieldId;
 }
@@ -531,7 +557,7 @@ function syncStateCourtSelection(source) {
 }
 
 function getStateCourtDynamicFieldIds(court = getSelectedStateCourt()) {
-  if (!court || isStateCourtActive(court)) {
+  if (!court || usesLegacyTjdftAdapter(court)) {
     return [];
   }
   const fields = [...(court.requiredFields || []), ...(court.optionalFields || [])];
@@ -580,7 +606,7 @@ function getStateCourtFieldsPayload() {
 
 function getStateCourtCertificateTypesPayload() {
   const selectedCourt = getSelectedStateCourt();
-  if (!selectedCourt || isStateCourtActive(selectedCourt)) {
+  if (!selectedCourt || usesLegacyTjdftAdapter(selectedCourt)) {
     return [...tjdftCertificateTypeInputs].filter((input) => input.checked).map((input) => input.value);
   }
   const available = Array.isArray(selectedCourt.certificateTypes) ? selectedCourt.certificateTypes : [];
@@ -592,9 +618,9 @@ function updateTjdftPersonFields() {
   const personType = getTjdftPersonType();
   const isPf = personType === "pf";
   const selectedCourt = getSelectedStateCourt();
-  const useTjdftAdapter = isStateCourtActive(selectedCourt);
+  const useTjdftAdapter = usesLegacyTjdftAdapter(selectedCourt);
   if (tjdftCourtLabel && selectedCourt) {
-    tjdftCourtLabel.textContent = `${selectedCourt.court} - ${getStateCourtStateName(selectedCourt)}${useTjdftAdapter ? " (automático)" : " (assistido/manual)"}`;
+    tjdftCourtLabel.textContent = `${selectedCourt.court} - ${getStateCourtStateName(selectedCourt)}${isStateCourtActive(selectedCourt) ? " (automático)" : " (assistido/manual)"}`;
   }
   tjdftPersonTypeLabel.textContent = isPf ? "Pessoa física" : "Pessoa jurídica";
   tjdftCertificateOptions?.classList.toggle("hidden", !useTjdftAdapter);
@@ -704,7 +730,7 @@ function validateAuditStep(step) {
     }
     if (selectedAuditViews.includes("tjdft")) {
       const selectedCourt = getSelectedStateCourt();
-      if (isStateCourtActive(selectedCourt)) {
+      if (usesLegacyTjdftAdapter(selectedCourt)) {
         const selectedTjdftCertificates = [...tjdftCertificateTypeInputs].filter((input) => input.checked);
         if (!selectedTjdftCertificates.length) {
           auditError.textContent = "Selecione pelo menos uma certidao estadual.";
