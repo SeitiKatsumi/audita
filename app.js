@@ -156,6 +156,8 @@ const stateCourtFieldLabels = {
   instance: "Instância",
   certificateKind: "Tipo de certidão",
   participation: "Tipo de participação",
+  domicile: "Domicílio",
+  nature: "Natureza",
   fullName: "Nome completo / razão social",
   firstName: "Primeiro nome",
   motherName: "Nome da mãe",
@@ -1232,7 +1234,7 @@ function renderAudit(audit) {
             <span class="module-status ${escapeHtml(execution.status)}">${escapeHtml(formatStatusLabel(execution.status))}</span>
           </div>
           <p>${escapeHtml(execution.summary || "")}</p>
-          ${execution.officialUrl ? `<a class="audit-official-link" href="${escapeHtml(execution.officialUrl)}" target="_blank" rel="noreferrer">Abrir portal oficial</a>` : ""}
+          ${renderAssistedPortalFrame(execution)}
           ${
             missingFields.length
               ? `<small class="audit-warning">Campos pendentes: ${escapeHtml(missingFields.map(formatAuditFieldLabel).join(", "))}</small>`
@@ -1259,6 +1261,37 @@ function renderAudit(audit) {
     })
     .join("");
   renderDocumentAiPanel(audit, visibleExecutions);
+}
+
+function renderAssistedPortalFrame(execution) {
+  const url = execution?.officialUrl || "";
+  const needsUserAction = ["manual_required", "waiting_user_action", "blocked"].includes(execution?.status);
+  if (!url || !needsUserAction) {
+    return url
+      ? `<a class="audit-official-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Abrir portal oficial</a>`
+      : "";
+  }
+  const title = execution?.data?.tribunal
+    ? `Portal oficial ${execution.data.tribunal}`
+    : `Portal oficial ${execution.sourceName || "da fonte"}`;
+  return `
+    <section class="assisted-portal-frame" data-portal-url="${escapeHtml(url)}">
+      <div class="assisted-portal-head">
+        <div>
+          <strong>Validação no portal oficial</strong>
+          <small>Resolva captcha, login ou confirmação diretamente na página oficial quando aparecer.</small>
+        </div>
+        <a class="audit-official-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Abrir em nova aba</a>
+      </div>
+      <iframe
+        title="${escapeHtml(title)}"
+        src="${escapeHtml(url)}"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+      ></iframe>
+      <small class="audit-warning">Se o tribunal bloquear iframe, use "Abrir em nova aba". Alguns portais impedem incorporação por segurança.</small>
+    </section>
+  `;
 }
 
 function renderDocumentAiPanel(audit, executions) {

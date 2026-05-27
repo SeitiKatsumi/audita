@@ -205,8 +205,12 @@ async function collectStateCourtPortal({ input, profile, stateCourtName, stateCo
     return collectEsTjesStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
   }
 
-  if (profile?.uf === "SP" && profile?.platform === "esaj") {
+  if (profile?.platform === "esaj") {
     return collectSpEsajStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+  }
+
+  if (profile?.uf === "SE") {
+    return collectSeTjseStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
   }
 
   if (profile?.uf === "BA") {
@@ -398,7 +402,7 @@ async function collectSpEsajStateCourt({ input, profile, stateCourtName, stateCo
   try {
     const results = [];
     for (const certificateType of requestedCertificates) {
-      results.push(await fillSpEsajCertificate({ context, input, certificateType }));
+      results.push(await fillSpEsajCertificate({ context, input, profile, certificateType }));
     }
 
     const completed = results.filter((result) => result.status === "success");
@@ -408,7 +412,7 @@ async function collectSpEsajStateCourt({ input, profile, stateCourtName, stateCo
         ...baseData,
         modo: waiting.length ? "automatico_com_validacao" : "automatico",
         tribunal: stateCourtName,
-        uf: "SP",
+        uf: profile?.uf || "SP",
         certidoes: results,
         totalCertidoes: results.length,
         certidoesBaixadas: results.filter((result) => result.pdfPath).length,
@@ -428,7 +432,7 @@ async function collectSpEsajStateCourt({ input, profile, stateCourtName, stateCo
         ...baseData,
         modo: "automatico_com_validacao",
         tribunal: stateCourtName,
-        uf: "SP",
+        uf: profile?.uf || "SP",
         certidoes: results,
         proximoPasso: "Resolver a validação oficial no portal para permitir o envio e o download.",
       },
@@ -537,6 +541,148 @@ async function collectBaTjbaStateCourt({ input, stateCourtName, requestedCertifi
   } finally {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
+  }
+}
+
+async function collectSeTjseStateCourt({ input, profile, stateCourtName, requestedCertificates, baseData }) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJSE.", {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({ headless: process.env.STATE_COURT_HEADLESS !== "false" });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    userAgent: "Audita/0.1 TJSE certificate collector",
+  });
+
+  try {
+    const results = [];
+    for (const certificateType of requestedCertificates) {
+      results.push(await fillSeTjseCertificate({ context, input, profile, certificateType }));
+    }
+
+    const completed = results.filter((result) => result.status === "success");
+    if (completed.length) {
+      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+        ...baseData,
+        modo: "automatico_com_validacao",
+        tribunal: stateCourtName || "TJSE",
+        uf: "SE",
+        certidoes: results,
+        totalCertidoes: results.length,
+        certidoesBaixadas: results.filter((result) => result.pdfPath).length,
+        resumo: "TJSE consultado pelo portal de certidão online.",
+      }, {
+        rawText: results.map((result) => result.rawText || result.pageText || "").filter(Boolean).join("\n\n---\n\n"),
+        pdfPath: results.find((result) => result.pdfPath)?.pdfPath || "",
+      });
+    }
+
+    return waitingUserActionResult(
+      fonte,
+      "TJSE foi preenchido automaticamente até a etapa permitida pelo portal oficial.",
+      {
+        ...baseData,
+        modo: "automatico_com_validacao",
+        tribunal: stateCourtName || "TJSE",
+        uf: "SE",
+        certidoes: results,
+        totalCertidoes: results.length,
+        proximoPasso: "Resolver validação oficial ou confirmar a solicitação no portal do TJSE quando exigido.",
+      },
+    );
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+}
+
+async function fillSeTjseCertificate({ context, input, profile, certificateType }) {
+  const page = await context.newPage();
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
+    const fields = input.extraFields?.stateCourtFields || {};
+    const documentValue = String(input.extraFields?.cpfDocument || input.extraFields?.cnpjDocument || input.documento || "").replace(/\D/g, "");
+    await page.goto(profile?.url || "https://certidao-online.tjse.jus.br/app/solicitacao/", {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+    await page.waitForTimeout(2500);
+    await page.getByText(input.tipoDocumento === "cnpj" ? "Jurídica" : "Física", { exact: true }).click({ timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(1200);
+
+    await selectTjseMatOption(page, 0, fields.domicile || "Aracaju");
+    await selectTjseMatOption(page, 1, fields.nature || certificateType.label || certificateType.id);
+    await safeFill(page, "input[formcontrolname='cpfCnpj']", documentValue);
+    await safeFill(page, "input[formcontrolname='nomeParte']", fields.fullName || fields.companyName);
+    await safeFill(page, "input[formcontrolname='dataNascimento']", formatCompactBrazilianDate(fields.birthDate));
+    await safeFill(page, "input[formcontrolname='nomeMae']", fields.motherName);
+    await safeFill(page, "input[formcontrolname='nomePai']", fields.fatherName);
+    await safeFill(page, "input[formcontrolname='email']", fields.email);
+    await safeFill(page, "input[formcontrolname='celular']", fields.mobile);
+
+    const beforeSubmitText = await page.locator("body").innerText().catch(() => "");
+    const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 30000) }).catch(() => null);
+    await page.getByRole("button", { name: /solicitar|emitir|avançar|enviar/i }).click({ timeout: 8000 }).catch(() => {});
+    const download = await downloadPromise;
+    await page.waitForLoadState("domcontentloaded", { timeout: envNumber("STATE_COURT_STEP_TIMEOUT_MS", 30000) }).catch(() => {});
+    await page.waitForTimeout(1800);
+    const pageText = await page.locator("body").innerText().catch(() => beforeSubmitText);
+
+    if (download) {
+      const downloadPath = await download.path();
+      const buffer = Buffer.from(await readFile(downloadPath));
+      const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+        consultaId: input.consultaId,
+        fonte,
+        fileName: `tjse-${certificateType.id}.pdf`,
+        buffer,
+      });
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(rawText || pageText),
+        pdfPath,
+        rawText,
+        pageText,
+        resumo: summarizeCertificateText(rawText || pageText),
+      };
+    }
+
+    if (hasCertificateResultSignal(pageText)) {
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(pageText),
+        rawText: pageText,
+        pageText,
+        resumo: summarizeCertificateText(pageText),
+      };
+    }
+
+    return {
+      tipo: certificateType.label,
+      status: "waiting_user_action",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      pageText,
+      errorMessage: "TJSE preenchido; portal ainda exige confirmação/validação ou não retornou PDF conclusivo.",
+      resumo: "Campos preenchidos; validação ou confirmação oficial pendente.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      errorMessage: error.message,
+    };
+  } finally {
+    await page.close().catch(() => {});
   }
 }
 
@@ -705,41 +851,121 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
   }
 }
 
-async function fillSpEsajCertificate({ context, input, certificateType }) {
+async function fillSpEsajCertificate({ context, input, profile, certificateType }) {
   const page = await context.newPage();
   try {
     page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
     const fields = input.extraFields?.stateCourtFields || {};
-    const cpf = String(input.extraFields?.cpfDocument || input.documento || "").replace(/\D/g, "");
-    await page.goto("https://esaj.tjsp.jus.br/sco/abrirCadastro.do", {
+    const documentValue = String(input.extraFields?.cpfDocument || input.extraFields?.cnpjDocument || input.documento || "").replace(/\D/g, "");
+    await page.goto(profile?.url || "https://esaj.tjsp.jus.br/sco/abrirCadastro.do", {
       waitUntil: "domcontentloaded",
       timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
     });
-    await page.locator("#cdModelo").selectOption(spEsajModelValue(certificateType.id));
-    await page.waitForTimeout(700);
+    await page.locator("#cdModelo").selectOption(spEsajModelValue(certificateType.id), {
+      timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000),
+    });
+    await page.waitForTimeout(900);
 
     const personType = input.tipoDocumento === "cnpj" ? "J" : "F";
-    await page.locator(`input[name="entity.tpPessoa"][value="${personType}"]`).check({ force: true });
-    await safeFill(page, "#nmCadastroF", fields.fullName);
-    await safeFill(page, "#nmCadastroJ", fields.fullName);
-    await safeFill(page, "#identity\\.nuCpfFormatado", formatDocument(cpf));
-    await safeFill(page, "#identity\\.nuRgFormatado", fields.rg);
-    await safeFill(page, "#identity\\.nuCnpjFormatado", String(input.extraFields?.cnpjDocument || input.documento || ""));
-    await safeFill(page, "#nmMaeCadastro", fields.motherName);
-    await safeFill(page, "#nmPaiCadastro", fields.fatherName);
-    await safeFill(page, "#dataNascimento", formatBrazilianDate(fields.birthDate));
-    await setRadioValue(page, "entity.flGenero", fields.gender);
-    await safeFill(page, "#entity\\.nacionalidade\\.deNacionalidade", fields.nationality || "Brasileira");
-    await safeFill(page, "#entity\\.naturalidade\\.nmMunicipio", fields.naturality);
-    await selectByTextOrValue(page, "#id_sco\\.pedido\\.label\\.cdEstadocivil", fields.civilStatus);
-    await safeFill(page, "#entity\\.deProfissao", fields.profession);
-    await safeFill(page, "#identity\\.endNomePesq\\.deEndereco", fields.address);
-    await safeFill(page, "#identity\\.endNomePesq\\.deComplemento", fields.addressComplement);
-    await safeFill(page, "#identity\\.endNomePesq\\.nuCep", fields.cep);
-    await safeFill(page, "#identity\\.endNomePesq\\.deBairro", fields.neighborhood);
-    await safeFill(page, "#entity\\.endNomePesq\\.municipio\\.nmMunicipio", fields.city);
-    await safeFill(page, "#identity\\.solicitante\\.deEmail", fields.email);
-    await page.locator("#confirmacaoInformacoes").check({ force: true }).catch(() => {});
+    await safeCheck(page, `input[name="entity.tpPessoa"][value="${personType}"]`);
+    await page.waitForTimeout(600);
+
+    const nameValue = fields.fullName || fields.companyName || "";
+    await safeFillVisible(page, "#nmCadastroF", nameValue);
+    await safeFillVisible(page, "#nmCadastroJ", nameValue);
+    await safeFillVisible(page, "#identity\\.nuCpfFormatado", formatDocument(documentValue));
+    await safeFillVisible(page, "#identity\\.nuRgFormatado", fields.rg || "DECLARA NÃO POSSUIR RG");
+    await safeFillVisible(page, "#identity\\.nuCnpjFormatado", formatDocument(documentValue));
+    await safeFillVisible(page, "#nmMaeCadastro", fields.motherName);
+    await safeFillVisible(page, "#nmPaiCadastro", fields.fatherName);
+    await safeFillVisible(page, "#dataNascimento", formatBrazilianDate(fields.birthDate));
+    await setVisibleRadioValue(page, "entity.flGenero", fields.gender);
+    await safeFillVisible(page, "#entity\\.nacionalidade\\.deNacionalidade", fields.nationality || "Brasileira");
+    await safeFillVisible(page, "#entity\\.naturalidade\\.nmMunicipio", fields.naturality || fields.city);
+    await selectVisibleByTextOrValue(page, "#id_sco\\.pedido\\.label\\.cdEstadocivil", fields.civilStatus || "Solteiro");
+    await safeFillVisible(page, "#entity\\.deProfissao", fields.profession);
+    await safeFillVisible(page, "#identity\\.endNomePesq\\.deEndereco", fields.address);
+    await safeFillVisible(page, "#identity\\.endNomePesq\\.deComplemento", fields.addressComplement);
+    await safeFillVisible(page, "#identity\\.endNomePesq\\.nuCep", fields.cep);
+    await safeFillVisible(page, "#identity\\.endNomePesq\\.deBairro", fields.neighborhood);
+    await safeFillVisible(page, "#entity\\.endNomePesq\\.municipio\\.nmMunicipio", fields.city);
+    await safeFillVisible(page, "#identity\\.solicitante\\.deEmail", fields.email);
+    await safeCheck(page, "#confirmacaoInformacoes");
+
+    const beforeSubmitText = await page.locator("body").innerText().catch(() => "");
+    const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 30000) }).catch(() => null);
+    await page.locator("#pbEnviar").click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000) }).catch(() => {});
+    const download = await downloadPromise;
+    await page.waitForLoadState("domcontentloaded", { timeout: envNumber("STATE_COURT_STEP_TIMEOUT_MS", 30000) }).catch(() => {});
+    await page.waitForTimeout(1800);
+    const submittedText = await page.locator("body").innerText().catch(() => beforeSubmitText);
+
+    if (download) {
+      const downloadPath = await download.path();
+      const buffer = Buffer.from(await readFile(downloadPath));
+      const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+        consultaId: input.consultaId,
+        fonte,
+        fileName: `tjsp-${certificateType.id}.pdf`,
+        buffer,
+      });
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(rawText || submittedText),
+        pdfPath,
+        rawText,
+        pageText: submittedText,
+        resumo: summarizeCertificateText(rawText || submittedText),
+      };
+    }
+
+    const pdfLink = await findPdfLink(page);
+    if (pdfLink) {
+      const pdfResponse = await fetch(pdfLink);
+      if (pdfResponse.ok) {
+        const buffer = Buffer.from(await pdfResponse.arrayBuffer());
+        const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+          consultaId: input.consultaId,
+          fonte,
+          fileName: `tjsp-${certificateType.id}.pdf`,
+          buffer,
+        });
+        return {
+          tipo: certificateType.label,
+          status: "success",
+          resultado: classifyCertificateText(rawText || submittedText),
+          pdfPath,
+          rawText,
+          pageText: submittedText,
+          downloadUrl: maskSignedUrl(pdfLink),
+          resumo: summarizeCertificateText(rawText || submittedText),
+        };
+      }
+    }
+
+    if (hasCertificateResultSignal(submittedText)) {
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(submittedText),
+        rawText: submittedText,
+        pageText: submittedText,
+        resumo: summarizeCertificateText(submittedText),
+      };
+    }
+
+    const validationDetected = /captcha|recaptcha|c[oó]digo de seguran[çc]a|confirme que voc[eê]|valida[çc][aã]o|obrigat[oó]rio|inv[aá]lido/i.test(submittedText);
+    return {
+      tipo: certificateType.label,
+      status: "waiting_user_action",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      pageText: submittedText,
+      errorMessage: validationDetected
+        ? "TJSP/ESAJ exige validação oficial ou correção de campos antes de emitir."
+        : "TJSP/ESAJ preenchido; emissão ainda não retornou PDF nem texto conclusivo.",
+      resumo: "Campos visíveis preenchidos; validação oficial pendente no portal.",
+    };
 
     const pageText = await page.locator("body").innerText().catch(() => "");
     const recaptchaPresent = await page.locator("[name='g-recaptcha-response'], iframe[src*='recaptcha']").count().catch(() => 0);
@@ -954,6 +1180,41 @@ async function safeFill(page, selector, value) {
   }
 }
 
+async function safeFillVisible(page, selector, value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return false;
+  }
+  const locator = page.locator(selector).first();
+  const usable = await locator
+    .evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      const visible = Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+      return visible && !element.disabled && !element.readOnly && style.visibility !== "hidden" && style.display !== "none";
+    })
+    .catch(() => false);
+  if (!usable) {
+    return false;
+  }
+  await locator.fill(text, { timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+  return true;
+}
+
+async function safeCheck(page, selector) {
+  const locator = page.locator(selector).first();
+  const usable = await locator
+    .evaluate((element) => {
+      const visible = Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+      return visible && !element.disabled;
+    })
+    .catch(() => false);
+  if (!usable) {
+    return false;
+  }
+  await locator.check({ force: true, timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+  return true;
+}
+
 async function setRadioValue(page, name, value) {
   const normalized = normalize(value);
   let radioValue = "";
@@ -963,6 +1224,17 @@ async function setRadioValue(page, name, value) {
     return;
   }
   await page.locator(`input[name="${name}"][value="${radioValue}"]`).check({ force: true }).catch(() => {});
+}
+
+async function setVisibleRadioValue(page, name, value) {
+  const normalized = normalize(value);
+  let radioValue = "";
+  if (["m", "masculino"].includes(normalized)) radioValue = "M";
+  if (["f", "feminino"].includes(normalized)) radioValue = "F";
+  if (!radioValue) {
+    return false;
+  }
+  return safeCheck(page, `input[name="${name}"][value="${radioValue}"]`);
 }
 
 async function selectByTextOrValue(page, selector, value) {
@@ -992,6 +1264,49 @@ async function selectByTextOrValue(page, selector, value) {
     return true;
   }, raw).catch(() => false);
   return selected;
+}
+
+async function selectVisibleByTextOrValue(page, selector, value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return false;
+  }
+  const locator = page.locator(selector).first();
+  const usable = await locator
+    .evaluate((element) => {
+      const visible = Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+      return visible && !element.disabled;
+    })
+    .catch(() => false);
+  if (!usable) {
+    return false;
+  }
+  return selectByTextOrValue(page, selector, raw);
+}
+
+async function selectTjseMatOption(page, index, preferredText) {
+  const selects = page.locator("mat-select");
+  if ((await selects.count().catch(() => 0)) <= index) {
+    return false;
+  }
+  await selects.nth(index).click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+  await page.waitForTimeout(500);
+  const raw = String(preferredText || "").trim();
+  const normalized = normalize(raw);
+  const options = page.locator("mat-option");
+  const count = await options.count().catch(() => 0);
+  if (!count) {
+    return false;
+  }
+  for (let optionIndex = 0; optionIndex < count; optionIndex += 1) {
+    const text = await options.nth(optionIndex).innerText().catch(() => "");
+    if (!normalized || normalize(text).includes(normalized)) {
+      await options.nth(optionIndex).click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+      return true;
+    }
+  }
+  await options.first().click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+  return true;
 }
 
 async function findPdfLink(page) {
@@ -1228,6 +1543,10 @@ function formatBrazilianDate(value) {
     return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
   }
   return raw;
+}
+
+function formatCompactBrazilianDate(value) {
+  return formatBrazilianDate(value).replace(/\D/g, "");
 }
 
 function maskSignedUrl(url) {

@@ -11,6 +11,8 @@ export const STATE_COURT_FIELD_LABELS = {
   instance: "Instância",
   certificateKind: "Tipo de certidão",
   participation: "Tipo de participação",
+  domicile: "Domicílio",
+  nature: "Natureza",
   fullName: "Nome completo / razão social",
   firstName: "Primeiro nome",
   motherName: "Nome da mãe",

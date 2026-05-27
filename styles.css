@@ -1449,6 +1449,44 @@ h2 {
   text-decoration: none;
 }
 
+.assisted-portal-frame {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(79, 218, 255, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(51, 204, 255, 0.08), transparent 50%),
+    rgba(3, 13, 28, 0.44);
+}
+
+.assisted-portal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.assisted-portal-head strong,
+.assisted-portal-head small {
+  display: block;
+}
+
+.assisted-portal-head small {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.assisted-portal-frame iframe {
+  width: 100%;
+  min-height: min(72vh, 720px);
+  border: 1px solid rgba(73, 169, 255, 0.28);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
 .tjdft-certificate-options {
   display: flex;
   flex-wrap: wrap;

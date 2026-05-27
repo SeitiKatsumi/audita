@@ -367,13 +367,13 @@
       "uf": "SE",
       "court": "TJSE",
       "stateName": "Sergipe",
-      "url": "https://www.tjse.jus.br/portal/servicos/certidao-online",
+      "url": "https://certidao-online.tjse.jus.br/app/solicitacao/",
       "platform": "custom",
-      "automationStatus": "needs_mapping",
-      "captchaMode": "manual",
+      "automationStatus": "mapped",
+      "captchaMode": "assisted",
       "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
+      "requiredFields": ["document", "fullName", "birthDate", "motherName", "domicile", "nature"],
+      "optionalFields": ["fatherName", "email", "mobile"],
       "certificateTypes": ["civil", "criminal"]
     },
     {
