@@ -104,7 +104,39 @@ test("catalogo de tribunais estaduais contem 27 UFs validas", () => {
     assert.equal(Array.isArray(profile.requiredFields), true);
     assert.equal(Array.isArray(profile.certificateTypes), true);
     assert.equal(profile.certificateTypes.length > 0, true);
+    assert.equal(["active", "mapped", "needs_mapping"].includes(profile.automationStatus), true);
+    assert.equal(["none", "assisted", "manual"].includes(profile.captchaMode), true);
   }
+});
+
+test("catalogo marca TJSP como ESAJ automatico com reCAPTCHA assistido", () => {
+  const tjsp = listStateCourtProfiles().find((profile) => profile.uf === "SP");
+  assert.equal(tjsp.court, "TJSP");
+  assert.equal(tjsp.platform, "esaj");
+  assert.equal(tjsp.automationStatus, "active");
+  assert.equal(tjsp.automatic, true);
+  assert.equal(tjsp.captchaMode, "assisted");
+});
+
+test("catalogo marca TJAM como ESAJ mapeado e assistido", () => {
+  const tjam = listStateCourtProfiles().find((profile) => profile.uf === "AM");
+  assert.equal(tjam.court, "TJAM");
+  assert.equal(tjam.platform, "esaj");
+  assert.equal(tjam.automationStatus, "mapped");
+  assert.equal(tjam.captchaMode, "assisted");
+});
+
+test("catalogo TJAP usa Tucujuris com campos reais do formulario", () => {
+  const tjap = listStateCourtProfiles().find((profile) => profile.uf === "AP");
+  assert.equal(tjap.court, "TJAP");
+  assert.equal(tjap.url, "https://tucujuris.tjap.jus.br/pages/certidao-publica/certidao-publica.html");
+  assert.equal(tjap.automationStatus, "active");
+  assert.equal(tjap.automatic, true);
+  assert.equal(tjap.captchaMode, "assisted");
+  assert.equal(tjap.frameMode, "new_tab");
+  assert.equal(tjap.blocker, "cloudflare");
+  assert.deepEqual(tjap.requiredFields, ["document", "fullName", "gender", "birthDate", "motherName", "rg", "email"]);
+  assert.deepEqual(tjap.certificateTypes, ["civil", "criminal", "especial", "falencia"]);
 });
 
 test("encaminha campos TJDFT para collector", async () => {

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = resolve(".");
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const catalogPath = join(root, "data", "state-courts.json");
 
 let cachedCatalog = null;

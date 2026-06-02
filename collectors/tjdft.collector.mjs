@@ -24,6 +24,8 @@ const CERTIFICATE_TYPES = [
   { id: "especial", label: "Especial (Cível e Criminal)", radioIndex: 3 },
 ];
 
+const assistedSessions = new Map();
+
 function envNumber(name, fallback) {
   const parsed = Number(process.env[name]);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -131,7 +133,8 @@ export async function collect(input) {
     const falhas = results.filter((result) => result.status !== "success");
 
     if (results.every((result) => result.status !== "success")) {
-      return failedResult(fonte, "Nao foi possivel emitir nenhuma certidao TJDFT.", {
+      const firstError = results.find((result) => result.errorMessage)?.errorMessage;
+      return failedResult(fonte, firstError || "Nao foi possivel emitir nenhuma certidao TJDFT.", {
         officialUrl: OFFICIAL_URL,
         certidoes: results,
       });
@@ -205,8 +208,16 @@ async function collectStateCourtPortal({ input, profile, stateCourtName, stateCo
     return collectEsTjesStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
   }
 
+  if (profile?.uf === "AP" && profile?.automationStatus === "active") {
+    return collectApTjapStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+  }
+
+  if (profile?.uf === "MT" && profile?.automationStatus === "mapped") {
+    return collectMtTjmtStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+  }
+
   if (profile?.platform === "esaj") {
-    return collectSpEsajStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
+    return collectEsajStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
   }
 
   if (profile?.uf === "SE") {
@@ -217,19 +228,15 @@ async function collectStateCourtPortal({ input, profile, stateCourtName, stateCo
     return collectBaTjbaStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
   }
 
-  if (profile?.automationStatus === "mapped" && ["esaj", "projudi", "eproc"].includes(profile.platform)) {
-    const portal = await inspectStateCourtPortal(profile);
-    return waitingUserActionResult(
-      fonte,
-      `${stateCourtName} usa portal com validacao assistida. O Audita abriu o fluxo e precisa da etapa humana quando houver captcha/login.`,
-      {
-        ...baseData,
-        modo: "assistido",
-        resumo: `${stateCourtName} mapeado em modo assistido. Portal carregado: ${portal.loaded ? "sim" : "nao"}.`,
-        portalInspection: portal,
-        proximoPasso: "Resolver validacao/captcha no portal oficial ou concluir mapeamento do adapter para persistir o PDF.",
-      },
-    );
+  if (profile?.automationStatus === "mapped") {
+    return collectGenericAssistedStateCourt({
+      input,
+      profile,
+      stateCourtName,
+      stateCourtUrl,
+      requestedCertificates,
+      baseData,
+    });
   }
 
   return manualRequiredResult(
@@ -310,6 +317,392 @@ async function inspectStateCourtPortal(profile) {
   }
 }
 
+async function collectGenericAssistedStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, `Instale a dependencia Playwright para executar o modo assistido ${stateCourtName}.`, {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({
+    headless: profile?.captchaMode === "assisted"
+      ? process.env.STATE_COURT_ASSISTED_HEADLESS === "true"
+      : process.env.STATE_COURT_HEADLESS !== "false",
+    slowMo: envNumber("STATE_COURT_ASSISTED_SLOW_MO_MS", 0),
+  });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    ignoreHTTPSErrors: true,
+    userAgent: `Audita/0.1 ${stateCourtName || profile?.court || "state-court"} assisted collector`,
+  });
+  let keepBrowserOpen = false;
+  let sessionId = "";
+
+  try {
+    const results = [];
+    for (const certificateType of requestedCertificates) {
+      results.push(await fillGenericAssistedCertificate({ context, input, profile, certificateType }));
+    }
+    const loaded = results.some((result) => result.portalLoaded);
+    const filledCount = results.reduce((sum, result) => sum + (Array.isArray(result.filledFields) ? result.filledFields.length : 0), 0);
+    const protectionDetected = results.some((result) => result.requiresCaptcha || result.requiresLogin || result.requiresConfirmation);
+    if (loaded && process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false") {
+      keepBrowserOpen = true;
+      sessionId = createAssistedSession({ browser, context, courtName: stateCourtName || profile?.court, courtUf: profile?.uf, portalUrl: stateCourtUrl || profile?.url, input, results });
+    }
+
+    return waitingUserActionResult(
+      fonte,
+      `${stateCourtName} esta em automacao assistida. O Audita preenche os campos reconhecidos e pausa na validacao oficial quando o portal exigir.`,
+      {
+        ...baseData,
+        automationStatus: "active",
+        captchaMode: profile?.captchaMode || "assisted",
+        modo: "automatico_com_validacao",
+        tribunal: stateCourtName || profile?.court,
+        uf: profile?.uf || input.extraFields?.stateCourtUf || "",
+        validationFrameUrl: stateCourtUrl || profile?.url,
+        assistedPortalUrl: stateCourtUrl || profile?.url,
+        assistedSession: sessionId || "external_browser",
+        sessionOpen: keepBrowserOpen,
+        certidoes: results,
+        totalCertidoes: results.length,
+        camposPreenchidos: filledCount,
+        portalInspection: {
+          loaded,
+          protectionDetected,
+          filledFields: [...new Set(results.flatMap((result) => result.filledFields || []))],
+          textSample: results.find((result) => result.pageText)?.pageText?.slice(0, 500) || "",
+        },
+        resumo: loaded
+          ? `${stateCourtName} carregado e preenchido em modo assistido. Campos preenchidos: ${filledCount}.`
+          : `${stateCourtName} nao carregou completamente no teste automatico.`,
+        proximoPasso: keepBrowserOpen
+          ? "Resolver reCAPTCHA, captcha, login ou confirmacao na janela oficial ja preenchida; depois anexar/confirmar a certidao no Audita."
+          : "Resolver reCAPTCHA, captcha, login ou confirmacao oficial no portal; depois anexar/confirmar a certidao para fechar a consulta.",
+      },
+    );
+  } finally {
+    if (!keepBrowserOpen) {
+      await context.close().catch(() => {});
+      await browser.close().catch(() => {});
+    }
+  }
+}
+
+async function fillGenericAssistedCertificate({ context, input, profile, certificateType }) {
+  const page = await context.newPage();
+  let keepPageOpen = false;
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 25000));
+    await page.goto(profile?.url, {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+    await page.waitForTimeout(envNumber("STATE_COURT_DISCOVERY_DELAY_MS", 1800));
+
+    const fields = buildGenericStateCourtValues(input, profile, certificateType);
+    await executeProfileNavigation(page, profile, fields);
+    const fillReport = await page.evaluate((values) => {
+      const normalizeText = (value) =>
+        String(value || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+      const visible = (element) => {
+        const style = window.getComputedStyle(element);
+        return Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length) && style.visibility !== "hidden" && style.display !== "none";
+      };
+      const fire = (element) => {
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+        element.dispatchEvent(new Event("blur", { bubbles: true }));
+      };
+      const labelText = (element) => {
+        const pieces = [];
+        if (element.id) {
+          const label = document.querySelector(`label[for="${CSS.escape(element.id)}"]`);
+          if (label) pieces.push(label.innerText || label.textContent || "");
+        }
+        const closestLabel = element.closest("label");
+        if (closestLabel) pieces.push(closestLabel.innerText || closestLabel.textContent || "");
+        const row = element.closest(".form-group, .field, .linha, .row, .control-group, p, div, td, tr, li");
+        if (row) pieces.push(row.innerText || row.textContent || "");
+        pieces.push(element.getAttribute("aria-label") || "");
+        pieces.push(element.getAttribute("placeholder") || "");
+        pieces.push(element.getAttribute("name") || "");
+        pieces.push(element.id || "");
+        return normalizeText(pieces.join(" "));
+      };
+      const pickField = (text, element) => {
+        const name = normalizeText(`${element.name || ""} ${element.id || ""}`);
+        const haystack = `${text} ${name}`;
+        if (/(cnpj|cpf|documento|doc\.?|cic)/.test(haystack)) return "document";
+        if (/(tipo documento|tipo de documento|documento ao lado)/.test(haystack)) return "documentType";
+        if (/(email|e-mail)/.test(haystack)) return "email";
+        if (/(mae|mãe|genitora)/.test(haystack)) return "motherName";
+        if (/(pai|genitor)/.test(haystack)) return "fatherName";
+        if (/(nasc|data nascimento|dt nascimento)/.test(haystack)) return "birthDate";
+        if (/(rg|identidade|registro geral)/.test(haystack)) return "rg";
+        if (/(telefone|celular|whatsapp)/.test(haystack)) return "phone";
+        if (/(cep)/.test(haystack)) return "cep";
+        if (/(bairro)/.test(haystack)) return "neighborhood";
+        if (/(cidade|municipio|município|comarca|domicilio|domicílio)/.test(haystack)) return "city";
+        if (/(endereco|endereço|logradouro|rua|avenida)/.test(haystack)) return "address";
+        if (/(profissao|profissão)/.test(haystack)) return "profession";
+        if (/(nacionalidade)/.test(haystack)) return "nationality";
+        if (/(naturalidade)/.test(haystack)) return "naturality";
+        if (/(estado civil|estadocivil)/.test(haystack)) return "civilStatus";
+        if (/(nome|razao social|razão social|requerente|parte|pessoa)/.test(haystack) && !/(mae|mãe|pai)/.test(haystack)) return "fullName";
+        return "";
+      };
+      const valuesFor = (field, element) => {
+        if (!field) return [];
+        if (field === "birthDate") {
+          return element.type === "date" ? [values.birthDateIso, values.birthDateText] : [values.birthDateText, values.birthDateIso];
+        }
+        if (field === "phone") return [values.mobile, values.phone];
+        if (field === "city") return [values.city, values.comarca, values.domicile];
+        return [values[field]];
+      };
+      const firstValue = (field, element) => valuesFor(field, element).find((item) => String(item || "").trim());
+      const fillElement = (element, field) => {
+        const value = firstValue(field, element);
+        if (!value || element.disabled || element.readOnly) return false;
+        element.focus();
+        element.value = String(value);
+        fire(element);
+        return true;
+      };
+      const chooseSelect = (select, field) => {
+        const preferred = valuesFor(field, select).map(normalizeText).filter(Boolean);
+        if (field === "certificate") preferred.push(normalizeText(values.certificateLabel), normalizeText(values.certificateId));
+        if (field === "personType") preferred.push(values.isCompany ? "juridica" : "fisica", values.isCompany ? "cnpj" : "cpf");
+        if (field === "documentType") preferred.push(values.isCompany ? "cnpj" : "cpf", values.isCompany ? "pessoa juridica" : "pessoa fisica");
+        if (!preferred.length) return false;
+        const options = [...select.options].filter((option) => !option.disabled);
+        const option = options.find((item) => {
+          const optionText = normalizeText(`${item.text} ${item.value}`);
+          return preferred.some((itemText) => itemText && (optionText === itemText || optionText.includes(itemText) || itemText.includes(optionText)));
+        });
+        if (!option) return false;
+        select.value = option.value;
+        fire(select);
+        return true;
+      };
+      const filledFields = [];
+      const inputs = [...document.querySelectorAll("input, textarea")].filter((element) => visible(element) && !["hidden", "submit", "button", "reset", "file"].includes(element.type));
+      for (const input of inputs) {
+        const text = labelText(input);
+        if (input.type === "radio") {
+          const radioText = normalizeText(`${text} ${input.value || ""}`);
+          const checked =
+            (/(fisica|física|cpf)/.test(radioText) && !values.isCompany) ||
+            (/(juridica|jurídica|cnpj)/.test(radioText) && values.isCompany) ||
+            (/(masculino|^m$)/.test(radioText) && values.gender === "M") ||
+            (/(feminino|^f$)/.test(radioText) && values.gender === "F") ||
+            (radioText.includes(normalizeText(values.certificateLabel)) || radioText.includes(normalizeText(values.certificateId)));
+          if (checked) {
+            input.checked = true;
+            fire(input);
+            filledFields.push(`opcao:${input.name || values.certificateId}`);
+          }
+          continue;
+        }
+        if (input.type === "checkbox") {
+          if (/(declaro|confirmo|aceito|ciente|termos|responsabilidade|informa[cç][oõ]es verdadeiras)/.test(text)) {
+            input.checked = true;
+            fire(input);
+            filledFields.push(`confirmacao:${input.name || input.id || "checkbox"}`);
+          }
+          continue;
+        }
+        const field = pickField(text, input);
+        if (fillElement(input, field)) {
+          filledFields.push(field);
+        }
+      }
+
+      const selects = [...document.querySelectorAll("select")].filter((element) => visible(element) && !element.disabled);
+      for (const select of selects) {
+        const text = labelText(select);
+        let field = pickField(text, select);
+        if (/(certidao|certidão|modelo|natureza|tipo)/.test(text)) field = "certificate";
+        if (/(pessoa|tipo pessoa|fisica|juridica|cpf|cnpj)/.test(text)) field = "personType";
+        if (!field && select.options.length <= 5) field = "certificate";
+        if (chooseSelect(select, field)) {
+          filledFields.push(`select:${field}`);
+        }
+      }
+
+      const bodyText = document.body?.innerText || "";
+      const frameSources = [...document.querySelectorAll("iframe")].map((frame) => frame.src || "").filter(Boolean);
+      return {
+        filledFields: [...new Set(filledFields)],
+        inputCount: inputs.length,
+        selectCount: selects.length,
+        iframeCount: frameSources.length,
+        frameSources,
+        captchaDetected: /captcha|recaptcha|hcaptcha|turnstile|cloudflare|security verification|malicious bots|codigo de seguranca|c[oó]digo de seguran[cç]a|sou humano|verify you are human/i.test(bodyText) ||
+          frameSources.some((src) => /captcha|recaptcha|hcaptcha|turnstile|cloudflare/i.test(src)),
+        loginDetected: /login|entrar|senha|certificado digital|gov\.br|credenciais|usu[aá]rio/i.test(bodyText),
+        confirmationDetected: /confirmar|prosseguir|avan[cç]ar|emitir|solicitar|enviar|aceito|declaro/i.test(bodyText),
+        bodyText: bodyText.slice(0, 4000),
+      };
+    }, fields);
+
+    const pageText = fillReport.bodyText || (await page.locator("body").innerText().catch(() => ""));
+    keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
+    return {
+      tipo: certificateType.label,
+      status: "waiting_user_action",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      portalLoaded: true,
+      filledFields: fillReport.filledFields || [],
+      pageText,
+      requiresCaptcha: Boolean(fillReport.captchaDetected),
+      requiresLogin: Boolean(fillReport.loginDetected),
+      requiresConfirmation: Boolean(fillReport.confirmationDetected),
+      assistedWindowOpen: keepPageOpen,
+      iframeCount: fillReport.iframeCount || 0,
+      frameSources: fillReport.frameSources || [],
+      errorMessage: fillReport.captchaDetected
+        ? `${profile?.court || "Portal"} preenchido ate a validacao CAPTCHA/reCAPTCHA oficial.`
+        : `${profile?.court || "Portal"} preenchido ate a etapa assistida; confirmacao oficial pendente.`,
+      resumo: (fillReport.filledFields || []).length
+        ? `Campos reconhecidos preenchidos: ${fillReport.filledFields.join(", ")}. Janela oficial mantida aberta para validação.`
+        : "Portal carregado, mas nenhum campo confiavel foi preenchido automaticamente. Janela oficial mantida aberta para validação.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      portalLoaded: false,
+      errorMessage: error.message,
+    };
+  } finally {
+    if (!keepPageOpen) {
+      await page.close().catch(() => {});
+    }
+  }
+}
+
+async function executeProfileNavigation(page, profile, values) {
+  const steps = Array.isArray(profile?.navigationSteps) ? profile.navigationSteps : [];
+  for (const step of steps) {
+    const action = String(step?.action || "").trim();
+    if (!action) continue;
+
+    if (action === "wait") {
+      await page.waitForTimeout(Number(step.ms || 1000));
+      continue;
+    }
+
+    if (action === "goto" && step.url) {
+      await page.goto(String(step.url), {
+        waitUntil: "domcontentloaded",
+        timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+      });
+      await page.waitForTimeout(Number(step.waitAfterMs || 1000));
+      continue;
+    }
+
+    if (action === "clickText" && step.text) {
+      await clickByText(page, String(step.text), { exact: step.exact !== false, timeoutMs: Number(step.timeoutMs || 8000) });
+      await page.waitForTimeout(Number(step.waitAfterMs || 1200));
+      continue;
+    }
+
+    if (action === "clickHrefContains" && step.hrefContains) {
+      const clicked = await page.evaluate((needle) => {
+        const link = [...document.querySelectorAll("a[href]")].find((anchor) => String(anchor.href || "").includes(needle));
+        if (!link) return false;
+        link.click();
+        return true;
+      }, String(step.hrefContains));
+      if (clicked) {
+        await page.waitForLoadState("domcontentloaded", { timeout: Number(step.timeoutMs || 15000) }).catch(() => {});
+        await page.waitForTimeout(Number(step.waitAfterMs || 1200));
+      }
+      continue;
+    }
+
+    if (action === "choosePersonType") {
+      await page.evaluate((isCompany) => {
+        const normalizeText = (value) =>
+          String(value || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim();
+        const expected = isCompany ? /juridica|cnpj/ : /fisica|cpf/;
+        const radios = [...document.querySelectorAll('input[type="radio"]')];
+        const radio = radios.find((input) => {
+          const label = input.id ? document.querySelector(`label[for="${CSS.escape(input.id)}"]`) : null;
+          const wrapper = input.closest("label, mat-radio-button, .mat-radio-button, div, span");
+          const text = normalizeText(`${input.value || ""} ${label?.textContent || ""} ${wrapper?.textContent || ""}`);
+          return expected.test(text);
+        });
+        if (!radio) return false;
+        radio.checked = true;
+        radio.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        radio.dispatchEvent(new Event("input", { bubbles: true }));
+        radio.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      }, Boolean(values?.isCompany));
+      await page.waitForTimeout(Number(step.waitAfterMs || 1800));
+    }
+  }
+}
+
+function buildGenericStateCourtValues(input, profile, certificateType) {
+  const extra = input.extraFields || {};
+  const fields = extra.stateCourtFields || {};
+  const documentValue = String(input.tipoDocumento === "cnpj" ? extra.cnpjDocument || input.documento : extra.cpfDocument || input.documento).replace(/\D/g, "");
+  const gender = normalize(fields.gender || "").startsWith("f") ? "F" : "M";
+  return {
+    isCompany: input.tipoDocumento === "cnpj",
+    document: formatDocument(documentValue),
+    documentRaw: documentValue,
+    fullName: fields.fullName || fields.companyName || extra.tjdftCompanyName || "",
+    motherName: fields.motherName || extra.motherName || extra.nomeMae || "",
+    fatherName: fields.fatherName || extra.fatherName || extra.nomePai || "",
+    birthDateIso: fields.birthDate || extra.birthDate || "",
+    birthDateText: formatBrazilianDate(fields.birthDate || extra.birthDate || ""),
+    rg: fields.rg || "",
+    email: fields.email || "",
+    phone: fields.phone || "",
+    mobile: fields.mobile || fields.phone || "",
+    cep: fields.cep || "",
+    city: fields.city || "",
+    comarca: fields.comarca || "",
+    domicile: fields.domicile || "",
+    address: fields.address || "",
+    neighborhood: fields.neighborhood || "",
+    profession: fields.profession || "",
+    nationality: fields.nationality || "Brasileira",
+    naturality: fields.naturality || fields.city || "",
+    civilStatus: fields.civilStatus || "",
+        participation: fields.participation || "Passiva",
+    instance: fields.instance || "Estadual",
+    certificateKind: fields.certificateKind || "",
+    nature: fields.nature || certificateType.label || "",
+    gender,
+    certificateId: certificateType.id,
+    certificateLabel: certificateType.label,
+    court: profile?.court || "",
+    uf: profile?.uf || "",
+  };
+}
+
 async function collectGoStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
   if (input.tipoDocumento !== "cpf") {
     return unavailableResult(fonte, "TJGO/Projudi emite certidão pública automatizada apenas para pessoa física neste adapter.", {
@@ -382,43 +775,146 @@ async function collectGoStateCourt({ input, profile, stateCourtName, stateCourtU
   }
 }
 
-async function collectSpEsajStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+async function collectEsajStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+  const courtName = stateCourtName || profile?.court || "Tribunal ESAJ";
+  const courtUf = profile?.uf || input.extraFields?.stateCourtUf || "";
+  const portalUrl = stateCourtUrl || profile?.url || "https://esaj.tjsp.jus.br/sco/abrirCadastro.do";
   let chromium;
   try {
     ({ chromium } = await import("playwright"));
   } catch {
-    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJSP/ESAJ.", {
+    return unavailableResult(fonte, `Instale a dependência Playwright para executar o adapter ${courtName}/ESAJ.`, {
       ...baseData,
       install: "npm install && npx playwright install chromium",
     });
   }
 
-  const browser = await chromium.launch({ headless: process.env.STATE_COURT_HEADLESS !== "false" });
+  const browser = await chromium.launch({
+    headless: profile?.captchaMode === "assisted"
+      ? process.env.STATE_COURT_ASSISTED_HEADLESS === "true"
+      : process.env.STATE_COURT_HEADLESS !== "false",
+    slowMo: envNumber("STATE_COURT_ASSISTED_SLOW_MO_MS", 0),
+  });
   const context = await browser.newContext({
     acceptDownloads: true,
-    userAgent: "Audita/0.1 TJSP ESAJ certificate collector",
+    userAgent: `Audita/0.1 ${courtName} ESAJ certificate collector`,
+  });
+  let keepBrowserOpen = false;
+  let sessionId = "";
+
+  try {
+    const results = [];
+    for (const certificateType of requestedCertificates) {
+      results.push(await fillEsajCertificate({ context, input, profile, certificateType }));
+    }
+
+    const completed = results.filter((result) => result.status === "success");
+    const waiting = results.filter((result) => result.status === "waiting_user_action");
+    if (completed.length && !waiting.length) {
+      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+        ...baseData,
+        modo: "automatico",
+        tribunal: courtName,
+        uf: courtUf,
+        certidoes: results,
+        totalCertidoes: results.length,
+        certidoesBaixadas: results.filter((result) => result.pdfPath).length,
+        resumo: `${courtName} consultado automaticamente pelo ESAJ.`,
+      }, {
+        rawText: results.map((result) => result.rawText || result.pageText || "").filter(Boolean).join("\n\n---\n\n"),
+        pdfPath: results.find((result) => result.pdfPath)?.pdfPath || "",
+      });
+    }
+
+    if (waiting.length && process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false") {
+      keepBrowserOpen = true;
+      sessionId = createAssistedSession({ browser, context, courtName, courtUf, portalUrl, input, results });
+    }
+
+    return waitingUserActionResult(
+      fonte,
+      `${courtName}/ESAJ foi preenchido automaticamente, mas o portal exige reCAPTCHA/validação oficial antes de emitir.`,
+      {
+        ...baseData,
+        modo: "automatico_com_validacao",
+        tribunal: courtName,
+        uf: courtUf,
+        validationFrameUrl: portalUrl,
+        assistedPortalUrl: portalUrl,
+        assistedSession: sessionId || "external_browser",
+        sessionOpen: keepBrowserOpen,
+        certidoes: results,
+        proximoPasso: keepBrowserOpen
+          ? "Resolver a validação oficial na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo no Audita."
+          : "Resolver a validação oficial no portal para permitir o envio e o download.",
+      },
+    );
+  } finally {
+    if (!keepBrowserOpen) {
+      await context.close().catch(() => {});
+      await browser.close().catch(() => {});
+    }
+  }
+}
+
+function createAssistedSession({ browser, context, courtName, courtUf, portalUrl, input, results }) {
+  const sessionId = cryptoRandomId();
+  assistedSessions.set(sessionId, {
+    browser,
+    context,
+    courtName,
+    courtUf,
+    portalUrl,
+    consultaId: input.consultaId,
+    createdAt: new Date().toISOString(),
+    results,
+  });
+  return sessionId;
+}
+
+function cryptoRandomId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function collectApTjapStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJAP/Tucujuris.", {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({
+    headless: process.env.TJAP_HEADLESS === "true",
+    slowMo: envNumber("TJAP_SLOW_MO_MS", 0),
+  });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    ignoreHTTPSErrors: true,
+    userAgent: "Audita/0.1 TJAP Tucujuris certificate collector",
   });
 
   try {
     const results = [];
     for (const certificateType of requestedCertificates) {
-      results.push(await fillSpEsajCertificate({ context, input, profile, certificateType }));
+      results.push(await fillApTjapCertificate({ context, input, profile, certificateType }));
     }
 
     const completed = results.filter((result) => result.status === "success");
     const waiting = results.filter((result) => result.status === "waiting_user_action");
-    if (completed.length) {
+    if (completed.length && !waiting.length) {
       return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
         ...baseData,
-        modo: waiting.length ? "automatico_com_validacao" : "automatico",
-        tribunal: stateCourtName,
-        uf: profile?.uf || "SP",
+        modo: "automatico",
+        automationStatus: "active",
+        tribunal: stateCourtName || "TJAP",
+        uf: "AP",
         certidoes: results,
         totalCertidoes: results.length,
-        certidoesBaixadas: results.filter((result) => result.pdfPath).length,
-        resumo: waiting.length
-          ? "TJSP foi preenchido automaticamente, mas algumas certidões exigem validação oficial."
-          : "TJSP consultado automaticamente pelo ESAJ.",
+        resumo: "TJAP consultado automaticamente pelo Tucujuris.",
       }, {
         rawText: results.map((result) => result.rawText || result.pageText || "").filter(Boolean).join("\n\n---\n\n"),
         pdfPath: results.find((result) => result.pdfPath)?.pdfPath || "",
@@ -427,19 +923,27 @@ async function collectSpEsajStateCourt({ input, profile, stateCourtName, stateCo
 
     return waitingUserActionResult(
       fonte,
-      "TJSP/ESAJ foi preenchido automaticamente, mas o portal exige reCAPTCHA/validação oficial antes de emitir.",
+      "TJAP/Tucujuris foi aberto e preenchido automaticamente. Confirme o Cloudflare/Turnstile na janela oficial para concluir.",
       {
         ...baseData,
         modo: "automatico_com_validacao",
-        tribunal: stateCourtName,
-        uf: profile?.uf || "SP",
+        automationStatus: "active",
+        captchaMode: "assisted",
+        frameMode: "new_tab",
+        blocker: "cloudflare",
+        tribunal: stateCourtName || "TJAP",
+        uf: "AP",
+        validationFrameUrl: stateCourtUrl || profile?.url,
+        assistedPortalUrl: stateCourtUrl || profile?.url,
         certidoes: results,
-        proximoPasso: "Resolver a validação oficial no portal para permitir o envio e o download.",
+        proximoPasso: "Resolver a verificação Cloudflare/Turnstile na janela aberta e enviar a requisição no portal oficial.",
       },
     );
   } finally {
-    await context.close().catch(() => {});
-    await browser.close().catch(() => {});
+    if (process.env.TJAP_KEEP_BROWSER_OPEN !== "true") {
+      await context.close().catch(() => {});
+      await browser.close().catch(() => {});
+    }
   }
 }
 
@@ -499,6 +1003,86 @@ async function collectEsTjesStateCourt({ input, profile, stateCourtName, stateCo
   } finally {
     await context.close().catch(() => {});
     await browser.close().catch(() => {});
+  }
+}
+
+async function collectMtTjmtStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return unavailableResult(fonte, "Instale a dependência Playwright para executar o adapter TJMT/SEC.", {
+      ...baseData,
+      install: "npm install && npx playwright install chromium",
+    });
+  }
+
+  const browser = await chromium.launch({
+    headless: process.env.STATE_COURT_ASSISTED_HEADLESS === "true",
+    slowMo: envNumber("STATE_COURT_ASSISTED_SLOW_MO_MS", 0),
+  });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    ignoreHTTPSErrors: true,
+    userAgent: "Audita/0.1 TJMT SEC certificate collector",
+  });
+  let keepBrowserOpen = false;
+  let sessionId = "";
+
+  try {
+    const results = [];
+    for (const certificateType of requestedCertificates) {
+      results.push(await fillMtTjmtCertificate({ context, input, profile, certificateType }));
+    }
+    const waiting = results.filter((result) => result.status === "waiting_user_action");
+    const completed = results.filter((result) => result.status === "success");
+    if (completed.length && !waiting.length) {
+      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+        ...baseData,
+        modo: "automatico",
+        tribunal: stateCourtName || "TJMT",
+        uf: "MT",
+        certidoes: results,
+        totalCertidoes: results.length,
+        certidoesBaixadas: results.filter((result) => result.pdfPath).length,
+        resumo: "TJMT consultado automaticamente pelo SEC.",
+      }, {
+        rawText: results.map((result) => result.rawText || result.pageText || "").filter(Boolean).join("\n\n---\n\n"),
+        pdfPath: results.find((result) => result.pdfPath)?.pdfPath || "",
+      });
+    }
+
+    if (process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false") {
+      keepBrowserOpen = true;
+      sessionId = createAssistedSession({ browser, context, courtName: stateCourtName || "TJMT", courtUf: "MT", portalUrl: stateCourtUrl || profile?.url, input, results });
+    }
+
+    return waitingUserActionResult(
+      fonte,
+      "TJMT/SEC foi preenchido automaticamente até a etapa permitida. Resolva a validação ou confirme a emissão na janela oficial.",
+      {
+        ...baseData,
+        modo: "automatico_com_validacao",
+        automationStatus: "active",
+        captchaMode: "assisted",
+        tribunal: stateCourtName || "TJMT",
+        uf: "MT",
+        validationFrameUrl: stateCourtUrl || profile?.url,
+        assistedPortalUrl: stateCourtUrl || profile?.url,
+        assistedSession: sessionId || "external_browser",
+        sessionOpen: keepBrowserOpen,
+        certidoes: results,
+        totalCertidoes: results.length,
+        proximoPasso: keepBrowserOpen
+          ? "Resolver a validação/confirmar a emissão na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo no Audita."
+          : "Resolver a validação/confirmar a emissão no portal oficial.",
+      },
+    );
+  } finally {
+    if (!keepBrowserOpen) {
+      await context.close().catch(() => {});
+      await browser.close().catch(() => {});
+    }
   }
 }
 
@@ -721,6 +1305,94 @@ async function fillBaTjbaCertificate({ context, input, certificateType }) {
   }
 }
 
+async function fillMtTjmtCertificate({ context, input, profile, certificateType }) {
+  const page = await context.newPage();
+  let keepPageOpen = false;
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
+    const fields = input.extraFields?.stateCourtFields || {};
+    const documentValue = String(input.extraFields?.cpfDocument || input.documento || "").replace(/\D/g, "");
+    await page.goto(profile?.url || "https://sec.tjmt.jus.br/primeiro-grau/criar-pedido-certidao", {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+    await page.waitForTimeout(1600);
+
+    await clickByText(page, /certid[aã]o negativa/i);
+    await page.waitForTimeout(900);
+
+    await fillByLabelLike(page, /documento|cpf/i, formatDocument(documentValue));
+    await fillByLabelLike(page, /data de nascimento|nascimento/i, formatBrazilianDate(fields.birthDate));
+    await clickByText(page, /consultar documento/i);
+    await page.waitForTimeout(1800);
+
+    await fillByLabelLike(page, /^nome|nome completo/i, fields.fullName);
+    await selectMtCertificateType(page, certificateType.id);
+    await clickByText(page, /emitir certid[aã]o/i);
+    await page.waitForTimeout(1800);
+
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    const download = await page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 6000) }).catch(() => null);
+    if (download) {
+      const downloadPath = await download.path();
+      const buffer = Buffer.from(await readFile(downloadPath));
+      const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+        consultaId: input.consultaId,
+        fonte,
+        fileName: `tjmt-${certificateType.id}.pdf`,
+        buffer,
+      });
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(rawText || pageText),
+        pdfPath,
+        rawText,
+        pageText,
+        resumo: summarizeCertificateText(rawText || pageText),
+      };
+    }
+
+    const pdfLink = await findPdfLink(page);
+    if (pdfLink) {
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        downloadUrl: maskSignedUrl(pdfLink),
+        pageText,
+        resumo: "TJMT retornou link de certidão no SEC.",
+      };
+    }
+
+    keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
+    return {
+      tipo: certificateType.label,
+      status: "waiting_user_action",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      pageText,
+      assistedWindowOpen: keepPageOpen,
+      errorMessage: /captcha|recaptcha|valida[çc][aã]o|confirme|obrigat[oó]rio|diverg[eê]ncia/i.test(pageText)
+        ? "TJMT/SEC exige validação, correção de dados ou confirmação antes de emitir."
+        : "TJMT/SEC preenchido; emissão ainda não retornou PDF nem texto conclusivo.",
+      resumo: keepPageOpen
+        ? "Campos TJMT preenchidos; janela oficial mantida aberta para validação ou emissão."
+        : "Campos TJMT preenchidos; validação ou emissão pendente no portal.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      errorMessage: error.message,
+    };
+  } finally {
+    if (!keepPageOpen) {
+      await page.close().catch(() => {});
+    }
+  }
+}
+
 async function collectEsTjesCertificate({ context, input, certificateType }) {
   const page = await context.newPage();
   try {
@@ -738,7 +1410,7 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
     await page.waitForTimeout(500);
     await page.locator("#cbNatureza").selectOption(esNatureValue(certificateType.id)).catch(() => {});
     await page.locator(input.tipoDocumento === "cnpj" ? "#rbPessoaJ" : "#rbPessoaF").check({ force: true }).catch(() => {});
-    await safeFill(page, input.tipoDocumento === "cnpj" ? "#edCnpj" : "#edCpf", documentValue);
+    await safeFill(page, input.tipoDocumento === "cnpj" ? "#edCnpj" : "#edCpf", formatDocument(documentValue));
     await safeFill(page, "#edRg", fields.rg);
     await safeFill(page, "#edTitEleitor", fields.voterTitle);
     await safeFill(page, "#edCtpsNumero", fields.ctpsNumber);
@@ -762,10 +1434,10 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
 
     const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 25000) }).catch(() => null);
     await page.locator("#btnSolicitar").click();
-    const download = await downloadPromise;
     await page.waitForLoadState("domcontentloaded", { timeout: envNumber("STATE_COURT_STEP_TIMEOUT_MS", 30000) }).catch(() => {});
     await page.waitForTimeout(1500);
     const pageText = await page.locator("body").innerText().catch(() => "");
+    const download = await Promise.race([downloadPromise, page.waitForTimeout(1200).then(() => null)]);
     const captchaDetected = /captcha|recaptcha|c[oó]digo de seguran[çc]a|caracteres exibidos/i.test(pageText);
     if (captchaDetected) {
       return {
@@ -821,12 +1493,14 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
       }
     }
 
-    if (hasCertificateResultSignal(pageText)) {
+    if (hasEsTjesPrintableCertificateSignal(pageText) || (hasCertificateResultSignal(pageText) && !hasEsTjesRequestFormSignal(pageText))) {
+      const { pdfPath, rawText } = await saveEsTjesPrintedCertificate({ page, input, certificateType });
       return {
         tipo: certificateType.label,
         status: "success",
         resultado: classifyCertificateText(pageText),
-        rawText: pageText,
+        pdfPath,
+        rawText: rawText || pageText,
         pageText,
         resumo: summarizeCertificateText(pageText),
       };
@@ -851,8 +1525,36 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
   }
 }
 
-async function fillSpEsajCertificate({ context, input, profile, certificateType }) {
+async function saveEsTjesPrintedCertificate({ page, input, certificateType }) {
+  await page
+    .addStyleTag({
+      content: `
+        @media print {
+          input[type="button"], input[type="submit"], button { display: none !important; }
+        }
+      `,
+    })
+    .catch(() => {});
+  await page.emulateMedia({ media: "print" }).catch(() => {});
+  const buffer = await page.pdf({
+    format: "A4",
+    printBackground: true,
+    preferCSSPageSize: true,
+    margin: { top: "8mm", right: "8mm", bottom: "8mm", left: "8mm" },
+  });
+  return saveAndExtractPdfBuffer({
+    consultaId: input.consultaId,
+    fonte,
+    fileName: `tjes-${certificateType.id}.pdf`,
+    buffer,
+  });
+}
+
+async function fillEsajCertificate({ context, input, profile, certificateType }) {
   const page = await context.newPage();
+  const courtName = profile?.court || input.extraFields?.stateCourtName || "Tribunal ESAJ";
+  const courtSlug = String(profile?.uf || input.extraFields?.stateCourtUf || "esaj").toLowerCase();
+  let keepPageOpen = false;
   try {
     page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
     const fields = input.extraFields?.stateCourtFields || {};
@@ -861,7 +1563,7 @@ async function fillSpEsajCertificate({ context, input, profile, certificateType 
       waitUntil: "domcontentloaded",
       timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
     });
-    await page.locator("#cdModelo").selectOption(spEsajModelValue(certificateType.id), {
+    await page.locator("#cdModelo").selectOption(esajModelValue(certificateType.id), {
       timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000),
     });
     await page.waitForTimeout(900);
@@ -906,7 +1608,7 @@ async function fillSpEsajCertificate({ context, input, profile, certificateType 
       const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
         consultaId: input.consultaId,
         fonte,
-        fileName: `tjsp-${certificateType.id}.pdf`,
+        fileName: `${courtSlug}-${certificateType.id}.pdf`,
         buffer,
       });
       return {
@@ -928,7 +1630,7 @@ async function fillSpEsajCertificate({ context, input, profile, certificateType 
         const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
           consultaId: input.consultaId,
           fonte,
-          fileName: `tjsp-${certificateType.id}.pdf`,
+          fileName: `${courtSlug}-${certificateType.id}.pdf`,
           buffer,
         });
         return {
@@ -955,38 +1657,38 @@ async function fillSpEsajCertificate({ context, input, profile, certificateType 
       };
     }
 
-    const validationDetected = /captcha|recaptcha|c[oó]digo de seguran[çc]a|confirme que voc[eê]|valida[çc][aã]o|obrigat[oó]rio|inv[aá]lido/i.test(submittedText);
-    return {
-      tipo: certificateType.label,
-      status: "waiting_user_action",
-      resultado: SOURCE_RESULT.INDISPONIVEL,
-      pageText: submittedText,
-      errorMessage: validationDetected
-        ? "TJSP/ESAJ exige validação oficial ou correção de campos antes de emitir."
-        : "TJSP/ESAJ preenchido; emissão ainda não retornou PDF nem texto conclusivo.",
-      resumo: "Campos visíveis preenchidos; validação oficial pendente no portal.",
-    };
-
-    const pageText = await page.locator("body").innerText().catch(() => "");
+    const pageText = await page.locator("body").innerText().catch(() => submittedText);
     const recaptchaPresent = await page.locator("[name='g-recaptcha-response'], iframe[src*='recaptcha']").count().catch(() => 0);
     if (recaptchaPresent) {
+      keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
       return {
         tipo: certificateType.label,
         status: "waiting_user_action",
         resultado: SOURCE_RESULT.INDISPONIVEL,
         pageText,
-        errorMessage: "TJSP/ESAJ possui reCAPTCHA oficial antes do envio.",
-        resumo: "Campos preenchidos; validação oficial pendente.",
+        requiresRecaptcha: true,
+        assistedWindowOpen: keepPageOpen,
+        errorMessage: `${courtName}/ESAJ possui reCAPTCHA oficial antes do envio.`,
+        resumo: keepPageOpen
+          ? "Campos preenchidos; reCAPTCHA oficial pendente na janela aberta."
+          : "Campos preenchidos; reCAPTCHA oficial pendente.",
       };
     }
 
+    const validationDetected = /captcha|recaptcha|c[oó]digo de seguran[çc]a|confirme que voc[eê]|valida[çc][aã]o|obrigat[oó]rio|inv[aá]lido/i.test(submittedText);
+    keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
     return {
       tipo: certificateType.label,
       status: "waiting_user_action",
       resultado: SOURCE_RESULT.INDISPONIVEL,
       pageText,
-      errorMessage: "TJSP/ESAJ preenchido; envio final requer confirmação no portal oficial.",
-      resumo: "Campos preenchidos; ação final do usuário pendente.",
+      assistedWindowOpen: keepPageOpen,
+      errorMessage: validationDetected
+        ? `${courtName}/ESAJ exige validação oficial ou correção de campos antes de emitir.`
+        : `${courtName}/ESAJ preenchido; emissão ainda não retornou PDF nem texto conclusivo.`,
+      resumo: keepPageOpen
+        ? "Campos visíveis preenchidos; validação oficial pendente na janela aberta."
+        : "Campos visíveis preenchidos; validação oficial pendente no portal.",
     };
   } catch (error) {
     return {
@@ -996,7 +1698,127 @@ async function fillSpEsajCertificate({ context, input, profile, certificateType 
       errorMessage: error.message,
     };
   } finally {
-    await page.close().catch(() => {});
+    if (!keepPageOpen) {
+      await page.close().catch(() => {});
+    }
+  }
+}
+
+async function fillApTjapCertificate({ context, input, profile, certificateType }) {
+  const page = await context.newPage();
+  try {
+    page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
+    const fields = input.extraFields?.stateCourtFields || {};
+    const documentValue = String(input.extraFields?.cpfDocument || input.extraFields?.cnpjDocument || input.documento || "").replace(/\D/g, "");
+    const isCompany = input.tipoDocumento === "cnpj";
+    await page.goto(profile?.url || "https://tucujuris.tjap.jus.br/pages/certidao-publica/certidao-publica.html", {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+
+    const formReady = await waitForTjapFormOrProtection(page);
+    if (!formReady.formVisible) {
+      return {
+        tipo: certificateType.label,
+        status: "waiting_user_action",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        pageText: formReady.pageText,
+        requiresCloudflare: true,
+        errorMessage: "TJAP/Tucujuris exibiu proteção Cloudflare/Azion antes do formulário.",
+        resumo: "Abra a janela oficial, resolva a verificação e execute novamente para o Audita preencher os campos.",
+      };
+    }
+
+    await safeCheck(page, `input[name="tipopessoa"][value="${isCompany ? "juridica" : "fisica"}"]`);
+    await page.waitForTimeout(400);
+
+    const fullName = fields.fullName || fields.companyName || input.extraFields?.tjdftCompanyName || "";
+    await fillVisibleInputByIndex(page, "input[type='text']", 0, fullName);
+    if (!isCompany) {
+      await setVisibleRadioValue(page, "sexo", fields.gender || "M");
+      await fillVisibleInputByIndex(page, "input[type='date']", 0, fields.birthDate);
+      await fillVisibleInputByIndex(page, "input[type='text']", 1, fields.motherName || input.extraFields?.motherName);
+      await fillVisibleInputByIndex(page, "input[type='text']", 2, fields.fatherName || input.extraFields?.fatherName);
+      await fillVisibleInputByIndex(page, "input[type='text']", 3, formatDocument(documentValue));
+      await fillVisibleInputByIndex(page, "input[type='text']", 4, fields.rg || "NAO INFORMADO");
+    } else {
+      await fillVisibleInputByIndex(page, "input[type='text']", 1, formatDocument(documentValue));
+    }
+    await selectFirstVisibleSelectByTextOrValue(page, fields.uf || "AP");
+    await fillVisibleInputByIndex(page, "input[type='email']", 0, fields.email);
+    await chooseTjapCertificateType(page, certificateType.id);
+
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    const protectedChallenge = await hasTjapProtection(page, pageText);
+    if (protectedChallenge) {
+      return {
+        tipo: certificateType.label,
+        status: "waiting_user_action",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        pageText,
+        requiresCloudflare: true,
+        errorMessage: "Campos TJAP preenchidos; confirme o Cloudflare/Turnstile na janela oficial.",
+        resumo: "Formulário preenchido automaticamente; validação humana pendente.",
+      };
+    }
+
+    const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 25000) }).catch(() => null);
+    await page.locator("input[type='submit'], button[type='submit']").first().click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000) }).catch(() => {});
+    const download = await downloadPromise;
+    await page.waitForTimeout(1600);
+    const submittedText = await page.locator("body").innerText().catch(() => pageText);
+
+    if (download) {
+      const downloadPath = await download.path();
+      const buffer = Buffer.from(await readFile(downloadPath));
+      const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+        consultaId: input.consultaId,
+        fonte,
+        fileName: `tjap-${certificateType.id}.pdf`,
+        buffer,
+      });
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: classifyCertificateText(rawText || submittedText),
+        pdfPath,
+        rawText,
+        pageText: submittedText,
+        resumo: summarizeCertificateText(rawText || submittedText),
+      };
+    }
+
+    const pdfLink = await findPdfLink(page);
+    if (pdfLink) {
+      return {
+        tipo: certificateType.label,
+        status: "success",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        downloadUrl: maskSignedUrl(pdfLink),
+        pageText: submittedText,
+        resumo: "TJAP retornou link de certidão no portal oficial.",
+      };
+    }
+
+    return {
+      tipo: certificateType.label,
+      status: "waiting_user_action",
+      resultado: SOURCE_RESULT.INDISPONIVEL,
+      pageText: submittedText,
+      errorMessage: "TJAP/Tucujuris preenchido; envio final ou download ainda depende do portal oficial.",
+      resumo: "Campos preenchidos; etapa final pendente.",
+    };
+  } catch (error) {
+    return {
+      tipo: certificateType.label,
+      status: "failed",
+      resultado: SOURCE_RESULT.ERRO,
+      errorMessage: error.message,
+    };
+  } finally {
+    if (process.env.TJAP_KEEP_PAGE_OPEN !== "true") {
+      await page.close().catch(() => {});
+    }
   }
 }
 
@@ -1125,7 +1947,7 @@ function goCertificateUrl(certificateId) {
   return "https://projudi.tjgo.jus.br/CertidaoNegativaPositivaPublica?PaginaAtual=1&TipoArea=1&InteressePessoal=&Territorio=&Finalidade=";
 }
 
-function spEsajModelValue(certificateId) {
+function esajModelValue(certificateId) {
   const values = {
     falencia: "58",
     criminal: "6",
@@ -1167,6 +1989,92 @@ function baParticipationSelector(value) {
   if (normalized.includes("ativa")) return "#radioAtiva";
   if (normalized.includes("ambas")) return "#radioAmbas";
   return "#radioPassiva";
+}
+
+async function waitForTjapFormOrProtection(page) {
+  await page
+    .waitForFunction(
+      () => /Requisitar certid|Tipo de pessoa|Cloudflare|Azion|Forbidden|Verify you are human/i.test(document.body?.innerText || ""),
+      null,
+      { timeout: envNumber("TJAP_CLOUDFLARE_TIMEOUT_MS", 120000) },
+    )
+    .catch(() => {});
+  const pageText = await page.locator("body").innerText().catch(() => "");
+  const formVisible = /Requisitar certid|Tipo de pessoa/i.test(pageText) && (await page.locator("input[name='tipopessoa']").count().catch(() => 0)) > 0;
+  return { formVisible, pageText };
+}
+
+async function hasTjapProtection(page, pageText = "") {
+  const text = pageText || (await page.locator("body").innerText().catch(() => ""));
+  if (/Verify you are human|Cloudflare|Azion|Forbidden|seguran[çc]a|verifica/i.test(text)) {
+    return true;
+  }
+  return (
+    (await page
+      .locator("iframe[src*='turnstile'], iframe[src*='cloudflare'], input[name='cf-turnstile-response'], .cf-turnstile")
+      .count()
+      .catch(() => 0)) > 0
+  );
+}
+
+async function fillVisibleInputByIndex(page, selector, index, value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return false;
+  }
+  const locator = page.locator(selector).filter({ visible: true });
+  if ((await locator.count().catch(() => 0)) <= index) {
+    return false;
+  }
+  await locator.nth(index).fill(text, { timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+  return true;
+}
+
+async function selectFirstVisibleSelectByTextOrValue(page, value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return false;
+  }
+  const selects = page.locator("select").filter({ visible: true });
+  if (!(await selects.count().catch(() => 0))) {
+    return false;
+  }
+  const selected = await selects
+    .first()
+    .evaluate((select, rawValue) => {
+      const normalized = String(rawValue || "").toLowerCase();
+      const option = [...select.options].find((item) => item.value.toLowerCase() === normalized || item.text.toLowerCase().includes(normalized));
+      if (!option) return false;
+      select.value = option.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    }, raw)
+    .catch(() => false);
+  return selected;
+}
+
+async function chooseTjapCertificateType(page, certificateId) {
+  const labels = {
+    falencia: /fal[eê]ncia|recupera[çc][aã]o/i,
+    especial: /c[ií]vel e criminal|incidente/i,
+    criminal: /^criminal$/i,
+    civil: /^c[ií]vel$/i,
+  };
+  const pattern = labels[certificateId] || labels.especial;
+  const radios = page.locator("input[name='tipocertidao']").filter({ visible: true });
+  const count = await radios.count().catch(() => 0);
+  for (let index = 0; index < count; index += 1) {
+    const containerText = await radios.nth(index).evaluate((input) => input.parentElement?.innerText || input.nextSibling?.textContent || "").catch(() => "");
+    if (pattern.test(containerText)) {
+      await radios.nth(index).check({ force: true }).catch(() => {});
+      return true;
+    }
+  }
+  if (count) {
+    await radios.nth(Math.min(1, count - 1)).check({ force: true }).catch(() => {});
+    return true;
+  }
+  return false;
 }
 
 async function safeFill(page, selector, value) {
@@ -1213,6 +2121,70 @@ async function safeCheck(page, selector) {
   }
   await locator.check({ force: true, timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
   return true;
+}
+
+async function clickByText(page, pattern) {
+  const locator = page.locator("button, a, .q-item, .v-list-item, .card, [role='button'], div").filter({ hasText: pattern }).filter({ visible: true });
+  const count = await locator.count().catch(() => 0);
+  if (!count) {
+    return false;
+  }
+  await locator.first().click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+  return true;
+}
+
+async function fillByLabelLike(page, pattern, value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return false;
+  }
+  return page
+    .evaluate(
+      ({ source, flags, textValue }) => {
+        const pattern = new RegExp(source, flags);
+        const normalizeText = (value) =>
+          String(value || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase();
+        const visible = (element) => {
+          const style = window.getComputedStyle(element);
+          return Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length) && style.visibility !== "hidden" && style.display !== "none";
+        };
+        const fields = [...document.querySelectorAll("input, textarea")].filter((element) => visible(element) && !element.disabled && !element.readOnly);
+        for (const field of fields) {
+          const label = [
+            field.getAttribute("aria-label"),
+            field.getAttribute("placeholder"),
+            field.name,
+            field.id,
+            field.closest("label")?.innerText,
+            field.closest(".form-group, .v-input, .q-field, .row, div")?.innerText,
+          ].join(" ");
+          if (pattern.test(normalizeText(label))) {
+            field.focus();
+            field.value = textValue;
+            field.dispatchEvent(new Event("input", { bubbles: true }));
+            field.dispatchEvent(new Event("change", { bubbles: true }));
+            field.dispatchEvent(new Event("blur", { bubbles: true }));
+            return true;
+          }
+        }
+        return false;
+      },
+      { source: pattern.source, flags: pattern.flags.includes("i") ? pattern.flags : `${pattern.flags}i`, textValue: text },
+    )
+    .catch(() => false);
+}
+
+async function selectMtCertificateType(page, certificateId) {
+  const label = certificateId === "criminal" ? /criminal/i : /c[ií]vel/i;
+  const checkbox = page.locator("label, .v-list-item, .q-item, div").filter({ hasText: label }).locator("input[type='checkbox']").filter({ visible: true });
+  if (await checkbox.count().catch(() => 0)) {
+    await checkbox.first().check({ force: true, timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 5000) }).catch(() => {});
+    return true;
+  }
+  return clickByText(page, label);
 }
 
 async function setRadioValue(page, name, value) {
@@ -1416,12 +2388,22 @@ async function fillFirstStep(page, documento, firstName, certificateType) {
     await textInputs.nth(1).fill(firstName);
   }
   await chooseCertificateType(page, certificateType);
-  await page.getByRole("button", { name: "Próximo" }).click();
-  await page.waitForFunction(
-    () => document.body.innerText.includes("Nome da Mãe") || document.body.innerText.includes("DOWNLOAD") || document.body.innerText.includes("Download"),
+  await page.getByRole("button", { name: /pr[óo]ximo/i }).click();
+  const firstStepState = await page.waitForFunction(
+    () => {
+      const text = document.body.innerText || "";
+      if (/Ocorreu um erro|erro ao recuperar os dados do solicitante|solicitante n[aã]o encontrado/i.test(text)) return "error";
+      if (/Nome da M[ãa]e|Nome do Pai|DOWNLOAD|Download/i.test(text)) return "ready";
+      return "";
+    },
     null,
     { timeout: stepTimeoutMs },
   );
+  const state = await firstStepState.jsonValue().catch(() => "");
+  if (state === "error") {
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    throw new Error(extractPortalError(pageText) || "TJDFT nao conseguiu recuperar os dados do solicitante. Confira CPF/CNPJ e primeiro nome.");
+  }
 }
 
 async function fillSecondStep(page, motherName, fatherName) {
@@ -1437,12 +2419,22 @@ async function fillSecondStep(page, motherName, fatherName) {
   if (fatherName) {
     await textInputs.nth(3).fill(fatherName);
   }
-  await page.getByRole("button", { name: "Próximo" }).click();
-  await page.waitForFunction(
-    () => document.body.innerText.includes("DOWNLOAD") || document.body.innerText.includes("Download"),
+  await page.getByRole("button", { name: /pr[óo]ximo/i }).click();
+  const secondStepState = await page.waitForFunction(
+    () => {
+      const text = document.body.innerText || "";
+      if (/Ocorreu um erro|erro ao recuperar|inv[aá]lid|obrigat[oó]rio/i.test(text)) return "error";
+      if (/DOWNLOAD|Download/i.test(text)) return "ready";
+      return "";
+    },
     null,
     { timeout: stepTimeoutMs },
   );
+  const state = await secondStepState.jsonValue().catch(() => "");
+  if (state === "error") {
+    const pageText = await page.locator("body").innerText().catch(() => "");
+    throw new Error(extractPortalError(pageText) || "TJDFT recusou os dados complementares informados.");
+  }
 }
 
 async function chooseCertificateType(page, certificateType) {
@@ -1456,6 +2448,18 @@ async function readResult(page) {
     .getAttribute("href")
     .catch(() => "");
   return { downloadUrl, pageText };
+}
+
+function extractPortalError(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return (
+    lines.find((line) => /erro ao recuperar os dados do solicitante|solicitante n[aã]o encontrado/i.test(line)) ||
+    lines.find((line) => /Ocorreu um erro/i.test(line)) ||
+    ""
+  );
 }
 
 function hasPositiveCertificateSignal(text) {
@@ -1526,6 +2530,25 @@ function hasCertificateResultSignal(text) {
     normalized.includes("certidao nada consta") ||
     normalized.includes("certidao positiva") ||
     normalized.includes("certidao emitida")
+  );
+}
+
+function hasEsTjesPrintableCertificateSignal(text) {
+  const normalized = normalize(text);
+  return (
+    normalized.includes("tribunal de justica do estado do espirito santo") &&
+    normalized.includes("certidao negativa") &&
+    (normalized.includes("dados da certidao") || normalized.includes("nada consta") || normalized.includes("imprimir"))
+  );
+}
+
+function hasEsTjesRequestFormSignal(text) {
+  const normalized = normalize(text);
+  return (
+    normalized.includes("solicitacao de certidao negativa") ||
+    normalized.includes("preencha o cpf") ||
+    normalized.includes("preencha o cnpj") ||
+    normalized.includes("informe o nome conforme o cpf")
   );
 }
 

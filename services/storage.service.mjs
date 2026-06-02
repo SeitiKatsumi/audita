@@ -1,7 +1,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const storageRoot = resolve("storage");
+const storageRoot = join(dirname(dirname(fileURLToPath(import.meta.url))), "storage");
 const pdfRoot = join(storageRoot, "pdfs");
 
 export async function savePdf({ consultaId, fonte, fileName, contentBase64 }) {

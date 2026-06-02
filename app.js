@@ -78,6 +78,7 @@ const stateCourtHint = document.querySelector("#stateCourtHint");
 const stateCourtPortalTitle = document.querySelector("#stateCourtPortalTitle");
 const stateCourtRequiredFields = document.querySelector("#stateCourtRequiredFields");
 const stateCourtPortalLink = document.querySelector("#stateCourtPortalLink");
+const stateCourtAssistPanel = document.querySelector("#stateCourtAssistPanel");
 const stateCourtDynamicFields = document.querySelector("#stateCourtDynamicFields");
 const tjdftPersonTypeLabel = document.querySelector("#tjdftPersonTypeLabel");
 const tjdftCourtUf = document.querySelector("#tjdftCourtUf");
@@ -125,8 +126,34 @@ let currentDocumentAiContext = null;
 let stateCourtDirectory = [
   { uf: "AC", court: "TJAC", name: "Acre", url: "https://www.tjac.jus.br/servicos/certidoes/" },
   { uf: "AL", court: "TJAL", name: "Alagoas", url: "https://www.tjal.jus.br/certidoes/" },
-  { uf: "AP", court: "TJAP", name: "Amapá", url: "https://www.tjap.jus.br/portal/servicos/certidoes.html" },
-  { uf: "AM", court: "TJAM", name: "Amazonas", url: "https://consultasaj.tjam.jus.br/sco/abrirCadastro.do" },
+  {
+    uf: "AP",
+    court: "TJAP",
+    name: "Amapá",
+    url: "https://tucujuris.tjap.jus.br/pages/certidao-publica/certidao-publica.html",
+    platform: "custom",
+    automationStatus: "active",
+    captchaMode: "assisted",
+    automatic: true,
+    frameMode: "new_tab",
+    blocker: "cloudflare",
+    requiredFields: ["document", "fullName", "gender", "birthDate", "motherName", "rg", "email"],
+    optionalFields: ["fatherName"],
+    certificateTypes: ["civil", "criminal", "especial", "falencia"],
+  },
+  {
+    uf: "AM",
+    court: "TJAM",
+    name: "Amazonas",
+    url: "https://consultasaj.tjam.jus.br/sco/abrirCadastro.do",
+    platform: "esaj",
+    automationStatus: "active",
+    captchaMode: "none",
+    automatic: true,
+    requiredFields: ["document", "fullName"],
+    optionalFields: ["motherName", "fatherName", "birthDate", "rg", "email"],
+    certificateTypes: ["civil", "criminal"],
+  },
   { uf: "BA", court: "TJBA", name: "Bahia", url: "https://esaj.tjba.jus.br/sco/abrirCadastro.do" },
   { uf: "CE", court: "TJCE", name: "Ceará", url: "https://esaj.tjce.jus.br/sco/abrirCadastro.do" },
   { uf: "DF", court: "TJDFT", name: "Distrito Federal", url: "https://cnc.tjdft.jus.br/solicitacao-externa", automatic: true },
@@ -147,7 +174,36 @@ let stateCourtDirectory = [
   { uf: "RO", court: "TJRO", name: "Rondônia", url: "https://www.tjro.jus.br/certidaoonline/" },
   { uf: "RR", court: "TJRR", name: "Roraima", url: "https://projudi.tjrr.jus.br/projudi/certidao" },
   { uf: "SC", court: "TJSC", name: "Santa Catarina", url: "https://certidoes.tjsc.jus.br/" },
-  { uf: "SP", court: "TJSP", name: "São Paulo", url: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do" },
+  {
+    uf: "SP",
+    court: "TJSP",
+    name: "São Paulo",
+    url: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do",
+    platform: "esaj",
+    automationStatus: "active",
+    captchaMode: "assisted",
+    automatic: true,
+    requiredFields: [
+      "document",
+      "fullName",
+      "rg",
+      "motherName",
+      "fatherName",
+      "birthDate",
+      "gender",
+      "nationality",
+      "naturality",
+      "civilStatus",
+      "profession",
+      "address",
+      "addressComplement",
+      "cep",
+      "neighborhood",
+      "city",
+      "email",
+    ],
+    certificateTypes: ["civil", "criminal", "falencia"],
+  },
   { uf: "SE", court: "TJSE", name: "Sergipe", url: "https://www.tjse.jus.br/portal/servicos/certidao-online" },
   { uf: "TO", court: "TJTO", name: "Tocantins", url: "https://eproc1.tjto.jus.br/eprocV2_prod_1grau/externo_controlador.php?acao=certidao_negativa" },
 ];
@@ -183,6 +239,44 @@ const stateCourtFieldLabels = {
   mobile: "Telefone celular",
   comarca: "Comarca",
   companyName: "Razão social",
+};
+const stateCourtFieldOptions = {
+  instance: [
+    { value: "", label: ".: Escolha uma opção :." },
+    { value: "1ª instância (Fóruns)", label: "1ª instância (Fóruns)" },
+    { value: "2ª instância (Tribunal)", label: "2ª instância (Tribunal)" },
+  ],
+  nature: [
+    { value: "", label: ".: Escolha uma opção :." },
+    { value: "Todas exceto família", label: "Todas exceto família" },
+    { value: "Cível", label: "Cível" },
+    { value: "Criminal", label: "Criminal" },
+    { value: "Auditoria Militar", label: "Auditoria Militar" },
+    { value: "Execuções Fiscais", label: "Execuções Fiscais" },
+    { value: "Família", label: "Família" },
+    { value: "Recuperação Judicial e Extrajudicial (Falência e Concordata)", label: "Recuperação Judicial e Extrajudicial (Falência e Concordata)" },
+  ],
+  nationality: [
+    { value: "", label: "Selecione" },
+    { value: "BRASILEIRO", label: "BRASILEIRO" },
+    { value: "NATURALIZADO BRASILEIRO", label: "NATURALIZADO BRASILEIRO" },
+    { value: "ARGENTINO", label: "ARGENTINO" },
+    { value: "BOLIVIANO", label: "BOLIVIANO" },
+    { value: "CHILENO", label: "CHILENO" },
+    { value: "PARAGUAIO", label: "PARAGUAIO" },
+    { value: "URUGUAIO", label: "URUGUAIO" },
+    { value: "PORTUGUES", label: "PORTUGUÊS" },
+    { value: "JAPONES", label: "JAPONÊS" },
+    { value: "OUTROS", label: "OUTROS" },
+  ],
+  civilStatus: [
+    { value: "", label: "Selecione" },
+    { value: "Solteiro", label: "Solteiro" },
+    { value: "Casado", label: "Casado" },
+    { value: "Divorciado", label: "Divorciado" },
+    { value: "Separado", label: "Separado" },
+    { value: "Viúvo", label: "Viúvo" },
+  ],
 };
 const stateCourtCertificateLabels = {
   criminal: "Criminal",
@@ -480,11 +574,24 @@ function getStateCourtStateName(court) {
 }
 
 function isStateCourtActive(court) {
-  return Boolean(court?.automatic || court?.automationStatus === "active");
+  return Boolean(court?.automatic || court?.automationStatus === "active" || (court?.automationStatus === "mapped" && court?.captchaMode === "assisted"));
+}
+
+function getStateCourtAutomationLabel(court) {
+  if (!court) {
+    return "manual";
+  }
+  if ((court.automatic || court.automationStatus === "active") && court.captchaMode === "none") {
+    return "automático";
+  }
+  if (isStateCourtActive(court)) {
+    return "automático assistido";
+  }
+  return court.captchaMode === "assisted" ? "assistido" : "manual";
 }
 
 function usesLegacyTjdftAdapter(court) {
-  return court?.platform === "tjdft" || court?.uf === "DF" || court?.automatic;
+  return court?.platform === "tjdft" || court?.uf === "DF";
 }
 
 function formatStateCourtFieldLabel(fieldId) {
@@ -537,10 +644,10 @@ function syncStateCourtSelection(source) {
     tjdftCourtUf.value = value;
   }
   const selectedCourt = getSelectedStateCourt();
-  const useTjdftAdapter = isStateCourtActive(selectedCourt);
+  const automationLabel = getStateCourtAutomationLabel(selectedCourt);
   if (stateCourtHint && selectedCourt) {
     stateCourtHint.textContent = isStateCourtActive(selectedCourt)
-      ? `${selectedCourt.court} está com automação ativa.`
+      ? `${selectedCourt.court} está em modo ${automationLabel}.`
       : `${selectedCourt.court} está em modo ${selectedCourt.captchaMode === "assisted" ? "assistido" : "portal oficial"}.`;
   }
   if (stateCourtPortalTitle && selectedCourt) {
@@ -554,8 +661,63 @@ function syncStateCourtSelection(source) {
     stateCourtPortalLink.href = selectedCourt.url;
     stateCourtPortalLink.textContent = isStateCourtActive(selectedCourt) ? `Abrir portal ${selectedCourt.court}` : `Abrir emissão ${selectedCourt.court}`;
   }
+  renderStateCourtAssistPanel(selectedCourt);
   renderStateCourtDynamicFields();
   updateTjdftPersonFields();
+}
+
+function shouldShowStateCourtAssistPanel(court) {
+  if (!court || usesLegacyTjdftAdapter(court)) {
+    return false;
+  }
+  return court.frameMode === "new_tab" || ["cloudflare", "azion"].includes(court.blocker || "");
+}
+
+function renderStateCourtAssistPanel(court = getSelectedStateCourt()) {
+  if (!stateCourtAssistPanel) {
+    return;
+  }
+  if (!shouldShowStateCourtAssistPanel(court)) {
+    stateCourtAssistPanel.classList.add("hidden");
+    stateCourtAssistPanel.innerHTML = "";
+    return;
+  }
+  const title = `Portal oficial ${court.court}`;
+  const url = court.url || "";
+  const blocker = court.blocker || "";
+  const requiresExternal = court.frameMode === "new_tab" || ["cloudflare", "azion"].includes(blocker);
+  stateCourtAssistPanel.classList.remove("hidden");
+  stateCourtAssistPanel.innerHTML = requiresExternal
+    ? `
+      <section class="assisted-portal-frame assisted-portal-frame--external">
+        <div class="assisted-portal-head">
+          <div>
+            <strong>Validação antes da consulta</strong>
+            <small>Este portal usa proteção ${escapeHtml(blocker || "anti-bot")} e deve abrir como página principal. Abra em nova aba para confirmar a verificação antes de enviar a consulta.</small>
+          </div>
+          <a class="audit-official-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Abrir em nova aba</a>
+        </div>
+        <div class="assisted-portal-placeholder">
+          <strong>${escapeHtml(title)}</strong>
+          <span>Por segurança do tribunal, esta verificação não aparece dentro de iframe. Depois de confirmar, volte ao Audita e continue a consulta.</span>
+        </div>
+      </section>
+    `
+    : `
+      <section class="assisted-portal-frame assisted-portal-frame--external">
+        <div class="assisted-portal-head">
+          <div>
+            <strong>Validação após o preenchimento</strong>
+            <small>O Audita vai preencher o portal oficial depois que você criar a consulta. Se aparecer reCAPTCHA/captcha, uma sessão oficial já preenchida ficará aberta para confirmação.</small>
+          </div>
+          <a class="audit-official-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Abrir em nova aba</a>
+        </div>
+        <div class="assisted-portal-placeholder">
+          <strong>${escapeHtml(title)}</strong>
+          <span>Preencha os campos abaixo e crie a consulta. A validação humana aparece somente quando o portal chegar nessa etapa.</span>
+        </div>
+      </section>
+    `;
 }
 
 function getStateCourtDynamicFieldIds(court = getSelectedStateCourt()) {
@@ -564,6 +726,36 @@ function getStateCourtDynamicFieldIds(court = getSelectedStateCourt()) {
   }
   const fields = [...(court.requiredFields || []), ...(court.optionalFields || [])];
   return [...new Set(fields)].filter((field) => field !== "document");
+}
+
+function renderStateCourtDynamicInput(field, required) {
+  const label = formatStateCourtFieldLabel(field);
+  const options = stateCourtFieldOptions[field];
+  const requiredText = required ? "Obrigatório" : "Opcional";
+  const requiredAttr = required ? "required" : "";
+  if (Array.isArray(options)) {
+    return `
+      <label class="state-court-field ${required ? "is-required" : "is-optional"}">
+        <span>
+          ${escapeHtml(label)}
+          <small>${requiredText}</small>
+        </span>
+        <select data-state-court-field="${escapeHtml(field)}" ${requiredAttr}>
+          ${options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join("")}
+        </select>
+      </label>
+    `;
+  }
+  const type = field === "email" ? "email" : field === "birthDate" ? "date" : "text";
+  return `
+    <label class="state-court-field ${required ? "is-required" : "is-optional"}">
+      <span>
+        ${escapeHtml(label)}
+        <small>${requiredText}</small>
+      </span>
+      <input data-state-court-field="${escapeHtml(field)}" type="${type}" autocomplete="off" ${requiredAttr} />
+    </label>
+  `;
 }
 
 function renderStateCourtDynamicFields() {
@@ -579,21 +771,32 @@ function renderStateCourtDynamicFields() {
   }
 
   const required = new Set(selectedCourt.requiredFields || []);
+  const requiredFields = fields.filter((field) => required.has(field));
+  const optionalFields = fields.filter((field) => !required.has(field));
   stateCourtDynamicFields.classList.remove("hidden");
   stateCourtDynamicFields.innerHTML = `
     <fieldset class="state-court-profile-fields">
       <legend>Campos solicitados por ${escapeHtml(selectedCourt.court)}</legend>
-      ${fields
-        .map((field) => {
-          const type = field === "email" ? "email" : field === "birthDate" ? "date" : "text";
-          return `
-            <label>
-              ${escapeHtml(formatStateCourtFieldLabel(field))}
-              <input data-state-court-field="${escapeHtml(field)}" type="${type}" autocomplete="off" ${required.has(field) ? "required" : ""} />
-            </label>
-          `;
-        })
-        .join("")}
+      ${
+        requiredFields.length
+          ? `<div class="state-court-field-group">
+              <strong>Obrigatórios</strong>
+              <div class="state-court-field-grid">
+                ${requiredFields.map((field) => renderStateCourtDynamicInput(field, true)).join("")}
+              </div>
+            </div>`
+          : ""
+      }
+      ${
+        optionalFields.length
+          ? `<div class="state-court-field-group">
+              <strong>Opcionais</strong>
+              <div class="state-court-field-grid">
+                ${optionalFields.map((field) => renderStateCourtDynamicInput(field, false)).join("")}
+              </div>
+            </div>`
+          : ""
+      }
     </fieldset>
   `;
 }
@@ -622,7 +825,7 @@ function updateTjdftPersonFields() {
   const selectedCourt = getSelectedStateCourt();
   const useTjdftAdapter = usesLegacyTjdftAdapter(selectedCourt);
   if (tjdftCourtLabel && selectedCourt) {
-    tjdftCourtLabel.textContent = `${selectedCourt.court} - ${getStateCourtStateName(selectedCourt)}${isStateCourtActive(selectedCourt) ? " (automático)" : " (assistido/manual)"}`;
+    tjdftCourtLabel.textContent = `${selectedCourt.court} - ${getStateCourtStateName(selectedCourt)} (${getStateCourtAutomationLabel(selectedCourt)})`;
   }
   tjdftPersonTypeLabel.textContent = isPf ? "Pessoa física" : "Pessoa jurídica";
   tjdftCertificateOptions?.classList.toggle("hidden", !useTjdftAdapter);
@@ -1183,7 +1386,7 @@ function renderAudit(audit) {
         data: result.dados || {},
         rawText: result.rawText || "",
         missingFields: [],
-        evidence: buildAuditEvidence(result),
+        evidence: [...buildAuditEvidence(result), ...(Array.isArray(result.evidence) ? result.evidence : [])],
       }))
     : Array.isArray(audit.executions)
       ? audit.executions
@@ -1235,6 +1438,7 @@ function renderAudit(audit) {
           </div>
           <p>${escapeHtml(execution.summary || "")}</p>
           ${renderAssistedPortalFrame(execution)}
+          ${renderAuditEvidenceForm(audit, execution)}
           ${
             missingFields.length
               ? `<small class="audit-warning">Campos pendentes: ${escapeHtml(missingFields.map(formatAuditFieldLabel).join(", "))}</small>`
@@ -1263,23 +1467,75 @@ function renderAudit(audit) {
   renderDocumentAiPanel(audit, visibleExecutions);
 }
 
+function renderAuditEvidenceForm(audit, execution) {
+  const pending = ["manual_required", "waiting_user_action", "blocked"].includes(execution?.status);
+  if (!pending) {
+    return "";
+  }
+  const auditId = audit?.consultaId || audit?.id || "";
+  const executionId = execution?.id || execution?.sourceId || "";
+  if (!auditId || !executionId) {
+    return "";
+  }
+  return `
+    <form class="audit-evidence-form" data-audit-id="${escapeHtml(auditId)}" data-execution-id="${escapeHtml(executionId)}">
+      <label>
+        Evidência
+        <select name="evidenceType">
+          <option value="pdf">PDF da certidão</option>
+          <option value="protocol">Protocolo</option>
+          <option value="summary">Resultado textual</option>
+        </select>
+      </label>
+      <label>
+        Título
+        <input name="title" type="text" value="Certidão emitida" required />
+      </label>
+      <label>
+        Protocolo ou resumo
+        <input name="value" type="text" placeholder="Ex: nada consta, protocolo, observação" />
+      </label>
+      <label>
+        Arquivo
+        <input name="file" type="file" accept="application/pdf,image/*" />
+      </label>
+      <button class="primary-action" type="submit">Trazer para o Audita</button>
+    </form>
+  `;
+}
+
 function renderAssistedPortalFrame(execution) {
-  const url = execution?.officialUrl || "";
+  const url = execution?.data?.validationFrameUrl || execution?.data?.assistedPortalUrl || execution?.officialUrl || "";
   const needsUserAction = ["manual_required", "waiting_user_action", "blocked"].includes(execution?.status);
   if (!url || !needsUserAction) {
-    return url
-      ? `<a class="audit-official-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Abrir portal oficial</a>`
-      : "";
+    return "";
   }
   const title = execution?.data?.tribunal
     ? `Portal oficial ${execution.data.tribunal}`
     : `Portal oficial ${execution.sourceName || "da fonte"}`;
+  const frameMode = execution?.data?.frameMode || "";
+  const blocker = execution?.data?.blocker || "";
+  const assistedSession = execution?.data?.assistedSession || "";
+  const sessionOpen = execution?.data?.sessionOpen;
+  if (assistedSession || frameMode === "new_tab" || ["cloudflare", "azion"].includes(blocker)) {
+    return `
+      <div class="audit-result-action">
+        <small class="audit-warning">${
+          assistedSession
+            ? escapeHtml(sessionOpen === false
+              ? "A sessão oficial não ficou aberta neste ambiente. Use o portal oficial ou reexecute com navegador assistido habilitado."
+              : "O portal foi preenchido em uma sessão oficial aberta. Resolva a validação nessa janela e traga o PDF/protocolo para o Audita.")
+            : "Validação protegida tratada em janela oficial."
+        }</small>
+      </div>
+    `;
+  }
   return `
     <section class="assisted-portal-frame" data-portal-url="${escapeHtml(url)}">
       <div class="assisted-portal-head">
         <div>
           <strong>Validação no portal oficial</strong>
-          <small>Resolva captcha, login ou confirmação diretamente na página oficial quando aparecer.</small>
+          <small>Resolva reCAPTCHA, captcha, login ou confirmação diretamente na página oficial quando aparecer.</small>
         </div>
         <a class="audit-official-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Abrir em nova aba</a>
       </div>
@@ -1459,13 +1715,15 @@ function buildAuditEvidence(result) {
   if (result.fonte === "tjdft") {
     const isOfficialPortalMode = dados.modo === "portal_oficial";
     const certificates = Array.isArray(dados.certidoes) ? dados.certidoes : [];
+    const downloadedCertificates = certificates.filter((certificate) => certificate.pdfPath || certificate.downloadUrl);
+    const totalCertificates = certificates.length || dados.totalCertidoes || 4;
     const items = [
       {
         type: "summary",
         title: "Certid?es",
         value: isOfficialPortalMode
-          ? `${certificates.length || dados.totalCertidoes || 4} certid?es no portal oficial`
-          : `${dados.certidoesBaixadas || 0}/${dados.totalCertidoes || 4} PDFs baixados`,
+          ? `${totalCertificates} certid?es no portal oficial`
+          : `${downloadedCertificates.length}/${totalCertificates} PDFs baixados`,
       },
     ];
 
@@ -1475,10 +1733,10 @@ function buildAuditEvidence(result) {
         title: certificate.tipo || "Certidão",
         value: isOfficialPortalMode
           ? "Emitir no portal oficial"
-          : certificate.pdfPath
+          : certificate.pdfPath || certificate.downloadUrl
             ? "PDF baixado"
             : certificate.errorMessage || "PDF não disponível",
-        href: toPdfPublicUrl(certificate.pdfPath),
+        href: certificate.downloadUrl || toPdfPublicUrl(certificate.pdfPath),
       })),
     );
 
@@ -2265,6 +2523,8 @@ auditForm.addEventListener("submit", async (event) => {
           stateCourtName: getSelectedStateCourt()?.court || "TJDFT",
           stateCourtUrl: getSelectedStateCourt()?.url || "",
           stateCourtProfileId: getSelectedStateCourt()?.uf || "DF",
+          stateCourtFrameMode: getSelectedStateCourt()?.frameMode || "",
+          stateCourtBlocker: getSelectedStateCourt()?.blocker || "",
           stateCourtFields: getStateCourtFieldsPayload(),
           stateCourtCertificateTypes: getStateCourtCertificateTypesPayload(),
           tjdftPersonType: getTjdftPersonType(),
@@ -2298,6 +2558,12 @@ auditForm.addEventListener("submit", async (event) => {
     }
 
     const data = await response.json();
+    if (!data.consultaId) {
+      auditError.textContent = "A API criou uma resposta sem ID de consulta. Recarregue o ambiente local e tente novamente.";
+      auditResultStatus.textContent = "Falhou";
+      auditSummary.innerHTML = `<p class="empty-state">A consulta não pôde ser acompanhada porque o servidor não retornou um identificador.</p>`;
+      return;
+    }
     auditSummary.innerHTML = `<p class="empty-state">Consulta ${escapeHtml(data.consultaId)} criada. Coletando fontes selecionadas...</p>`;
     await loadAuditResult(data.consultaId);
   } catch {
