@@ -122,6 +122,7 @@ const auditNextButton = document.querySelector("#auditNextButton");
 const auditSubmitButton = document.querySelector("#auditSubmitButton");
 let selectedAuditViews = [];
 let currentDocumentAiContext = null;
+const assistedRemoteSessions = new Map();
 
 let stateCourtDirectory = [
   { uf: "AC", court: "TJAC", name: "Acre", url: "https://www.tjac.jus.br/servicos/certidoes/" },
@@ -604,7 +605,10 @@ function formatStateCourtCertificateLabel(certificateId) {
 
 async function loadStateCourtCatalog() {
   try {
-    const response = await fetch("/data/state-courts.json", { headers: { accept: "application/json" } });
+    const response = await fetch(`/data/state-courts.json?v=${Date.now()}`, {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
     if (!response.ok) {
       return;
     }
@@ -1465,6 +1469,7 @@ function renderAudit(audit) {
     })
     .join("");
   renderDocumentAiPanel(audit, visibleExecutions);
+  hydrateAssistedRemoteBrowsers();
 }
 
 function renderAuditEvidenceForm(audit, execution) {
@@ -1483,8 +1488,10 @@ function renderAuditEvidenceForm(audit, execution) {
         Evidência
         <select name="evidenceType">
           <option value="pdf">PDF da certidão</option>
+          <option value="official_url">Link oficial</option>
           <option value="protocol">Protocolo</option>
           <option value="summary">Resultado textual</option>
+          <option value="manual_step">Checkpoint oficial</option>
         </select>
       </label>
       <label>
@@ -1499,8 +1506,69 @@ function renderAuditEvidenceForm(audit, execution) {
         Arquivo
         <input name="file" type="file" accept="application/pdf,image/*" />
       </label>
+      <input name="generatedFileName" type="hidden" value="" />
+      <input name="generatedContentBase64" type="hidden" value="" />
       <button class="primary-action" type="submit">Trazer para o Audita</button>
     </form>
+  `;
+}
+
+function renderAssistedCheckpointPanel(execution) {
+  const data = execution?.data || {};
+  const certificates = Array.isArray(data.certidoes) ? data.certidoes : [];
+  const lab = data.captchaLab || {};
+  const checkpoints = Array.isArray(lab.checkpoints) ? lab.checkpoints : [];
+  const requiresRecaptcha = Boolean(
+    lab.reachedCaptcha ||
+      data.requiresRecaptcha ||
+      data.requiresCaptcha ||
+      certificates.some((certificate) => certificate.requiresRecaptcha || certificate.requiresCaptcha),
+  );
+  const blockedByProtection = Boolean(
+    lab.reachedAntiBot ||
+      data.blockedByProtection ||
+      certificates.some((certificate) => certificate.blockedByProtection || certificate.requiresCloudflare),
+  );
+  const needsConfirmation = Boolean(
+    lab.reachedConfirmation ||
+      data.requiresConfirmation ||
+      certificates.some((certificate) => certificate.requiresConfirmation),
+  );
+  const firstCheckpoint = blockedByProtection
+    ? "anti_bot_block"
+    : requiresRecaptcha
+      ? "captcha_or_recaptcha"
+      : needsConfirmation
+        ? "official_confirmation"
+        : checkpoints[0] || certificates.find((certificate) => certificate.humanCheckpoint)?.humanCheckpoint || "";
+  if (!firstCheckpoint && !requiresRecaptcha && !blockedByProtection && !needsConfirmation) {
+    return "";
+  }
+
+  const checkpointLabels = {
+    anti_bot_block: "Protecao anti-bot",
+    captcha_or_recaptcha: "reCAPTCHA/CAPTCHA oficial",
+    login_or_certificate: "Login ou certificado",
+    official_confirmation: "Confirmacao oficial",
+    manual_review: "Revisao manual",
+  };
+  const filledFields = Array.isArray(lab.filledFields) ? lab.filledFields : [];
+  const actionText = requiresRecaptcha
+    ? "Formulario preenchido. Acione Enviar no portal e conclua a validacao oficial quando ela aparecer."
+    : blockedByProtection
+      ? "A protecao do portal apareceu antes da emissao. Conclua a verificacao oficial na sessao aberta."
+      : "Revise a tela oficial, confirme os dados e conclua a etapa solicitada pelo tribunal.";
+
+  return `
+    <div class="assisted-checkpoint-panel">
+      <span>${escapeHtml(checkpointLabels[firstCheckpoint] || "Validacao oficial")}</span>
+      <p>${escapeHtml(actionText)}</p>
+      <div>
+        <small>${filledFields.length ? `${filledFields.length} campos reconhecidos` : "Campos visiveis tratados"}</small>
+        <small>${data.sessionOpen === false ? "Sessao externa" : "Sessao incorporada"}</small>
+        <small>Depois traga PDF, protocolo ou resultado textual</small>
+      </div>
+    </div>
   `;
 }
 
@@ -1517,6 +1585,54 @@ function renderAssistedPortalFrame(execution) {
   const blocker = execution?.data?.blocker || "";
   const assistedSession = execution?.data?.assistedSession || "";
   const sessionOpen = execution?.data?.sessionOpen;
+  if (assistedSession && assistedSession !== "external_browser" && sessionOpen !== false) {
+    const cachedSession = assistedRemoteSessions.get(assistedSession);
+    const cachedScreenshot = cachedSession?.screenshot || "";
+    const cachedStatus = cachedSession?.title || cachedSession?.url || "";
+    const cachedFormState = cachedSession?.formState;
+    return `
+      <section class="assisted-remote-browser" data-assisted-session="${escapeHtml(assistedSession)}">
+        <div class="assisted-portal-head">
+          <div>
+            <strong>Navegador remoto assistido</strong>
+            <small>Interaja com a sessao oficial aberta pelo Audita. A validacao humana continua sendo feita por voce.</small>
+          </div>
+          <div class="assisted-remote-actions">
+            <button class="secondary-action" type="button" data-assisted-action="submit">Enviar no portal</button>
+            <button class="secondary-action" type="button" data-assisted-action="recover">Recuperar portal</button>
+            <button class="secondary-action assisted-refresh" type="button" data-assisted-action="refresh">Atualizar</button>
+            <button class="secondary-action" type="button" data-assisted-action="inspect">Inspecionar resultado</button>
+            <button class="secondary-action assisted-close" type="button" data-assisted-action="close">Fechar</button>
+          </div>
+        </div>
+        <div class="assisted-remote-meta">
+          <span>Sessao ${escapeHtml(assistedSession)}</span>
+          <span>${escapeHtml(execution?.data?.tribunal || execution?.sourceName || "")}</span>
+          ${execution?.data?.tribunal === "TJSP" ? "<span>reCAPTCHA invisivel no canto inferior direito</span>" : ""}
+          <span data-assisted-form-state>${cachedFormState?.filledCount ? `${escapeHtml(String(cachedFormState.filledCount))} campos preenchidos` : "Campos aguardando leitura"}</span>
+        </div>
+        ${renderAssistedCheckpointPanel(execution)}
+        <button class="assisted-remote-screen" type="button" data-assisted-action="click" aria-label="Tela remota do portal oficial">
+          <span>${escapeHtml(cachedStatus || "Carregando tela remota...")}</span>
+          <img alt="Tela remota do portal oficial" ${cachedScreenshot ? `src="${escapeHtml(cachedScreenshot)}" data-remote-screenshot="${escapeHtml(cachedScreenshot)}"` : ""} />
+        </button>
+        <form class="assisted-remote-type">
+          <input name="remoteText" type="text" autocomplete="off" placeholder="Digite texto para enviar ao campo focado" />
+          <button class="primary-action" type="submit">Enviar texto</button>
+        </form>
+        <div class="assisted-remote-keys">
+          <button class="secondary-action" type="button" data-assisted-key="Enter">Enter</button>
+          <button class="secondary-action" type="button" data-assisted-key="Tab">Tab</button>
+          <button class="secondary-action" type="button" data-assisted-key="Backspace">Backspace</button>
+          <button class="secondary-action" type="button" data-assisted-scroll="-520">Rolar acima</button>
+          <button class="secondary-action" type="button" data-assisted-scroll="520">Rolar abaixo</button>
+        </div>
+        <div class="assisted-result-inspection hidden" data-assisted-result></div>
+        <small class="audit-warning">Use Enviar no portal para acionar o botao oficial preenchido. Se o e-SAJ retornar erro oficial, use Recuperar portal para voltar a sessao. Resolva validacoes humanas quando aparecerem e depois use Atualizar/Inspecionar resultado.</small>
+      </section>
+    `;
+  }
+
   if (assistedSession || frameMode === "new_tab" || ["cloudflare", "azion"].includes(blocker)) {
     return `
       <div class="audit-result-action">
@@ -1548,6 +1664,208 @@ function renderAssistedPortalFrame(execution) {
       <small class="audit-warning">Se o tribunal bloquear iframe, use "Abrir em nova aba". Alguns portais impedem incorporação por segurança.</small>
     </section>
   `;
+}
+
+function hydrateAssistedRemoteBrowsers() {
+  document.querySelectorAll("[data-assisted-session]").forEach((element) => {
+    loadAssistedRemoteSession(element.dataset.assistedSession);
+  });
+}
+
+function setAssistedRemoteImage(image, screenshot) {
+  if (!image || !screenshot || image.dataset.remoteScreenshot === screenshot) {
+    return;
+  }
+  const preload = new Image();
+  preload.onload = () => {
+    image.src = screenshot;
+    image.dataset.remoteScreenshot = screenshot;
+    image.classList.remove("hidden");
+  };
+  preload.src = screenshot;
+}
+
+async function loadAssistedRemoteSession(sessionId, { force = false } = {}) {
+  if (!sessionId) return;
+  const panel = document.querySelector(`[data-assisted-session="${CSS.escape(sessionId)}"]`);
+  if (!panel) return;
+  const screen = panel.querySelector(".assisted-remote-screen");
+  const image = panel.querySelector("img");
+  const status = screen?.querySelector("span");
+  const cached = assistedRemoteSessions.get(sessionId);
+  if (!force && cached?.screenshot) {
+    updateAssistedRemotePanel(sessionId, cached);
+    return;
+  }
+  if (!force && cached?.loading) {
+    return;
+  }
+  assistedRemoteSessions.set(sessionId, { ...(cached || {}), loading: true });
+  if (status && !cached?.screenshot) status.textContent = "Atualizando tela remota...";
+
+  try {
+    const response = await fetch(`/api/assisted-sessions/${encodeURIComponent(sessionId)}`, {
+      headers: { accept: "application/json" },
+    });
+    if (response.status === 401) {
+      showLogin("Entre para controlar a sessao assistida.");
+      return;
+    }
+    if (response.status === 404) {
+      updateAssistedRemotePanel(sessionId, { id: sessionId, closed: true });
+      return;
+    }
+    if (!response.ok) {
+      if (status) status.textContent = "Sessao remota indisponivel.";
+      return;
+    }
+    const data = await response.json();
+    updateAssistedRemotePanel(sessionId, data.session);
+  } catch {
+    if (status) status.textContent = "Falha ao carregar tela remota.";
+    assistedRemoteSessions.set(sessionId, { ...(cached || {}), loading: false });
+  }
+}
+
+function updateAssistedRemotePanel(sessionId, session) {
+  const panel = document.querySelector(`[data-assisted-session="${CSS.escape(sessionId)}"]`);
+  if (!panel) return;
+  const screen = panel.querySelector(".assisted-remote-screen");
+  const image = panel.querySelector("img");
+  const status = screen?.querySelector("span");
+  const formState = panel.querySelector("[data-assisted-form-state]");
+  assistedRemoteSessions.set(sessionId, { ...(session || {}), loading: false });
+
+  if (session?.closed) {
+    if (status) status.textContent = "Sessao fechada.";
+    if (image && !image.src) image.removeAttribute("src");
+    panel.classList.add("assisted-remote-closed");
+    return;
+  }
+
+  panel.classList.remove("assisted-remote-closed");
+  if (image && session?.screenshot) {
+    setAssistedRemoteImage(image, session.screenshot);
+  }
+  if (status) {
+    status.textContent = session?.title || session?.url || "Tela remota pronta.";
+  }
+  if (formState && session?.formState) {
+    formState.textContent = session.formState.filledCount
+      ? `${session.formState.filledCount} campos preenchidos`
+      : "Nenhum campo preenchido detectado";
+  }
+}
+
+async function sendAssistedRemoteAction(sessionId, action) {
+  if (!sessionId) return;
+  const panel = document.querySelector(`[data-assisted-session="${CSS.escape(sessionId)}"]`);
+  const status = panel?.querySelector(".assisted-remote-screen span");
+  const cached = assistedRemoteSessions.get(sessionId);
+  if (status && !cached?.screenshot) status.textContent = "Enviando comando...";
+  try {
+    const response = await fetch(`/api/assisted-sessions/${encodeURIComponent(sessionId)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(action),
+    });
+    if (response.status === 401) {
+      showLogin("Entre para controlar a sessao assistida.");
+      return;
+    }
+    if (!response.ok) {
+      if (status) {
+        status.textContent =
+          action.type === "submit"
+            ? "Botao oficial nao encontrado."
+            : action.type === "recover"
+              ? "Nao foi possivel recuperar o portal."
+              : "Comando nao executado.";
+      }
+      return;
+    }
+    const data = await response.json();
+    updateAssistedRemotePanel(sessionId, data.session);
+  } catch {
+    if (status) status.textContent = "Falha ao enviar comando.";
+  }
+}
+
+function renderAssistedInspection(result) {
+  const labels = {
+    result_available: "Resultado encontrado",
+    captcha_pending: "Validação pendente",
+    portal_error: "Erro no portal",
+    no_result_yet: "Sem resultado ainda",
+  };
+  const pdfLinks = Array.isArray(result?.pdfLinks) ? result.pdfLinks : [];
+  return `
+    <strong>${escapeHtml(labels[result?.status] || "Inspecao concluida")}</strong>
+    ${result?.protocol ? `<p>Protocolo: ${escapeHtml(result.protocol)}</p>` : ""}
+    ${result?.textSample ? `<small>${escapeHtml(result.textSample)}</small>` : ""}
+    ${
+      pdfLinks.length
+        ? `<div class="assisted-result-links">${pdfLinks
+            .map((link) => `<a href="${escapeHtml(link.href)}" target="_blank" rel="noreferrer">${escapeHtml(link.text || "Abrir PDF")}</a>`)
+            .join("")}</div>`
+        : ""
+    }
+    ${result?.evidenceScreenshot ? `<small>Captura da tela oficial pronta para anexar.</small>` : ""}
+    ${result?.status === "result_available" || result?.evidenceScreenshot ? `<button class="secondary-action" type="button" data-assisted-action="use-inspection">Usar como evidencia</button>` : ""}
+  `;
+}
+
+async function inspectAssistedRemoteResult(sessionId) {
+  if (!sessionId) return;
+  const panel = document.querySelector(`[data-assisted-session="${CSS.escape(sessionId)}"]`);
+  const target = panel?.querySelector("[data-assisted-result]");
+  if (!target) return;
+  target.classList.remove("hidden");
+  target.innerHTML = `<span>Inspecionando pagina oficial...</span>`;
+  try {
+    const response = await fetch(`/api/assisted-sessions/${encodeURIComponent(sessionId)}/result`, {
+      headers: { accept: "application/json" },
+    });
+    if (response.status === 401) {
+      showLogin("Entre para inspecionar a sessao assistida.");
+      return;
+    }
+    if (!response.ok) {
+      target.innerHTML = `<span>Nao foi possivel inspecionar a sessao agora.</span>`;
+      return;
+    }
+    const data = await response.json();
+    const cached = assistedRemoteSessions.get(sessionId) || {};
+    assistedRemoteSessions.set(sessionId, { ...cached, inspection: data.result });
+    target.innerHTML = renderAssistedInspection(data.result);
+  } catch {
+    target.innerHTML = `<span>Falha ao inspecionar a sessao.</span>`;
+  }
+}
+
+function useAssistedInspectionAsEvidence(sessionId) {
+  const panel = document.querySelector(`[data-assisted-session="${CSS.escape(sessionId)}"]`);
+  const form = panel?.closest(".audit-source-item")?.querySelector(".audit-evidence-form");
+  const inspection = assistedRemoteSessions.get(sessionId)?.inspection;
+  if (!form || !inspection) return;
+  const firstPdf = Array.isArray(inspection.pdfLinks) ? inspection.pdfLinks[0] : null;
+  const pending = inspection.status === "captcha_pending";
+  const evidenceType = firstPdf ? "official_url" : inspection.protocol ? "protocol" : pending ? "manual_step" : "summary";
+  form.elements.evidenceType.value = evidenceType;
+  form.elements.title.value = firstPdf
+    ? "PDF da certidao localizado"
+    : inspection.protocol
+      ? "Protocolo localizado"
+      : pending
+        ? "Checkpoint de validacao oficial"
+        : "Resultado inspecionado";
+  form.elements.value.value = firstPdf?.href || inspection.protocol || (pending ? "Validacao oficial pendente na sessao assistida." : inspection.textSample || "");
+  if (form.elements.generatedFileName && form.elements.generatedContentBase64 && inspection.evidenceScreenshot) {
+    form.elements.generatedFileName.value = inspection.evidenceFileName || "audita-sessao-assistida.jpg";
+    form.elements.generatedContentBase64.value = String(inspection.evidenceScreenshot).split(",")[1] || "";
+  }
+  form.scrollIntoView({ behavior: "smooth", block: "center" });
+  form.elements.value.focus();
 }
 
 function renderDocumentAiPanel(audit, executions) {
@@ -1888,6 +2206,23 @@ async function loadAudits() {
   }
 }
 
+function getResumeAuditId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("audit") || params.get("consultaId") || "";
+}
+
+function hasOpenAssistedUserAction(audit) {
+  return (audit?.resultados || []).some((result) => {
+    const data = result?.dados || {};
+    return (
+      result?.status === "waiting_user_action" &&
+      data.assistedSession &&
+      data.assistedSession !== "external_browser" &&
+      data.sessionOpen !== false
+    );
+  });
+}
+
 async function loadAuditResult(consultaId, attempts = 180) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const response = await fetch(`/audit/${consultaId}`, { headers: { accept: "application/json" } });
@@ -1896,6 +2231,11 @@ async function loadAuditResult(consultaId, attempts = 180) {
     }
     const audit = await response.json();
     renderAudit(audit);
+    if (hasOpenAssistedUserAction(audit)) {
+      auditResultStatus.textContent = "Aguardando ação";
+      await loadAuditHistory();
+      return;
+    }
     if (!["pending", "running", "partial"].includes(audit.status)) {
       await loadAuditHistory();
       return;
@@ -2498,6 +2838,9 @@ auditForm.addEventListener("submit", async (event) => {
 
   auditError.textContent = "";
   auditResultStatus.textContent = "Criando";
+  assistedRemoteSessions.clear();
+  auditSourceList.innerHTML = "";
+  renderDocumentAiPanel(null, []);
   setAuditWizardStep(3);
 
   try {
@@ -2564,6 +2907,7 @@ auditForm.addEventListener("submit", async (event) => {
       auditSummary.innerHTML = `<p class="empty-state">A consulta não pôde ser acompanhada porque o servidor não retornou um identificador.</p>`;
       return;
     }
+    sessionStorage.setItem("audita:lastAuditId", data.consultaId);
     auditSummary.innerHTML = `<p class="empty-state">Consulta ${escapeHtml(data.consultaId)} criada. Coletando fontes selecionadas...</p>`;
     await loadAuditResult(data.consultaId);
   } catch {
@@ -2632,6 +2976,84 @@ stateCourtUf?.addEventListener("change", () => {
   updateTjdftPersonFields();
 });
 
+auditSourceList.addEventListener("click", async (event) => {
+  const remotePanel = event.target.closest("[data-assisted-session]");
+  if (!remotePanel) {
+    return;
+  }
+  const sessionId = remotePanel.dataset.assistedSession;
+  const keyButton = event.target.closest("[data-assisted-key]");
+  if (keyButton) {
+    await sendAssistedRemoteAction(sessionId, { type: "press", key: keyButton.dataset.assistedKey });
+    return;
+  }
+
+  const scrollButton = event.target.closest("[data-assisted-scroll]");
+  if (scrollButton) {
+    await sendAssistedRemoteAction(sessionId, { type: "scroll", deltaY: Number(scrollButton.dataset.assistedScroll || 0) });
+    return;
+  }
+
+  const actionButton = event.target.closest("[data-assisted-action]");
+  if (!actionButton) {
+    return;
+  }
+
+  const action = actionButton.dataset.assistedAction;
+  if (action === "refresh") {
+    await loadAssistedRemoteSession(sessionId, { force: true });
+    return;
+  }
+  if (action === "submit") {
+    await sendAssistedRemoteAction(sessionId, { type: "submit" });
+    return;
+  }
+  if (action === "recover") {
+    await sendAssistedRemoteAction(sessionId, { type: "recover" });
+    return;
+  }
+  if (action === "inspect") {
+    await inspectAssistedRemoteResult(sessionId);
+    return;
+  }
+  if (action === "use-inspection") {
+    useAssistedInspectionAsEvidence(sessionId);
+    return;
+  }
+  if (action === "close") {
+    await sendAssistedRemoteAction(sessionId, { type: "close" });
+    return;
+  }
+  if (action === "click") {
+    const image = actionButton.querySelector("img");
+    const state = assistedRemoteSessions.get(sessionId) || {};
+    const viewport = state.viewport || {};
+    if (!image?.src || !viewport.width || !viewport.height) {
+      return;
+    }
+    const rect = image.getBoundingClientRect();
+    const x = Math.max(0, Math.round(((event.clientX - rect.left) / rect.width) * viewport.width));
+    const y = Math.max(0, Math.round(((event.clientY - rect.top) / rect.height) * viewport.height));
+    await sendAssistedRemoteAction(sessionId, { type: "click", x, y });
+  }
+});
+
+auditSourceList.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".assisted-remote-type");
+  if (!form) {
+    return;
+  }
+  event.preventDefault();
+  const remotePanel = form.closest("[data-assisted-session]");
+  const input = form.elements.remoteText;
+  const text = input?.value || "";
+  if (!remotePanel?.dataset.assistedSession || !text.trim()) {
+    return;
+  }
+  input.value = "";
+  await sendAssistedRemoteAction(remotePanel.dataset.assistedSession, { type: "type", text });
+});
+
 auditSourceList.addEventListener("submit", async (event) => {
   const form = event.target.closest(".audit-evidence-form");
   if (!form) {
@@ -2643,9 +3065,14 @@ auditSourceList.addEventListener("submit", async (event) => {
 
   const file = form.elements.file.files[0];
   const contentBase64 = await readFileAsBase64(file);
+  const generatedFileName = form.elements.generatedFileName?.value || "";
+  const generatedContentBase64 = form.elements.generatedContentBase64?.value || "";
+  const evidenceEndpoint = /^[0-9a-f-]{36}$/i.test(form.dataset.auditId || "")
+    ? `/audit/${form.dataset.auditId}/evidence`
+    : `/api/audits/${form.dataset.auditId}/evidence`;
 
   try {
-    const response = await fetch(`/api/audits/${form.dataset.auditId}/evidence`, {
+    const response = await fetch(evidenceEndpoint, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
@@ -2653,8 +3080,8 @@ auditSourceList.addEventListener("submit", async (event) => {
         evidenceType: form.elements.evidenceType.value,
         title: form.elements.title.value,
         value: form.elements.value.value,
-        fileName: file?.name || "",
-        contentBase64,
+        fileName: file?.name || generatedFileName,
+        contentBase64: contentBase64 || generatedContentBase64,
       }),
     });
 
@@ -2746,6 +3173,11 @@ if (authState.authRequired && !authState.user) {
   }
   await loadDashboard();
   await loadAudits();
+  const resumeAuditId = getResumeAuditId();
+  if (resumeAuditId) {
+    setAuditWizardStep(3);
+    await loadAuditResult(resumeAuditId, 1);
+  }
   await loadAuditHistory();
   await loadConsultations();
   await loadSources();

@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import { createAuditService, validateCnpj, validateCpf } from "../services/audit.service.mjs";
 import { calculateRiskScore } from "../services/risk-score.service.mjs";
 import { listStateCourtProfiles } from "../services/state-courts.service.mjs";
-import { collect as collectTjdft, getCertificateTypesForInput } from "../collectors/tjdft.collector.mjs";
+import {
+  analyzeAssistedSessionSnapshot,
+  buildCaptchaLabReport,
+  classifyHumanCheckpoint,
+  collect as collectTjdft,
+  getCertificateTypesForInput,
+} from "../collectors/tjdft.collector.mjs";
 
 test("valida CPF e CNPJ", () => {
   assert.equal(validateCpf("529.982.247-25"), true);
@@ -295,5 +301,229 @@ test("cache considera tribunal estadual selecionado", async () => {
 
   assert.equal(auditAc.resultados[0].dados.tribunal, "TJAC");
   assert.equal(auditSp.resultados[0].dados.tribunal, "TJSP");
+});
+
+test("nao cacheia sessao assistida viva", async () => {
+  let calls = 0;
+  const service = createAuditService({
+    getDb: () => ({ pool: null, dbReady: false }),
+    getAuthContext: async () => ({ tenantId: 1, user: null, unauthorized: false }),
+    customCollectors: {
+      tjdft: {
+        collect: async () => {
+          calls += 1;
+          return {
+            fonte: "tjdft",
+            status: "waiting_user_action",
+            resultado: "indisponivel",
+            dados: {
+              assistedSession: `session-${calls}`,
+              sessionOpen: true,
+              resumo: "Sessao assistida pendente.",
+            },
+          };
+        },
+      },
+    },
+  });
+
+  const body = {
+    documento: "52998224725",
+    tipoDocumento: "cpf",
+    fontes: ["tjdft"],
+    extraFields: {
+      stateCourtUf: "SP",
+      stateCourtName: "TJSP",
+      stateCourtFields: { fullName: "Pessoa Teste" },
+    },
+  };
+
+  const first = await service.startAudit({ body });
+  const second = await service.startAudit({ body });
+
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  const firstAudit = await service.findAudit(first.consultaId);
+  const secondAudit = await service.findAudit(second.consultaId);
+
+  assert.equal(calls, 2);
+  assert.equal(firstAudit.resultados[0].dados.assistedSession, "session-1");
+  assert.equal(secondAudit.resultados[0].dados.assistedSession, "session-2");
+});
+
+test("anexa evidencia em consulta audit real e conclui fonte pendente", async () => {
+  const service = createAuditService({
+    getDb: () => ({ pool: null, dbReady: false }),
+    getAuthContext: async () => ({ tenantId: 1, user: null, unauthorized: false }),
+    customCollectors: {
+      tjdft: {
+        collect: async () => ({
+          fonte: "tjdft",
+          status: "waiting_user_action",
+          resultado: "indisponivel",
+          dados: {
+            assistedSession: "session-evidence",
+            sessionOpen: true,
+            resumo: "Validacao pendente.",
+          },
+        }),
+      },
+    },
+  });
+
+  const started = await service.startAudit({
+    body: {
+      documento: "52998224725",
+      tipoDocumento: "cpf",
+      fontes: ["tjdft"],
+      extraFields: { stateCourtUf: "SP", stateCourtName: "TJSP" },
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  const result = await service.addEvidence(started.consultaId, {
+    body: {
+      executionId: "tjdft",
+      evidenceType: "summary",
+      title: "Resultado inspecionado",
+      value: "Nada consta",
+      fileName: "captura.jpg",
+      contentBase64: "Y2FwdHVyYQ==",
+    },
+  });
+
+  assert.equal(result.evidence.type, "summary");
+  assert.equal(result.audit.resultados[0].status, "success");
+  assert.equal(result.audit.resultados[0].resultado, "nada_consta");
+  assert.equal(result.audit.resultados[0].evidence.length, 1);
+  assert.equal(result.audit.resultados[0].evidence[0].fileName, "captura.jpg");
+});
+
+test("evidencia de checkpoint humano nao conclui fonte pendente", async () => {
+  const service = createAuditService({
+    getDb: () => ({ pool: null, dbReady: false }),
+    getAuthContext: async () => ({ tenantId: 1, user: null, unauthorized: false }),
+    customCollectors: {
+      tjdft: {
+        collect: async () => ({
+          fonte: "tjdft",
+          status: "waiting_user_action",
+          resultado: "indisponivel",
+          erro: "TJSP/ESAJ possui reCAPTCHA oficial antes do envio.",
+          dados: {
+            assistedSession: "session-pending-evidence",
+            sessionOpen: true,
+            resumo: "Validacao pendente.",
+          },
+        }),
+      },
+    },
+  });
+
+  const started = await service.startAudit({
+    body: {
+      documento: "52998224725",
+      tipoDocumento: "cpf",
+      fontes: ["tjdft"],
+      extraFields: { stateCourtUf: "SP", stateCourtName: "TJSP" },
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  const result = await service.addEvidence(started.consultaId, {
+    body: {
+      executionId: "tjdft",
+      evidenceType: "manual_step",
+      title: "Checkpoint de validacao oficial",
+      value: "Validacao oficial pendente na sessao assistida.",
+      fileName: "checkpoint.jpg",
+      contentBase64: "Y2hlY2twb2ludA==",
+    },
+  });
+
+  assert.equal(result.evidence.type, "manual_step");
+  assert.equal(result.audit.status, "partial");
+  assert.equal(result.audit.resultados[0].status, "waiting_user_action");
+  assert.equal(result.audit.resultados[0].resultado, "indisponivel");
+  assert.equal(result.audit.resultados[0].evidence.length, 1);
+  assert.equal(result.audit.resultados[0].evidence[0].fileName, "checkpoint.jpg");
+});
+
+test("classifica requiresRecaptcha como checkpoint humano de captcha", () => {
+  assert.equal(classifyHumanCheckpoint({ requiresRecaptcha: true }), "captcha_or_recaptcha");
+  assert.equal(classifyHumanCheckpoint({ requiresCaptcha: true }), "captcha_or_recaptcha");
+  assert.equal(classifyHumanCheckpoint({ blockedByProtection: true, requiresRecaptcha: true }), "anti_bot_block");
+});
+
+test("relatorio captchaLab preserva campos preenchidos e checkpoint recaptcha", () => {
+  const report = buildCaptchaLabReport({
+    profile: { court: "TJSP", captchaMode: "assisted" },
+    sessionOpen: true,
+    sessionId: "sessao-teste",
+    results: [
+      {
+        status: "waiting_user_action",
+        requiresRecaptcha: true,
+        filledFields: ["modelo", "cpf", "email", "cpf"],
+      },
+    ],
+  });
+
+  assert.equal(report.policy, "no_bypass");
+  assert.equal(report.reachedCaptcha, true);
+  assert.deepEqual(report.checkpoints, ["captcha_or_recaptcha"]);
+  assert.deepEqual(report.filledFields, ["modelo", "cpf", "email"]);
+  assert.equal(report.sessionOpen, true);
+  assert.equal(report.assistedSession, "sessao-teste");
+});
+
+test("analisa snapshot de sessao assistida com pdf e protocolo", () => {
+  const inspection = analyzeAssistedSessionSnapshot({
+    title: "e-SAJ",
+    url: "https://esaj.tjsp.jus.br/sco/resultado.do",
+    text: "Pedido numero 12345-67 cadastrado. Certidao emitida.",
+    links: [{ text: "Baixar certidao", href: "https://esaj.tjsp.jus.br/documento/certidao.pdf" }],
+  });
+
+  assert.equal(inspection.status, "result_available");
+  assert.equal(inspection.protocol, "12345-67");
+  assert.equal(inspection.pdfLinks.length, 1);
+});
+
+test("analisa snapshot de sessao assistida ainda pendente em captcha", () => {
+  const inspection = analyzeAssistedSessionSnapshot({
+    text: "Confirme que voce nao e um robo. reCAPTCHA pendente.",
+    links: [],
+  });
+
+  assert.equal(inspection.status, "captcha_pending");
+});
+
+test("nao trata formulario ESAJ como resultado disponivel", () => {
+  const inspection = analyzeAssistedSessionSnapshot({
+    title: "e-SAJ",
+    url: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do",
+    text: "Cadastro de Pedido de Certidao Para pedir uma certidao, preencha os campos do formulario abaixo.",
+    links: [
+      { text: "Visualizar Certidao", href: "https://esaj.tjsp.jus.br/sco/abrirDownload.do" },
+      { text: "Cadastro de Pedido de Certidao", href: "https://esaj.tjsp.jus.br/sco/abrirCadastro.do" },
+    ],
+  });
+
+  assert.equal(inspection.status, "captcha_pending");
+  assert.equal(inspection.protocol, "");
+  assert.equal(inspection.pdfLinks.length, 0);
+});
+
+test("classifica erro oficial ESAJ apos envio como erro do portal", () => {
+  const inspection = analyzeAssistedSessionSnapshot({
+    title: "e-SAJ",
+    url: "https://esaj.tjsp.jus.br/sco/salvarCadastro.do",
+    text: "Cadastro de Pedido de Certidao Atencao Nao foi possivel executar esta operacao. Tente novamente mais tarde.",
+    links: [],
+  });
+
+  assert.equal(inspection.status, "portal_error");
+  assert.equal(inspection.protocol, "");
+  assert.equal(inspection.pdfLinks.length, 0);
 });
 

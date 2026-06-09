@@ -4,6 +4,12 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { createAuditService } from "./services/audit.service.mjs";
+import {
+  closeAssistedSession,
+  getAssistedSessionView,
+  inspectAssistedSessionResult,
+  interactAssistedSession,
+} from "./collectors/tjdft.collector.mjs";
 
 const root = resolve(".");
 const port = Number(process.env.PORT || 8080);
@@ -2521,6 +2527,33 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  const publicAuditEvidenceMatch = pathname.match(/^\/audit\/([0-9a-fA-F-]{36})\/evidence$/);
+  if (publicAuditEvidenceMatch && request.method === "POST") {
+    try {
+      request.body = await readJsonBody(request);
+      const result = await auditService.addEvidence(publicAuditEvidenceMatch[1], request);
+      if (result?.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result?.invalid) {
+        sendJson(response, 400, { error: "invalid_audit_evidence" });
+        return true;
+      }
+      if (result?.notFound || !result) {
+        sendJson(response, 404, { error: "audit_execution_not_found" });
+        return true;
+      }
+      sendJson(response, 201, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "audit_evidence_create_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
   const publicAuditMatch = pathname.match(/^\/audit\/([0-9a-fA-F-]{36})$/);
   if (publicAuditMatch && request.method === "GET") {
     try {
@@ -2537,6 +2570,81 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "audit_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const assistedSessionResultMatch = pathname.match(/^\/api\/assisted-sessions\/([A-Za-z0-9_-]+)\/result$/);
+  if (assistedSessionResultMatch && request.method === "GET") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const result = await inspectAssistedSessionResult(assistedSessionResultMatch[1]);
+      if (result.notFound) {
+        sendJson(response, 404, { error: "assisted_session_not_found" });
+        return true;
+      }
+      sendJson(response, 200, { result });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "assisted_session_result_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const assistedSessionMatch = pathname.match(/^\/api\/assisted-sessions\/([A-Za-z0-9_-]+)$/);
+  if (assistedSessionMatch && request.method === "GET") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const view = await getAssistedSessionView(assistedSessionMatch[1]);
+      if (view.notFound) {
+        sendJson(response, 404, { error: "assisted_session_not_found" });
+        return true;
+      }
+      sendJson(response, 200, { session: view });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "assisted_session_view_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (assistedSessionMatch && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      const result = body?.type === "close"
+        ? await closeAssistedSession(assistedSessionMatch[1])
+        : await interactAssistedSession(assistedSessionMatch[1], body);
+      if (result.notFound) {
+        sendJson(response, 404, { error: "assisted_session_not_found" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_assisted_session_action" });
+        return true;
+      }
+      sendJson(response, 200, { session: result });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "assisted_session_action_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }

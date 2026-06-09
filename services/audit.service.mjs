@@ -114,14 +114,16 @@ function normalizeExtraFields(value) {
 }
 
 function toApiResult(row) {
+  const dados = row.dados || row.dadosJson || {};
   return {
     fonte: row.fonte,
     status: row.status,
     resultado: row.resultado,
-    dados: row.dados || row.dadosJson || {},
+    dados,
     pdfUrl: row.pdfUrl || row.pdfPath || "",
     rawText: row.rawText || "",
     erro: row.erro ?? row.errorMessage ?? null,
+    evidence: Array.isArray(dados.evidence) ? dados.evidence : [],
     startedAt: row.startedAt || "",
     finishedAt: row.finishedAt || "",
   };
@@ -174,6 +176,24 @@ function aggregateStatus(results) {
   return "partial";
 }
 
+function classifyEvidenceValue(value, fallback = "nada_consta") {
+  const text = String(value || "");
+  if (/nada\s+consta|negativa/i.test(text)) {
+    return "nada_consta";
+  }
+  if (/consta|positiva|apontamento|processo/i.test(text)) {
+    return "consta";
+  }
+  return fallback === "consta" ? "consta" : "nada_consta";
+}
+
+function isPendingValidationEvidence(evidenceType, value) {
+  return (
+    evidenceType === "manual_step" ||
+    /valida[cç][aã]o\s+oficial\s+pendente|checkpoint|captcha|recaptcha|aguardando\s+a[cç][aã]o/i.test(String(value || ""))
+  );
+}
+
 function stableStringify(value) {
   if (Array.isArray(value)) {
     return `[${value.map(stableStringify).join(",")}]`;
@@ -201,7 +221,10 @@ async function runCollectorWithCache({ collector, fonte, input, documentoHash, t
   }
 
   const result = await collector.collect(input);
-  resultCache.set(key, { createdAt: Date.now(), result });
+  const hasLiveAssistedSession = Boolean(result?.dados?.assistedSession);
+  if (!hasLiveAssistedSession && result.status === "success") {
+    resultCache.set(key, { createdAt: Date.now(), result });
+  }
   return result;
 }
 
@@ -640,7 +663,113 @@ export function createAuditService({ getDb, getAuthContext, logError = console.e
     };
   }
 
-  return { startAudit, findAudit, listAuditHistory };
+  async function addEvidence(consultaId, request) {
+    const authContext = request ? await getAuthContext(request) : { tenantId: null, user: null, unauthorized: false };
+    if (authContext.unauthorized) {
+      return { unauthorized: true };
+    }
+
+    const body = request.body || {};
+    const fonte = String(body.executionId || body.fonte || "").trim();
+    const evidenceType = String(body.evidenceType || "").trim();
+    const title = String(body.title || "").trim();
+    const value = String(body.value || "").trim();
+    const fileName = String(body.fileName || "").trim();
+    const contentBase64 = String(body.contentBase64 || "").trim();
+    if (!fonte || !["summary", "official_url", "protocol", "pdf", "manual_step"].includes(evidenceType) || !title) {
+      return { invalid: true };
+    }
+
+    const evidence = {
+      id: crypto.randomUUID(),
+      type: evidenceType,
+      title,
+      value,
+      fileName,
+      contentBase64,
+      createdAt: new Date().toISOString(),
+    };
+
+    const memory = memoryQueries.get(consultaId);
+    if (memory) {
+      if (authContext?.tenantId && memory.tenantId !== authContext.tenantId) {
+        return null;
+      }
+      if (authContext?.user?.id && memory.userId !== authContext.user.id) {
+        return null;
+      }
+      const current = memory.resultados.find((result) => result.fonte === fonte);
+      if (!current) {
+        return { notFound: true };
+      }
+      const nextDados = {
+        ...(current.dados || {}),
+        evidence: [...(Array.isArray(current.dados?.evidence) ? current.dados.evidence : []), evidence],
+      };
+      const pendingValidationEvidence = isPendingValidationEvidence(evidenceType, value);
+      const nextResult = {
+        ...current,
+        status: pendingValidationEvidence ? current.status : "success",
+        resultado: pendingValidationEvidence ? current.resultado : classifyEvidenceValue(value, current.resultado),
+        dados: nextDados,
+        pdfUrl: evidenceType === "pdf" && fileName ? fileName : current.pdfUrl,
+        rawText: value || current.rawText,
+        erro: pendingValidationEvidence ? current.erro : null,
+        finishedAt: pendingValidationEvidence ? current.finishedAt : new Date().toISOString(),
+      };
+      await updateResult(consultaId, nextResult);
+      return { evidence, audit: await findAudit(consultaId, request) };
+    }
+
+    const { pool, dbReady } = getDb ? getDb() : {};
+    if (!pool || !dbReady) {
+      return null;
+    }
+
+    const existing = await pool.query(
+      `SELECT ae.fonte, ae.dados_json, ae.resultado, ae.pdf_path, ae.raw_text
+       FROM audita_audit_executions ae
+       JOIN audita_audits aq ON aq.id = ae.audit_id
+       WHERE aq.public_id = $1
+         AND aq.tenant_id = $2
+         AND ae.fonte = $3
+       LIMIT 1`,
+      [consultaId, authContext.tenantId, fonte],
+    );
+    const row = existing.rows[0];
+    if (!row) {
+      return { notFound: true };
+    }
+    const dados = row.dados_json || {};
+    const nextDados = {
+      ...dados,
+      evidence: [...(Array.isArray(dados.evidence) ? dados.evidence : []), evidence],
+    };
+    const pendingValidationEvidence = isPendingValidationEvidence(evidenceType, value);
+    const nextStatus = pendingValidationEvidence ? "waiting_user_action" : "success";
+    const nextResultado = pendingValidationEvidence ? row.resultado : classifyEvidenceValue(value, row.resultado);
+    await pool.query(
+      `UPDATE audita_audit_executions ae
+       SET status = $8,
+           resultado = $4,
+           dados_json = $5,
+           pdf_path = COALESCE(NULLIF($6, ''), pdf_path),
+           raw_text = COALESCE(NULLIF($7, ''), raw_text),
+           error_message = CASE WHEN $8 = 'success' THEN '' ELSE error_message END,
+           finished_at = CASE WHEN $8 = 'success' THEN NOW() ELSE finished_at END,
+           updated_at = NOW()
+       FROM audita_audits aq
+       WHERE ae.audit_id = aq.id
+         AND aq.public_id = $1
+         AND aq.tenant_id = $2
+         AND ae.fonte = $3`,
+      [consultaId, authContext.tenantId, fonte, nextResultado, JSON.stringify(nextDados), evidenceType === "pdf" ? fileName : "", value, nextStatus],
+    );
+    const audit = await findAudit(consultaId, request);
+    return { evidence, audit };
+  }
+
+  return { startAudit, findAudit, listAuditHistory, addEvidence };
 }
 
 export const supportedAuditSources = Object.keys(collectors);

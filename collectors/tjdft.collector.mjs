@@ -31,6 +31,100 @@ function envNumber(name, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function envFlag(name, fallback = false) {
+  const value = process.env[name];
+  if (value === undefined || value === "") return fallback;
+  return ["1", "true", "yes", "on"].includes(String(value).trim().toLowerCase());
+}
+
+function isCaptchaLabMode() {
+  return envFlag("AUDITA_CAPTCHA_LAB_MODE", false);
+}
+
+function isRemoteAssistedBrowser() {
+  return envFlag("AUDITA_REMOTE_ASSISTED_BROWSER", true);
+}
+
+function getAssistedHeadless(profile) {
+  if (isRemoteAssistedBrowser()) {
+    return true;
+  }
+  if (profile?.captchaMode === "assisted") {
+    return envFlag("STATE_COURT_ASSISTED_HEADLESS", false);
+  }
+  return process.env.STATE_COURT_HEADLESS !== "false";
+}
+
+function shouldKeepAssistedOpen() {
+  return isCaptchaLabMode() || process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
+}
+
+export function classifyHumanCheckpoint({ requiresCaptcha, requiresRecaptcha, requiresLogin, requiresConfirmation, blockedByProtection } = {}) {
+  if (blockedByProtection) return "anti_bot_block";
+  if (requiresCaptcha || requiresRecaptcha) return "captcha_or_recaptcha";
+  if (requiresLogin) return "login_or_certificate";
+  if (requiresConfirmation) return "official_confirmation";
+  return "manual_review";
+}
+
+export function buildCaptchaLabReport({ profile, results, sessionOpen, sessionId, browserEngine = "playwright" }) {
+  const safeResults = Array.isArray(results) ? results : [];
+  const checkpoints = safeResults.map((result) => classifyHumanCheckpoint(result));
+  const uniqueCheckpoints = [...new Set(checkpoints)];
+  return {
+    enabled: isCaptchaLabMode(),
+    policy: "no_bypass",
+    remoteBrowser: isRemoteAssistedBrowser(),
+    browserEngine,
+    headless: getAssistedHeadless(profile),
+    sessionOpen: Boolean(sessionOpen),
+    assistedSession: sessionId || "",
+    checkpoints: uniqueCheckpoints,
+    reachedCaptcha: safeResults.some((result) => result.requiresCaptcha || result.requiresRecaptcha),
+    reachedAntiBot: safeResults.some((result) => result.blockedByProtection),
+    reachedLogin: safeResults.some((result) => result.requiresLogin),
+    reachedConfirmation: safeResults.some((result) => result.requiresConfirmation),
+    filledFields: [...new Set(safeResults.flatMap((result) => result.filledFields || []))],
+    note: "Laboratorio local mede ate onde o fluxo oficial avanca e pausa para validacao humana; nao tenta contornar CAPTCHA, reCAPTCHA, Cloudflare ou protecao anti-bot.",
+  };
+}
+
+export function analyzeAssistedSessionSnapshot({ title = "", url = "", text = "", links = [] } = {}) {
+  const safeText = String(text || "");
+  const safeLinks = Array.isArray(links) ? links : [];
+  const isCadastroForm = /abrirCadastro\.do/i.test(String(url || "")) || /Cadastro de Pedido de Certid[aã]o|Para pedir uma certid[aã]o/i.test(safeText);
+  const pdfLinks = isCadastroForm
+    ? []
+    : safeLinks.filter((link) => {
+        const href = String(link.href || "");
+        const label = String(link.text || "");
+        return /\.pdf(?:\?|#|$)/i.test(href) || /(?:abrirDownload|download).*certid/i.test(`${href} ${label}`);
+      });
+  const rawProtocolMatch = safeText.match(
+    /(?:protocolo|pedido|solicita[cç][aã]o)\s*(?:n(?:[uú]mero|[ºo.])?)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9./-]{4,})/i,
+  );
+  const protocol = /\d/.test(rawProtocolMatch?.[1] || "") ? rawProtocolMatch[1] : "";
+  const hasResultSignal = !isCadastroForm && /nada\s+consta|certid[aã]o\s+(?:negativa|emitida)|consta(?:m)?\s+(?:registro|apontamento|distribui[cç][aã]o|processo)|protocolo|pedido\s+(?:gerado|registrado|cadastrado)/i.test(safeText);
+  const hasCaptchaSignal = /captcha|recaptcha|confirme que voc[eê]|sou humano|valida[cç][aã]o humana/i.test(safeText);
+  const hasErrorSignal = /erro|falha|indispon[ií]vel|n[aã]o foi poss[ií]vel|tente novamente/i.test(safeText);
+  const status = pdfLinks.length || protocol || hasResultSignal
+    ? "result_available"
+    : hasErrorSignal
+      ? "portal_error"
+      : hasCaptchaSignal || isCadastroForm
+        ? "captcha_pending"
+        : "no_result_yet";
+
+  return {
+    status,
+    title: String(title || ""),
+    url: String(url || ""),
+    protocol,
+    pdfLinks: pdfLinks.slice(0, 5),
+    textSample: safeText.replace(/\s+/g, " ").trim().slice(0, 900),
+  };
+}
+
 async function withTimeout(promise, timeoutMs, message) {
   let timeout;
   try {
@@ -329,9 +423,7 @@ async function collectGenericAssistedStateCourt({ input, profile, stateCourtName
   }
 
   const browser = await chromium.launch({
-    headless: profile?.captchaMode === "assisted"
-      ? process.env.STATE_COURT_ASSISTED_HEADLESS === "true"
-      : process.env.STATE_COURT_HEADLESS !== "false",
+    headless: getAssistedHeadless(profile),
     slowMo: envNumber("STATE_COURT_ASSISTED_SLOW_MO_MS", 0),
   });
   const context = await browser.newContext({
@@ -350,9 +442,9 @@ async function collectGenericAssistedStateCourt({ input, profile, stateCourtName
     const loaded = results.some((result) => result.portalLoaded);
     const filledCount = results.reduce((sum, result) => sum + (Array.isArray(result.filledFields) ? result.filledFields.length : 0), 0);
     const protectionDetected = results.some((result) => result.requiresCaptcha || result.requiresLogin || result.requiresConfirmation);
-    if (loaded && process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false") {
+    if (loaded && shouldKeepAssistedOpen()) {
       keepBrowserOpen = true;
-      sessionId = createAssistedSession({ browser, context, courtName: stateCourtName || profile?.court, courtUf: profile?.uf, portalUrl: stateCourtUrl || profile?.url, input, results });
+      sessionId = createAssistedSession({ browser, context, courtName: stateCourtName || profile?.court, courtUf: profile?.uf, portalUrl: stateCourtUrl || profile?.url, input, profile, results });
     }
 
     return waitingUserActionResult(
@@ -378,6 +470,7 @@ async function collectGenericAssistedStateCourt({ input, profile, stateCourtName
           filledFields: [...new Set(results.flatMap((result) => result.filledFields || []))],
           textSample: results.find((result) => result.pageText)?.pageText?.slice(0, 500) || "",
         },
+        captchaLab: buildCaptchaLabReport({ profile, results, sessionOpen: keepBrowserOpen, sessionId }),
         resumo: loaded
           ? `${stateCourtName} carregado e preenchido em modo assistido. Campos preenchidos: ${filledCount}.`
           : `${stateCourtName} nao carregou completamente no teste automatico.`,
@@ -558,7 +651,11 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
     }, fields);
 
     const pageText = fillReport.bodyText || (await page.locator("body").innerText().catch(() => ""));
-    keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
+    keepPageOpen = shouldKeepAssistedOpen();
+    const blockedByProtection = Boolean(
+      fillReport.captchaDetected &&
+        (fillReport.frameSources || []).some((src) => /cloudflare|turnstile|perfdrive|shieldsquare/i.test(src)),
+    );
     return {
       tipo: certificateType.label,
       status: "waiting_user_action",
@@ -569,6 +666,13 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
       requiresCaptcha: Boolean(fillReport.captchaDetected),
       requiresLogin: Boolean(fillReport.loginDetected),
       requiresConfirmation: Boolean(fillReport.confirmationDetected),
+      blockedByProtection,
+      humanCheckpoint: classifyHumanCheckpoint({
+        requiresCaptcha: Boolean(fillReport.captchaDetected),
+        requiresLogin: Boolean(fillReport.loginDetected),
+        requiresConfirmation: Boolean(fillReport.confirmationDetected),
+        blockedByProtection,
+      }),
       assistedWindowOpen: keepPageOpen,
       iframeCount: fillReport.iframeCount || 0,
       frameSources: fillReport.frameSources || [],
@@ -790,9 +894,7 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
   }
 
   const browser = await chromium.launch({
-    headless: profile?.captchaMode === "assisted"
-      ? process.env.STATE_COURT_ASSISTED_HEADLESS === "true"
-      : process.env.STATE_COURT_HEADLESS !== "false",
+    headless: getAssistedHeadless(profile),
     slowMo: envNumber("STATE_COURT_ASSISTED_SLOW_MO_MS", 0),
   });
   const context = await browser.newContext({
@@ -805,7 +907,11 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
   try {
     const results = [];
     for (const certificateType of requestedCertificates) {
-      results.push(await fillEsajCertificate({ context, input, profile, certificateType }));
+      const result = await fillEsajCertificate({ context, input, profile, certificateType });
+      results.push(result);
+      if (result.status === "waiting_user_action" && shouldKeepAssistedOpen()) {
+        break;
+      }
     }
 
     const completed = results.filter((result) => result.status === "success");
@@ -826,9 +932,9 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
       });
     }
 
-    if (waiting.length && process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false") {
+    if (waiting.length && shouldKeepAssistedOpen()) {
       keepBrowserOpen = true;
-      sessionId = createAssistedSession({ browser, context, courtName, courtUf, portalUrl, input, results });
+      sessionId = createAssistedSession({ browser, context, courtName, courtUf, portalUrl, input, profile, results });
     }
 
     return waitingUserActionResult(
@@ -844,6 +950,7 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
         assistedSession: sessionId || "external_browser",
         sessionOpen: keepBrowserOpen,
         certidoes: results,
+        captchaLab: buildCaptchaLabReport({ profile, results, sessionOpen: keepBrowserOpen, sessionId }),
         proximoPasso: keepBrowserOpen
           ? "Resolver a validação oficial na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo no Audita."
           : "Resolver a validação oficial no portal para permitir o envio e o download.",
@@ -857,7 +964,7 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
   }
 }
 
-function createAssistedSession({ browser, context, courtName, courtUf, portalUrl, input, results }) {
+function createAssistedSession({ browser, context, courtName, courtUf, portalUrl, input, profile, results }) {
   const sessionId = cryptoRandomId();
   assistedSessions.set(sessionId, {
     browser,
@@ -866,10 +973,232 @@ function createAssistedSession({ browser, context, courtName, courtUf, portalUrl
     courtUf,
     portalUrl,
     consultaId: input.consultaId,
+    input,
+    profile,
     createdAt: new Date().toISOString(),
     results,
   });
   return sessionId;
+}
+
+function getAssistedSession(sessionId) {
+  return assistedSessions.get(String(sessionId || ""));
+}
+
+function getAssistedSessionPage(session) {
+  const pages = session?.context?.pages?.() || [];
+  return pages.filter((page) => !page.isClosed()).at(-1) || null;
+}
+
+async function readAssistedSessionFormState(page) {
+  return page.evaluate(() => {
+    const visible = (element) => {
+      const style = window.getComputedStyle(element);
+      return (
+        style.visibility !== "hidden" &&
+        style.display !== "none" &&
+        Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length)
+      );
+    };
+    const maskValue = (value) => {
+      const text = String(value || "");
+      if (!text) return "";
+      if (text.length <= 3) return "***";
+      return `${text.slice(0, 2)}***${text.slice(-2)}`;
+    };
+    const controls = [...document.querySelectorAll("input, select, textarea")]
+      .filter((element) => visible(element) && element.type !== "hidden")
+      .slice(0, 80)
+      .map((element) => {
+        const type = String(element.type || element.tagName || "").toLowerCase();
+        const rawValue = type === "checkbox" || type === "radio" ? (element.checked ? element.value || "checked" : "") : element.value || "";
+        const label =
+          element.getAttribute("aria-label") ||
+          document.querySelector(`label[for="${CSS.escape(element.id || "")}"]`)?.textContent ||
+          element.name ||
+          element.id ||
+          element.placeholder ||
+          type;
+        return {
+          label: String(label || "").replace(/\s+/g, " ").trim().slice(0, 80),
+          type,
+          filled: Boolean(rawValue),
+          valuePreview: maskValue(rawValue),
+        };
+      });
+    return {
+      filledCount: controls.filter((control) => control.filled).length,
+      totalCount: controls.length,
+      fields: controls.filter((control) => control.filled).slice(0, 24),
+    };
+  }).catch(() => ({ filledCount: 0, totalCount: 0, fields: [] }));
+}
+
+export async function getAssistedSessionView(sessionId) {
+  const session = getAssistedSession(sessionId);
+  if (!session) {
+    return { notFound: true };
+  }
+  const page = getAssistedSessionPage(session);
+  if (!page) {
+    return {
+      id: sessionId,
+      closed: true,
+      courtName: session.courtName,
+      courtUf: session.courtUf,
+      portalUrl: session.portalUrl,
+      consultaId: session.consultaId,
+      createdAt: session.createdAt,
+    };
+  }
+
+  const screenshot = await page.screenshot({ type: "jpeg", quality: 78, fullPage: false });
+  const viewport = page.viewportSize?.() || { width: 1280, height: 720 };
+  const formState = await readAssistedSessionFormState(page);
+  return {
+    id: sessionId,
+    closed: false,
+    courtName: session.courtName,
+    courtUf: session.courtUf,
+    portalUrl: session.portalUrl,
+    consultaId: session.consultaId,
+    createdAt: session.createdAt,
+    title: await page.title().catch(() => ""),
+    url: page.url(),
+    viewport,
+    formState,
+    screenshot: `data:image/jpeg;base64,${screenshot.toString("base64")}`,
+  };
+}
+
+export async function interactAssistedSession(sessionId, action = {}) {
+  const session = getAssistedSession(sessionId);
+  if (!session) {
+    return { notFound: true };
+  }
+  const page = getAssistedSessionPage(session);
+  if (!page) {
+    return { closed: true };
+  }
+
+  const type = String(action.type || "").trim();
+  if (type === "click") {
+    await page.mouse.click(Number(action.x || 0), Number(action.y || 0));
+  } else if (type === "type") {
+    const text = String(action.text || "");
+    if (text) await page.keyboard.type(text);
+  } else if (type === "press") {
+    const key = String(action.key || "");
+    if (key) await page.keyboard.press(key);
+  } else if (type === "scroll") {
+    await page.mouse.wheel(Number(action.deltaX || 0), Number(action.deltaY || 0));
+  } else if (type === "recover") {
+    const navigationTimeout = envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000);
+    const previousPage = await page.goBack({ waitUntil: "domcontentloaded", timeout: navigationTimeout }).catch(() => null);
+    if (!previousPage && session.portalUrl) {
+      await page.goto(session.portalUrl, { waitUntil: "domcontentloaded", timeout: navigationTimeout }).catch(() => {});
+    }
+    if (session.input && isEsajAssistedSession(session)) {
+      const certificateType = getEsajSessionCertificateType(session);
+      await fillEsajPageFields({ page, input: session.input, profile: session.profile, certificateType }).catch(() => null);
+    }
+  } else if (type === "submit") {
+    const clicked = await page.evaluate(() => {
+      const candidates = [
+        "#pbEnviar",
+        "button[type='submit']",
+        "input[type='submit']",
+        "button",
+        "input[type='button']",
+      ];
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element);
+        return (
+          style.visibility !== "hidden" &&
+          style.display !== "none" &&
+          !element.disabled &&
+          Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length)
+        );
+      };
+      for (const selector of candidates) {
+        const elements = [...document.querySelectorAll(selector)];
+        const target = elements.find((element) => {
+          const label = `${element.textContent || ""} ${element.value || ""} ${element.getAttribute("aria-label") || ""}`;
+          return isVisible(element) && /enviar|emitir|consultar|continuar|prosseguir|gerar/i.test(label);
+        });
+        if (target) {
+          target.click();
+          return true;
+        }
+      }
+      return false;
+    }).catch(() => false);
+    if (!clicked) {
+      return { invalid: true, reason: "submit_target_not_found" };
+    }
+  } else {
+    return { invalid: true };
+  }
+
+  await page.waitForTimeout(envNumber("ASSISTED_SESSION_AFTER_ACTION_DELAY_MS", 350)).catch(() => {});
+  return getAssistedSessionView(sessionId);
+}
+
+export async function inspectAssistedSessionResult(sessionId) {
+  const session = getAssistedSession(sessionId);
+  if (!session) {
+    return { notFound: true };
+  }
+  const page = getAssistedSessionPage(session);
+  if (!page) {
+    return { closed: true };
+  }
+
+  const snapshot = await page.evaluate(() => {
+    const links = [...document.querySelectorAll("a[href]")]
+      .slice(0, 80)
+      .map((link) => ({
+        text: (link.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160),
+        href: link.href,
+      }));
+    return {
+      title: document.title || "",
+      url: location.href,
+      text: (document.body?.innerText || "").slice(0, 12000),
+      links,
+    };
+  }).catch(async () => ({
+    title: await page.title().catch(() => ""),
+    url: page.url(),
+    text: "",
+    links: [],
+  }));
+  const screenshot = await page.screenshot({ type: "jpeg", quality: 78, fullPage: false }).catch(() => null);
+  const formState = await readAssistedSessionFormState(page);
+
+  return {
+    id: sessionId,
+    closed: false,
+    courtName: session.courtName,
+    courtUf: session.courtUf,
+    consultaId: session.consultaId,
+    inspectedAt: new Date().toISOString(),
+    evidenceScreenshot: screenshot ? `data:image/jpeg;base64,${screenshot.toString("base64")}` : "",
+    evidenceFileName: `audita-${session.courtUf || "portal"}-${Date.now()}.jpg`.toLowerCase(),
+    formState,
+    ...analyzeAssistedSessionSnapshot(snapshot),
+  };
+}
+
+export async function closeAssistedSession(sessionId) {
+  const session = getAssistedSession(sessionId);
+  if (!session) {
+    return { notFound: true };
+  }
+  assistedSessions.delete(String(sessionId || ""));
+  await session.context?.close?.().catch(() => {});
+  await session.browser?.close?.().catch(() => {});
+  return { id: sessionId, ok: true, closed: true };
 }
 
 function cryptoRandomId() {
@@ -913,6 +1242,12 @@ async function collectApTjapStateCourt({ input, profile, stateCourtName, stateCo
         tribunal: stateCourtName || "TJAP",
         uf: "AP",
         certidoes: results,
+        sessionOpen: isCaptchaLabMode() || process.env.TJAP_KEEP_BROWSER_OPEN === "true",
+        captchaLab: buildCaptchaLabReport({
+          profile,
+          results,
+          sessionOpen: isCaptchaLabMode() || process.env.TJAP_KEEP_BROWSER_OPEN === "true",
+        }),
         totalCertidoes: results.length,
         resumo: "TJAP consultado automaticamente pelo Tucujuris.",
       }, {
@@ -936,11 +1271,17 @@ async function collectApTjapStateCourt({ input, profile, stateCourtName, stateCo
         validationFrameUrl: stateCourtUrl || profile?.url,
         assistedPortalUrl: stateCourtUrl || profile?.url,
         certidoes: results,
+        sessionOpen: isCaptchaLabMode() || process.env.TJAP_KEEP_BROWSER_OPEN === "true",
+        captchaLab: buildCaptchaLabReport({
+          profile,
+          results,
+          sessionOpen: isCaptchaLabMode() || process.env.TJAP_KEEP_BROWSER_OPEN === "true",
+        }),
         proximoPasso: "Resolver a verificação Cloudflare/Turnstile na janela aberta e enviar a requisição no portal oficial.",
       },
     );
   } finally {
-    if (process.env.TJAP_KEEP_BROWSER_OPEN !== "true") {
+    if (!isCaptchaLabMode() && process.env.TJAP_KEEP_BROWSER_OPEN !== "true") {
       await context.close().catch(() => {});
       await browser.close().catch(() => {});
     }
@@ -1018,7 +1359,7 @@ async function collectMtTjmtStateCourt({ input, profile, stateCourtName, stateCo
   }
 
   const browser = await chromium.launch({
-    headless: process.env.STATE_COURT_ASSISTED_HEADLESS === "true",
+    headless: getAssistedHeadless(profile),
     slowMo: envNumber("STATE_COURT_ASSISTED_SLOW_MO_MS", 0),
   });
   const context = await browser.newContext({
@@ -1052,9 +1393,9 @@ async function collectMtTjmtStateCourt({ input, profile, stateCourtName, stateCo
       });
     }
 
-    if (process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false") {
+    if (shouldKeepAssistedOpen()) {
       keepBrowserOpen = true;
-      sessionId = createAssistedSession({ browser, context, courtName: stateCourtName || "TJMT", courtUf: "MT", portalUrl: stateCourtUrl || profile?.url, input, results });
+      sessionId = createAssistedSession({ browser, context, courtName: stateCourtName || "TJMT", courtUf: "MT", portalUrl: stateCourtUrl || profile?.url, input, profile, results });
     }
 
     return waitingUserActionResult(
@@ -1073,6 +1414,7 @@ async function collectMtTjmtStateCourt({ input, profile, stateCourtName, stateCo
         sessionOpen: keepBrowserOpen,
         certidoes: results,
         totalCertidoes: results.length,
+        captchaLab: buildCaptchaLabReport({ profile, results, sessionOpen: keepBrowserOpen, sessionId }),
         proximoPasso: keepBrowserOpen
           ? "Resolver a validação/confirmar a emissão na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo no Audita."
           : "Resolver a validação/confirmar a emissão no portal oficial.",
@@ -1365,7 +1707,7 @@ async function fillMtTjmtCertificate({ context, input, profile, certificateType 
       };
     }
 
-    keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
+    keepPageOpen = shouldKeepAssistedOpen();
     return {
       tipo: certificateType.label,
       status: "waiting_user_action",
@@ -1550,6 +1892,70 @@ async function saveEsTjesPrintedCertificate({ page, input, certificateType }) {
   });
 }
 
+function isEsajAssistedSession(session) {
+  return /esaj|saj/i.test(`${session?.portalUrl || ""} ${session?.courtName || ""} ${session?.profile?.adapter || ""}`);
+}
+
+function getEsajSessionCertificateType(session) {
+  const types = getStateCertificateTypesForInput(session.input || {}, session.profile || {});
+  return types[0] || { id: "civil", label: getStateCourtCertificateLabel("civil") };
+}
+
+async function fillEsajPageFields({ page, input, profile, certificateType }) {
+  const fields = input.extraFields?.stateCourtFields || {};
+  const filledFields = [];
+  const recordField = async (label, promise) => {
+    const filled = await promise.catch(() => false);
+    if (filled) filledFields.push(label);
+    return filled;
+  };
+  const documentValue = String(input.extraFields?.cpfDocument || input.extraFields?.cnpjDocument || input.documento || "").replace(/\D/g, "");
+  const portalUrl = input.extraFields?.stateCourtUrl || profile?.url || "https://esaj.tjsp.jus.br/sco/abrirCadastro.do";
+  const hasModelSelect = await page.locator("#cdModelo").count().catch(() => 0);
+  if (!hasModelSelect) {
+    await page.goto(portalUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
+    });
+  }
+  await page.locator("#cdModelo").selectOption(esajModelValue(certificateType.id), {
+    timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000),
+  });
+  filledFields.push("modelo");
+  await page.waitForTimeout(900);
+
+  const personType = input.tipoDocumento === "cnpj" ? "J" : "F";
+  await recordField("tipoPessoa", safeCheck(page, `input[name="entity.tpPessoa"][value="${personType}"]`));
+  await page.waitForTimeout(600);
+
+  const nameValue = fields.fullName || fields.companyName || "";
+  await recordField("nome", safeFillVisible(page, "#nmCadastroF", nameValue));
+  await recordField("razaoSocial", safeFillVisible(page, "#nmCadastroJ", nameValue));
+  await recordField("cpf", safeFillVisible(page, "#identity\\.nuCpfFormatado", formatDocument(documentValue)));
+  await safeFillVisible(page, "#identity\\.nuRgFormatado", fields.rg || "DECLARA NÃO POSSUIR RG");
+  if (fields.rg) filledFields.push("rg");
+  await recordField("cnpj", safeFillVisible(page, "#identity\\.nuCnpjFormatado", formatDocument(documentValue)));
+  await recordField("mae", safeFillVisible(page, "#nmMaeCadastro", fields.motherName));
+  await recordField("pai", safeFillVisible(page, "#nmPaiCadastro", fields.fatherName));
+  await recordField("nascimento", safeFillVisible(page, "#dataNascimento", formatBrazilianDate(fields.birthDate)));
+  await recordField("genero", setVisibleRadioValue(page, "entity.flGenero", fields.gender));
+  await recordField("nacionalidade", safeFillVisible(page, "#entity\\.nacionalidade\\.deNacionalidade", fields.nationality || "Brasileira"));
+  await recordField("naturalidade", safeFillVisible(page, "#entity\\.naturalidade\\.nmMunicipio", fields.naturality || fields.city));
+  await recordField("estadoCivil", selectVisibleByTextOrValue(page, "#id_sco\\.pedido\\.label\\.cdEstadocivil", fields.civilStatus || "Solteiro"));
+  await recordField("profissao", safeFillVisible(page, "#entity\\.deProfissao", fields.profession));
+  await recordField("endereco", safeFillVisible(page, "#identity\\.endNomePesq\\.deEndereco", fields.address));
+  await recordField("complemento", safeFillVisible(page, "#identity\\.endNomePesq\\.deComplemento", fields.addressComplement));
+  await recordField("cep", safeFillVisible(page, "#identity\\.endNomePesq\\.nuCep", fields.cep));
+  await recordField("bairro", safeFillVisible(page, "#identity\\.endNomePesq\\.deBairro", fields.neighborhood));
+  await recordField("municipio", safeFillVisible(page, "#entity\\.endNomePesq\\.municipio\\.nmMunicipio", fields.city));
+  await recordField("email", safeFillVisible(page, "#identity\\.solicitante\\.deEmail", fields.email));
+  await recordField("confirmacao", safeCheck(page, "#confirmacaoInformacoes"));
+
+  const beforeSubmitText = await page.locator("body").innerText().catch(() => "");
+  const preSubmitRecaptcha = await page.locator("[name='g-recaptcha-response'], iframe[src*='recaptcha']").count().catch(() => 0);
+  return { filledFields, beforeSubmitText, preSubmitRecaptcha };
+}
+
 async function fillEsajCertificate({ context, input, profile, certificateType }) {
   const page = await context.newPage();
   const courtName = profile?.court || input.extraFields?.stateCourtName || "Tribunal ESAJ";
@@ -1557,44 +1963,24 @@ async function fillEsajCertificate({ context, input, profile, certificateType })
   let keepPageOpen = false;
   try {
     page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
-    const fields = input.extraFields?.stateCourtFields || {};
-    const documentValue = String(input.extraFields?.cpfDocument || input.extraFields?.cnpjDocument || input.documento || "").replace(/\D/g, "");
-    await page.goto(profile?.url || "https://esaj.tjsp.jus.br/sco/abrirCadastro.do", {
-      waitUntil: "domcontentloaded",
-      timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
-    });
-    await page.locator("#cdModelo").selectOption(esajModelValue(certificateType.id), {
-      timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000),
-    });
-    await page.waitForTimeout(900);
+    const { filledFields, beforeSubmitText, preSubmitRecaptcha } = await fillEsajPageFields({ page, input, profile, certificateType });
+    if (preSubmitRecaptcha) {
+      keepPageOpen = shouldKeepAssistedOpen();
+      return {
+        tipo: certificateType.label,
+        status: "waiting_user_action",
+        resultado: SOURCE_RESULT.INDISPONIVEL,
+        pageText: beforeSubmitText,
+        requiresRecaptcha: true,
+        filledFields,
+        assistedWindowOpen: keepPageOpen,
+        errorMessage: `${courtName}/ESAJ possui reCAPTCHA oficial antes do envio.`,
+        resumo: keepPageOpen
+          ? "Campos preenchidos; reCAPTCHA oficial pendente na sessao remota."
+          : "Campos preenchidos; reCAPTCHA oficial pendente.",
+      };
+    }
 
-    const personType = input.tipoDocumento === "cnpj" ? "J" : "F";
-    await safeCheck(page, `input[name="entity.tpPessoa"][value="${personType}"]`);
-    await page.waitForTimeout(600);
-
-    const nameValue = fields.fullName || fields.companyName || "";
-    await safeFillVisible(page, "#nmCadastroF", nameValue);
-    await safeFillVisible(page, "#nmCadastroJ", nameValue);
-    await safeFillVisible(page, "#identity\\.nuCpfFormatado", formatDocument(documentValue));
-    await safeFillVisible(page, "#identity\\.nuRgFormatado", fields.rg || "DECLARA NÃO POSSUIR RG");
-    await safeFillVisible(page, "#identity\\.nuCnpjFormatado", formatDocument(documentValue));
-    await safeFillVisible(page, "#nmMaeCadastro", fields.motherName);
-    await safeFillVisible(page, "#nmPaiCadastro", fields.fatherName);
-    await safeFillVisible(page, "#dataNascimento", formatBrazilianDate(fields.birthDate));
-    await setVisibleRadioValue(page, "entity.flGenero", fields.gender);
-    await safeFillVisible(page, "#entity\\.nacionalidade\\.deNacionalidade", fields.nationality || "Brasileira");
-    await safeFillVisible(page, "#entity\\.naturalidade\\.nmMunicipio", fields.naturality || fields.city);
-    await selectVisibleByTextOrValue(page, "#id_sco\\.pedido\\.label\\.cdEstadocivil", fields.civilStatus || "Solteiro");
-    await safeFillVisible(page, "#entity\\.deProfissao", fields.profession);
-    await safeFillVisible(page, "#identity\\.endNomePesq\\.deEndereco", fields.address);
-    await safeFillVisible(page, "#identity\\.endNomePesq\\.deComplemento", fields.addressComplement);
-    await safeFillVisible(page, "#identity\\.endNomePesq\\.nuCep", fields.cep);
-    await safeFillVisible(page, "#identity\\.endNomePesq\\.deBairro", fields.neighborhood);
-    await safeFillVisible(page, "#entity\\.endNomePesq\\.municipio\\.nmMunicipio", fields.city);
-    await safeFillVisible(page, "#identity\\.solicitante\\.deEmail", fields.email);
-    await safeCheck(page, "#confirmacaoInformacoes");
-
-    const beforeSubmitText = await page.locator("body").innerText().catch(() => "");
     const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 30000) }).catch(() => null);
     await page.locator("#pbEnviar").click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000) }).catch(() => {});
     const download = await downloadPromise;
@@ -1660,13 +2046,14 @@ async function fillEsajCertificate({ context, input, profile, certificateType })
     const pageText = await page.locator("body").innerText().catch(() => submittedText);
     const recaptchaPresent = await page.locator("[name='g-recaptcha-response'], iframe[src*='recaptcha']").count().catch(() => 0);
     if (recaptchaPresent) {
-      keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
+      keepPageOpen = shouldKeepAssistedOpen();
       return {
         tipo: certificateType.label,
         status: "waiting_user_action",
         resultado: SOURCE_RESULT.INDISPONIVEL,
         pageText,
         requiresRecaptcha: true,
+        filledFields,
         assistedWindowOpen: keepPageOpen,
         errorMessage: `${courtName}/ESAJ possui reCAPTCHA oficial antes do envio.`,
         resumo: keepPageOpen
@@ -1676,12 +2063,13 @@ async function fillEsajCertificate({ context, input, profile, certificateType })
     }
 
     const validationDetected = /captcha|recaptcha|c[oó]digo de seguran[çc]a|confirme que voc[eê]|valida[çc][aã]o|obrigat[oó]rio|inv[aá]lido/i.test(submittedText);
-    keepPageOpen = process.env.STATE_COURT_KEEP_ASSISTED_OPEN !== "false";
+    keepPageOpen = shouldKeepAssistedOpen();
     return {
       tipo: certificateType.label,
       status: "waiting_user_action",
       resultado: SOURCE_RESULT.INDISPONIVEL,
       pageText,
+      filledFields,
       assistedWindowOpen: keepPageOpen,
       errorMessage: validationDetected
         ? `${courtName}/ESAJ exige validação oficial ou correção de campos antes de emitir.`
@@ -2093,7 +2481,11 @@ async function safeFillVisible(page, selector, value) {
   if (!text) {
     return false;
   }
-  const locator = page.locator(selector).first();
+  const matches = page.locator(selector);
+  if (!(await matches.count().catch(() => 0))) {
+    return false;
+  }
+  const locator = matches.first();
   const usable = await locator
     .evaluate((element) => {
       const style = window.getComputedStyle(element);
@@ -2109,7 +2501,11 @@ async function safeFillVisible(page, selector, value) {
 }
 
 async function safeCheck(page, selector) {
-  const locator = page.locator(selector).first();
+  const matches = page.locator(selector);
+  if (!(await matches.count().catch(() => 0))) {
+    return false;
+  }
+  const locator = matches.first();
   const usable = await locator
     .evaluate((element) => {
       const visible = Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
