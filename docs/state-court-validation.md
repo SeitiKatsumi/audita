@@ -23,8 +23,8 @@ Os testes praticos usaram dados autorizados informados pelo usuario na sessao, c
 | MS | TJMS | Assistido funcional | Corrigido modelo ESAJ por UF; preenche campos e pausa em reCAPTCHA. | Completar campos opcionais e captura pos-CAPTCHA. |
 | SP | TJSP | Assistido funcional | ESAJ preenche fluxo e pausa em reCAPTCHA oficial. | Validacao humana e captura do PDF pos-CAPTCHA. |
 | AP | TJAP | Bloqueio oficial | Portal chega em Cloudflare/Azion antes do formulario. | Manter fluxo assistido externo; mapear pos-validacao. |
-| CE | TJCE | Parcial assistido | Portal carrega e preenche 8 campos; pausa em validacao oficial. | Mapear envio/download conclusivo. |
-| RJ | TJRJ | Parcial assistido | Portal carrega e preenche 4 campos. | Mapear seletores e caminho ate emissao. |
+| CE | TJCE | Assistido funcional / CAPTCHA | Formulario SIRECE carrega e aceita preenchimento; ao confirmar, retorna "Selecione o Captcha!". | Manter pausa assistida e mapear captura do protocolo/PDF apos validacao humana. |
+| RJ | TJRJ | Parcial / wizard | Portal abre selecao de comarca/modelo, mas o wizard nao expoe campos finais sem mapear clique de modelo e etapas seguintes. | Mapear seletores do wizard CJE: modelo, requerente, pesquisado, local e resumo. |
 | MA | TJMA | Parcial / login | Portal indica login/controle oficial; nenhum campo confiavel preenchido. | Confirmar se ha fluxo publico sem login e mapear formulario. |
 | MG | TJMG | Parcial / login | Portal indica login/controle oficial; nenhum campo confiavel preenchido. | Mapear fluxo publico especifico. |
 | PR | TJPR | Parcial assistido | Formulario publico de 2º grau carregado; 9 campos preenchidos e pausa em confirmacao oficial. | Mapear envio/download conclusivo e separar 1º grau, que exige contato com distribuidor. |
@@ -33,9 +33,9 @@ Os testes praticos usaram dados autorizados informados pelo usuario na sessao, c
 | PB | TJPB | Mapeamento pendente / protecao | Portal carrega, mas nenhum campo confiavel foi preenchido. | Mapear pos-protecao e formulario. |
 | SC | TJSC | Mapeamento pendente / CAPTCHA | Portal carrega, mas nenhum campo confiavel foi preenchido. | Mapear formulario e validacao. |
 | RR | TJRR | Parcial | Portal carrega e preenche 1 campo. | Mapear seletores Projudi TJRR. |
-| MT | TJMT | Parcial assistido | SEC abre, mas ainda exige validacao/correcao antes de emitir. | Mapear campos obrigatorios faltantes. |
+| MT | TJMT | Instavel / acesso | Em rodada anterior abriu parcialmente; na ultima inspecao retornou `ERR_CONNECTION_RESET`. | Revalidar disponibilidade e mapear campos obrigatorios faltantes quando o portal estabilizar. |
 | SE | TJSE | 100% funcional | Portal consultado automaticamente; certidao existente localizada pelo protocolo, PDF baixado, texto extraido e `nada_consta` identificado. | Validar natureza criminal e novas emissoes sem certidao preexistente. |
-| BA | TJBA | Falha de acesso no teste | Timeout/`ERR_CONNECTION_TIMED_OUT` no portal oficial. | Revalidar disponibilidade e aumentar estrategia de espera. |
+| BA | TJBA | Falha de acesso no teste | `Invoke-WebRequest` nao conectou e Playwright retornou `ERR_CONNECTION_TIMED_OUT` no portal oficial. | Revalidar disponibilidade do portal e rota de rede antes de ajustar adapter. |
 | AC | TJAC | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
 | PA | TJPA | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
 | PE | TJPE | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
