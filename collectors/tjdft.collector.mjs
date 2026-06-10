@@ -1556,7 +1556,7 @@ async function collectSeTjseStateCourt({ input, profile, stateCourtName, request
 
       return successResult(fonte, resultadoGeral, {
         ...baseData,
-        modo: "automatico_com_validacao",
+        modo: "automatico",
         tribunal: stateCourtName || "TJSE",
         uf: "SE",
         certidoes: results,
@@ -1600,6 +1600,7 @@ async function fillSeTjseCertificate({ context, input, profile, certificateType 
     });
     await page.waitForTimeout(2500);
     await page.getByText(input.tipoDocumento === "cnpj" ? "Jurídica" : "Física", { exact: true }).click({ timeout: 8000 }).catch(() => {});
+    await chooseTjsePersonType(page, input.tipoDocumento === "cnpj");
     await page.waitForTimeout(1200);
 
     await selectTjseMatOption(page, 0, fields.domicile || "Aracaju");
@@ -1611,6 +1612,9 @@ async function fillSeTjseCertificate({ context, input, profile, certificateType 
     await safeFill(page, "input[formcontrolname='nomePai']", fields.fatherName);
     await safeFill(page, "input[formcontrolname='email']", fields.email);
     await safeFill(page, "input[formcontrolname='celular']", fields.mobile);
+    if (!fields.mobile && fields.phone) {
+      await safeFill(page, "input[formcontrolname='celular']", fields.phone);
+    }
 
     const beforeSubmitText = await page.locator("body").innerText().catch(() => "");
     const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 30000) }).catch(() => null);
@@ -1638,6 +1642,33 @@ async function fillSeTjseCertificate({ context, input, profile, certificateType 
         pageText,
         resumo: summarizeCertificateText(rawText || pageText),
       };
+    }
+
+    const existingCertificateMatch = pageText.match(/certid[aÃ£]o\s+gerada[\s\S]{0,300}?\b(\d{6,})\b/i);
+    if (existingCertificateMatch) {
+      const existingDownloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 30000) }).catch(() => null);
+      await page.getByText(existingCertificateMatch[1], { exact: true }).click({ timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000) }).catch(() => {});
+      const existingDownload = await existingDownloadPromise;
+      if (existingDownload) {
+        const downloadPath = await existingDownload.path();
+        const buffer = Buffer.from(await readFile(downloadPath));
+        const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+          consultaId: input.consultaId,
+          fonte,
+          fileName: `tjse-${certificateType.id}-${existingCertificateMatch[1]}.pdf`,
+          buffer,
+        });
+        return {
+          tipo: certificateType.label,
+          status: "success",
+          resultado: classifyCertificateText(rawText || pageText),
+          pdfPath,
+          rawText,
+          pageText,
+          protocolo: existingCertificateMatch[1],
+          resumo: summarizeCertificateText(rawText || pageText),
+        };
+      }
     }
 
     if (hasCertificateResultSignal(pageText)) {
@@ -2729,6 +2760,38 @@ async function selectVisibleByTextOrValue(page, selector, value) {
   return selectByTextOrValue(page, selector, raw);
 }
 
+async function chooseTjsePersonType(page, isCompany) {
+  return page.evaluate((shouldChooseCompany) => {
+    const visible = (element) => {
+      const style = window.getComputedStyle(element);
+      return (
+        style.visibility !== "hidden" &&
+        style.display !== "none" &&
+        Boolean(element.offsetWidth || element.offsetHeight || element.getClientRects().length)
+      );
+    };
+    const normalizeText = (value) =>
+      String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    const radios = [...document.querySelectorAll('mat-radio-button, input[type="radio"]')].filter(visible);
+    const wanted = shouldChooseCompany ? /juridica|cnpj/ : /fisica|cpf/;
+    const byText = radios.find((element) => wanted.test(normalizeText(element.innerText || element.closest("label, div")?.innerText || "")));
+    const target = byText || radios[shouldChooseCompany ? 1 : 0];
+    if (!target) return false;
+    const input = target.matches?.('input[type="radio"]') ? target : target.querySelector?.('input[type="radio"]');
+    const clickable = input || target;
+    clickable.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    if (input) {
+      input.checked = true;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return true;
+  }, Boolean(isCompany)).catch(() => false);
+}
+
 async function selectTjseMatOption(page, index, preferredText) {
   const selects = page.locator("mat-select");
   if ((await selects.count().catch(() => 0)) <= index) {
@@ -3000,6 +3063,8 @@ function hasCertificateResultSignal(text) {
   return (
     hasPositiveCertificateSignal(text) ||
     hasNegativeCertificateSignal(text) ||
+    normalized.includes("certidao gerada") ||
+    normalized.includes("certidÃ£o gerada") ||
     normalized.includes("certidao nada consta") ||
     normalized.includes("certidao positiva") ||
     normalized.includes("certidao emitida")

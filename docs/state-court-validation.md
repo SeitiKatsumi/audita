@@ -34,7 +34,7 @@ Os testes praticos usaram dados autorizados informados pelo usuario na sessao, c
 | SC | TJSC | Mapeamento pendente / CAPTCHA | Portal carrega, mas nenhum campo confiavel foi preenchido. | Mapear formulario e validacao. |
 | RR | TJRR | Parcial | Portal carrega e preenche 1 campo. | Mapear seletores Projudi TJRR. |
 | MT | TJMT | Parcial assistido | SEC abre, mas ainda exige validacao/correcao antes de emitir. | Mapear campos obrigatorios faltantes. |
-| SE | TJSE | Instavel / parcial | Uma execucao retornou texto conclusivo; outra parou em validacao/confirmacao. | Estabilizar seletores e evento de emissao. |
+| SE | TJSE | 100% funcional | Portal consultado automaticamente; certidao existente localizada pelo protocolo, PDF baixado, texto extraido e `nada_consta` identificado. | Validar natureza criminal e novas emissoes sem certidao preexistente. |
 | BA | TJBA | Falha de acesso no teste | Timeout/`ERR_CONNECTION_TIMED_OUT` no portal oficial. | Revalidar disponibilidade e aumentar estrategia de espera. |
 | AC | TJAC | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
 | PA | TJPA | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
