@@ -49,3 +49,10 @@ Os testes praticos usaram dados autorizados informados pelo usuario na sessao, c
 - Corrigido mapeamento de modelos ESAJ por UF para AL, AM, MS e SP.
 - Corrigida agregacao de resultado para fluxos estaduais que retornavam `success` mas eram marcados como `indisponivel`.
 - Ajustada classificacao do fallback generico: portal carregado com zero campos preenchidos e sem CAPTCHA/login agora vira `manual_required`/`mapeamento_pendente`, nao "assistido funcional".
+
+## Validacao em producao
+
+- Deploy CapRover validado em `https://auditainteligente.com.br` no commit `b6184e0b94ddf4224e629e5b2f4125d10924c27c`.
+- `/api/health` retornou `status: ok`, banco `ready: true` e `auth.required: true`.
+- `/data/state-courts.json` em producao retornou TJPR apontando para `https://www.tjpr.jus.br/certidao-de-2-grau-para-pessoa-fisica`.
+- `POST /api/audits` e `GET /api/audits` em producao retornaram `401 authentication_required` sem sessao autenticada. Portanto, execucao pratica de consulta em producao precisa ser feita por usuario autenticado na interface ou com credencial/sessao valida.
