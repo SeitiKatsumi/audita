@@ -8,6 +8,7 @@ import {
   buildCaptchaLabReport,
   classifyHumanCheckpoint,
   collect as collectTjdft,
+  esajModelValue,
   getCertificateTypesForInput,
 } from "../collectors/tjdft.collector.mjs";
 
@@ -130,6 +131,29 @@ test("catalogo marca TJAM como ESAJ mapeado e assistido", () => {
   assert.equal(tjam.platform, "esaj");
   assert.equal(tjam.automationStatus, "mapped");
   assert.equal(tjam.captchaMode, "assisted");
+});
+
+test("catalogo TJPR aponta para formulario publico de certidao", () => {
+  const tjpr = listStateCourtProfiles().find((profile) => profile.uf === "PR");
+  assert.equal(tjpr.court, "TJPR");
+  assert.equal(tjpr.url, "https://www.tjpr.jus.br/certidao-de-2-grau-para-pessoa-fisica");
+  assert.equal(tjpr.automationStatus, "mapped");
+  assert.deepEqual(tjpr.requiredFields, ["document", "fullName", "email", "phone", "motherName", "fatherName", "birthDate"]);
+});
+
+test("mapeia modelos ESAJ por tribunal", () => {
+  assert.equal(esajModelValue("civil", { uf: "SP" }), "52");
+  assert.equal(esajModelValue("criminal", { uf: "SP" }), "6");
+  assert.equal(esajModelValue("falencia", { uf: "SP" }), "58");
+  assert.equal(esajModelValue("civil", { uf: "AL" }), "38");
+  assert.equal(esajModelValue("criminal", { uf: "AL" }), "39");
+  assert.equal(esajModelValue("falencia", { uf: "AL" }), "40");
+  assert.equal(esajModelValue("civil", { uf: "AM" }), "9");
+  assert.equal(esajModelValue("criminal", { uf: "AM" }), "7");
+  assert.equal(esajModelValue("falencia", { uf: "AM" }), "31");
+  assert.equal(esajModelValue("civil", { uf: "MS" }), "91");
+  assert.equal(esajModelValue("criminal", { uf: "MS" }), "92");
+  assert.equal(esajModelValue("falencia", { uf: "MS" }), "93");
 });
 
 test("catalogo TJAP usa Tucujuris com campos reais do formulario", () => {

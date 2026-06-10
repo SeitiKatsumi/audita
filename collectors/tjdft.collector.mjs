@@ -441,7 +441,34 @@ async function collectGenericAssistedStateCourt({ input, profile, stateCourtName
     }
     const loaded = results.some((result) => result.portalLoaded);
     const filledCount = results.reduce((sum, result) => sum + (Array.isArray(result.filledFields) ? result.filledFields.length : 0), 0);
-    const protectionDetected = results.some((result) => result.requiresCaptcha || result.requiresLogin || result.requiresConfirmation);
+    const captchaOrLoginDetected = results.some((result) => result.requiresCaptcha || result.requiresLogin || result.blockedByProtection);
+    const protectionDetected = results.some((result) => result.requiresCaptcha || result.requiresLogin || result.requiresConfirmation || result.blockedByProtection);
+    if (loaded && filledCount === 0 && !captchaOrLoginDetected) {
+      return manualRequiredResult(
+        fonte,
+        `${stateCourtName} carregou, mas o Audita ainda nao reconhece campos suficientes para automacao assistida confiavel.`,
+        {
+          ...baseData,
+          automationStatus: "needs_mapping",
+          captchaMode: profile?.captchaMode || "assisted",
+          modo: "mapeamento_pendente",
+          tribunal: stateCourtName || profile?.court,
+          uf: profile?.uf || input.extraFields?.stateCourtUf || "",
+          assistedPortalUrl: stateCourtUrl || profile?.url,
+          certidoes: results,
+          totalCertidoes: results.length,
+          camposPreenchidos: filledCount,
+          portalInspection: {
+            loaded,
+            protectionDetected,
+            filledFields: [],
+            textSample: results.find((result) => result.pageText)?.pageText?.slice(0, 500) || "",
+          },
+          resumo: `${stateCourtName} carregado, mas nenhum campo confiavel foi preenchido. Necessario mapear seletores especificos do portal.`,
+          proximoPasso: "Mapear formulario real, botoes de avanco, validacao oficial e download/protocolo antes de considerar esta UF funcional.",
+        },
+      );
+    }
     if (loaded && shouldKeepAssistedOpen()) {
       keepBrowserOpen = true;
       sessionId = createAssistedSession({ browser, context, courtName: stateCourtName || profile?.court, courtUf: profile?.uf, portalUrl: stateCourtUrl || profile?.url, input, profile, results });
@@ -917,7 +944,15 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
     const completed = results.filter((result) => result.status === "success");
     const waiting = results.filter((result) => result.status === "waiting_user_action");
     if (completed.length && !waiting.length) {
-      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+      const encontrados = results.filter((result) => result.resultado === SOURCE_RESULT.CONSTA);
+      const pendentes = results.filter((result) => result.resultado === SOURCE_RESULT.INDISPONIVEL);
+      const resultadoGeral = encontrados.length
+        ? SOURCE_RESULT.CONSTA
+        : pendentes.length
+          ? SOURCE_RESULT.INDISPONIVEL
+          : SOURCE_RESULT.NADA_CONSTA;
+
+      return successResult(fonte, resultadoGeral, {
         ...baseData,
         modo: "automatico",
         tribunal: courtName,
@@ -1235,7 +1270,15 @@ async function collectApTjapStateCourt({ input, profile, stateCourtName, stateCo
     const completed = results.filter((result) => result.status === "success");
     const waiting = results.filter((result) => result.status === "waiting_user_action");
     if (completed.length && !waiting.length) {
-      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+      const encontrados = results.filter((result) => result.resultado === SOURCE_RESULT.CONSTA);
+      const pendentes = results.filter((result) => result.resultado === SOURCE_RESULT.INDISPONIVEL);
+      const resultadoGeral = encontrados.length
+        ? SOURCE_RESULT.CONSTA
+        : pendentes.length
+          ? SOURCE_RESULT.INDISPONIVEL
+          : SOURCE_RESULT.NADA_CONSTA;
+
+      return successResult(fonte, resultadoGeral, {
         ...baseData,
         modo: "automatico",
         automationStatus: "active",
@@ -1378,7 +1421,15 @@ async function collectMtTjmtStateCourt({ input, profile, stateCourtName, stateCo
     const waiting = results.filter((result) => result.status === "waiting_user_action");
     const completed = results.filter((result) => result.status === "success");
     if (completed.length && !waiting.length) {
-      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+      const encontrados = results.filter((result) => result.resultado === SOURCE_RESULT.CONSTA);
+      const pendentes = results.filter((result) => result.resultado === SOURCE_RESULT.INDISPONIVEL);
+      const resultadoGeral = encontrados.length
+        ? SOURCE_RESULT.CONSTA
+        : pendentes.length
+          ? SOURCE_RESULT.INDISPONIVEL
+          : SOURCE_RESULT.NADA_CONSTA;
+
+      return successResult(fonte, resultadoGeral, {
         ...baseData,
         modo: "automatico",
         tribunal: stateCourtName || "TJMT",
@@ -1495,7 +1546,15 @@ async function collectSeTjseStateCourt({ input, profile, stateCourtName, request
 
     const completed = results.filter((result) => result.status === "success");
     if (completed.length) {
-      return successResult(fonte, SOURCE_RESULT.INDISPONIVEL, {
+      const encontrados = results.filter((result) => result.resultado === SOURCE_RESULT.CONSTA);
+      const pendentes = results.filter((result) => result.resultado === SOURCE_RESULT.INDISPONIVEL);
+      const resultadoGeral = encontrados.length
+        ? SOURCE_RESULT.CONSTA
+        : pendentes.length
+          ? SOURCE_RESULT.INDISPONIVEL
+          : SOURCE_RESULT.NADA_CONSTA;
+
+      return successResult(fonte, resultadoGeral, {
         ...baseData,
         modo: "automatico_com_validacao",
         tribunal: stateCourtName || "TJSE",
@@ -1918,7 +1977,7 @@ async function fillEsajPageFields({ page, input, profile, certificateType }) {
       timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
     });
   }
-  await page.locator("#cdModelo").selectOption(esajModelValue(certificateType.id), {
+  await page.locator("#cdModelo").selectOption(esajModelValue(certificateType.id, profile), {
     timeout: envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000),
   });
   filledFields.push("modelo");
@@ -2335,12 +2394,30 @@ function goCertificateUrl(certificateId) {
   return "https://projudi.tjgo.jus.br/CertidaoNegativaPositivaPublica?PaginaAtual=1&TipoArea=1&InteressePessoal=&Territorio=&Finalidade=";
 }
 
-function esajModelValue(certificateId) {
-  const values = {
-    falencia: "58",
-    criminal: "6",
-    civil: "52",
+export function esajModelValue(certificateId, profile = {}) {
+  const valuesByUf = {
+    AL: {
+      falencia: "40",
+      criminal: "39",
+      civil: "38",
+    },
+    AM: {
+      falencia: "31",
+      criminal: "7",
+      civil: "9",
+    },
+    MS: {
+      falencia: "93",
+      criminal: "92",
+      civil: "91",
+    },
+    SP: {
+      falencia: "58",
+      criminal: "6",
+      civil: "52",
+    },
   };
+  const values = valuesByUf[String(profile?.uf || "").toUpperCase()] || valuesByUf.SP;
   return values[certificateId] || values.civil;
 }
 

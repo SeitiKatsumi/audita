@@ -1,4 +1,7 @@
 import { savePdf, savePdfBuffer } from "./storage.service.mjs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 export async function saveAndExtractPdf({ consultaId, fonte, fileName, contentBase64 }) {
   const pdfPath = await savePdf({ consultaId, fonte, fileName, contentBase64 });
@@ -27,8 +30,7 @@ export async function extractPdfText(buffer) {
   }
 
   try {
-    const pdfParse = await import("pdf-parse");
-    const parser = pdfParse.default || pdfParse;
+    const parser = require("pdf-parse/lib/pdf-parse.js");
     const parsed = await parser(buffer);
     return String(parsed.text || "").replace(/\s+/g, " ").trim();
   } catch {

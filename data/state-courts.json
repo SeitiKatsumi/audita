@@ -228,13 +228,13 @@
       "uf": "PR",
       "court": "TJPR",
       "stateName": "Parana",
-      "url": "https://www.tjpr.jus.br/certidoes",
+      "url": "https://www.tjpr.jus.br/certidao-de-2-grau-para-pessoa-fisica",
       "platform": "custom",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
       "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
+      "requiredFields": ["document", "fullName", "email", "phone", "motherName", "fatherName", "birthDate"],
+      "optionalFields": [],
       "certificateTypes": ["civil", "criminal"]
     },
     {
