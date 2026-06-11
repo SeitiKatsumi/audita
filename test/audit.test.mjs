@@ -141,6 +141,20 @@ test("catalogo TJPR aponta para formulario publico de certidao", () => {
   assert.deepEqual(tjpr.requiredFields, ["document", "fullName", "email", "phone", "motherName", "fatherName", "birthDate"]);
 });
 
+test("catalogo mapeia aliases para tribunais estaduais parciais", () => {
+  const mappedUfs = ["RJ", "MA", "MG", "PR", "RN", "TO", "PB", "SC", "RR", "MT", "BA"];
+  const profiles = listStateCourtProfiles();
+  for (const uf of mappedUfs) {
+    const profile = profiles.find((item) => item.uf === uf);
+    assert.equal(Boolean(profile), true);
+    assert.equal(profile.mappingVersion, "2026-06-11");
+    assert.equal(profile.mappingScope, "field_navigation_assisted");
+    assert.equal(Array.isArray(profile.fieldAliases?.document), true);
+    assert.equal(Array.isArray(profile.fieldAliases?.fullName), true);
+    assert.equal(Boolean(profile.defaultValues), true);
+  }
+});
+
 test("mapeia modelos ESAJ por tribunal", () => {
   assert.equal(esajModelValue("civil", { uf: "SP" }), "52");
   assert.equal(esajModelValue("criminal", { uf: "SP" }), "6");
@@ -511,6 +525,19 @@ test("analisa snapshot de sessao assistida com pdf e protocolo", () => {
   assert.equal(inspection.status, "result_available");
   assert.equal(inspection.protocol, "12345-67");
   assert.equal(inspection.pdfLinks.length, 1);
+});
+
+test("analisa snapshot de sessao assistida quando a pagina atual e o pdf", () => {
+  const inspection = analyzeAssistedSessionSnapshot({
+    title: "Certidao",
+    url: "https://portal.tj.example/abrirDownloadCertidao.do?id=12345",
+    text: "",
+    links: [],
+  });
+
+  assert.equal(inspection.status, "result_available");
+  assert.equal(inspection.pdfLinks.length, 1);
+  assert.equal(inspection.pdfLinks[0].href, "https://portal.tj.example/abrirDownloadCertidao.do?id=12345");
 });
 
 test("analisa snapshot de sessao assistida ainda pendente em captcha", () => {

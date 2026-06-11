@@ -91,22 +91,30 @@ export function buildCaptchaLabReport({ profile, results, sessionOpen, sessionId
 
 export function analyzeAssistedSessionSnapshot({ title = "", url = "", text = "", links = [] } = {}) {
   const safeText = String(text || "");
+  const safeUrl = String(url || "");
   const safeLinks = Array.isArray(links) ? links : [];
-  const isCadastroForm = /abrirCadastro\.do/i.test(String(url || "")) || /Cadastro de Pedido de Certid[aã]o|Para pedir uma certid[aã]o/i.test(safeText);
-  const pdfLinks = isCadastroForm
+  const isCadastroForm = /abrirCadastro\.do/i.test(safeUrl) || /Cadastro de Pedido de Certid|Para pedir uma certid/i.test(safeText);
+  const detectedPdfLinks = isCadastroForm
     ? []
     : safeLinks.filter((link) => {
         const href = String(link.href || "");
         const label = String(link.text || "");
         return /\.pdf(?:\?|#|$)/i.test(href) || /(?:abrirDownload|download).*certid/i.test(`${href} ${label}`);
       });
+  const currentPagePdfLink = !isCadastroForm && (/\.pdf(?:\?|#|$)/i.test(safeUrl) || /(?:abrirDownload|download).*certid/i.test(safeUrl))
+    ? [{ text: "PDF atual", href: safeUrl }]
+    : [];
+  const pdfLinks = [...currentPagePdfLink, ...detectedPdfLinks].filter((link, index, array) => {
+    const href = String(link.href || "");
+    return href && array.findIndex((candidate) => String(candidate.href || "") === href) === index;
+  });
   const rawProtocolMatch = safeText.match(
-    /(?:protocolo|pedido|solicita[cç][aã]o)\s*(?:n(?:[uú]mero|[ºo.])?)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9./-]{4,})/i,
+    /(?:protocolo|pedido|solicita)\s*(?:n(?:umero|[o.])?)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9./-]{4,})/i,
   );
   const protocol = /\d/.test(rawProtocolMatch?.[1] || "") ? rawProtocolMatch[1] : "";
-  const hasResultSignal = !isCadastroForm && /nada\s+consta|certid[aã]o\s+(?:negativa|emitida)|consta(?:m)?\s+(?:registro|apontamento|distribui[cç][aã]o|processo)|protocolo|pedido\s+(?:gerado|registrado|cadastrado)/i.test(safeText);
-  const hasCaptchaSignal = /captcha|recaptcha|confirme que voc[eê]|sou humano|valida[cç][aã]o humana/i.test(safeText);
-  const hasErrorSignal = /erro|falha|indispon[ií]vel|n[aã]o foi poss[ií]vel|tente novamente/i.test(safeText);
+  const hasResultSignal = !isCadastroForm && /nada\s+consta|certid\s*(?:negativa|emitida)|consta(?:m)?\s+(?:registro|apontamento|distribui|processo)|protocolo|pedido\s+(?:gerado|registrado|cadastrado)/i.test(safeText);
+  const hasCaptchaSignal = /captcha|recaptcha|confirme que voc|sou humano|valid.*humana/i.test(safeText);
+  const hasErrorSignal = /erro|falha|indispon|n[aã]o foi poss|tente novamente/i.test(safeText);
   const status = pdfLinks.length || protocol || hasResultSignal
     ? "result_available"
     : hasErrorSignal
@@ -118,7 +126,7 @@ export function analyzeAssistedSessionSnapshot({ title = "", url = "", text = ""
   return {
     status,
     title: String(title || ""),
-    url: String(url || ""),
+    url: safeUrl,
     protocol,
     pdfLinks: pdfLinks.slice(0, 5),
     textSample: safeText.replace(/\s+/g, " ").trim().slice(0, 900),
@@ -560,11 +568,33 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
         pieces.push(element.id || "");
         return normalizeText(pieces.join(" "));
       };
+      const hintedField = (haystack) => {
+        const aliases = values.fieldAliases || {};
+        for (const [field, terms] of Object.entries(aliases)) {
+          const normalizedTerms = Array.isArray(terms) ? terms.map(normalizeText).filter(Boolean) : [];
+          if (normalizedTerms.some((term) => haystack.includes(term))) return field;
+        }
+        return "";
+      };
+      const hintedSelectField = (haystack) => {
+        const aliases = values.selectAliases || {};
+        for (const [field, terms] of Object.entries(aliases)) {
+          const normalizedTerms = Array.isArray(terms) ? terms.map(normalizeText).filter(Boolean) : [];
+          if (normalizedTerms.some((term) => haystack.includes(term))) return field;
+        }
+        return "";
+      };
       const pickField = (text, element) => {
         const name = normalizeText(`${element.name || ""} ${element.id || ""}`);
         const haystack = `${text} ${name}`;
+        const hinted = hintedField(haystack);
+        if (hinted) return hinted;
         if (/(cnpj|cpf|documento|doc\.?|cic)/.test(haystack)) return "document";
         if (/(tipo documento|tipo de documento|documento ao lado)/.test(haystack)) return "documentType";
+        if (/(instancia|grau)/.test(haystack)) return "instance";
+        if (/(natureza|classe|area|competencia)/.test(haystack)) return "nature";
+        if (/(tipo de certidao|tipo certidao|modelo|certidao|certidao negativa)/.test(haystack)) return "certificate";
+        if (/(participacao|participa|polo|figura como|parte ativa|parte passiva)/.test(haystack)) return "participation";
         if (/(email|e-mail)/.test(haystack)) return "email";
         if (/(mae|mãe|genitora)/.test(haystack)) return "motherName";
         if (/(pai|genitor)/.test(haystack)) return "fatherName";
@@ -579,6 +609,11 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
         if (/(nacionalidade)/.test(haystack)) return "nationality";
         if (/(naturalidade)/.test(haystack)) return "naturality";
         if (/(estado civil|estadocivil)/.test(haystack)) return "civilStatus";
+        if (/(titulo de eleitor|eleitor)/.test(haystack)) return "voterTitle";
+        if (/(ctps|carteira profissional|carteira de trabalho).*serie|serie/.test(haystack)) return "ctpsSeries";
+        if (/(ctps|carteira profissional|carteira de trabalho)/.test(haystack)) return "ctpsNumber";
+        if (/(numero)/.test(haystack) && /(endereco|logradouro|residencia)/.test(haystack)) return "addressNumber";
+        if (/(complemento)/.test(haystack)) return "addressComplement";
         if (/(nome|razao social|razão social|requerente|parte|pessoa)/.test(haystack) && !/(mae|mãe|pai)/.test(haystack)) return "fullName";
         return "";
       };
@@ -589,6 +624,10 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
         }
         if (field === "phone") return [values.mobile, values.phone];
         if (field === "city") return [values.city, values.comarca, values.domicile];
+        if (field === "instance") return [values.instance];
+        if (field === "nature") return [values.nature, values.certificateLabel, values.certificateId];
+        if (field === "certificate") return [values.certificateLabel, values.certificateId, values.nature, values.certificateKind];
+        if (field === "participation") return [values.participation];
         return [values[field]];
       };
       const firstValue = (field, element) => valuesFor(field, element).find((item) => String(item || "").trim());
@@ -653,8 +692,11 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
       for (const select of selects) {
         const text = labelText(select);
         let field = pickField(text, select);
+        field = hintedSelectField(text) || field;
         if (/(certidao|certidão|modelo|natureza|tipo)/.test(text)) field = "certificate";
         if (/(pessoa|tipo pessoa|fisica|juridica|cpf|cnpj)/.test(text)) field = "personType";
+        if (/(instancia|grau)/.test(text)) field = "instance";
+        if (/(participacao|polo|figura)/.test(text)) field = "participation";
         if (!field && select.options.length <= 5) field = "certificate";
         if (chooseSelect(select, field)) {
           filledFields.push(`select:${field}`);
@@ -671,6 +713,8 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
         frameSources,
         captchaDetected: /captcha|recaptcha|hcaptcha|turnstile|cloudflare|security verification|malicious bots|codigo de seguranca|c[oó]digo de seguran[cç]a|sou humano|verify you are human/i.test(bodyText) ||
           frameSources.some((src) => /captcha|recaptcha|hcaptcha|turnstile|cloudflare/i.test(src)),
+        protectionDetected: /403 forbidden|forbidden|acesso bloqueado|site maintenance|security service|security verification|malicious bots|muitas tentativas|acesso foi bloqueado/i.test(bodyText) ||
+          frameSources.some((src) => /cloudflare|turnstile|perfdrive|shieldsquare/i.test(src)),
         loginDetected: /login|entrar|senha|certificado digital|gov\.br|credenciais|usu[aá]rio/i.test(bodyText),
         confirmationDetected: /confirmar|prosseguir|avan[cç]ar|emitir|solicitar|enviar|aceito|declaro/i.test(bodyText),
         bodyText: bodyText.slice(0, 4000),
@@ -679,10 +723,7 @@ async function fillGenericAssistedCertificate({ context, input, profile, certifi
 
     const pageText = fillReport.bodyText || (await page.locator("body").innerText().catch(() => ""));
     keepPageOpen = shouldKeepAssistedOpen();
-    const blockedByProtection = Boolean(
-      fillReport.captchaDetected &&
-        (fillReport.frameSources || []).some((src) => /cloudflare|turnstile|perfdrive|shieldsquare/i.test(src)),
-    );
+    const blockedByProtection = Boolean(fillReport.protectionDetected);
     return {
       tipo: certificateType.label,
       status: "waiting_user_action",
@@ -797,6 +838,7 @@ async function executeProfileNavigation(page, profile, values) {
 function buildGenericStateCourtValues(input, profile, certificateType) {
   const extra = input.extraFields || {};
   const fields = extra.stateCourtFields || {};
+  const defaults = profile?.defaultValues || {};
   const documentValue = String(input.tipoDocumento === "cnpj" ? extra.cnpjDocument || input.documento : extra.cpfDocument || input.documento).replace(/\D/g, "");
   const gender = normalize(fields.gender || "").startsWith("f") ? "F" : "M";
   return {
@@ -812,25 +854,32 @@ function buildGenericStateCourtValues(input, profile, certificateType) {
     email: fields.email || "",
     phone: fields.phone || "",
     mobile: fields.mobile || fields.phone || "",
+    voterTitle: fields.voterTitle || "",
+    ctpsNumber: fields.ctpsNumber || "",
+    ctpsSeries: fields.ctpsSeries || "",
     cep: fields.cep || "",
     city: fields.city || "",
-    comarca: fields.comarca || "",
-    domicile: fields.domicile || "",
+    comarca: fields.comarca || defaults.comarca || "",
+    domicile: fields.domicile || defaults.domicile || "",
     address: fields.address || "",
+    addressNumber: fields.addressNumber || "",
+    addressComplement: fields.addressComplement || "",
     neighborhood: fields.neighborhood || "",
     profession: fields.profession || "",
-    nationality: fields.nationality || "Brasileira",
+    nationality: fields.nationality || defaults.nationality || "Brasileira",
     naturality: fields.naturality || fields.city || "",
-    civilStatus: fields.civilStatus || "",
-        participation: fields.participation || "Passiva",
-    instance: fields.instance || "Estadual",
-    certificateKind: fields.certificateKind || "",
-    nature: fields.nature || certificateType.label || "",
+    civilStatus: fields.civilStatus || defaults.civilStatus || "",
+    participation: fields.participation || defaults.participation || "Passiva",
+    instance: fields.instance || defaults.instance || "1ª instância",
+    certificateKind: fields.certificateKind || defaults.certificateKind || "",
+    nature: fields.nature || defaults.nature || certificateType.label || "",
     gender,
     certificateId: certificateType.id,
     certificateLabel: certificateType.label,
     court: profile?.court || "",
     uf: profile?.uf || "",
+    fieldAliases: profile?.fieldAliases || {},
+    selectAliases: profile?.selectAliases || {},
   };
 }
 
@@ -1210,6 +1259,10 @@ export async function inspectAssistedSessionResult(sessionId) {
   }));
   const screenshot = await page.screenshot({ type: "jpeg", quality: 78, fullPage: false }).catch(() => null);
   const formState = await readAssistedSessionFormState(page);
+  const inspection = analyzeAssistedSessionSnapshot(snapshot);
+  const pdfEvidence = await downloadAssistedSessionPdf({ page, session, inspection }).catch((error) => ({
+    pdfDownloadError: error.message,
+  }));
 
   return {
     id: sessionId,
@@ -1221,8 +1274,68 @@ export async function inspectAssistedSessionResult(sessionId) {
     evidenceScreenshot: screenshot ? `data:image/jpeg;base64,${screenshot.toString("base64")}` : "",
     evidenceFileName: `audita-${session.courtUf || "portal"}-${Date.now()}.jpg`.toLowerCase(),
     formState,
-    ...analyzeAssistedSessionSnapshot(snapshot),
+    ...inspection,
+    ...pdfEvidence,
   };
+}
+
+async function downloadAssistedSessionPdf({ page, session, inspection }) {
+  const firstPdf = Array.isArray(inspection?.pdfLinks) ? inspection.pdfLinks[0] : null;
+  const pdfUrl = firstPdf?.href || "";
+  if (!pdfUrl) {
+    return {};
+  }
+
+  const response = await page.context().request.get(pdfUrl, {
+    timeout: envNumber("ASSISTED_SESSION_PDF_DOWNLOAD_TIMEOUT_MS", 20000),
+  });
+  if (!response.ok()) {
+    return {
+      pdfDownloadUrl: maskSignedUrl(pdfUrl),
+      pdfDownloadError: `HTTP ${response.status()}`,
+    };
+  }
+
+  const buffer = await response.body();
+  if (!buffer?.length) {
+    return {
+      pdfDownloadUrl: maskSignedUrl(pdfUrl),
+      pdfDownloadError: "empty_pdf_response",
+    };
+  }
+
+  const fileName = assistedPdfFileName(session, firstPdf);
+  const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
+    consultaId: session.consultaId,
+    fonte,
+    fileName,
+    buffer,
+  });
+  return {
+    pdfDownloaded: true,
+    pdfFileName: fileName,
+    pdfPath,
+    pdfContentBase64: buffer.toString("base64"),
+    pdfRawText: rawText,
+    pdfDownloadUrl: maskSignedUrl(pdfUrl),
+  };
+}
+
+function assistedPdfFileName(session, link) {
+  const fromUrl = (() => {
+    try {
+      return new URL(link?.href || "").pathname.split("/").pop() || "";
+    } catch {
+      return "";
+    }
+  })();
+  const baseName = fromUrl && /\.pdf$/i.test(fromUrl)
+    ? fromUrl
+    : `${session?.courtUf || "tribunal"}-certidao-assistida-${Date.now()}.pdf`;
+  return baseName
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-");
 }
 
 export async function closeAssistedSession(sessionId) {

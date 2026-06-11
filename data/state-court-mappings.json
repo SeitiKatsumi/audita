@@ -1,0 +1,191 @@
+{
+  "profiles": {
+    "BA": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "participation": "Passiva", "nature": "Cível" },
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf/cnpj", "documento", "numero do cpf", "numero do documento"],
+        "fullName": ["nome completo", "nome da parte", "requerente", "solicitante", "razao social"],
+        "participation": ["participacao", "participacao processual", "polo", "figura como", "parte passiva"],
+        "certificate": ["tipo de certidao", "certidao", "modelo", "natureza da certidao", "natureza"]
+      },
+      "selectAliases": {
+        "certificate": ["tipo de certidao", "certidao", "modelo", "natureza da certidao", "natureza"],
+        "participation": ["participacao", "polo", "figura como"]
+      }
+    },
+    "MA": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "comarca": "Açailândia", "certificateKind": "Nome da Parte" },
+      "navigationSteps": [{ "action": "clickText", "text": "CIDADÃO", "exact": false, "waitAfterMs": 1200 }],
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf/cnpj", "documento", "chave de pesquisa"],
+        "fullName": ["nome completo", "nome da parte", "nome do pesquisado", "chave de pesquisa", "razao social"],
+        "comarca": ["comarca"],
+        "certificate": ["sistema", "pesquisar por", "tipo de certidao"]
+      },
+      "selectAliases": {
+        "certificate": ["pesquisar por", "sistema", "tipo de certidao"],
+        "comarca": ["comarca"]
+      }
+    },
+    "MG": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "instance": "1ª instância", "nature": "Cível", "participation": "Réu" },
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf/cnpj", "documento"],
+        "fullName": ["nome completo", "nome da parte", "nome do pesquisado", "requerente", "razao social"],
+        "email": ["email", "e-mail"],
+        "comarca": ["comarca", "foro"],
+        "certificateKind": ["tipo de certidao", "finalidade"],
+        "nature": ["natureza", "classe", "area", "competencia"]
+      },
+      "selectAliases": {
+        "certificate": ["tipo de certidao", "finalidade", "natureza"],
+        "nature": ["natureza", "classe", "area", "competencia"],
+        "instance": ["instancia", "grau"],
+        "comarca": ["comarca", "foro"]
+      }
+    },
+    "MT": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "nature": "Cível" },
+      "fieldAliases": {
+        "document": ["cpf", "documento", "numero do cpf"],
+        "fullName": ["nome completo", "nome"],
+        "birthDate": ["data de nascimento", "data nascimento", "nascimento"],
+        "certificate": ["tipos de certidao", "certidao"]
+      },
+      "selectAliases": { "certificate": ["tipos de certidao", "certidao"] }
+    },
+    "PB": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "nature": "Cível", "participation": "Passiva" },
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf/cnpj", "documento"],
+        "fullName": ["nome completo", "nome da parte interessada", "nome da parte", "requerente"],
+        "motherName": ["nome da mae", "mae", "genitora"],
+        "fatherName": ["nome do pai", "pai", "genitor"],
+        "birthDate": ["data de nascimento", "nascimento"],
+        "email": ["email", "e-mail"],
+        "certificate": ["certidao negativa", "tipo de certidao", "natureza"]
+      },
+      "selectAliases": {
+        "certificate": ["certidao negativa", "tipo de certidao", "natureza"],
+        "participation": ["participacao", "polo", "figura como"]
+      }
+    },
+    "PR": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "instance": "2º grau", "nature": "Cível" },
+      "fieldAliases": {
+        "document": ["cpf", "cpf do requerente", "documento"],
+        "fullName": ["nome completo", "nome do requerente", "nome"],
+        "email": ["email", "e-mail"],
+        "phone": ["telefone", "telefone celular", "celular"],
+        "motherName": ["nome da mae", "mae"],
+        "fatherName": ["nome do pai", "pai"],
+        "birthDate": ["data de nascimento", "nascimento"],
+        "certificate": ["tipo de certidao", "natureza"]
+      },
+      "selectAliases": {
+        "certificate": ["tipo de certidao", "natureza"],
+        "instance": ["instancia", "grau"]
+      }
+    },
+    "RJ": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "comarca": "Capital", "participation": "Passiva", "nature": "Cível" },
+      "navigationSteps": [
+        { "action": "clickHrefContains", "hrefContains": "solicitarCapital?comarca=Capital", "waitAfterMs": 1500 },
+        { "action": "clickText", "text": "Ações Cíveis", "exact": false, "waitAfterMs": 1500 },
+        { "action": "choosePersonType", "waitAfterMs": 1200 }
+      ],
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf/cnpj", "documento"],
+        "fullName": ["nome completo", "nome do requerente", "nome da pessoa pesquisada", "requerente", "pesquisado"],
+        "email": ["email", "e-mail"],
+        "phone": ["telefone", "celular"],
+        "rg": ["rg", "identidade"],
+        "certificate": ["acoes civeis", "acoes criminais", "falencia", "natureza"]
+      },
+      "selectAliases": {
+        "certificate": ["acoes civeis", "acoes criminais", "falencia", "natureza"],
+        "comarca": ["comarca"]
+      }
+    },
+    "RN": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "nature": "Cível" },
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf/cnpj", "documento"],
+        "fullName": ["nome completo", "nome pesquisado", "nome da pessoa", "nome da parte"],
+        "motherName": ["nome da mae", "mae"],
+        "fatherName": ["nome do pai", "pai"],
+        "birthDate": ["data de nascimento", "nascimento"],
+        "email": ["email", "e-mail"],
+        "certificate": ["tipo", "tipo de certidao", "natureza"]
+      },
+      "selectAliases": { "certificate": ["tipo", "tipo de certidao", "natureza"] }
+    },
+    "RR": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "nature": "Cível" },
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf cnpj", "cpf/cnpj", "documento"],
+        "fullName": ["nome completo", "nome da parte", "requerente"],
+        "motherName": ["nome da mae", "mae"],
+        "fatherName": ["nome do pai", "pai"],
+        "birthDate": ["data de nascimento", "nascimento"],
+        "email": ["email", "e-mail"],
+        "certificate": ["tipo de certidao", "natureza"]
+      },
+      "selectAliases": { "certificate": ["tipo de certidao", "natureza"] }
+    },
+    "SC": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "nature": "Cível", "participation": "Passiva" },
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf ou cnpj", "cpf/cnpj", "documento"],
+        "fullName": ["nome completo", "nome da parte", "requerente"],
+        "motherName": ["nome da mae", "mae"],
+        "fatherName": ["nome do pai", "pai"],
+        "birthDate": ["data de nascimento", "nascimento"],
+        "email": ["email", "e-mail"],
+        "certificate": ["tipo de certidao", "natureza"]
+      },
+      "selectAliases": {
+        "certificate": ["tipo de certidao", "natureza"],
+        "participation": ["participacao", "polo", "figura como"]
+      }
+    },
+    "TO": {
+      "mappingVersion": "2026-06-11",
+      "mappingScope": "field_navigation_assisted",
+      "defaultValues": { "instance": "1º grau", "nature": "Cível" },
+      "fieldAliases": {
+        "document": ["cpf", "cnpj", "cpf/cnpj da parte", "cpf/cnpj", "documento"],
+        "fullName": ["nome completo", "nome da parte", "requerente"],
+        "motherName": ["nome da mae", "mae"],
+        "fatherName": ["nome do pai", "pai"],
+        "birthDate": ["data de nascimento", "nascimento"],
+        "email": ["email", "e-mail"],
+        "certificate": ["tipo de certidao", "natureza"]
+      },
+      "selectAliases": {
+        "certificate": ["tipo de certidao", "natureza"],
+        "instance": ["instancia", "grau"]
+      }
+    }
+  }
+}

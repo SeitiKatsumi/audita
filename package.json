@@ -7,6 +7,7 @@
     "start": "node server.mjs",
     "dev": "PORT=3001 node server.mjs",
     "test": "node --test",
+    "smoke:production": "node scripts/smoke-production.mjs",
     "discover:state-courts": "node scripts/discover-state-courts.mjs"
   },
   "dependencies": {

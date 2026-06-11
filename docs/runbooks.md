@@ -11,6 +11,16 @@
 7. Rodar smoke test.
 8. Monitorar logs e metricas.
 
+## Portais bloqueados fora do Brasil
+
+1. Confirmar que o app em producao roda em VPS brasileira.
+2. Confirmar `APP_URL`, `DATABASE_URL`, `AUDITA_AUTH_REQUIRED` e cookies seguros.
+3. Confirmar que `AUDITA_REMOTE_ASSISTED_BROWSER=true` esta habilitado quando houver validacao humana.
+4. Rodar `AUDITA_BASE_URL=https://audita.seudominio.com.br npm run smoke:production`.
+5. Executar uma consulta sem CAPTCHA e confirmar PDF/protocolo no resultado.
+6. Executar uma consulta com CAPTCHA/Cloudflare e confirmar que a etapa assistida aparece no Audita.
+7. Conferir logs do collector antes de concluir que o portal esta indisponivel.
+
 ## Rollback
 
 1. Identificar versao anterior estavel.

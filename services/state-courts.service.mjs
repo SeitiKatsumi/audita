@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const catalogPath = join(root, "data", "state-courts.json");
+const mappingsPath = join(root, "data", "state-court-mappings.json");
 
 let cachedCatalog = null;
 
@@ -53,9 +54,25 @@ export const STATE_COURT_CERTIFICATE_LABELS = {
 
 export function getStateCourtCatalog() {
   if (!cachedCatalog) {
-    cachedCatalog = JSON.parse(readFileSync(catalogPath, "utf-8"));
+    const catalog = JSON.parse(readFileSync(catalogPath, "utf-8"));
+    const mappings = readStateCourtMappings();
+    cachedCatalog = {
+      ...catalog,
+      profiles: (catalog.profiles || []).map((profile) => ({
+        ...profile,
+        ...(mappings.profiles?.[profile.uf] || {}),
+      })),
+    };
   }
   return cachedCatalog;
+}
+
+function readStateCourtMappings() {
+  try {
+    return JSON.parse(readFileSync(mappingsPath, "utf-8"));
+  } catch {
+    return { profiles: {} };
+  }
 }
 
 export function listStateCourtProfiles() {

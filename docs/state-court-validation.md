@@ -24,18 +24,18 @@ Os testes praticos usaram dados autorizados informados pelo usuario na sessao, c
 | SP | TJSP | Assistido funcional | ESAJ preenche fluxo e pausa em reCAPTCHA oficial. | Validacao humana e captura do PDF pos-CAPTCHA. |
 | AP | TJAP | Bloqueio oficial | Portal chega em Cloudflare/Azion antes do formulario. | Manter fluxo assistido externo; mapear pos-validacao. |
 | CE | TJCE | Assistido funcional / CAPTCHA | Formulario SIRECE carrega e aceita preenchimento; ao confirmar, retorna "Selecione o Captcha!". | Manter pausa assistida e mapear captura do protocolo/PDF apos validacao humana. |
-| RJ | TJRJ | Parcial / wizard | Portal abre selecao de comarca/modelo, mas o wizard nao expoe campos finais sem mapear clique de modelo e etapas seguintes. | Mapear seletores do wizard CJE: modelo, requerente, pesquisado, local e resumo. |
-| MA | TJMA | Parcial / login | Portal indica login/controle oficial; nenhum campo confiavel preenchido. | Confirmar se ha fluxo publico sem login e mapear formulario. |
-| MG | TJMG | Parcial / login | Portal indica login/controle oficial; nenhum campo confiavel preenchido. | Mapear fluxo publico especifico. |
-| PR | TJPR | Parcial assistido | Formulario publico de 2º grau carregado; 9 campos preenchidos e pausa em confirmacao oficial. | Mapear envio/download conclusivo e separar 1º grau, que exige contato com distribuidor. |
-| RN | TJRN | Mapeamento pendente | Portal carrega, mas nenhum campo confiavel foi preenchido. | Mapear seletores do formulario. |
-| TO | TJTO | Mapeamento pendente | Portal carrega, mas nenhum campo confiavel foi preenchido. | Mapear seletores e fluxo eproc. |
-| PB | TJPB | Mapeamento pendente / protecao | Portal carrega, mas nenhum campo confiavel foi preenchido. | Mapear pos-protecao e formulario. |
-| SC | TJSC | Mapeamento pendente / CAPTCHA | Portal carrega, mas nenhum campo confiavel foi preenchido. | Mapear formulario e validacao. |
-| RR | TJRR | Parcial | Portal carrega e preenche 1 campo. | Mapear seletores Projudi TJRR. |
-| MT | TJMT | Instavel / acesso | Em rodada anterior abriu parcialmente; na ultima inspecao retornou `ERR_CONNECTION_RESET`. | Revalidar disponibilidade e mapear campos obrigatorios faltantes quando o portal estabilizar. |
+| RJ | TJRJ | Mapeado assistido / wizard | Catalogo agora possui aliases de campos, defaults e navegacao inicial para Capital/Acoes Civeis/tipo de pessoa. | Revalidar wizard final, envio e captura de protocolo/PDF. |
+| MA | TJMA | Mapeado assistido / login | Catalogo agora possui aliases e navegacao para entrada Cidadao, mas o portal pode exigir login/controle oficial. | Confirmar fluxo publico sem login e validar campos finais. |
+| MG | TJMG | Mapeado assistido / login | Catalogo agora possui aliases/defaults para instancia, comarca, finalidade e dados pessoais. | Validar fluxo publico especifico e checkpoint oficial. |
+| PR | TJPR | Mapeado assistido | Formulario publico de 2 grau possui aliases/defaults para pessoa fisica, contato e natureza. | Mapear envio/download conclusivo e separar 1 grau, que exige contato com distribuidor. |
+| RN | TJRN | Mapeado assistido | Catalogo agora possui aliases para documento, nome, filiacao, contato e tipo de certidao. | Revalidar seletores reais do formulario. |
+| TO | TJTO | Mapeado assistido / eproc | Catalogo agora possui aliases/defaults para eproc 1 grau. | Revalidar captcha/fluxo eproc e retorno final. |
+| PB | TJPB | Mapeado assistido / protecao | Catalogo agora possui aliases/defaults; portal pode bloquear por protecao oficial. | Mapear pos-protecao e captura final. |
+| SC | TJSC | Mapeado assistido / CAPTCHA | Catalogo agora possui aliases/defaults para formulario e validacao. | Revalidar captcha e download/protocolo. |
+| RR | TJRR | Mapeado assistido / Projudi | Catalogo agora possui aliases/defaults para Projudi TJRR. | Revalidar seletores e retorno final. |
+| MT | TJMT | Adapter especifico / instavel acesso | Adapter SEC ja preenche documento, nascimento, nome e tipo; catalogo ganhou aliases/defaults. | Revalidar disponibilidade quando o portal parar de retornar `ERR_CONNECTION_RESET`. |
 | SE | TJSE | 100% funcional | Portal consultado automaticamente; certidao existente localizada pelo protocolo, PDF baixado, texto extraido e `nada_consta` identificado. | Validar natureza criminal e novas emissoes sem certidao preexistente. |
-| BA | TJBA | Falha de acesso no teste | `Invoke-WebRequest` nao conectou e Playwright retornou `ERR_CONNECTION_TIMED_OUT` no portal oficial. | Revalidar disponibilidade do portal e rota de rede antes de ajustar adapter. |
+| BA | TJBA | Adapter especifico / falha de acesso | Adapter ja preenche tipo de pessoa/modelo/participacao e pausa no reCAPTCHA; catalogo ganhou aliases/defaults. | Revalidar disponibilidade do portal e rota de rede antes de captura pos-CAPTCHA. |
 | AC | TJAC | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
 | PA | TJPA | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
 | PE | TJPE | Manual | Catalogado sem adapter Playwright ativo. | Mapear portal. |
@@ -49,6 +49,7 @@ Os testes praticos usaram dados autorizados informados pelo usuario na sessao, c
 - Corrigido mapeamento de modelos ESAJ por UF para AL, AM, MS e SP.
 - Corrigida agregacao de resultado para fluxos estaduais que retornavam `success` mas eram marcados como `indisponivel`.
 - Ajustada classificacao do fallback generico: portal carregado com zero campos preenchidos e sem CAPTCHA/login agora vira `manual_required`/`mapeamento_pendente`, nao "assistido funcional".
+- Adicionados aliases/defaults declarativos para RJ, MA, MG, PR, RN, TO, PB, SC, RR, MT e BA, permitindo que o preenchimento generico reconheca campos e selects desses portais.
 
 ## Validacao em producao
 

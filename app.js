@@ -1452,15 +1452,16 @@ function renderAudit(audit) {
           ${
             normalizedEvidence.length
               ? `<div class="audit-evidence-list">${normalizedEvidence
-                  .map(
-                    (item) => `
+                  .map((item) => {
+                    const evidenceHref = item.href || evidenceDownloadHref(item);
+                    return `
                       <span>
                         <strong>${escapeHtml(item.title || formatStatusLabel(item.type))}</strong>
                         ${item.value ? `<small>${escapeHtml(item.value)}</small>` : ""}
-                        ${item.href ? `<a href="${escapeHtml(item.href)}" target="_blank" rel="noreferrer">Baixar PDF</a>` : ""}
+                        ${evidenceHref ? `<a href="${escapeHtml(evidenceHref)}" target="_blank" rel="noreferrer" download="${escapeHtml(item.fileName || "evidencia.pdf")}">Baixar PDF</a>` : ""}
                       </span>
-                    `,
-                  )
+                    `;
+                  })
                   .join("")}</div>`
               : ""
           }
@@ -1803,6 +1804,8 @@ function renderAssistedInspection(result) {
     <strong>${escapeHtml(labels[result?.status] || "Inspecao concluida")}</strong>
     ${result?.protocol ? `<p>Protocolo: ${escapeHtml(result.protocol)}</p>` : ""}
     ${result?.textSample ? `<small>${escapeHtml(result.textSample)}</small>` : ""}
+    ${result?.pdfDownloaded ? `<small>PDF oficial baixado e pronto para anexar.</small>` : ""}
+    ${result?.pdfDownloadError ? `<small>PDF localizado, mas o download automatico falhou: ${escapeHtml(result.pdfDownloadError)}</small>` : ""}
     ${
       pdfLinks.length
         ? `<div class="assisted-result-links">${pdfLinks
@@ -1811,7 +1814,7 @@ function renderAssistedInspection(result) {
         : ""
     }
     ${result?.evidenceScreenshot ? `<small>Captura da tela oficial pronta para anexar.</small>` : ""}
-    ${result?.status === "result_available" || result?.evidenceScreenshot ? `<button class="secondary-action" type="button" data-assisted-action="use-inspection">Usar como evidencia</button>` : ""}
+    ${result?.status === "result_available" || result?.pdfDownloaded || result?.evidenceScreenshot ? `<button class="secondary-action" type="button" data-assisted-action="use-inspection">Usar como evidencia</button>` : ""}
   `;
 }
 
@@ -1836,36 +1839,57 @@ async function inspectAssistedRemoteResult(sessionId) {
     }
     const data = await response.json();
     const cached = assistedRemoteSessions.get(sessionId) || {};
-    assistedRemoteSessions.set(sessionId, { ...cached, inspection: data.result });
+    const updatedSession = { ...cached, inspection: data.result };
+    assistedRemoteSessions.set(sessionId, updatedSession);
     target.innerHTML = renderAssistedInspection(data.result);
+    if (data.result?.pdfDownloaded && !updatedSession.autoAttachedPdf) {
+      const attached = await useAssistedInspectionAsEvidence(sessionId, { autoSubmit: true });
+      if (attached) {
+        assistedRemoteSessions.set(sessionId, { ...updatedSession, autoAttachedPdf: true });
+      }
+    }
   } catch {
     target.innerHTML = `<span>Falha ao inspecionar a sessao.</span>`;
   }
 }
 
-function useAssistedInspectionAsEvidence(sessionId) {
+async function useAssistedInspectionAsEvidence(sessionId, { autoSubmit = false } = {}) {
   const panel = document.querySelector(`[data-assisted-session="${CSS.escape(sessionId)}"]`);
   const form = panel?.closest(".audit-source-item")?.querySelector(".audit-evidence-form");
   const inspection = assistedRemoteSessions.get(sessionId)?.inspection;
-  if (!form || !inspection) return;
+  if (!form || !inspection) return false;
   const firstPdf = Array.isArray(inspection.pdfLinks) ? inspection.pdfLinks[0] : null;
+  const downloadedPdf = Boolean(inspection.pdfDownloaded && inspection.pdfContentBase64);
   const pending = inspection.status === "captcha_pending";
-  const evidenceType = firstPdf ? "official_url" : inspection.protocol ? "protocol" : pending ? "manual_step" : "summary";
+  const evidenceType = downloadedPdf ? "pdf" : firstPdf ? "official_url" : inspection.protocol ? "protocol" : pending ? "manual_step" : "summary";
   form.elements.evidenceType.value = evidenceType;
-  form.elements.title.value = firstPdf
+  form.elements.title.value = downloadedPdf
+    ? "PDF da certidao baixado"
+    : firstPdf
     ? "PDF da certidao localizado"
     : inspection.protocol
       ? "Protocolo localizado"
       : pending
         ? "Checkpoint de validacao oficial"
         : "Resultado inspecionado";
-  form.elements.value.value = firstPdf?.href || inspection.protocol || (pending ? "Validacao oficial pendente na sessao assistida." : inspection.textSample || "");
-  if (form.elements.generatedFileName && form.elements.generatedContentBase64 && inspection.evidenceScreenshot) {
-    form.elements.generatedFileName.value = inspection.evidenceFileName || "audita-sessao-assistida.jpg";
-    form.elements.generatedContentBase64.value = String(inspection.evidenceScreenshot).split(",")[1] || "";
+  form.elements.value.value = downloadedPdf
+    ? inspection.pdfRawText || inspection.textSample || "PDF oficial baixado da sessao assistida."
+    : firstPdf?.href || inspection.protocol || (pending ? "Validacao oficial pendente na sessao assistida." : inspection.textSample || "");
+  if (form.elements.generatedFileName && form.elements.generatedContentBase64) {
+    if (downloadedPdf) {
+      form.elements.generatedFileName.value = inspection.pdfFileName || "certidao-assistida.pdf";
+      form.elements.generatedContentBase64.value = inspection.pdfContentBase64;
+    } else if (inspection.evidenceScreenshot) {
+      form.elements.generatedFileName.value = inspection.evidenceFileName || "audita-sessao-assistida.jpg";
+      form.elements.generatedContentBase64.value = String(inspection.evidenceScreenshot).split(",")[1] || "";
+    }
   }
   form.scrollIntoView({ behavior: "smooth", block: "center" });
   form.elements.value.focus();
+  if (autoSubmit && downloadedPdf) {
+    return submitAuditEvidenceForm(form, { silent: true });
+  }
+  return true;
 }
 
 function renderDocumentAiPanel(audit, executions) {
@@ -2113,6 +2137,14 @@ function toPdfPublicUrl(pdfPath) {
   }
   const fileName = String(pdfPath).split(/[\\/]/).pop();
   return fileName ? `/storage/pdfs/${encodeURIComponent(fileName)}` : "";
+}
+
+function evidenceDownloadHref(item) {
+  const contentBase64 = String(item?.contentBase64 || "").trim();
+  if (!contentBase64 || item?.type !== "pdf") {
+    return "";
+  }
+  return `data:application/pdf;base64,${contentBase64}`;
 }
 
 function getAuditOfficialUrl(sourceId) {
@@ -3002,6 +3034,7 @@ auditSourceList.addEventListener("click", async (event) => {
   const action = actionButton.dataset.assistedAction;
   if (action === "refresh") {
     await loadAssistedRemoteSession(sessionId, { force: true });
+    await inspectAssistedRemoteResult(sessionId);
     return;
   }
   if (action === "submit") {
@@ -3017,7 +3050,7 @@ auditSourceList.addEventListener("click", async (event) => {
     return;
   }
   if (action === "use-inspection") {
-    useAssistedInspectionAsEvidence(sessionId);
+    await useAssistedInspectionAsEvidence(sessionId);
     return;
   }
   if (action === "close") {
@@ -3061,6 +3094,10 @@ auditSourceList.addEventListener("submit", async (event) => {
   }
 
   event.preventDefault();
+  await submitAuditEvidenceForm(form);
+});
+
+async function submitAuditEvidenceForm(form, { silent = false } = {}) {
   auditError.textContent = "";
 
   const file = form.elements.file.files[0];
@@ -3086,22 +3123,23 @@ auditSourceList.addEventListener("submit", async (event) => {
     });
 
     if (response.status === 401) {
-      showLogin("Entre para anexar evidências.");
-      return;
+      showLogin("Entre para anexar evidencias.");
+      return false;
     }
 
     if (!response.ok) {
-      auditError.textContent = "Não foi possível anexar a evidência.";
-      return;
+      if (!silent) auditError.textContent = "Nao foi possivel anexar a evidencia.";
+      return false;
     }
 
     const data = await response.json();
     renderAudit(data.audit);
+    return true;
   } catch {
-    auditError.textContent = "Falha ao anexar evidência.";
+    if (!silent) auditError.textContent = "Falha ao anexar evidencia.";
+    return false;
   }
-});
-
+}
 consultationForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   consultationError.textContent = "";

@@ -4,6 +4,11 @@
 
 O deploy sera realizado via CapRover/Docker em VPS propria.
 
+Para portais governamentais que bloqueiam acessos fora do Brasil, o backend e o
+Playwright devem rodar em uma VPS com IP brasileiro. O operador pode acessar a
+interface de qualquer pais, mas as consultas saem do Chromium do servidor. Veja
+o runbook completo em [Deploy Brasil](deployment-brasil.md).
+
 ## Estrategia recomendada
 
 ```text
@@ -88,6 +93,12 @@ Antes de cada deploy em producao:
 - validar migracoes;
 - definir caminho de rollback;
 - executar smoke test pos-deploy.
+
+Smoke test recomendado:
+
+```bash
+AUDITA_BASE_URL=https://audita.seudominio.com.br npm run smoke:production
+```
 
 ## Arquivos esperados
 

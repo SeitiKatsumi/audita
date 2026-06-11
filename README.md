@@ -45,6 +45,7 @@ A stack final da aplicacao deve ser confirmada em ADR antes da primeira implemen
 - [Consultas governamentais](docs/government-consultations.md)
 - [Modulo de auditoria CPF/CNPJ](docs/audit-module.md)
 - [Deploy](docs/deployment.md)
+- [Deploy Brasil para portais governamentais](docs/deployment-brasil.md)
 - [Seguranca](docs/security.md)
 - [Operacoes](docs/operations.md)
 - [Runbooks](docs/runbooks.md)
@@ -79,6 +80,10 @@ O projeto inclui:
 
 No CapRover, configure o app para usar a porta interna `8080`.
 
+Para consultas em portais que bloqueiam IP fora do Brasil, hospede o backend e
+o Playwright em uma VPS brasileira seguindo o runbook
+[Deploy Brasil para portais governamentais](docs/deployment-brasil.md).
+
 Variaveis minimas do app `audita-staging` no CapRover:
 
 ```text
@@ -95,6 +100,12 @@ AUDITA_BOOTSTRAP_ADMIN_EMAIL=admin@seudominio.com
 AUDITA_BOOTSTRAP_ADMIN_PASSWORD=SENHA_FORTE
 AUDITA_BOOTSTRAP_ADMIN_NAME=Audita Admin
 COOKIE_SECURE=true
+```
+
+Smoke test pos-deploy:
+
+```bash
+AUDITA_BASE_URL=https://audita.seudominio.com.br npm run smoke:production
 ```
 
 Nao commite valores reais de `DATABASE_URL`.
