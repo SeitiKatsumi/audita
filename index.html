@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260608-assisted-stable12" />
+    <link rel="stylesheet" href="styles.css?v=20260720-chat-1" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -16,7 +16,7 @@
         <div class="login-heading">
           <p class="eyebrow" id="loginEyebrow">Acesso seguro</p>
           <h1 id="loginTitle">Audita</h1>
-          <p>Entre para acessar o ambiente de auditoria da sua organização.</p>
+          <p>Entre para acessar o ambiente de auditoria da sua organiza&ccedil;&atilde;o.</p>
         </div>
 
         <label class="hidden" id="loginNameField">
@@ -44,42 +44,46 @@
 
     <div class="shell">
       <button class="mobile-menu-button" id="mobileMenuButton" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
-      <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
-        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher menu" title="Recolher menu">‹</button>
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher menu" title="Recolher menu">&lsaquo;</button>
+      <aside class="sidebar" id="sidebar" aria-label="Navega&ccedil;&atilde;o principal">
         <div class="brand">
           <img class="brand-logo" src="assets/audita-logo-white.svg" alt="Audita" />
           <div>
             <strong>Audita</strong>
             <small>Elevenmind</small>
-            <small class="deploy-version" id="deployVersion">versão local</small>
+            <small class="deploy-version" id="deployVersion">vers&atilde;o local</small>
           </div>
         </div>
 
         <nav class="nav-list">
           <a class="active" href="#home">Home</a>
+          <a class="nav-ai" href="/chat" data-app-route="chat">
+            <span class="nav-ai-mark" aria-hidden="true">A</span>
+            Audita IA
+          </a>
           <details class="nav-group" open>
             <summary>Assistente de Consultas</summary>
-            <details class="nav-subgroup" open>
-              <summary>Tribunais estaduais</summary>
-              <a class="nav-grandchild" href="#consulta-tjdft-pf">Pessoa física</a>
-              <a class="nav-grandchild" href="#consulta-tjdft-pj">Pessoa jurídica</a>
-            </details>
-            <a class="nav-child" href="#consulta-receita">Receita/CNPJ</a>
-            <a class="nav-child" href="#consulta-pgfn">PGFN/CND</a>
-            <a class="nav-child" href="#consulta-cndt">CNDT/TST</a>
-            <a class="nav-child" href="#consulta-trf1">TRF1</a>
-            <a class="nav-child" href="#consulta-fgts">FGTS/CEF</a>
+            <a class="nav-child" href="#consulta-tjdft-pf" data-nav-pages="consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj">
+              Certid&otilde;es estaduais
+            </a>
+            <a class="nav-child" href="#consulta-imoveis">Busca de im&oacute;veis</a>
+            <a class="nav-child" href="#consulta-cnib">Indisponibilidade de bens</a>
           </details>
-          <a href="#historico">Histórico de consultas</a>
+          <a href="#historico">Hist&oacute;rico de consultas</a>
           <a href="#meu-painel">Meu painel</a>
         </nav>
 
-        <div class="environment">
-          <span class="pulse"></span>
-          <div>
-            <strong id="environmentName">Local</strong>
-            <small id="environmentDetail">Ambiente Audita</small>
+        <div class="sidebar-footer">
+          <div class="environment">
+            <span class="pulse"></span>
+            <div>
+              <strong id="environmentName">Local</strong>
+              <small id="environmentDetail">Ambiente Audita</small>
+            </div>
           </div>
+          <button class="sidebar-logout hidden" id="logoutButton" type="button" aria-label="Sair" title="Sair">
+            <strong>Sair</strong>
+          </button>
         </div>
       </aside>
 
@@ -89,30 +93,109 @@
             <p class="eyebrow" id="pageEyebrow">Plataforma de consulta e auditoria</p>
             <h1 id="pageTitle">Audita</h1>
           </div>
-        <div class="actions">
-            <button class="icon-button" aria-label="Atualizar dados" title="Atualizar dados">R</button>
+          <div class="actions">
             <button class="secondary-action" id="loginButton" type="button">Entrar</button>
-            <button class="icon-button hidden" id="logoutButton" aria-label="Sair" title="Sair">S</button>
           </div>
         </header>
+
+        <section class="chat-page" id="chat" data-page="chat">
+          <aside class="chat-threads" aria-label="Conversas recentes">
+            <a class="chat-home-link" href="/#home" aria-label="Voltar ao Audita">
+              <img src="assets/audita-logo-white.svg" alt="" />
+              <span>Audita</span>
+            </a>
+            <div class="chat-threads-header">
+              <strong>Conversas</strong>
+              <button class="chat-icon-button" id="chatNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
+            </div>
+            <div class="chat-thread-list" id="chatThreadList"></div>
+            <p class="chat-privacy-note">Dados pessoais devem ser informados somente nos formul&aacute;rios seguros de consulta.</p>
+          </aside>
+
+          <div class="chat-main">
+            <header class="chat-header">
+              <a class="chat-assistant-identity" href="/#home" aria-label="Voltar ao Audita">
+                <span class="chat-logo-frame"><img src="assets/audita-logo-white.svg" alt="" /></span>
+                <div>
+                  <strong>Audita IA</strong>
+                  <small><span class="chat-online-dot" aria-hidden="true"></span>Especialista jur&iacute;dica</small>
+                </div>
+              </a>
+              <div class="chat-header-actions">
+                <button class="chat-tools-button" id="chatToolsButton" type="button" aria-expanded="false" aria-controls="chatToolsPanel">
+                  Ferramentas <span id="chatToolCount">5</span>
+                </button>
+                <button class="chat-icon-button chat-mobile-new" id="chatMobileNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
+              </div>
+              <div class="chat-tools-panel hidden" id="chatToolsPanel">
+                <a href="/#consulta-tjdft-pf"><span class="tool-status active"></span><strong>Certid&otilde;es estaduais</strong><small>Autom&aacute;tico e assistido</small></a>
+                <div><span class="tool-status active"></span><strong>IBGE</strong><small>API p&uacute;blica ativa</small></div>
+                <a href="/#consulta-imoveis"><span class="tool-status review"></span><strong>Busca de im&oacute;veis</strong><small>Em homologa&ccedil;&atilde;o</small></a>
+                <a href="/#consulta-cnib"><span class="tool-status pending"></span><strong>Indisponibilidade</strong><small>Aguardando provedor</small></a>
+                <a href="/#historico"><span class="tool-status active"></span><strong>Hist&oacute;rico</strong><small>Consultas do usu&aacute;rio</small></a>
+              </div>
+            </header>
+
+            <main class="chat-messages" id="chatMessages" tabindex="-1" aria-live="polite">
+              <section class="chat-empty-state" id="chatEmptyState">
+                <span class="chat-welcome-logo"><img src="assets/audita-logo-white.svg" alt="Audita" /></span>
+                <p class="eyebrow">Intelig&ecirc;ncia jur&iacute;dica</p>
+                <h2>Como posso ajudar?</h2>
+                <p>Conte o que voc&ecirc; precisa verificar. Eu organizo o caminho e aciono as fontes adequadas.</p>
+                <div class="chat-suggestions" aria-label="Sugest&otilde;es de consulta">
+                  <button type="button" data-chat-prompt="Preciso emitir certidoes estaduais para uma pessoa fisica. Por onde comecamos?">
+                    <strong>Emitir certid&otilde;es estaduais</strong>
+                    <small>Organizar documentos e tribunal</small>
+                  </button>
+                  <button type="button" data-chat-prompt="Quero verificar a indisponibilidade de bens de um vendedor. Explique o fluxo atual.">
+                    <strong>Verificar indisponibilidade</strong>
+                    <small>Entender fonte, risco e pr&oacute;xima a&ccedil;&atilde;o</small>
+                  </button>
+                  <button type="button" data-chat-prompt="Quero pesquisar bens imoveis vinculados a uma pessoa. Como a Audita pode ajudar?">
+                    <strong>Pesquisar im&oacute;veis</strong>
+                    <small>Escolher a modalidade adequada</small>
+                  </button>
+                  <button type="button" data-chat-prompt="Quais consultas e analises a Audita consegue fazer hoje?">
+                    <strong>Explorar capacidades</strong>
+                    <small>Ver ferramentas ativas e em evolu&ccedil;&atilde;o</small>
+                  </button>
+                </div>
+              </section>
+            </main>
+
+            <div class="chat-error hidden" id="chatError" role="alert"></div>
+            <form class="chat-composer" id="chatForm">
+              <textarea
+                id="chatInput"
+                rows="1"
+                maxlength="5000"
+                placeholder="Pergunte &agrave; Audita"
+                aria-label="Mensagem para a Audita"
+                required
+              ></textarea>
+              <button class="chat-send-button" id="chatSendButton" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem">&#8593;</button>
+              <small>A Audita apoia sua an&aacute;lise. Valide decis&otilde;es jur&iacute;dicas relevantes.</small>
+            </form>
+          </div>
+        </section>
 
         <section class="home-hero" id="home" data-page="home">
           <article class="home-hero-panel">
             <div class="home-hero-copy">
-              <span class="hero-pill"><span></span>Inteligência Jurídica</span>
+              <span class="hero-pill"><span></span>Intelig&ecirc;ncia Jur&iacute;dica</span>
               <h2>
-                Certidões e documentações com
-                <em>análise inteligente</em>, laudos completos e uma linguagem simples para
-                <em>decisões mais seguras</em>.
+                Certid&otilde;es e documenta&ccedil;&otilde;es com
+                <em>an&aacute;lise inteligente</em>, laudos completos e uma linguagem simples para
+                <em>decis&otilde;es mais seguras</em>.
               </h2>
               <div class="home-hero-features" aria-label="Recursos principais">
-                <span><i aria-hidden="true">□</i>Certidões e documentações</span>
-                <span><i aria-hidden="true">◇</i>Análise inteligente</span>
+                <span><i aria-hidden="true">□</i>Certid&otilde;es e documenta&ccedil;&otilde;es</span>
+                <span><i aria-hidden="true">◇</i>An&aacute;lise inteligente</span>
                 <span><i aria-hidden="true">✓</i>Laudos completos</span>
                 <span><i aria-hidden="true">○</i>Linguagem simples</span>
               </div>
             </div>
-            <canvas id="signalCanvas" width="760" height="360" aria-label="Visualização de sinais analíticos"></canvas>
+            <canvas id="signalCanvas" width="760" height="360" aria-label="Visualiza&ccedil;&atilde;o de sinais anal&iacute;ticos"></canvas>
           </article>
         </section>
 
@@ -125,17 +208,17 @@
           <article>
             <small>Fontes conectadas</small>
             <strong>37</strong>
-            <span>Judicial, fiscal, imóveis e APIs</span>
+            <span>Judicial, fiscal, im&oacute;veis e APIs</span>
           </article>
           <article>
-            <small>Alertas críticos</small>
+            <small>Alertas cr&iacute;ticos</small>
             <strong>9</strong>
-            <span>3 exigem revisão humana</span>
+            <span>3 exigem revis&atilde;o humana</span>
           </article>
           <article>
-            <small>Tempo médio</small>
+            <small>Tempo m&eacute;dio</small>
             <strong>4.8s</strong>
-            <span>Análise preliminar</span>
+            <span>An&aacute;lise preliminar</span>
           </article>
         </section>
 
@@ -144,22 +227,22 @@
             <div class="module-header">
               <div>
                 <p class="eyebrow">Assistente Audita</p>
-                <h2>Consultar órgãos por código</h2>
+                <h2>Consultar &oacute;rg&atilde;os por c&oacute;digo</h2>
               </div>
               <span class="live" id="assistantSourceStatus">Fontes oficiais</span>
             </div>
 
             <form class="assistant-query-form" id="assistantQueryForm">
               <label>
-                Órgão ou fonte
+                &Oacute;rg&atilde;o ou fonte
                 <select id="assistantSource" required></select>
               </label>
               <label>
-                Código ou identificador
+                C&oacute;digo ou identificador
                 <input
                   id="assistantCode"
                   type="text"
-                  placeholder="Ex: SP, 3550308, CNPJ, processo ou código da API"
+                  placeholder="Ex: SP, 3550308, CNPJ, processo ou c&oacute;digo da API"
                   autocomplete="off"
                 />
               </label>
@@ -168,7 +251,7 @@
                 <textarea
                   id="assistantPrompt"
                   rows="3"
-                  placeholder="Ex: Consulte esse código e resuma os principais dados encontrados."
+                  placeholder="Ex: Consulte esse c&oacute;digo e resuma os principais dados encontrados."
                   required
                 ></textarea>
               </label>
@@ -180,7 +263,7 @@
             </small>
 
             <div class="agent-answer assistant-result" id="assistantResult">
-              <p>Selecione uma fonte, informe o código quando necessário e descreva a consulta.</p>
+              <p>Selecione uma fonte, informe o c&oacute;digo quando necess&aacute;rio e descreva a consulta.</p>
             </div>
           </article>
         </section>
@@ -188,7 +271,7 @@
         <section
           class="consultation-grid"
           id="consultas"
-          data-page="consultas consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts historico"
+          data-page="consultas consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-imoveis consulta-cnib consulta-receita consulta-pgfn consulta-cndt consulta-trf1 consulta-fgts historico"
         >
           <article class="module agent-panel" data-page="integracoes">
             <div class="module-header">
@@ -205,7 +288,7 @@
                 <textarea
                   id="agentQuestion"
                   rows="3"
-                  placeholder="Ex: Liste os estados do Brasil pelo IBGE ou Quais municípios existem em SP?"
+                  placeholder="Ex: Liste os estados do Brasil pelo IBGE ou Quais munic&iacute;pios existem em SP?"
                   required
                 ></textarea>
               </label>
@@ -214,12 +297,12 @@
 
             <div class="prompt-suggestions">
               <button type="button" data-question="Liste os estados do Brasil pela base do IBGE.">Estados do Brasil</button>
-              <button type="button" data-question="Quais municípios existem em SP segundo o IBGE?">Municípios de SP</button>
+              <button type="button" data-question="Quais munic&iacute;pios existem em SP segundo o IBGE?">Munic&iacute;pios de SP</button>
               <button type="button" data-question="Mostre exemplos de classes CNAE do IBGE.">Classes CNAE</button>
             </div>
 
             <div class="agent-answer" id="agentAnswer">
-              <p>Faça uma pergunta em linguagem natural. Eu busco na fonte oficial disponível e resumo o resultado.</p>
+              <p>Fa&ccedil;a uma pergunta em linguagem natural. Eu busco na fonte oficial dispon&iacute;vel e resumo o resultado.</p>
             </div>
           </article>
 
@@ -229,7 +312,7 @@
                 <p class="eyebrow">IA generativa</p>
                 <h2>API ChatGPT/OpenAI</h2>
               </div>
-              <span class="live" id="agentSettingsStatus">Não configurada</span>
+              <span class="live" id="agentSettingsStatus">N&atilde;o configurada</span>
             </div>
 
             <form class="agent-settings-form" id="agentSettingsForm">
@@ -254,11 +337,11 @@
                 Prompt base do agente
                 <textarea id="agentSystemPrompt" rows="4" required>Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.</textarea>
               </label>
-              <button class="primary-action" type="submit">Salvar configuração</button>
+              <button class="primary-action" type="submit">Salvar configura&ccedil;&atilde;o</button>
             </form>
 
             <small class="consultation-note">
-              A chave real deve ficar no CapRover como variável/secret. Aqui salve apenas o nome da variável.
+              A chave real deve ficar no CapRover como vari&aacute;vel/secret. Aqui salve apenas o nome da vari&aacute;vel.
             </small>
             <small class="login-error" id="agentSettingsError" role="alert"></small>
           </article>
@@ -269,28 +352,28 @@
           >
             <div class="module-header">
               <div>
-                <p class="eyebrow">Auditoria básica</p>
+                <p class="eyebrow">Auditoria b&aacute;sica</p>
                 <h2 id="auditPanelTitle">CPF/CNPJ completo</h2>
               </div>
-              <span class="live" id="auditStatusLabel">14 fontes</span>
+              <span class="live" id="auditStatusLabel">15 fontes</span>
             </div>
 
             <form class="audit-form audit-wizard" id="auditForm">
               <div class="audit-stepper" aria-label="Etapas da consulta">
                 <button class="active" type="button" data-audit-step-button="1"><span>1</span>Documentos</button>
-                <button type="button" data-audit-step-button="2"><span>2</span>Informações</button>
+                <button type="button" data-audit-step-button="2"><span>2</span>Informa&ccedil;&otilde;es</button>
                 <button type="button" data-audit-step-button="3"><span>3</span>Resultados</button>
               </div>
 
               <section class="audit-step-panel" data-audit-step-panel="1">
                 <div class="audit-step-copy">
                   <strong>Escolha os documentos</strong>
-                  <small>Selecione quais certidões e consultas deseja gerar no resultado.</small>
+                  <small>Selecione quais certid&otilde;es e consultas deseja gerar no resultado.</small>
                 </div>
                 <label class="state-court-picker" id="stateCourtPicker">
                   Filtrar por estado
                   <select id="stateCourtUf"></select>
-                  <small id="stateCourtHint">DF usa automação TJDFT. Outros estados abrem o portal oficial mapeado.</small>
+                  <small id="stateCourtHint">DF usa automa&ccedil;&atilde;o TJDFT. Outros estados abrem o portal oficial mapeado.</small>
                 </label>
                 <fieldset class="audit-options">
                   <legend>Documentos desejados</legend>
@@ -299,15 +382,16 @@
                   <label><input type="checkbox" name="auditView" value="cndt" /> CNDT/TST</label>
                   <label><input type="checkbox" name="auditView" value="trf1" /> TRF1</label>
                   <label><input type="checkbox" name="auditView" value="tjdft" /> Tribunais estaduais</label>
+                  <label><input type="checkbox" name="auditView" value="imoveis_onr" /> Busca de im&oacute;veis</label>
+                  <label><input type="checkbox" name="auditView" value="cnib" /> Indisponibilidade de bens</label>
                   <label><input type="checkbox" name="auditView" value="fgts" /> FGTS/CEF</label>
-                  <label><input type="checkbox" name="auditView" value="portal_transparencia" /> Sanções/CGU</label>
+                  <label><input type="checkbox" name="auditView" value="portal_transparencia" /> San&ccedil;&otilde;es/CGU</label>
                 </fieldset>
               </section>
 
               <section class="audit-step-panel hidden" data-audit-step-panel="2">
                 <div class="audit-step-copy">
-                  <strong>Preencha os dados necessários</strong>
-                  <small>O Audita pede CPF ou CNPJ conforme os documentos selecionados.</small>
+                  <strong>Dados da consulta</strong>
                 </div>
                 <label class="hidden">
                   Documento
@@ -329,65 +413,54 @@
                   <input id="auditCnpjDocument" type="text" placeholder="Digite o CNPJ" inputmode="numeric" maxlength="18" autocomplete="off" />
                 </label>
                 <fieldset class="audit-extra-fields hidden" id="tjdftFields">
-                  <legend>Dados para tribunal estadual</legend>
-                  <div class="tjdft-person-type" aria-label="Tribunal estadual selecionado">
-                    <span>Tribunal</span>
-                    <strong id="tjdftCourtLabel">TJDFT</strong>
-                  </div>
+                  <legend>Tribunal estadual</legend>
                   <label class="tjdft-court-field">
                     Estado
                     <select id="tjdftCourtUf"></select>
                   </label>
-                  <div class="state-court-portal">
-                    <div>
-                      <strong id="stateCourtPortalTitle">Portal oficial do tribunal</strong>
-                      <small id="stateCourtRequiredFields">Campos comuns: CPF/CNPJ, nome, filia??o e tipo de certid?o.</small>
-                    </div>
-                    <a id="stateCourtPortalLink" href="https://cnc.tjdft.jus.br/solicitacao-externa" target="_blank" rel="noreferrer">Abrir emiss?o oficial</a>
-                  </div>
                   <div class="state-court-assist-panel hidden" id="stateCourtAssistPanel"></div>
                   <div class="state-court-dynamic-fields" id="stateCourtDynamicFields"></div>
                   <div class="tjdft-person-type" aria-label="Tipo de pessoa">
                     <span>Tipo de pessoa</span>
-                    <strong id="tjdftPersonTypeLabel">Pessoa física</strong>
+                    <strong id="tjdftPersonTypeLabel">Pessoa f&iacute;sica</strong>
                   </div>
                   <fieldset class="tjdft-certificate-options">
-                    <legend>Certidões estaduais</legend>
+                    <legend>Certid&otilde;es estaduais</legend>
                     <label><input type="checkbox" name="tjdftCertificateType" value="criminal" checked /> Criminal</label>
-                    <label><input type="checkbox" name="tjdftCertificateType" value="civil" checked /> Cível</label>
-                    <label><input type="checkbox" name="tjdftCertificateType" value="falencia" checked /> Falência e Recuperação Judicial</label>
-                    <label><input type="checkbox" name="tjdftCertificateType" value="especial" checked /> Especial (Cível e Criminal)</label>
+                    <label><input type="checkbox" name="tjdftCertificateType" value="civil" checked /> C&iacute;vel</label>
+                    <label><input type="checkbox" name="tjdftCertificateType" value="falencia" checked /> Fal&ecirc;ncia e Recupera&ccedil;&atilde;o Judicial</label>
+                    <label><input type="checkbox" name="tjdftCertificateType" value="especial" checked /> Especial (C&iacute;vel e Criminal)</label>
                   </fieldset>
                   <label class="tjdft-pf-field">
                     Primeiro nome
                     <input id="auditFirstName" type="text" placeholder="Ex: Aparecido" autocomplete="given-name" />
                   </label>
                   <label class="tjdft-pf-field">
-                    Nome da mãe
-                    <input id="auditMotherName" type="text" placeholder="Nome completo da mãe" autocomplete="off" />
+                    Nome da m&atilde;e
+                    <input id="auditMotherName" type="text" placeholder="Nome completo da m&atilde;e" autocomplete="off" />
                   </label>
                   <label class="tjdft-pf-field">
                     Nome do pai
                     <input id="auditFatherName" type="text" placeholder="Nome completo do pai" autocomplete="off" />
                   </label>
                   <label class="tjdft-pj-field hidden">
-                    Razão social
+                    Raz&atilde;o social
                     <input id="tjdftCompanyName" type="text" placeholder="Nome da empresa, se solicitado" autocomplete="organization" />
                   </label>
                 </fieldset>
                 <fieldset class="audit-extra-fields hidden" id="trf1Fields">
                   <legend>Dados para TRF1/CJF</legend>
                   <label>
-                    Tipo de certidão
+                    Tipo de certid&atilde;o
                     <select id="trf1CertificateType">
                       <option value="Criminal">Criminal</option>
-                      <option value="Cível">Cível</option>
+                      <option value="C&iacute;vel">C&iacute;vel</option>
                     </select>
                   </label>
                   <label>
-                    Órgãos
+                    &Oacute;rg&atilde;os
                     <select id="trf1Orgaos">
-                      <option value="Todos os 4 órgãos selecionados">Todos os 4 órgãos selecionados</option>
+                      <option value="Todos os 4 &Oacute;rg&atilde;os selecionados">Todos os 4 &Oacute;rg&atilde;os selecionados</option>
                       <option value="TRF1">TRF1</option>
                       <option value="TRF2">TRF2</option>
                       <option value="TRF3">TRF3</option>
@@ -398,7 +471,7 @@
                   </label>
                   <label>
                     E-mail
-                    <input id="trf1Email" type="email" placeholder="E-mail para receber a certidão" autocomplete="email" />
+                    <input id="trf1Email" type="email" placeholder="E-mail para receber a certid&atilde;o" autocomplete="email" />
                   </label>
                   <label>
                     Nome social
@@ -408,15 +481,15 @@
                 <fieldset class="audit-extra-fields hidden" id="fgtsFields">
                   <legend>Dados para FGTS/CRF</legend>
                   <label>
-                    Tipo de inscrição
+                    Tipo de inscri&ccedil;&atilde;o
                     <select id="fgtsRegistrationType">
                       <option value="CNPJ">CNPJ</option>
                       <option value="CEI">CEI</option>
                     </select>
                   </label>
                   <label>
-                    Inscrição
-                    <input id="fgtsRegistration" type="text" placeholder="Somente números" autocomplete="off" />
+                    Inscri&ccedil;&atilde;o
+                    <input id="fgtsRegistration" type="text" placeholder="Somente n&uacute;meros" autocomplete="off" />
                   </label>
                   <label>
                     UF
@@ -454,7 +527,7 @@
                 </fieldset>
                 <label class="audit-consent">
                   <input id="auditAuthorization" type="checkbox" required />
-                  Confirmo autorização/base legal para consultar dados pessoais ou empresariais.
+                  Confirmo autoriza&ccedil;&atilde;o/base legal para consultar dados pessoais ou empresariais.
                 </label>
               </section>
 
@@ -470,11 +543,11 @@
                   <p class="empty-state">Informe CPF/CNPJ e escolha o que deseja visualizar.</p>
                 </div>
                 <div class="audit-source-list" id="auditSourceList"></div>
-                <section class="document-ai-panel hidden" id="documentAiPanel" aria-label="Parecer inteligente sobre as certidões">
+                <section class="document-ai-panel hidden" id="documentAiPanel" aria-label="Parecer inteligente sobre as certid&otilde;es">
                   <div class="module-header">
                     <div>
-                      <p class="eyebrow">Inteligência documental</p>
-                      <h2>Parecer de IA sobre as certidões</h2>
+                      <p class="eyebrow">Intelig&ecirc;ncia documental</p>
+                      <h2>Parecer de IA sobre as certid&otilde;es</h2>
                     </div>
                     <span class="live" id="documentAiRisk">Aguardando PDFs</span>
                   </div>
@@ -487,13 +560,13 @@
                       <textarea
                         id="documentAiQuestion"
                         rows="3"
-                        placeholder="Ex: Existe algum risco relevante? A certidão criminal retornou nada consta? O que devo explicar ao cliente?"
+                        placeholder="Ex: Existe algum risco relevante? A certid&atilde;o criminal retornou nada consta? O que devo explicar ao cliente?"
                       ></textarea>
                     </label>
                     <button class="primary-action" id="documentAiQuestionButton" type="button">Perguntar sobre os PDFs</button>
                   </div>
                   <div class="document-ai-answer" id="documentAiAnswer">
-                    <p>Faça uma pergunta para cruzar o conteúdo das certidões com o parecer e os riscos.</p>
+                    <p>Fa&ccedil;a uma pergunta para cruzar o conte&uacute;do das certid&otilde;es com o parecer e os riscos.</p>
                   </div>
                 </section>
               </section>
@@ -511,13 +584,200 @@
             <small class="login-error" id="auditError" role="alert"></small>
           </article>
 
+          <article class="module property-panel" data-page="consulta-imoveis">
+            <div class="module-header property-module-header">
+              <div>
+                <p class="eyebrow">Imobili&aacute;rio</p>
+                <h2>Busca de im&oacute;veis</h2>
+              </div>
+              <div class="property-header-status">
+                <span class="live" id="propertyProviderStatus">ONR / RI Digital</span>
+                <span class="property-credit-badge" id="propertyWalletStatus">Cr&eacute;ditos desativados</span>
+              </div>
+            </div>
+
+            <div class="property-workspace">
+              <form class="property-search-form" id="propertySearchForm">
+                <label>
+                  Servi&ccedil;o
+                  <select id="propertyOperation" required>
+                    <option value="pesquisa_previa">Pesquisa Pr&eacute;via</option>
+                    <option value="pesquisa_qualificada">Pesquisa Qualificada</option>
+                    <option value="certidao_digital">Certid&atilde;o Digital</option>
+                    <option value="indisponibilidade">Indisponibilidade de Bens</option>
+                  </select>
+                </label>
+                <label>
+                  Tipo de documento
+                  <select id="propertyDocumentType" required>
+                    <option value="cpf">CPF</option>
+                    <option value="cnpj">CNPJ</option>
+                  </select>
+                </label>
+                <label>
+                  CPF/CNPJ pesquisado
+                  <input id="propertyDocument" type="text" inputmode="numeric" autocomplete="off" placeholder="Somente n&uacute;meros" required />
+                </label>
+                <label>
+                  Nome/Raz&atilde;o social
+                  <input id="propertySubjectName" type="text" autocomplete="name" placeholder="Nome completo ou raz&atilde;o social" />
+                </label>
+                <label id="propertyUfField">
+                  Estado
+                  <select id="propertyUf" required>
+                    <option value="">Selecione</option>
+                    <option value="AC">Acre</option>
+                    <option value="AL">Alagoas</option>
+                    <option value="AP">Amap&aacute;</option>
+                    <option value="AM">Amazonas</option>
+                    <option value="BA">Bahia</option>
+                    <option value="CE">Cear&aacute;</option>
+                    <option value="DF">Distrito Federal</option>
+                    <option value="ES">Esp&iacute;rito Santo</option>
+                    <option value="GO">Goi&aacute;s</option>
+                    <option value="MA">Maranh&atilde;o</option>
+                    <option value="MG">Minas Gerais</option>
+                    <option value="MS">Mato Grosso do Sul</option>
+                    <option value="MT">Mato Grosso</option>
+                    <option value="PA">Par&aacute;</option>
+                    <option value="PB">Para&iacute;ba</option>
+                    <option value="PE">Pernambuco</option>
+                    <option value="PI">Piau&iacute;</option>
+                    <option value="PR">Paran&aacute;</option>
+                    <option value="RJ">Rio de Janeiro</option>
+                    <option value="RN">Rio Grande do Norte</option>
+                    <option value="RO">Rond&ocirc;nia</option>
+                    <option value="RR">Roraima</option>
+                    <option value="RS">Rio Grande do Sul</option>
+                    <option value="SC">Santa Catarina</option>
+                    <option value="SE">Sergipe</option>
+                    <option value="SP">S&atilde;o Paulo</option>
+                    <option value="TO">Tocantins</option>
+                  </select>
+                </label>
+                <label class="property-detail-field hidden" id="propertyRegistrationField">
+                  Matr&iacute;cula
+                  <input id="propertyRegistrationNumber" type="text" autocomplete="off" placeholder="N&uacute;mero da matr&iacute;cula" />
+                </label>
+                <label class="property-detail-field hidden" id="propertyRegistryField">
+                  <span id="propertyRegistryLabel">Cart&oacute;rio de Registro de Im&oacute;veis</span>
+                  <select id="propertyRegistryOfficeIds" size="5">
+                    <option value="">Selecione o estado para carregar os cart&oacute;rios</option>
+                  </select>
+                  <small id="propertyRegistryHelp">Lista oficial carregada pelo WSRIDIGITAL.</small>
+                </label>
+                <label class="property-detail-field hidden" id="propertyCityField">
+                  Munic&iacute;pio
+                  <input id="propertyCity" type="text" autocomplete="address-level2" />
+                </label>
+                <label class="property-detail-field hidden" id="propertyCertificatePurposeField">
+                  Finalidade LGPD da certid&atilde;o
+                  <select id="propertyCertificatePurpose">
+                    <option value="">Selecione</option>
+                    <option value="1">Avalia&ccedil;&atilde;o de cr&eacute;dito, solv&ecirc;ncia ou responsabilidade civil</option>
+                    <option value="2">Investiga&ccedil;&atilde;o jur&iacute;dica do im&oacute;vel ou invent&aacute;rio</option>
+                    <option value="3">Instru&ccedil;&atilde;o de processo judicial ou administrativo</option>
+                    <option value="4">Titular de direito real registrado sobre o im&oacute;vel</option>
+                    <option value="5">N&atilde;o declarar a finalidade</option>
+                  </select>
+                </label>
+                <label class="audit-consent property-detail-field hidden" id="propertyTransferredField">
+                  <input id="propertyIncludeTransferred" type="checkbox" />
+                  Incluir tamb&eacute;m im&oacute;veis ou direitos transferidos
+                </label>
+                <label class="property-detail-field hidden" id="propertyTransferDateField">
+                  Transfer&ecirc;ncias a partir de
+                  <input id="propertyTransferDate" type="date" />
+                </label>
+
+                <div class="property-operation-summary" id="propertyOperationSummary">
+                  <strong>Pesquisa Pr&eacute;via</strong>
+                  <span>Localiza refer&ecirc;ncias de matr&iacute;culas por CPF/CNPJ nas bases participantes.</span>
+                  <small id="propertyCreditQuote">1 cr&eacute;dito ap&oacute;s registrar o pedido ou resultado</small>
+                </div>
+
+                <label class="audit-consent property-consent">
+                  <input id="propertyAuthorization" type="checkbox" required />
+                  Confirmo autoriza&ccedil;&atilde;o/base legal para consultar os dados informados.
+                </label>
+                <div class="property-form-actions">
+                  <button class="primary-action" id="propertySubmitButton" type="submit">Iniciar consulta</button>
+                </div>
+                <small class="login-error" id="propertySearchError" role="alert"></small>
+              </form>
+
+              <section class="property-result" id="propertySearchResult" aria-live="polite">
+                <div class="property-empty-state">
+                  <strong>Nenhuma consulta iniciada</strong>
+                  <small>Escolha o servi&ccedil;o oficial e informe o CPF ou CNPJ.</small>
+                </div>
+              </section>
+            </div>
+
+            <section class="property-history">
+              <div class="property-section-heading">
+                <strong>Consultas recentes</strong>
+                <span id="propertyHistoryCount">0 registros</span>
+              </div>
+              <div class="property-history-list" id="propertyHistoryList">
+                <p class="empty-state">Nenhuma busca de im&oacute;veis registrada.</p>
+              </div>
+            </section>
+          </article>
+
+          <article class="module cnib-panel" data-page="consulta-cnib">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Imobili&aacute;rio</p>
+                <h2>Indisponibilidade de bens</h2>
+              </div>
+              <span class="live" id="cnibStatusLabel">BigDataCorp</span>
+            </div>
+
+            <div class="cnib-layout">
+              <form class="source-form cnib-form" id="cnibForm">
+                <div class="cnib-intro">
+                  <strong>Consulta por CPF ou CNPJ do vendedor</strong>
+                  <small>
+                    Resultado via provedor de dados. Validar se substitui ou complementa a certid&atilde;o oficial CNIB conforme contrato/fonte habilitada.
+                  </small>
+                </div>
+                <label>
+                  Tipo de documento
+                  <select id="cnibDocumentType" required>
+                    <option value="cpf">CPF</option>
+                    <option value="cnpj">CNPJ</option>
+                  </select>
+                </label>
+                <label>
+                  CPF/CNPJ do vendedor
+                  <input id="cnibDocument" type="text" inputmode="numeric" autocomplete="off" placeholder="Digite somente os n&uacute;meros" required />
+                </label>
+                <label>
+                  Nome/Raz&atilde;o social
+                  <input id="cnibSubjectName" type="text" autocomplete="name" placeholder="Opcional" />
+                </label>
+                <label class="audit-consent">
+                  <input id="cnibAuthorization" type="checkbox" required />
+                  Confirmo autoriza&ccedil;&atilde;o/base legal para consultar dados pessoais ou empresariais.
+                </label>
+                <button class="primary-action" id="cnibSubmitButton" type="submit">Consultar</button>
+                <small class="login-error" id="cnibError" role="alert"></small>
+              </form>
+
+              <section class="cnib-result" id="cnibResult" aria-live="polite">
+                <p class="empty-state">Informe o documento do vendedor para iniciar a consulta.</p>
+              </section>
+            </div>
+          </article>
+
           <article class="module audit-history-panel" data-page="historico">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Histórico</p>
+                <p class="eyebrow">Hist&oacute;rico</p>
                 <h2>Documentos solicitados</h2>
               </div>
-              <span class="live">Por usuário</span>
+              <span class="live">Por usu&aacute;rio</span>
             </div>
             <div class="history-list audit-history-list" id="auditHistoryList">
               <p class="empty-state">Nenhuma auditoria solicitada ainda.</p>
@@ -535,7 +795,7 @@
 
             <form class="consultation-form" id="consultationForm">
               <label>
-                Módulo
+                M&oacute;dulo
                 <select id="consultationModule" required></select>
               </label>
               <label>
@@ -544,7 +804,7 @@
                   <option value="cnpj">CNPJ</option>
                   <option value="cpf">CPF</option>
                   <option value="processo">Processo</option>
-                  <option value="imovel">Imóvel</option>
+                  <option value="imovel">Im&oacute;vel</option>
                 </select>
               </label>
               <label>
@@ -587,19 +847,19 @@
               </div>
               <div>
                 <small>E-mail</small>
-                <strong id="profileEmail">Não informado</strong>
+                <strong id="profileEmail">N&atilde;o informado</strong>
               </div>
               <div>
                 <small>CPF</small>
-                <strong>Não informado</strong>
+                <strong>N&atilde;o informado</strong>
               </div>
               <div>
                 <small>RG</small>
-                <strong>Não informado</strong>
+                <strong>N&atilde;o informado</strong>
               </div>
               <div class="wide-profile-field">
-                <small>Endereço</small>
-                <strong>Não informado</strong>
+                <small>Endere&ccedil;o</small>
+                <strong>N&atilde;o informado</strong>
               </div>
               <div>
                 <small>Plano</small>
@@ -613,10 +873,10 @@
           <article class="module integration-form-card">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Administração</p>
-                <h2>Integrações de órgãos</h2>
+                <p class="eyebrow">Administra&ccedil;&atilde;o</p>
+                <h2>Integra&ccedil;&otilde;es de &oacute;rg&atilde;os</h2>
               </div>
-              <span class="live">Fontes configuráveis</span>
+              <span class="live">Fontes configur&aacute;veis</span>
             </div>
 
             <form class="source-form" id="sourceForm">
@@ -625,7 +885,7 @@
                 <input id="sourceName" type="text" placeholder="Ex: Receita Federal CNPJ" required />
               </label>
               <label>
-                Órgão
+                &Oacute;rg&atilde;o
                 <input id="sourceAgency" type="text" placeholder="Ex: Receita Federal" required />
               </label>
               <label>
@@ -633,8 +893,8 @@
                 <select id="sourceCategory" required>
                   <option value="fiscal">Fiscal</option>
                   <option value="judicial">Judicial</option>
-                  <option value="imobiliario">Imobiliário</option>
-                  <option value="juridico">Jurídico</option>
+                  <option value="imobiliario">Imobili&aacute;rio</option>
+                  <option value="juridico">Jur&iacute;dico</option>
                   <option value="compliance">Compliance</option>
                 </select>
               </label>
@@ -646,13 +906,13 @@
                 Acesso
                 <select id="sourceAccessMethod">
                   <option value="api">API</option>
-                  <option value="hybrid">Híbrido</option>
+                  <option value="hybrid">H&iacute;brido</option>
                   <option value="scraping">Coleta controlada</option>
                   <option value="manual">Manual</option>
                 </select>
               </label>
               <label>
-                Autenticação
+                Autentica&ccedil;&atilde;o
                 <select id="sourceAuthType">
                   <option value="none">Sem autenticação</option>
                   <option value="token">Token</option>
@@ -661,7 +921,7 @@
                 </select>
               </label>
               <label>
-                Referência do secret
+                Refer&ecirc;ncia do secret
                 <input id="sourceSecretRef" type="text" placeholder="Ex: CAPROVER_SECRET_RECEITA_TOKEN" />
               </label>
               <label>
@@ -674,8 +934,8 @@
                 </select>
               </label>
               <label class="wide-field">
-                Observações de normalização
-                <textarea id="sourceSchemaNotes" rows="3" placeholder="Campos esperados, formato de resposta, regras de normalização"></textarea>
+                Observa&ccedil;&otilde;es de normaliza&ccedil;&atilde;o
+                <textarea id="sourceSchemaNotes" rows="3" placeholder="Campos esperados, formato de resposta, regras de normaliza&ccedil;&atilde;o"></textarea>
               </label>
               <button class="primary-action" type="submit">Salvar fonte</button>
             </form>
@@ -688,7 +948,7 @@
           <article class="module">
             <div class="module-header">
               <div>
-                <p class="eyebrow">Normalização</p>
+                <p class="eyebrow">Normaliza&ccedil;&atilde;o</p>
                 <h2>Fontes cadastradas</h2>
               </div>
             </div>
@@ -701,7 +961,7 @@
             <div class="module-header">
               <div>
                 <p class="eyebrow">Pipeline</p>
-                <h2>Coleta e normalização</h2>
+                <h2>Coleta e normaliza&ccedil;&atilde;o</h2>
               </div>
               <span class="live">Tempo real</span>
             </div>
@@ -713,17 +973,17 @@
               </div>
               <div>
                 <span>02</span>
-                <strong>Normalização</strong>
+                <strong>Normaliza&ccedil;&atilde;o</strong>
                 <small>JSON padronizado</small>
               </div>
               <div>
                 <span>03</span>
-                <strong>Análise IA</strong>
+                <strong>An&aacute;lise IA</strong>
                 <small>Riscos e recomendações</small>
               </div>
               <div>
                 <span>04</span>
-                <strong>Relatório</strong>
+                <strong>Relat&oacute;rio</strong>
                 <small>Entrega web e WhatsApp</small>
               </div>
             </div>
@@ -733,29 +993,29 @@
             <div class="module-header">
               <div>
                 <p class="eyebrow">Auditoria</p>
-                <h2>Sinais prioritários</h2>
+                <h2>Sinais priorit&aacute;rios</h2>
               </div>
             </div>
             <ul class="signal-list">
               <li>
                 <span class="severity high"></span>
                 <div>
-                  <strong>Inconsistência fiscal recorrente</strong>
+                  <strong>Inconsist&ecirc;ncia fiscal recorrente</strong>
                   <small>Cliente ACME | 2 fontes divergentes</small>
                 </div>
               </li>
               <li>
                 <span class="severity medium"></span>
                 <div>
-                  <strong>Processo judicial com mudança recente</strong>
+                  <strong>Processo judicial com mudan&ccedil;a recente</strong>
                   <small>Atualização detectada há 14 minutos</small>
                 </div>
               </li>
               <li>
                 <span class="severity low"></span>
                 <div>
-                  <strong>Imóvel com pendência documental</strong>
-                  <small>Recomendação pronta para revisão</small>
+                  <strong>Im&oacute;vel com pend&ecirc;ncia documental</strong>
+                  <small>Recomenda&ccedil;&atilde;o pronta para revis&atilde;o</small>
                 </div>
               </li>
             </ul>
@@ -771,16 +1031,16 @@
             <p id="assistantText">
               Foram encontrados sinais relevantes em 3 fontes. A recomendação é
               priorizar a divergência fiscal, validar documentos do imóvel e gerar
-              relatório executivo para aprovação.
+              relat&oacute;rio executivo para aprova&ccedil;&atilde;o.
             </p>
-            <button class="secondary-action" id="generateReport">Gerar relatório</button>
+            <button class="secondary-action" id="generateReport">Gerar relat&oacute;rio</button>
           </article>
 
           <article class="module" id="integracoes" data-page="integracoes">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Ecossistema</p>
-                <h2>Integrações previstas</h2>
+                <h2>Integra&ccedil;&otilde;es previstas</h2>
               </div>
             </div>
             <div class="integration-grid">
@@ -796,6 +1056,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260608-assisted-stable12"></script>
+    <script type="module" src="app.js?v=20260720-chat-1"></script>
   </body>
 </html>

@@ -4,14 +4,28 @@
       "uf": "AC",
       "court": "TJAC",
       "stateName": "Acre",
-      "url": "https://www.tjac.jus.br/servicos/certidoes/",
-      "platform": "custom",
-      "automationStatus": "needs_mapping",
-      "captchaMode": "manual",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "url": "https://certidoes.tjac.jus.br/",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
+      "captchaMode": "assisted",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "AL",
@@ -22,26 +36,62 @@
       "automationStatus": "active",
       "captchaMode": "assisted",
       "automatic": true,
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName", "rg", "gender", "motherName", "birthDate", "nationality", "civilStatus", "email"],
-      "optionalFields": ["fatherName", "profession"],
-      "certificateTypes": ["civil", "criminal", "falencia"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "rg",
+        "gender",
+        "motherName",
+        "birthDate",
+        "nationality",
+        "civilStatus",
+        "email"
+      ],
+      "optionalFields": [
+        "fatherName",
+        "profession"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "falencia"
+      ]
     },
     {
       "uf": "AP",
       "court": "TJAP",
       "stateName": "Amapa",
       "url": "https://tucujuris.tjap.jus.br/pages/certidao-publica/certidao-publica.html",
-      "platform": "custom",
-      "automationStatus": "active",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
       "captchaMode": "assisted",
-      "automatic": true,
-      "frameMode": "new_tab",
       "blocker": "cloudflare",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName", "gender", "birthDate", "motherName", "rg", "email"],
-      "optionalFields": ["fatherName"],
-      "certificateTypes": ["civil", "criminal", "especial", "falencia"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "gender",
+        "birthDate",
+        "motherName",
+        "rg",
+        "email"
+      ],
+      "optionalFields": [
+        "fatherName"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "especial",
+        "falencia"
+      ]
     },
     {
       "uf": "AM",
@@ -51,10 +101,37 @@
       "platform": "esaj",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "rg", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "comarca",
+        "fullName",
+        "gender",
+        "birthDate",
+        "nationality",
+        "naturality",
+        "civilStatus",
+        "profession",
+        "address",
+        "addressComplement",
+        "cep",
+        "neighborhood",
+        "city",
+        "email"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "rg"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "falencia"
+      ]
     },
     {
       "uf": "BA",
@@ -64,10 +141,31 @@
       "platform": "custom",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "participation"],
-      "optionalFields": [],
-      "certificateTypes": ["civil", "criminal", "inventario", "insolvencia", "interdicao"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "participation",
+        "fullName",
+        "nationality",
+        "civilStatus",
+        "rg",
+        "issuingAuthority",
+        "address",
+        "motherName"
+      ],
+      "optionalFields": [
+        "fatherName"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "inventario",
+        "insolvencia",
+        "interdicao"
+      ]
     },
     {
       "uf": "CE",
@@ -77,10 +175,26 @@
       "platform": "sirece",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName", "motherName", "fatherName", "birthDate", "email"],
-      "optionalFields": ["phone", "mobile"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "optionalFields": [
+        "phone",
+        "mobile"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "DF",
@@ -91,10 +205,25 @@
       "automationStatus": "active",
       "captchaMode": "none",
       "automatic": true,
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "firstName", "motherName", "fatherName"],
-      "optionalFields": ["companyName"],
-      "certificateTypes": ["criminal", "civil", "falencia", "especial"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "firstName",
+        "motherName",
+        "fatherName"
+      ],
+      "optionalFields": [
+        "companyName"
+      ],
+      "certificateTypes": [
+        "criminal",
+        "civil",
+        "falencia",
+        "especial"
+      ]
     },
     {
       "uf": "ES",
@@ -105,8 +234,16 @@
       "automationStatus": "active",
       "captchaMode": "assisted",
       "automatic": true,
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "instance", "nature", "fullName"],
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "instance",
+        "nature",
+        "fullName"
+      ],
       "optionalFields": [
         "rg",
         "voterTitle",
@@ -128,7 +265,11 @@
         "phone",
         "mobile"
       ],
-      "certificateTypes": ["civil", "criminal", "falencia"]
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "falencia"
+      ]
     },
     {
       "uf": "GO",
@@ -139,36 +280,77 @@
       "automationStatus": "active",
       "captchaMode": "assisted",
       "automatic": true,
-      "documentTypes": ["cpf"],
-      "requiredFields": ["document", "fullName", "motherName", "birthDate"],
-      "optionalFields": ["comarca"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "motherName",
+        "birthDate"
+      ],
+      "optionalFields": [
+        "comarca"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "MA",
       "court": "TJMA",
       "stateName": "Maranhao",
-      "url": "https://jurisconsult.tjma.jus.br/#/certidao-negativa",
+      "url": "https://jurisconsult.tjma.jus.br/#/certidao-generate-state-certificate-form",
       "platform": "custom",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email", "comarca"],
-      "certificateTypes": ["civil", "criminal", "falencia"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "birthDate",
+        "motherName"
+      ],
+      "optionalFields": [
+        "fatherName",
+        "email",
+        "comarca"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "MT",
       "court": "TJMT",
       "stateName": "Mato Grosso",
-      "url": "https://sec.tjmt.jus.br/primeiro-grau/criar-pedido-certidao",
-      "platform": "custom",
-      "automationStatus": "mapped",
+      "url": "https://sec.tjmt.jus.br/primeiro-grau",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf"],
-      "requiredFields": ["document", "fullName", "birthDate"],
-      "optionalFields": ["motherName", "fatherName", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "blocker": "recaptcha_quota",
+      "documentTypes": [
+        "cpf"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "birthDate"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "MS",
@@ -178,36 +360,97 @@
       "platform": "esaj",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "rg", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "comarca",
+        "certificateKind",
+        "fullName",
+        "rg",
+        "gender",
+        "email"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "falencia"
+      ]
     },
     {
       "uf": "MG",
       "court": "TJMG",
       "stateName": "Minas Gerais",
-      "url": "https://www.tjmg.jus.br/portal-tjmg/processos/certidao-judicial/",
-      "platform": "custom",
-      "automationStatus": "mapped",
+      "url": "https://rupe.tjmg.jus.br/rupe/justica/publico/certidoes/criarSolicitacaoCertidao.rupe?solicitacaoPublica=true",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName", "email", "comarca"],
-      "optionalFields": ["instance", "certificateKind", "motherName", "fatherName", "birthDate"],
-      "certificateTypes": ["civil", "criminal", "falencia"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "email",
+        "comarca"
+      ],
+      "optionalFields": [
+        "instance",
+        "certificateKind",
+        "motherName",
+        "fatherName",
+        "birthDate"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "falencia"
+      ]
     },
     {
       "uf": "PA",
       "court": "TJPA",
       "stateName": "Para",
-      "url": "https://www.tjpa.jus.br/PortalExterno/institucional/Certidoes.xhtml",
-      "platform": "custom",
-      "automationStatus": "needs_mapping",
-      "captchaMode": "manual",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "url": "https://portal-certidao.tjpa.jus.br/solicitacao-certidao",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
+      "captchaMode": "assisted",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "birthDate",
+        "fullName",
+        "motherName",
+        "naturality",
+        "civilStatus",
+        "nationality"
+      ],
+      "optionalFields": [
+        "fatherName",
+        "email",
+        "cep",
+        "address",
+        "addressNumber",
+        "addressComplement",
+        "neighborhood",
+        "stateUf",
+        "city"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "PB",
@@ -217,12 +460,24 @@
       "platform": "custom",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
-      "frameMode": "new_tab",
-      "blocker": "cloudflare",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "PR",
@@ -232,121 +487,265 @@
       "platform": "custom",
       "automationStatus": "mapped",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName", "email", "phone", "motherName", "fatherName", "birthDate"],
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "email",
+        "phone",
+        "motherName",
+        "fatherName",
+        "birthDate"
+      ],
       "optionalFields": [],
-      "certificateTypes": ["civil", "criminal"]
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "PE",
       "court": "TJPE",
       "stateName": "Pernambuco",
-      "url": "https://www.tjpe.jus.br/certidaopje/xhtml/main.xhtml",
-      "platform": "custom",
-      "automationStatus": "needs_mapping",
-      "captchaMode": "manual",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "url": "https://certidoesunificadas.app.tjpe.jus.br/",
+      "platform": "tjpe",
+      "automationStatus": "mapped",
+      "captchaMode": "assisted",
+      "documentTypes": [
+        "cpf"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "birthDate",
+        "motherName"
+      ],
+      "optionalFields": [
+        "fatherName"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "PI",
       "court": "TJPI",
       "stateName": "Piaui",
-      "url": "https://www.tjpi.jus.br/certidao-negativa/",
-      "platform": "custom",
-      "automationStatus": "needs_mapping",
-      "captchaMode": "manual",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "url": "https://europa.tjpi.jus.br/certidao/unificada",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
+      "captchaMode": "assisted",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "rg",
+        "issuingAuthority",
+        "civilStatus",
+        "motherName",
+        "cep",
+        "address",
+        "addressNumber",
+        "neighborhood",
+        "stateUf",
+        "city"
+      ],
+      "optionalFields": [
+        "fatherName",
+        "birthDate",
+        "email",
+        "addressComplement"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "RJ",
       "court": "TJRJ",
       "stateName": "Rio de Janeiro",
-      "url": "https://www3.tjrj.jus.br/CJE/certidao/judicial/selecionarComarcas",
-      "platform": "custom",
-      "automationStatus": "mapped",
+      "url": "https://www3.tjrj.jus.br/CJE/certidao/judicial/solicitarCapital?comarca=Capital",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
       "captchaMode": "assisted",
       "navigationSteps": [
-        { "action": "clickHrefContains", "hrefContains": "solicitarCapital?comarca=Capital" },
-        { "action": "clickText", "text": "Ações Cíveis" },
-        { "action": "choosePersonType" }
+        {
+          "action": "clickText",
+          "text": "Acoes Civeis",
+          "exact": false,
+          "waitAfterMs": 1500
+        },
+        {
+          "action": "choosePersonType",
+          "waitAfterMs": 1200
+        }
       ],
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName", "email"],
-      "optionalFields": ["phone", "motherName", "fatherName", "birthDate", "rg"],
-      "certificateTypes": ["civil", "criminal", "falencia"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "email"
+      ],
+      "optionalFields": [
+        "phone",
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "rg"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "falencia"
+      ]
     },
     {
       "uf": "RN",
       "court": "TJRN",
       "stateName": "Rio Grande do Norte",
       "url": "https://certidao.tjrn.jus.br/",
-      "platform": "custom",
-      "automationStatus": "mapped",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "RS",
       "court": "TJRS",
       "stateName": "Rio Grande do Sul",
-      "url": "https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/emissao-de-certidoes/",
-      "platform": "custom",
-      "automationStatus": "needs_mapping",
-      "captchaMode": "manual",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "url": "https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/emissao-de-antecedentes-e-certidoes/",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
+      "captchaMode": "assisted",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "RO",
       "court": "TJRO",
       "stateName": "Rondonia",
-      "url": "https://www.tjro.jus.br/certidaoonline/",
-      "platform": "custom",
-      "automationStatus": "needs_mapping",
-      "captchaMode": "manual",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "url": "https://www.tjro.jus.br/certidao-unificada/",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
+      "captchaMode": "assisted",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "RR",
       "court": "TJRR",
       "stateName": "Roraima",
       "url": "https://projudi.tjrr.jus.br/projudi/certidao",
-      "platform": "projudi",
-      "automationStatus": "mapped",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
       "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "SC",
       "court": "TJSC",
       "stateName": "Santa Catarina",
       "url": "https://certidoes.tjsc.jus.br/",
-      "platform": "custom",
-      "automationStatus": "mapped",
+      "platform": "agent_assisted",
+      "automationStatus": "agent_assisted",
       "captchaMode": "assisted",
       "frameMode": "new_tab",
       "blocker": "captcha",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "SP",
@@ -357,7 +756,10 @@
       "automationStatus": "active",
       "captchaMode": "assisted",
       "automatic": true,
-      "documentTypes": ["cpf", "cnpj"],
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
       "requiredFields": [
         "document",
         "fullName",
@@ -378,7 +780,11 @@
         "email"
       ],
       "optionalFields": [],
-      "certificateTypes": ["civil", "criminal", "falencia"]
+      "certificateTypes": [
+        "civil",
+        "criminal",
+        "falencia"
+      ]
     },
     {
       "uf": "SE",
@@ -389,25 +795,58 @@
       "automationStatus": "mapped",
       "captchaMode": "assisted",
       "navigationSteps": [
-        { "action": "choosePersonType" }
+        {
+          "action": "choosePersonType"
+        }
       ],
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName", "birthDate", "motherName", "domicile", "nature"],
-      "optionalFields": ["fatherName", "email", "mobile"],
-      "certificateTypes": ["civil", "criminal"]
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName",
+        "birthDate",
+        "motherName",
+        "domicile",
+        "nature"
+      ],
+      "optionalFields": [
+        "fatherName",
+        "email",
+        "mobile"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     },
     {
       "uf": "TO",
       "court": "TJTO",
       "stateName": "Tocantins",
-      "url": "https://eproc1.tjto.jus.br/eprocV2_prod_1grau/externo_controlador.php?acao=certidao_negativa",
+      "url": "https://eproc1.tjto.jus.br/eprocV2_prod_1grau/externo_controlador.php?acao=cj_online&acao_origem=&acao_retorno=cj",
       "platform": "eproc",
       "automationStatus": "mapped",
-      "captchaMode": "assisted",
-      "documentTypes": ["cpf", "cnpj"],
-      "requiredFields": ["document", "fullName"],
-      "optionalFields": ["motherName", "fatherName", "birthDate", "email"],
-      "certificateTypes": ["civil", "criminal"]
+      "captchaMode": "none",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "requiredFields": [
+        "document",
+        "fullName"
+      ],
+      "optionalFields": [
+        "motherName",
+        "fatherName",
+        "birthDate",
+        "email"
+      ],
+      "certificateTypes": [
+        "civil",
+        "criminal"
+      ]
     }
   ]
 }

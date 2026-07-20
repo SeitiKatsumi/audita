@@ -4,14 +4,22 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { createAuditService } from "./services/audit.service.mjs";
+import { createCreditsService } from "./services/credits.service.mjs";
+import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
+import { runAuditaChat } from "./services/chat-assistant.service.mjs";
 import {
   closeAssistedSession,
   getAssistedSessionView,
   inspectAssistedSessionResult,
   interactAssistedSession,
 } from "./collectors/tjdft.collector.mjs";
+import {
+  getStateCourtAgentSession,
+  handleStateCourtAgentAction,
+} from "./services/state-court-agent.service.mjs";
 
 const root = resolve(".");
+loadLocalEnvFiles();
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || "0.0.0.0";
 const databaseUrl = process.env.DATABASE_URL;
@@ -32,6 +40,27 @@ let fallbackUserId = 1;
 const fallbackUsers = new Map();
 const fallbackUsersByEmail = new Map();
 const fallbackSessions = new Map();
+
+function loadLocalEnvFiles() {
+  for (const fileName of [".env.local", ".env"]) {
+    const filePath = join(root, fileName);
+    if (!existsSync(filePath)) continue;
+    const content = readFileSync(filePath, "utf-8");
+    for (const rawLine of content.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+      const separatorIndex = line.indexOf("=");
+      if (separatorIndex <= 0) continue;
+      const key = line.slice(0, separatorIndex).trim();
+      let value = line.slice(separatorIndex + 1).trim();
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || process.env[key] !== undefined) continue;
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      process.env[key] = value;
+    }
+  }
+}
 
 function resolveGitVersion() {
   try {
@@ -115,6 +144,27 @@ const fallbackGovernmentModules = [
     authType: "token_or_public",
     status: "planned",
     description: "Consulta e acompanhamento de processos judiciais em fontes oficiais.",
+  },
+  {
+    slug: "imoveis-registro",
+    name: "Busca de Imóveis",
+    category: "imobiliario",
+    provider: "ONR / RI Digital",
+    accessMethod: "hybrid",
+    authType: "credential",
+    status: "sandbox",
+    description: "Pesquisa Prévia, Pesquisa Qualificada e Certidão Digital com contingência operacional oficial sem scraping.",
+  },
+  {
+    slug: "cnib-indisponibilidade-bens",
+    name: "Indisponibilidade de Bens",
+    category: "imobiliario",
+    provider: "BigDataCorp",
+    accessMethod: "api",
+    authType: "token",
+    status: "sandbox",
+    description:
+      "Indicador de indisponibilidade de bens via provedor DaaS autorizado. Validar contrato/fonte antes de tratar como certidao oficial CNIB.",
   },
   {
     slug: "diarios-oficiais",
@@ -209,18 +259,29 @@ const auditSources = [
       "Use o servico de certidoes do STF, informe os dados exigidos e anexe o PDF ou protocolo.",
   },
   {
-    id: "cnib",
-    name: "CNIB Indisponibilidade de Bens",
+    id: "imoveis-onr",
+    name: "Busca de Imóveis / ONR",
     category: "imobiliario",
     scope: "cpf_cnpj",
-    mode: "restricted",
-    officialUrl:
-      "https://cnbsp.org.br/2024/12/11/cnj-publica-provimento-no-188-2024-que-trata-sobre-o-funcionamento-da-central-nacional-de-indisponibilidade-de-bens-cnib-2-0/",
-    requiredFields: ["document", "name"],
+    mode: "manual_guided",
+    officialUrl: "https://www.ridigital.org.br/PO/DefaultPO.aspx",
+    requiredFields: ["document", "uf"],
+    optionalFields: ["name", "registrationNumber", "registryOffice"],
+    summary: "Pesquisa de matrículas, confirmação qualificada e certidão digital pelo ecossistema oficial ONR/RI Digital.",
+    manualInstruction: "Conclua o pedido oficial no RI Digital e registre protocolo, relatório ou certidão no Audita. Não há scraping.",
+  },
+  {
+    id: "cnib",
+    name: "Indisponibilidade de Bens",
+    category: "imobiliario",
+    scope: "cpf_cnpj",
+    mode: "api",
+    officialUrl: "https://docs.bigdatacorp.com.br/plataforma/reference/marketplace-dados-restritivos-quod-pessoa",
+    requiredFields: ["document"],
     optionalFields: [],
-    summary: "Consulta de indisponibilidade de bens, com acesso restrito conforme perfil autorizado.",
+    summary: "Indicador de indisponibilidade de bens via BigDataCorp Marketplace, sem scraping.",
     manualInstruction:
-      "Fonte com restricao de acesso. Registre credencial autorizada ou anexe evidencia obtida por operador habilitado.",
+      "Configure BIGDATACORP_CNIB_ENABLED=true, BIGDATACORP_ACCESS_TOKEN e BIGDATACORP_TOKEN_ID para consultar o provedor.",
   },
   {
     id: "tst-cndt",
@@ -1179,6 +1240,12 @@ async function getTenantIdForRequest(request) {
 const auditService = createAuditService({
   getDb: () => ({ pool, dbReady }),
   getAuthContext: getTenantIdForRequest,
+});
+const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
+const propertyAssetsService = createPropertyAssetsService({
+  getDb: () => ({ pool, dbReady }),
+  getAuthContext: getTenantIdForRequest,
+  creditsService,
 });
 
 async function getDashboard(request) {
@@ -2487,6 +2554,39 @@ async function runAuditaAgent(request) {
   };
 }
 
+async function runChatConversation(request) {
+  const authContext = await getTenantIdForRequest(request);
+  if (authContext.unauthorized) {
+    return { unauthorized: true };
+  }
+
+  const body = await readJsonBody(request);
+  const settings = await getAgentSettings(request);
+  const result = await runAuditaChat({
+    messages: body.messages,
+    settings,
+    userName: authContext.user?.name || "",
+  });
+
+  if (!result.invalid && !result.unavailable && pool && dbReady && authContext.tenantId) {
+    await pool.query(
+      `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+       VALUES ($1, 'chat.message.completed', $2)`,
+      [
+        authContext.tenantId,
+        JSON.stringify({
+          model: result.model,
+          messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
+          actions: Array.isArray(result.actions) ? result.actions.map((action) => action.moduleId) : [],
+          sources: Array.isArray(result.sources) ? result.sources.map((source) => source.name) : [],
+        }),
+      ],
+    );
+  }
+
+  return result;
+}
+
 async function handleApi(request, response, pathname) {
   if (pathname === "/audit" && request.method === "GET") {
     try {
@@ -2576,6 +2676,144 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/property-search/config" && request.method === "GET") {
+    try {
+      const config = await propertyAssetsService.getConfig(request);
+      if (config.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, config);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "property_search_config_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/property-search/registry-offices" && request.method === "GET") {
+    try {
+      const requestUrl = new URL(request.url || pathname, `http://${request.headers.host || "127.0.0.1"}`);
+      const result = await propertyAssetsService.listRegistryOffices(request, {
+        uf: requestUrl.searchParams.get("uf"),
+        operation: requestUrl.searchParams.get("operation"),
+      });
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_registry_office_query", reason: result.reason });
+        return true;
+      }
+      sendJson(response, result.status === "unavailable" ? 503 : 200, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "registry_office_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/property-searches" && request.method === "GET") {
+    try {
+      const result = await propertyAssetsService.listSearches(request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "property_search_list_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/property-searches" && request.method === "POST") {
+    try {
+      request.body = await readJsonBody(request);
+      const result = await propertyAssetsService.createSearch(request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.insufficientCredits) {
+        sendJson(response, 402, { error: "insufficient_credits", ...result });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_property_search", reason: result.reason });
+        return true;
+      }
+      sendJson(response, 201, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "property_search_create_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const propertySearchActionMatch = pathname.match(/^\/api\/property-searches\/([0-9a-fA-F-]{36})\/actions$/);
+  if (propertySearchActionMatch && request.method === "POST") {
+    try {
+      request.body = await readJsonBody(request);
+      const result = await propertyAssetsService.handleAction(propertySearchActionMatch[1], request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.insufficientCredits) {
+        sendJson(response, 402, { error: "insufficient_credits", ...result });
+        return true;
+      }
+      if (result.notFound) {
+        sendJson(response, 404, { error: "property_search_not_found" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_property_search_action", reason: result.reason });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "property_search_action_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const propertySearchMatch = pathname.match(/^\/api\/property-searches\/([0-9a-fA-F-]{36})$/);
+  if (propertySearchMatch && request.method === "GET") {
+    try {
+      const search = await propertyAssetsService.findSearch(propertySearchMatch[1], request);
+      if (search?.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (!search) {
+        sendJson(response, 404, { error: "property_search_not_found" });
+        return true;
+      }
+      sendJson(response, 200, { search });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "property_search_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
   const assistedSessionResultMatch = pathname.match(/^\/api\/assisted-sessions\/([A-Za-z0-9_-]+)\/result$/);
   if (assistedSessionResultMatch && request.method === "GET") {
     try {
@@ -2593,6 +2831,56 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "assisted_session_result_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  const stateCourtAgentSessionMatch = pathname.match(/^\/api\/state-court-agent-sessions\/([A-Za-z0-9_-]+)$/);
+  if (stateCourtAgentSessionMatch && request.method === "GET") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const session = getStateCourtAgentSession(stateCourtAgentSessionMatch[1]);
+      if (!session) {
+        sendJson(response, 404, { error: "state_court_agent_session_not_found" });
+        return true;
+      }
+      sendJson(response, 200, { session });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "state_court_agent_session_view_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (stateCourtAgentSessionMatch && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      const session = await handleStateCourtAgentAction(stateCourtAgentSessionMatch[1], body);
+      if (session.notFound) {
+        sendJson(response, 404, { error: "state_court_agent_session_not_found" });
+        return true;
+      }
+      if (session.invalid) {
+        sendJson(response, 400, { error: "invalid_state_court_agent_action" });
+        return true;
+      }
+      sendJson(response, 200, { session });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "state_court_agent_session_action_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -2943,6 +3231,37 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/chat" && request.method === "POST") {
+    try {
+      const result = await runChatConversation(request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_chat_messages" });
+        return true;
+      }
+      if (result.unavailable) {
+        sendJson(response, 503, {
+          error: result.reason || "chat_unavailable",
+          secretRef: result.secretRef || "OPENAI_API_KEY",
+        });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch (error) {
+      const timedOut = error?.name === "AbortError" || /aborted|timeout/i.test(String(error?.message || ""));
+      sendJson(response, timedOut ? 504 : 500, {
+        error: timedOut ? "chat_timeout" : "chat_failed",
+        message: timedOut
+          ? "A Audita demorou mais que o esperado para responder."
+          : "Nao foi possivel concluir esta conversa.",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/agent/settings" && request.method === "GET") {
     try {
       const settings = await getAgentSettings(request);
@@ -3130,7 +3449,13 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  const requestedPath = url.pathname === "/" ? "/index.html" : url.pathname;
+  if (url.pathname === "/chat/") {
+    response.writeHead(302, { location: "/chat" });
+    response.end();
+    return;
+  }
+
+  const requestedPath = url.pathname === "/" || url.pathname === "/chat" ? "/index.html" : url.pathname;
   const filePath = resolve(join(root, requestedPath));
 
   if (!filePath.startsWith(root) || !existsSync(filePath)) {

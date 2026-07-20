@@ -16,6 +16,8 @@ out/
 # logs
 *.log
 logs/
+output/
+tmp-*.png
 
 # OS/editor
 .DS_Store

@@ -2,9 +2,29 @@ export function calculateRiskScore(results) {
   const motivos = [];
   const relevantResults = Array.isArray(results) ? results : [];
 
-  if (relevantResults.some((result) => result.resultado === "consta")) {
+  if (relevantResults.some((result) => result.fonte === "cnib" && result.resultado === "consta")) {
+    motivos.push("Indicador de indisponibilidade de bens retornou ocorrencia.");
+    return { nivel: "alto", motivos };
+  }
+
+  if (
+    relevantResults.some(
+      (result) =>
+        result.resultado === "consta" &&
+        !(result.fonte === "imoveis_onr" && result.dados?.operation !== "indisponibilidade"),
+    )
+  ) {
     motivos.push("Uma ou mais fontes retornaram ocorrencia.");
     return { nivel: "alto", motivos };
+  }
+
+  if (
+    relevantResults.some(
+      (result) => result.fonte === "imoveis_onr" && result.resultado === "consta" && result.dados?.operation !== "indisponibilidade",
+    )
+  ) {
+    motivos.push("Foram localizadas referencias de imoveis; a titularidade atual ainda deve ser confirmada.");
+    return { nivel: "baixo", motivos };
   }
 
   const importantSources = new Set(["receita_federal", "pgfn", "cndt", "trf1", "tjdft", "portal_transparencia"]);

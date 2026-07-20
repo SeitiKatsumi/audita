@@ -6,6 +6,8 @@ import * as trf1 from "../collectors/trf1.collector.mjs";
 import * as tjdft from "../collectors/tjdft.collector.mjs";
 import * as fgts from "../collectors/fgts.collector.mjs";
 import * as portalTransparencia from "../collectors/portal-transparencia.collector.mjs";
+import * as cnib from "../collectors/cnib.collector.mjs";
+import * as imoveisOnr from "../collectors/imoveis-onr.collector.mjs";
 import { calculateRiskScore } from "./risk-score.service.mjs";
 
 const collectors = {
@@ -16,6 +18,8 @@ const collectors = {
   tjdft,
   fgts,
   portal_transparencia: portalTransparencia,
+  cnib,
+  imoveis_onr: imoveisOnr,
 };
 
 const memoryQueries = new Map();
@@ -110,6 +114,13 @@ function normalizeExtraFields(value) {
     fgtsRegistrationType: String(value.fgtsRegistrationType || value.tipoInscricaoFgts || "CNPJ").trim(),
     fgtsRegistration: String(value.fgtsRegistration || value.inscricaoFgts || "").trim(),
     fgtsUf: String(value.fgtsUf || value.ufFgts || "").trim().toUpperCase(),
+    cnibSubjectName: String(value.cnibSubjectName || value.nomeVendedor || value.razaoSocialVendedor || "").trim(),
+    propertySubjectName: String(value.propertySubjectName || value.nomePesquisadoImoveis || "").trim(),
+    propertyUf: String(value.propertyUf || value.ufImoveis || "").trim().toUpperCase(),
+    propertyOperation: String(value.propertyOperation || value.operacaoImoveis || "pesquisa_previa").trim(),
+    propertyRegistrationNumber: String(value.propertyRegistrationNumber || value.matriculaImovel || "").trim(),
+    propertyRegistryOffice: String(value.propertyRegistryOffice || value.cartorioImovel || "").trim(),
+    propertyCity: String(value.propertyCity || value.municipioImovel || "").trim(),
   };
 }
 

@@ -190,6 +190,73 @@ CREATE TABLE IF NOT EXISTS audita_audit_evidence (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS audita_credit_wallets (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL UNIQUE REFERENCES audita_tenants(id) ON DELETE RESTRICT,
+  balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
+  consumed INTEGER NOT NULL DEFAULT 0 CHECK (consumed >= 0),
+  reserved INTEGER NOT NULL DEFAULT 0 CHECK (reserved >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_credit_ledger (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE RESTRICT,
+  user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  entry_type TEXT NOT NULL CHECK (entry_type IN ('consume', 'grant', 'refund', 'reserve', 'release')),
+  amount INTEGER NOT NULL,
+  operation TEXT NOT NULL,
+  reference_id TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_property_searches (
+  id BIGSERIAL PRIMARY KEY,
+  public_id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE RESTRICT,
+  requested_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  subject_type TEXT NOT NULL CHECK (subject_type IN ('cpf', 'cnpj')),
+  subject_hash TEXT NOT NULL,
+  subject_masked TEXT NOT NULL,
+  uf TEXT,
+  operation TEXT NOT NULL CHECK (operation IN ('pesquisa_previa', 'pesquisa_qualificada', 'certidao_digital', 'indisponibilidade')),
+  provider TEXT NOT NULL DEFAULT 'ONR / RI Digital',
+  provider_mode TEXT NOT NULL CHECK (provider_mode IN ('api', 'official_manual')),
+  status TEXT NOT NULL CHECK (status IN ('waiting_user_action', 'processing', 'completed', 'failed', 'cancelled', 'unavailable')),
+  outcome TEXT NOT NULL CHECK (outcome IN ('pending', 'nothing_found', 'assets_found', 'restriction_found', 'inconclusive')),
+  credit_cost INTEGER NOT NULL DEFAULT 0 CHECK (credit_cost >= 0),
+  credit_state TEXT NOT NULL DEFAULT 'not_charged' CHECK (credit_state IN ('not_charged', 'reserved', 'consumed', 'refunded')),
+  provider_order_id TEXT,
+  request_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  result_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS audita_property_evidence (
+  id BIGSERIAL PRIMARY KEY,
+  property_search_id BIGINT NOT NULL REFERENCES audita_property_searches(id) ON DELETE CASCADE,
+  evidence_type TEXT NOT NULL CHECK (evidence_type IN ('onr_report', 'qualified_report', 'certificate', 'protocol', 'note')),
+  title TEXT NOT NULL,
+  value TEXT,
+  file_name TEXT,
+  file_path TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DO $$
+BEGIN
+  ALTER TABLE audita_property_searches
+    DROP CONSTRAINT IF EXISTS audita_property_searches_provider_mode_check;
+  ALTER TABLE audita_property_searches
+    ADD CONSTRAINT audita_property_searches_provider_mode_check
+    CHECK (provider_mode IN ('api', 'official_manual', 'credentialing_required'));
+END $$;
+
 CREATE TABLE IF NOT EXISTS audita_job_logs (
   id BIGSERIAL PRIMARY KEY,
   audit_query_id BIGINT REFERENCES audita_audits(id) ON DELETE CASCADE,
@@ -251,7 +318,7 @@ ALTER TABLE audita_audit_executions
 ALTER TABLE audita_audit_executions DROP CONSTRAINT IF EXISTS audita_audit_executions_status_check;
 ALTER TABLE audita_audit_executions
   ADD CONSTRAINT audita_audit_executions_status_check
-  CHECK (status IN ('queued', 'pending', 'running', 'manual_required', 'success', 'completed', 'failed', 'blocked', 'not_applicable', 'unavailable'));
+  CHECK (status IN ('queued', 'pending', 'running', 'manual_required', 'waiting_user_action', 'success', 'completed', 'failed', 'blocked', 'not_applicable', 'unavailable'));
 
 ALTER TABLE audita_audit_executions DROP CONSTRAINT IF EXISTS audita_audit_executions_resultado_check;
 ALTER TABLE audita_audit_executions
@@ -377,6 +444,11 @@ CREATE INDEX IF NOT EXISTS audita_audits_document_idx ON audita_audits(tenant_id
 CREATE INDEX IF NOT EXISTS audita_audit_executions_audit_idx ON audita_audit_executions(audit_id, status);
 CREATE INDEX IF NOT EXISTS audita_audit_evidence_audit_idx ON audita_audit_evidence(audit_id, audit_execution_id);
 CREATE INDEX IF NOT EXISTS audita_job_logs_audit_idx ON audita_job_logs(audit_query_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS audita_credit_ledger_tenant_idx ON audita_credit_ledger(tenant_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS audita_credit_ledger_reference_idx ON audita_credit_ledger(tenant_id, reference_id, entry_type);
+CREATE INDEX IF NOT EXISTS audita_property_searches_tenant_idx ON audita_property_searches(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS audita_property_searches_subject_idx ON audita_property_searches(tenant_id, subject_hash);
+CREATE INDEX IF NOT EXISTS audita_property_evidence_search_idx ON audita_property_evidence(property_search_id, created_at);
 
 DO $$
 BEGIN
@@ -407,7 +479,8 @@ VALUES
   ('receita-cnpj', 'Consulta CNPJ Receita Federal', 'fiscal', 'Receita Federal', 'api', 'certificate_or_token', 'planned', 'Consulta cadastral e fiscal de pessoa juridica quando houver credencial autorizada.'),
   ('cnj-processos', 'Consulta Processual CNJ/Tribunais', 'judicial', 'CNJ e tribunais', 'hybrid', 'token_or_public', 'planned', 'Consulta e acompanhamento de processos judiciais em fontes oficiais.'),
   ('cadin', 'Consulta CADIN', 'fiscal', 'Governo Federal', 'api', 'token', 'planned', 'Verificacao de pendencias e registros restritivos quando houver permissao legal.'),
-  ('imoveis-registro', 'Registro Imobiliario', 'imobiliario', 'Registradores e cartorios', 'hybrid', 'credential', 'planned', 'Consulta de matriculas, pendencias e situacao documental de imoveis.'),
+  ('imoveis-registro', 'Busca de Imoveis', 'imobiliario', 'ONR / RI Digital', 'hybrid', 'credential', 'sandbox', 'Pesquisa Previa, Pesquisa Qualificada e Certidao Digital com contingencia operacional oficial sem scraping.'),
+  ('cnib-indisponibilidade-bens', 'Indisponibilidade de Bens', 'imobiliario', 'BigDataCorp', 'api', 'token', 'sandbox', 'Indicador de indisponibilidade de bens via provedor DaaS autorizado. Validar contrato/fonte antes de tratar como certidao oficial CNIB.'),
   ('diarios-oficiais', 'Diarios Oficiais', 'juridico', 'Fontes oficiais', 'scraping', 'none', 'sandbox', 'Monitoramento de publicacoes oficiais e mencoes relevantes.')
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name,
