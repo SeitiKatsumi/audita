@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   AUDITA_CHAT_CAPABILITIES,
   buildAuditaChatInstructions,
+  cleanAuditaChatAnswer,
+  inferItauConversationStage,
   maskSensitiveIdentifiers,
   normalizeChatMessages,
   normalizeItauCaseContext,
@@ -18,6 +20,15 @@ test("chat masks CPF, CNPJ and email before model input", () => {
   assert.equal(
     masked,
     "CPF [CPF informado], CNPJ [CNPJ informado] e contato [e-mail informado]",
+  );
+});
+
+test("chat removes duplicated source labels from the conversational answer", () => {
+  assert.equal(
+    cleanAuditaChatAnswer(
+      'Você reconhece "Cartão Protegido"? Fonte: fatura do Itaú enviada pelo usuário.',
+    ),
+    'Você reconhece "Cartão Protegido"?',
   );
 });
 
@@ -42,6 +53,30 @@ test("chat instructions prohibit invented results and personal data collection",
   assert.match(instructions, /Nunca invente certidoes/i);
   assert.match(instructions, /Nao solicite CPF, CNPJ/i);
   assert.match(instructions, /Diferencie dado oficial/i);
+  assert.match(instructions, /no maximo 80 palavras/i);
+  assert.match(instructions, /uma evidencia recente/i);
+  assert.match(instructions, /uma pergunta curta por vez/i);
+});
+
+test("Itau conversation advances from one recent finding to historical evidence", () => {
+  assert.deepEqual(inferItauConversationStage({ status: "no_candidate_found", candidates: [] }), {
+    phase: "screening_no_signal",
+    nextQuestion: "Qual nome, valor ou detalhe do lancamento fez voce desconfiar?",
+  });
+
+  const confirmation = inferItauConversationStage({
+    status: "review_required",
+    candidates: [{ label: "Cartao Protegido", answer: "pending" }],
+  });
+  assert.equal(confirmation.phase, "confirm_candidate");
+  assert.match(confirmation.nextQuestion, /Cartao Protegido/);
+
+  const history = inferItauConversationStage({
+    status: "review_required",
+    candidates: [{ label: "Cartao Protegido", answer: "not_recognized" }],
+  });
+  assert.equal(history.phase, "collect_history");
+  assert.match(history.nextQuestion, /outros meses/i);
 });
 
 test("chat capability registry exposes current module status and routes", () => {
@@ -87,6 +122,7 @@ test("chat receives only normalized Itau findings instead of the uploaded docume
   });
 
   assert.match(context, /Seguro Fatura Protegida/);
+  assert.match(context, /collect_history/);
   assert.doesNotMatch(context, /49532724800|conteudo sigiloso|linha completa/);
   assert.doesNotMatch(context, /internal-case-id/);
 });

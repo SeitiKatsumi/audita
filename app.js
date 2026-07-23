@@ -1879,9 +1879,12 @@ function initializeChatEntryContext() {
     id: createChatId(),
     role: "assistant",
     content:
-      "Anexe uma fatura detalhada do cartão em PDF ou imagem. Eu vou localizar seguros e serviços candidatos, mas você confirma o que reconhece antes de qualquer conclusão.",
+      "Vamos por partes. O que fez você desconfiar da cobrança: o nome do lançamento, o valor ou o fato de ela se repetir?",
     createdAt: new Date().toISOString(),
   });
+  if (chatInput) {
+    chatInput.placeholder = "Conte o que chamou sua atenção";
+  }
   thread.updatedAt = new Date().toISOString();
   saveChatState();
 }
@@ -1987,6 +1990,26 @@ function itauClassificationLabel(evaluation = {}) {
   return labels[evaluation.classification] || evaluation.classificationLabel || "Análise inicial";
 }
 
+function itauConversationGuidance(caseData = {}) {
+  const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
+  if (caseData.status === "unreadable") {
+    return "Envie uma imagem mais nítida ou um PDF digital desta cobrança.";
+  }
+  if (!candidates.length) {
+    return "Diga qual nome, valor ou detalhe do lançamento chamou sua atenção.";
+  }
+  if (candidates.some((candidate) => candidate.answer === "pending")) {
+    return "Confirme apenas se você reconhece a contratação encontrada.";
+  }
+  if (candidates.some((candidate) => candidate.answer === "not_recognized")) {
+    return "Há sinal para investigar. O próximo passo é comparar extratos de outros meses.";
+  }
+  if (candidates.some((candidate) => candidate.answer === "unknown")) {
+    return "Procure contrato, apólice ou autorização antes de concluir.";
+  }
+  return "As cobranças desta evidência foram reconhecidas. Você pode mostrar outra suspeita.";
+}
+
 function renderItauCaseCard(caseData) {
   if (!caseData?.id) return "";
   const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
@@ -2043,10 +2066,9 @@ function renderItauCaseCard(caseData) {
         <span class="itau-risk ${riskClass}">Risco ${escapeHtml(evaluation.risk || "indefinido")}</span>
       </header>
 
-      <div class="itau-analysis-metrics">
-        <span><strong>${candidates.length}</strong> candidatos</span>
-        <span><strong>${Number(evaluation.disputedCount || 0)}</strong> não reconhecidos</span>
-        <span><strong>${formatChatCurrency(evaluation.totalDisputed || 0)}</strong> em revisão</span>
+      <div class="itau-next-step">
+        <small>Próximo passo</small>
+        <strong>${escapeHtml(itauConversationGuidance(caseData))}</strong>
       </div>
 
       <div class="itau-charge-list">${candidateHtml}</div>
@@ -2054,81 +2076,93 @@ function renderItauCaseCard(caseData) {
       ${
         candidates.length
           ? `
-            <form class="itau-review-form" data-itau-review-form="${escapeHtml(caseData.id)}">
-              <h4>Complete o contexto</h4>
-              <div class="itau-review-grid">
-                <label>
-                  <span>Reclamou ao banco até 18/12/2025?</span>
-                  <select name="priorComplaint">${itauChoiceOptions(answers.priorComplaint)}</select>
-                </label>
-                <label>
-                  <span>Data da reclamação</span>
-                  <input name="priorComplaintDate" type="date" value="${escapeHtml(answers.priorComplaintDate || "")}" />
-                </label>
-                <label>
-                  <span>Protocolo, se houver</span>
-                  <input name="priorComplaintProtocol" type="text" maxlength="80" value="${escapeHtml(answers.priorComplaintProtocol || "")}" placeholder="Opcional" />
-                </label>
-                <label>
-                  <span>Já pediu cancelamento?</span>
-                  <select name="cancellationRequested">${itauChoiceOptions(answers.cancellationRequested)}</select>
-                </label>
-                <label>
-                  <span>Data do cancelamento</span>
-                  <input name="cancellationDate" type="date" value="${escapeHtml(answers.cancellationDate || "")}" />
-                </label>
-                <label>
-                  <span>Continuou cobrando depois?</span>
-                  <select name="continuedAfterCancellation">${itauChoiceOptions(answers.continuedAfterCancellation)}</select>
-                </label>
-                <label>
-                  <span>O banco prometeu estorno?</span>
-                  <select name="bankPromisedRefund">${itauChoiceOptions(answers.bankPromisedRefund)}</select>
-                </label>
-                <label>
-                  <span>Há cobrança duplicada?</span>
-                  <select name="duplicateCharge">${itauChoiceOptions(answers.duplicateCharge)}</select>
-                </label>
-              </div>
-              <button class="itau-evaluate-button" type="submit">Atualizar análise</button>
-            </form>
-          `
-          : ""
-      }
-
-      <div class="itau-result-summary">
-        <div>
-          <small>Enquadramento no acordo coletivo</small>
-          <strong>${escapeHtml(evaluation.agreementLabel || "Ainda não avaliado")}</strong>
-        </div>
-        ${
-          nextActions.length
-            ? `<ol>${nextActions.map((action) => `<li>${escapeHtml(action)}</li>`).join("")}</ol>`
-            : ""
-        }
-      </div>
-
-      ${
-        requestText
-          ? `
-            <details class="itau-request-draft">
-              <summary>Ver pedido administrativo</summary>
-              <pre>${escapeHtml(requestText)}</pre>
-              <button type="button" data-itau-copy="${escapeHtml(caseData.id)}">Copiar pedido</button>
+            <details class="itau-review-details">
+              <summary>Informar contexto adicional</summary>
+              <form class="itau-review-form" data-itau-review-form="${escapeHtml(caseData.id)}">
+                <p>Use estes campos somente quando a Audita pedir o dado correspondente.</p>
+                <div class="itau-review-grid">
+                  <label>
+                    <span>Reclamou ao banco até 18/12/2025?</span>
+                    <select name="priorComplaint">${itauChoiceOptions(answers.priorComplaint)}</select>
+                  </label>
+                  <label>
+                    <span>Data da reclamação</span>
+                    <input name="priorComplaintDate" type="date" value="${escapeHtml(answers.priorComplaintDate || "")}" />
+                  </label>
+                  <label>
+                    <span>Protocolo, se houver</span>
+                    <input name="priorComplaintProtocol" type="text" maxlength="80" value="${escapeHtml(answers.priorComplaintProtocol || "")}" placeholder="Opcional" />
+                  </label>
+                  <label>
+                    <span>Já pediu cancelamento?</span>
+                    <select name="cancellationRequested">${itauChoiceOptions(answers.cancellationRequested)}</select>
+                  </label>
+                  <label>
+                    <span>Data do cancelamento</span>
+                    <input name="cancellationDate" type="date" value="${escapeHtml(answers.cancellationDate || "")}" />
+                  </label>
+                  <label>
+                    <span>Continuou cobrando depois?</span>
+                    <select name="continuedAfterCancellation">${itauChoiceOptions(answers.continuedAfterCancellation)}</select>
+                  </label>
+                  <label>
+                    <span>O banco prometeu estorno?</span>
+                    <select name="bankPromisedRefund">${itauChoiceOptions(answers.bankPromisedRefund)}</select>
+                  </label>
+                  <label>
+                    <span>Há cobrança duplicada?</span>
+                    <select name="duplicateCharge">${itauChoiceOptions(answers.duplicateCharge)}</select>
+                  </label>
+                </div>
+                <button class="itau-evaluate-button" type="submit">Atualizar análise</button>
+              </form>
             </details>
           `
           : ""
       }
 
-      <footer>
-        <span>Triagem de apoio, não decisão judicial.</span>
-        ${(caseData.sources || [])
-          .map(
-            (source) =>
-              `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>`,
-          )
-          .join("")}
-      </footer>
+      <details class="itau-analysis-details">
+        <summary>Ver análise completa</summary>
+        <div class="itau-analysis-metrics">
+          <span><strong>${candidates.length}</strong> candidatos</span>
+          <span><strong>${Number(evaluation.disputedCount || 0)}</strong> não reconhecidos</span>
+          <span><strong>${formatChatCurrency(evaluation.totalDisputed || 0)}</strong> em revisão</span>
+        </div>
+
+        <div class="itau-result-summary">
+          <div>
+            <small>Enquadramento no acordo coletivo</small>
+            <strong>${escapeHtml(evaluation.agreementLabel || "Ainda não avaliado")}</strong>
+          </div>
+          ${
+            nextActions.length
+              ? `<ol>${nextActions.map((action) => `<li>${escapeHtml(action)}</li>`).join("")}</ol>`
+              : ""
+          }
+        </div>
+
+        ${
+          requestText
+            ? `
+              <details class="itau-request-draft">
+                <summary>Ver pedido administrativo</summary>
+                <pre>${escapeHtml(requestText)}</pre>
+                <button type="button" data-itau-copy="${escapeHtml(caseData.id)}">Copiar pedido</button>
+              </details>
+            `
+            : ""
+        }
+
+        <footer>
+          <span>Triagem de apoio, não decisão judicial.</span>
+          ${(caseData.sources || [])
+            .map(
+              (source) =>
+                `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>`,
+            )
+            .join("")}
+        </footer>
+      </details>
     </section>
   `;
 }
@@ -2301,9 +2335,9 @@ function localItauAnalysisMessage(caseData) {
     return "Não consegui ler o conteúdo desta fatura. Envie um PDF digital ou uma imagem mais nítida para eu tentar novamente.";
   }
   if (!caseData.candidates?.length) {
-    return "Concluí a primeira leitura e não localizei descrições conhecidas de seguros ou serviços. Isso não encerra a revisão: confira se o arquivo está completo e legível.";
+    return "Nesta primeira leitura, não encontrei uma cobrança conhecida. Qual nome, valor ou detalhe do lançamento fez você desconfiar?";
   }
-  return `Encontrei ${caseData.candidates.length} lançamento(s) que precisam da sua confirmação. Marque abaixo o que você reconhece; só depois disso a Audita classifica o caso e prepara o pedido administrativo.`;
+  return `Encontrei ${caseData.candidates.length} possível cobrança. Você reconhece essa contratação?`;
 }
 
 async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment) {
@@ -2579,7 +2613,7 @@ async function submitItauCaseReview(form) {
   }
 }
 
-chatMessages?.addEventListener("click", (event) => {
+chatMessages?.addEventListener("click", async (event) => {
   const recognitionButton = event.target.closest("[data-itau-answer]");
   if (recognitionButton) {
     const found = findItauCaseMessage(recognitionButton.dataset.itauCase || "");
@@ -2588,6 +2622,7 @@ chatMessages?.addEventListener("click", (event) => {
     );
     if (!candidate) return;
     candidate.answer = recognitionButton.dataset.itauAnswer;
+    const candidateLabel = candidate.label;
     recognitionButton
       .closest(".itau-recognition")
       ?.querySelectorAll("[data-itau-answer]")
@@ -2598,7 +2633,41 @@ chatMessages?.addEventListener("click", (event) => {
           button === recognitionButton && button.dataset.itauAnswer === "not_recognized",
         );
       });
+    try {
+      const response = await fetch(
+        `/api/itau-refund/cases/${encodeURIComponent(found.message.itauCase.id)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({
+            candidateAnswers: Object.fromEntries(
+              found.message.itauCase.candidates.map((item) => [item.id, item.answer]),
+            ),
+          }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.case) {
+        found.message.itauCase = data.case;
+      } else if (response.status === 401) {
+        showLogin("Entre para continuar a análise.");
+        return;
+      } else {
+        setChatError("A confirmação foi mantida nesta conversa, mas não pôde ser sincronizada.");
+      }
+    } catch {
+      setChatError("A confirmação foi mantida nesta conversa, mas não pôde ser sincronizada.");
+    }
     saveChatState();
+    const replyByAnswer = {
+      recognized: `Reconheço a contratação de "${candidateLabel}".`,
+      not_recognized: `Não reconheço a contratação de "${candidateLabel}".`,
+      unknown: `Não sei se contratei "${candidateLabel}".`,
+    };
+    sendChatMessage(
+      replyByAnswer[recognitionButton.dataset.itauAnswer] || "Quero continuar esta análise.",
+      null,
+    );
     return;
   }
 

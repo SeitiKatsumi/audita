@@ -4,14 +4,27 @@
 
 O modulo ajuda o consumidor a:
 
-1. anexar uma fatura detalhada do cartao;
-2. localizar seguros, protecoes, garantias e servicos que precisam de confirmacao;
-3. informar se reconhece cada contratacao;
-4. registrar sinais adicionais, como cobranca posterior ao cancelamento;
-5. verificar um possivel enquadramento no acordo coletivo divulgado pelo MPMG;
-6. gerar um pedido administrativo de revisao e restituicao.
+1. explicar em conversa qual cobranca despertou a suspeita;
+2. enviar somente uma evidencia recente, como print, foto, fatura ou trecho do extrato;
+3. localizar seguros, protecoes, garantias e servicos que precisam de confirmacao;
+4. informar se reconhece cada contratacao;
+5. quando houver sinal concreto, coletar extratos de um periodo maior para medir recorrencia e duracao;
+6. registrar sinais adicionais, como cobranca posterior ao cancelamento;
+7. verificar um possivel enquadramento no acordo coletivo divulgado pelo MPMG;
+8. gerar um pedido administrativo de revisao e restituicao.
 
-O modulo nao presta servico de advocacia, nao decide que uma cobranca e ilegal e nao gera peticao judicial nesta fase.
+O modulo nao presta servico de advocacia e nao decide que uma cobranca e ilegal. A peticao e o protocolo no JEC pertencem a uma fase posterior, com revisao e envio final pelo usuario.
+
+## Jornada conversacional
+
+- `suspeita`: uma pergunta curta identifica nome, valor ou recorrencia que chamou a atencao.
+- `evidencia_recente`: a Audita analisa apenas um documento pequeno para decidir se vale investigar.
+- `confirmacao`: o consumidor confirma se reconhece a contratacao encontrada.
+- `historico`: somente se houver sinal, a Audita pede os meses necessarios e cria uma linha do tempo consolidada.
+- `contexto`: reclamacao previa, cancelamento e estorno sao perguntados um por vez.
+- `saida`: resumo, evidencias e pedido administrativo; o caminho judicial fica separado.
+
+A resposta conversacional deve mostrar apenas o proximo passo. Regras completas, fontes e formulario de contexto ficam recolhidos e sao exibidos quando solicitados.
 
 ## Classificacao
 
@@ -65,7 +78,10 @@ O consumo aparece no painel administrativo como operacao `itau_statement_analysi
 
 - persistencia criptografada e politica formal de retencao;
 - OCR dedicado para documentos de baixa qualidade;
-- multiplas faturas por caso e calculo cronologico;
+- multiplas faturas por caso, eliminacao de duplicatas e calculo cronologico;
+- upload em lote processado de forma assincrona, enviando ao modelo apenas lancamentos normalizados em vez dos PDFs completos;
 - exportacao do dossie administrativo em PDF;
 - integracao com protocolo oficial do banco, se houver canal contratado;
+- geracao revisavel da peticao para JEC;
+- navegador copiloto com transmissao ao vivo, handoff humano e protocolo final feito pelo usuario;
 - modulo juridico separado, condicionado a revisao profissional e definicao regulatoria.

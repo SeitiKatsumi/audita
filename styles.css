@@ -4094,6 +4094,28 @@ body[data-active-page="chat"] .workspace {
   background: rgba(116, 255, 154, 0.07);
 }
 
+.itau-next-step {
+  display: grid;
+  gap: 3px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(73, 169, 255, 0.16);
+  background: rgba(116, 255, 154, 0.045);
+}
+
+.itau-next-step small {
+  color: var(--lime);
+  font-size: 0.64rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.itau-next-step strong {
+  color: #dcecf8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 .itau-analysis-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4182,9 +4204,11 @@ body[data-active-page="chat"] .workspace {
 .itau-recognition button {
   min-height: 31px;
   padding: 0 9px;
+  border: 1px solid rgba(73, 169, 255, 0.32);
   color: #b9d5e8;
   font-size: 0.7rem;
   font-weight: 750;
+  background: #08223a;
 }
 
 .itau-recognition button.active {
@@ -4205,6 +4229,26 @@ body[data-active-page="chat"] .workspace {
   padding: 17px 0;
 }
 
+.itau-review-details,
+.itau-analysis-details {
+  border-top: 1px solid rgba(73, 169, 255, 0.16);
+}
+
+.itau-review-details > summary,
+.itau-analysis-details > summary {
+  padding: 12px 16px;
+  color: var(--aqua);
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.itau-review-details[open] > summary,
+.itau-analysis-details[open] > summary {
+  border-bottom: 1px solid rgba(73, 169, 255, 0.16);
+  background: rgba(73, 169, 255, 0.04);
+}
+
 .itau-review-form {
   display: grid;
   gap: 12px;
@@ -4212,9 +4256,10 @@ body[data-active-page="chat"] .workspace {
   border-bottom: 1px solid rgba(73, 169, 255, 0.16);
 }
 
-.itau-review-form h4 {
+.itau-review-form > p {
   margin: 0;
-  font-size: 0.82rem;
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .itau-review-grid {
@@ -4327,7 +4372,7 @@ body[data-active-page="chat"] .workspace {
   font-weight: 800;
 }
 
-.itau-analysis-card > footer {
+.itau-analysis-details > footer {
   display: flex;
   flex-wrap: wrap;
   gap: 7px 12px;
@@ -4336,7 +4381,7 @@ body[data-active-page="chat"] .workspace {
   font-size: 0.64rem;
 }
 
-.itau-analysis-card > footer a {
+.itau-analysis-details > footer a {
   color: var(--aqua);
 }
 
