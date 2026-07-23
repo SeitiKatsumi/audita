@@ -203,9 +203,12 @@ function createCandidate(input = {}) {
   const rawLabel = String(input.label || input.description || "Cobrança a revisar").slice(0, 120);
   const normalizedLabel = normalizeForMatch(rawLabel);
   const catalogMatch = ITAU_CANDIDATE_CATALOG.find(
-    (item) =>
-      normalizeForMatch(item.label) === normalizedLabel ||
-      item.aliases.some((alias) => normalizeForMatch(alias) === normalizedLabel),
+    (item) => {
+      const aliases = [item.label, ...item.aliases].map(normalizeForMatch).filter(Boolean);
+      return aliases.some(
+        (alias) => alias === normalizedLabel || normalizedLabel.includes(alias),
+      );
+    },
   );
   const amount = input.amount === null || input.amount === undefined
     ? null

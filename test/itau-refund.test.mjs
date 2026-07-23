@@ -166,6 +166,40 @@ test("reconciles the same charge found by AI and local rules without duplication
   assert.equal(analyzed.case.candidates[0].amount, 18.9);
 });
 
+test("reconciles an AI label with extra insurance wording against the catalog", async () => {
+  const service = createItauRefundService({
+    aiAnalyzer: async () => ({
+      document_readable: true,
+      institution_mentioned: true,
+      billing_period: "07/2025",
+      candidate_charges: [
+        {
+          label: "SEGURO CARTAO PROTEGIDO",
+          description: "Cartao Protegido",
+          category: "seguro",
+          date: "2025-07-11",
+          amount: 18.9,
+          evidence: "Leitura visual do lancamento.",
+          reason: "Seguro que deve ser confirmado pelo titular.",
+          confidence: "high",
+        },
+      ],
+      notes: [],
+      model: "test-model",
+    }),
+  });
+
+  const analyzed = await service.analyze({
+    buffer: Buffer.from("11/07/2025 SEGURO CARTAO PROTEGIDO R$ 18,90"),
+    fileName: "fatura.txt",
+    mimeType: "text/plain",
+  });
+
+  assert.equal(analyzed.case.candidates.length, 1);
+  assert.equal(analyzed.case.candidates[0].label, "Cartao Protegido");
+  assert.equal(analyzed.case.candidates[0].amount, 18.9);
+});
+
 test("rejects unsupported document formats", async () => {
   const service = createItauRefundService({ aiAnalyzer: async () => ({ unavailable: true }) });
   const result = await service.analyze({
