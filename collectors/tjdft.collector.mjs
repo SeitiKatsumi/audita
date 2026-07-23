@@ -523,7 +523,14 @@ async function inspectStateCourtPortal(profile) {
 }
 
 async function collectAgentAssistedStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData }) {
-  const apiKeyRef = process.env.STATE_COURT_AGENT_API_KEY_SECRET || "OPENAI_API_KEY";
+  const preferredApiKeyRef = process.env.STATE_COURT_AGENT_API_KEY_SECRET || "AUDITA_OPENAI_API_KEY";
+  const apiKeyRef = process.env[preferredApiKeyRef]
+    ? preferredApiKeyRef
+    : process.env.AUDITA_OPENAI_API_KEY
+      ? "AUDITA_OPENAI_API_KEY"
+      : process.env.OPENAI_API_KEY
+        ? "OPENAI_API_KEY"
+        : preferredApiKeyRef;
   if (!process.env[apiKeyRef]) {
     return unavailableResult(fonte, `${stateCourtName} esta configurado para agente navegador, mas o secret ${apiKeyRef} nao esta disponivel.`, {
       ...baseData,

@@ -486,9 +486,9 @@ test("encaminha tribunal estadual selecionado para collector", async () => {
 });
 
 test("tribunal estadual agent-assisted sem secret retorna indisponivel controlado", async () => {
-  const previousOpenAiKey = process.env.OPENAI_API_KEY;
+  const previousOpenAiKey = process.env.AUDITA_OPENAI_API_KEY;
   const previousAgentKey = process.env.STATE_COURT_AGENT_API_KEY_SECRET;
-  delete process.env.OPENAI_API_KEY;
+  delete process.env.AUDITA_OPENAI_API_KEY;
   delete process.env.STATE_COURT_AGENT_API_KEY_SECRET;
   try {
     const result = await collectTjdft({
@@ -511,12 +511,12 @@ test("tribunal estadual agent-assisted sem secret retorna indisponivel controlad
     assert.equal(result.dados.uf, "AC");
     assert.equal(result.dados.automationStatus, "agent_assisted");
     assert.equal(result.dados.modo, "agent_assisted_unavailable");
-    assert.match(result.errorMessage, /OPENAI_API_KEY/);
+    assert.match(result.errorMessage, /AUDITA_OPENAI_API_KEY/);
   } finally {
     if (previousOpenAiKey === undefined) {
-      delete process.env.OPENAI_API_KEY;
+      delete process.env.AUDITA_OPENAI_API_KEY;
     } else {
-      process.env.OPENAI_API_KEY = previousOpenAiKey;
+      process.env.AUDITA_OPENAI_API_KEY = previousOpenAiKey;
     }
     if (previousAgentKey === undefined) {
       delete process.env.STATE_COURT_AGENT_API_KEY_SECRET;
@@ -527,8 +527,8 @@ test("tribunal estadual agent-assisted sem secret retorna indisponivel controlad
 });
 
 test("tribunal agent-assisted nao bloqueia antes do agente por campo estadual faltante", async () => {
-  const previousOpenAiKey = process.env.OPENAI_API_KEY;
-  delete process.env.OPENAI_API_KEY;
+  const previousOpenAiKey = process.env.AUDITA_OPENAI_API_KEY;
+  delete process.env.AUDITA_OPENAI_API_KEY;
   try {
     const result = await collectTjdft({
       documento: "25308218870",
@@ -561,9 +561,9 @@ test("tribunal agent-assisted nao bloqueia antes do agente por campo estadual fa
     assert.doesNotMatch(result.errorMessage, /exige campos adicionais/);
   } finally {
     if (previousOpenAiKey === undefined) {
-      delete process.env.OPENAI_API_KEY;
+      delete process.env.AUDITA_OPENAI_API_KEY;
     } else {
-      process.env.OPENAI_API_KEY = previousOpenAiKey;
+      process.env.AUDITA_OPENAI_API_KEY = previousOpenAiKey;
     }
   }
 });

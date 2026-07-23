@@ -82,11 +82,14 @@ export async function collect(input) {
     );
 
     if (!data || typeof data !== "object") {
+      await recordMarketplaceUsage(input, dataset, "failed");
       return failedResult(fonte, "BigDataCorp retornou uma resposta vazia ou invalida.", {
         provider: "BigDataCorp",
         dataset,
       });
     }
+
+    await recordMarketplaceUsage(input, dataset, "success");
 
     const ocorrencias = extractCnibOccurrences(data);
     const naturezaCodes = [...new Set(ocorrencias.map((item) => item.natureza).filter(Boolean))];
@@ -118,12 +121,35 @@ export async function collect(input) {
       },
     );
   } catch (error) {
+    await recordMarketplaceUsage(input, dataset, error?.name === "AbortError" ? "cancelled" : "failed", {
+      httpStatus: error?.status || null,
+    });
     return failedResult(fonte, `Falha ao consultar BigDataCorp: ${normalizeErrorMessage(error)}.`, {
       provider: "BigDataCorp",
       dataset,
       httpStatus: error?.status || null,
       errorData: sanitizeErrorData(error?.data),
     });
+  }
+}
+
+async function recordMarketplaceUsage(input, dataset, status, metadata = {}) {
+  if (typeof input?.recordApiUsage !== "function") return;
+  try {
+    await input.recordApiUsage(input.usageContext || {}, {
+      provider: "bigdatacorp",
+      service: "marketplace",
+      operation: "asset_unavailability",
+      model: dataset,
+      status,
+      requestCount: 1,
+      quantity: 1,
+      unitName: "consulta",
+      referenceId: `${input.consultaId || "cnib"}:bigdatacorp`,
+      metadata: { dataset, ...metadata },
+    });
+  } catch (error) {
+    console.error("[audita] failed to record BigDataCorp usage", error);
   }
 }
 

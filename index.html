@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260720-chat-1" />
+    <link rel="stylesheet" href="styles.css?v=20260720-api-usage-1" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -71,6 +71,7 @@
           </details>
           <a href="#historico">Hist&oacute;rico de consultas</a>
           <a href="#meu-painel">Meu painel</a>
+          <a class="hidden" href="#admin-consumo" id="adminUsageNav">Consumo de APIs</a>
         </nav>
 
         <div class="sidebar-footer">
@@ -123,7 +124,7 @@
               </a>
               <div class="chat-header-actions">
                 <button class="chat-tools-button" id="chatToolsButton" type="button" aria-expanded="false" aria-controls="chatToolsPanel">
-                  Ferramentas <span id="chatToolCount">5</span>
+                  Ferramentas <span id="chatToolCount">6</span>
                 </button>
                 <button class="chat-icon-button chat-mobile-new" id="chatMobileNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
               </div>
@@ -132,6 +133,7 @@
                 <div><span class="tool-status active"></span><strong>IBGE</strong><small>API p&uacute;blica ativa</small></div>
                 <a href="/#consulta-imoveis"><span class="tool-status review"></span><strong>Busca de im&oacute;veis</strong><small>Em homologa&ccedil;&atilde;o</small></a>
                 <a href="/#consulta-cnib"><span class="tool-status pending"></span><strong>Indisponibilidade</strong><small>Aguardando provedor</small></a>
+                <a href="/chat?tool=itau-refund"><span class="tool-status active"></span><strong>Revis&atilde;o Ita&uacute;</strong><small>An&aacute;lise de faturas ativa</small></a>
                 <a href="/#historico"><span class="tool-status active"></span><strong>Hist&oacute;rico</strong><small>Consultas do usu&aacute;rio</small></a>
               </div>
             </header>
@@ -143,6 +145,10 @@
                 <h2>Como posso ajudar?</h2>
                 <p>Conte o que voc&ecirc; precisa verificar. Eu organizo o caminho e aciono as fontes adequadas.</p>
                 <div class="chat-suggestions" aria-label="Sugest&otilde;es de consulta">
+                  <button type="button" data-chat-prompt="Quero analisar uma fatura do Itau para identificar seguros ou servicos que talvez eu nao tenha contratado.">
+                    <strong>Revisar cobran&ccedil;as Ita&uacute;</strong>
+                    <small>Anexar fatura e confirmar lan&ccedil;amentos</small>
+                  </button>
                   <button type="button" data-chat-prompt="Preciso emitir certidoes estaduais para uma pessoa fisica. Por onde comecamos?">
                     <strong>Emitir certid&otilde;es estaduais</strong>
                     <small>Organizar documentos e tribunal</small>
@@ -150,10 +156,6 @@
                   <button type="button" data-chat-prompt="Quero verificar a indisponibilidade de bens de um vendedor. Explique o fluxo atual.">
                     <strong>Verificar indisponibilidade</strong>
                     <small>Entender fonte, risco e pr&oacute;xima a&ccedil;&atilde;o</small>
-                  </button>
-                  <button type="button" data-chat-prompt="Quero pesquisar bens imoveis vinculados a uma pessoa. Como a Audita pode ajudar?">
-                    <strong>Pesquisar im&oacute;veis</strong>
-                    <small>Escolher a modalidade adequada</small>
                   </button>
                   <button type="button" data-chat-prompt="Quais consultas e analises a Audita consegue fazer hoje?">
                     <strong>Explorar capacidades</strong>
@@ -165,16 +167,25 @@
 
             <div class="chat-error hidden" id="chatError" role="alert"></div>
             <form class="chat-composer" id="chatForm">
+              <div class="chat-attachment-preview hidden" id="chatAttachmentPreview"></div>
+              <label class="chat-attach-button" for="chatAttachment" aria-label="Anexar fatura" title="Anexar fatura">
+                <span aria-hidden="true">+</span>
+              </label>
+              <input
+                class="hidden"
+                id="chatAttachment"
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,application/pdf,image/png,image/jpeg,text/csv,text/plain"
+              />
               <textarea
                 id="chatInput"
                 rows="1"
                 maxlength="5000"
                 placeholder="Pergunte &agrave; Audita"
                 aria-label="Mensagem para a Audita"
-                required
               ></textarea>
               <button class="chat-send-button" id="chatSendButton" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem">&#8593;</button>
-              <small>A Audita apoia sua an&aacute;lise. Valide decis&otilde;es jur&iacute;dicas relevantes.</small>
+              <small>Faturas anexadas s&atilde;o processadas para esta an&aacute;lise e n&atilde;o ficam armazenadas pelo m&oacute;dulo.</small>
             </form>
           </div>
         </section>
@@ -322,7 +333,7 @@
               </label>
               <label>
                 Secret da API key
-                <input id="agentApiKeySecretRef" type="text" value="OPENAI_API_KEY" required />
+                <input id="agentApiKeySecretRef" type="text" value="AUDITA_OPENAI_API_KEY" required />
               </label>
               <label>
                 Status
@@ -838,7 +849,7 @@
                 <p class="eyebrow">Conta</p>
                 <h2>Meu painel</h2>
               </div>
-              <span class="live">Super admin</span>
+              <span class="live" id="profileRole">Super admin</span>
             </div>
             <div class="profile-fields">
               <div>
@@ -866,6 +877,254 @@
                 <strong id="profilePlan">Ilimitado</strong>
               </div>
             </div>
+          </article>
+        </section>
+
+        <section class="api-usage-admin" id="admin-consumo" data-page="admin-consumo">
+          <div class="api-usage-title-row">
+            <div>
+              <p class="eyebrow">Administra&ccedil;&atilde;o</p>
+              <h2>Consumo de APIs</h2>
+              <p>Acompanhe chamadas, unidades consumidas e custos por usu&aacute;rio e fornecedor.</p>
+            </div>
+            <div class="api-usage-filters">
+              <label>
+                Per&iacute;odo
+                <select id="apiUsageDays">
+                  <option value="7">7 dias</option>
+                  <option value="30" selected>30 dias</option>
+                  <option value="90">90 dias</option>
+                  <option value="365">12 meses</option>
+                </select>
+              </label>
+              <label>
+                Fornecedor
+                <select id="apiUsageProvider">
+                  <option value="">Todos</option>
+                </select>
+              </label>
+              <button class="secondary-action" id="apiUsageRefresh" type="button">Atualizar</button>
+            </div>
+          </div>
+
+          <p class="api-usage-error hidden" id="apiUsageError" role="alert"></p>
+
+          <article class="module openai-official-usage-card">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">OpenAI</p>
+                <h2>Consumo oficial da chave Audita</h2>
+              </div>
+              <span class="api-usage-status" id="openaiOfficialStatus">Verificando</span>
+            </div>
+            <p class="openai-official-message" id="openaiOfficialMessage">
+              Consultando os dados oficiais de uso e faturamento da OpenAI.
+            </p>
+            <div class="openai-official-metrics" aria-label="Consumo oficial da OpenAI">
+              <div>
+                <small>Custo faturado</small>
+                <strong id="openaiOfficialCost">US$ 0,00</strong>
+                <span>Costs API</span>
+              </div>
+              <div>
+                <small>Requisi&ccedil;&otilde;es</small>
+                <strong id="openaiOfficialRequests">0</strong>
+                <span id="openaiOfficialModels">0 modelos</span>
+              </div>
+              <div>
+                <small>Tokens processados</small>
+                <strong id="openaiOfficialTokens">0</strong>
+                <span id="openaiOfficialTokenSplit">0 entrada / 0 sa&iacute;da</span>
+              </div>
+              <div>
+                <small>Chave monitorada</small>
+                <strong class="openai-official-identifier" id="openaiOfficialKey">N&atilde;o configurada</strong>
+                <span id="openaiOfficialProject">Projeto n&atilde;o configurado</span>
+              </div>
+            </div>
+            <div class="openai-official-footer">
+              <span id="openaiOfficialSync">Ainda n&atilde;o sincronizado</span>
+              <span id="openaiOfficialLineItems"></span>
+            </div>
+            <p class="openai-official-warning hidden" id="openaiOfficialWarning"></p>
+          </article>
+
+          <div class="api-usage-section-heading">
+            <div>
+              <p class="eyebrow">Audita</p>
+              <h2>Rastreabilidade interna</h2>
+            </div>
+            <p>Identifica quais usu&aacute;rios e ferramentas originaram o consumo. Os valores abaixo s&atilde;o rateios internos.</p>
+          </div>
+
+          <div class="api-usage-metrics" aria-label="Resumo do consumo">
+            <article>
+              <small>Rateio interno</small>
+              <strong id="apiUsageCost">US$ 0,00</strong>
+              <span id="apiUsageUnpriced">Tudo com tarifa de rateio</span>
+            </article>
+            <article>
+              <small>Requisi&ccedil;&otilde;es</small>
+              <strong id="apiUsageRequests">0</strong>
+              <span id="apiUsageFailures">Nenhuma falha</span>
+            </article>
+            <article>
+              <small>Tokens OpenAI</small>
+              <strong id="apiUsageTokens">0</strong>
+              <span id="apiUsageTokenSplit">0 entrada / 0 sa&iacute;da</span>
+            </article>
+            <article>
+              <small>Usu&aacute;rios ativos</small>
+              <strong id="apiUsageUsers">0</strong>
+              <span id="apiUsageProviders">0 fornecedores</span>
+            </article>
+          </div>
+
+          <div class="api-usage-grid">
+            <article class="module api-usage-module">
+              <div class="module-header">
+                <div>
+                  <p class="eyebrow">Fornecedores</p>
+                  <h2>Consumo por API</h2>
+                </div>
+              </div>
+              <div class="api-usage-table-wrap">
+                <table class="api-usage-table">
+                  <thead>
+                    <tr>
+                      <th>API / modelo</th>
+                      <th>Chamadas</th>
+                      <th>Unidades</th>
+                      <th>Rateio</th>
+                    </tr>
+                  </thead>
+                  <tbody id="apiUsageProviderRows"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="module api-usage-module">
+              <div class="module-header">
+                <div>
+                  <p class="eyebrow">Pessoas</p>
+                  <h2>Consumo por usu&aacute;rio</h2>
+                </div>
+              </div>
+              <div class="api-usage-table-wrap">
+                <table class="api-usage-table">
+                  <thead>
+                    <tr>
+                      <th>Usu&aacute;rio</th>
+                      <th>Chamadas</th>
+                      <th>Tokens</th>
+                      <th>Rateio</th>
+                    </tr>
+                  </thead>
+                  <tbody id="apiUsageUserRows"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <article class="module api-usage-module">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Rastreabilidade</p>
+                <h2>Uso recente</h2>
+              </div>
+              <span class="live">Sem dados pessoais</span>
+            </div>
+            <div class="api-usage-table-wrap">
+              <table class="api-usage-table api-usage-recent-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Usu&aacute;rio</th>
+                    <th>Fornecedor</th>
+                    <th>Opera&ccedil;&atilde;o</th>
+                    <th>Uso</th>
+                    <th>Status</th>
+                    <th>Rateio</th>
+                  </tr>
+                </thead>
+                <tbody id="apiUsageRecentRows"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="module api-pricing-module">
+            <div class="module-header">
+              <div>
+                <p class="eyebrow">Rateio</p>
+                <h2>Tarifas internas</h2>
+              </div>
+              <span class="live">Edit&aacute;vel</span>
+            </div>
+            <p class="api-pricing-note">
+              Use estas tarifas para atribuir consumo aos usu&aacute;rios e para APIs sem relat&oacute;rio oficial. O faturamento OpenAI acima vem diretamente da API do provedor.
+            </p>
+            <div class="api-pricing-list" id="apiPricingList"></div>
+            <form class="api-pricing-form" id="apiPricingForm">
+              <label>
+                Fornecedor
+                <input id="apiPricingProvider" type="text" placeholder="Ex: directdata" required />
+              </label>
+              <label>
+                Servi&ccedil;o
+                <input id="apiPricingService" type="text" placeholder="Ex: processos" required />
+              </label>
+              <label>
+                Modelo ou produto
+                <input id="apiPricingModel" type="text" placeholder="Opcional" />
+              </label>
+              <label>
+                Nome exibido
+                <input id="apiPricingDisplayName" type="text" placeholder="Ex: Direct Data Processos" required />
+              </label>
+              <label>
+                Moeda
+                <select id="apiPricingCurrency">
+                  <option value="BRL">BRL</option>
+                  <option value="USD">USD</option>
+                </select>
+              </label>
+              <label>
+                Unidade
+                <input id="apiPricingUnitName" type="text" value="consulta" required />
+              </label>
+              <label>
+                Entrada / 1M tokens
+                <input id="apiPricingInputCost" type="number" min="0" step="0.000001" value="0" />
+              </label>
+              <label>
+                Entrada em cache / 1M
+                <input id="apiPricingCachedInputCost" type="number" min="0" step="0.000001" value="0" />
+              </label>
+              <label>
+                Sa&iacute;da / 1M tokens
+                <input id="apiPricingOutputCost" type="number" min="0" step="0.000001" value="0" />
+              </label>
+              <label>
+                Custo por requisi&ccedil;&atilde;o
+                <input id="apiPricingRequestCost" type="number" min="0" step="0.000001" value="0" />
+              </label>
+              <label>
+                Custo por unidade
+                <input id="apiPricingUnitCost" type="number" min="0" step="0.000001" value="0" />
+              </label>
+              <label>
+                Fonte da tarifa
+                <input id="apiPricingSource" type="text" value="Contrato do provedor" />
+              </label>
+              <label class="api-pricing-toggle">
+                <input id="apiPricingActive" type="checkbox" checked />
+                Tarifa ativa
+              </label>
+              <div class="api-pricing-actions">
+                <button class="primary-action" type="submit">Salvar tarifa</button>
+                <button class="secondary-action" id="apiPricingClear" type="button">Limpar</button>
+              </div>
+            </form>
           </article>
         </section>
 
@@ -1056,6 +1315,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260720-chat-1"></script>
+    <script type="module" src="app.js?v=20260720-api-usage-1"></script>
   </body>
 </html>

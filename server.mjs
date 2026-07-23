@@ -4,9 +4,12 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { createAuditService } from "./services/audit.service.mjs";
+import { createApiUsageService } from "./services/api-usage.service.mjs";
+import { createOpenAIOfficialUsageService } from "./services/openai-official-usage.service.mjs";
 import { createCreditsService } from "./services/credits.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
 import { runAuditaChat } from "./services/chat-assistant.service.mjs";
+import { createItauRefundService } from "./services/itau-refund.service.mjs";
 import {
   closeAssistedSession,
   getAssistedSessionView,
@@ -1129,6 +1132,24 @@ async function readJsonBody(request) {
   return body ? JSON.parse(body) : {};
 }
 
+async function readBufferBody(request, maxBytes = 12 * 1024 * 1024) {
+  const chunks = [];
+  let size = 0;
+
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > maxBytes) {
+      const error = new Error("Request body too large");
+      error.code = "BODY_TOO_LARGE";
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  return Buffer.concat(chunks);
+}
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "content-type": "application/json; charset=utf-8",
@@ -1237,9 +1258,12 @@ async function getTenantIdForRequest(request) {
   };
 }
 
+const apiUsageService = createApiUsageService({ getDb: () => ({ pool, dbReady }) });
+const openAIOfficialUsageService = createOpenAIOfficialUsageService();
 const auditService = createAuditService({
   getDb: () => ({ pool, dbReady }),
   getAuthContext: getTenantIdForRequest,
+  recordApiUsage: (usageContext, event) => apiUsageService.record(usageContext, event),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
 const propertyAssetsService = createPropertyAssetsService({
@@ -1247,6 +1271,7 @@ const propertyAssetsService = createPropertyAssetsService({
   getAuthContext: getTenantIdForRequest,
   creditsService,
 });
+const itauRefundService = createItauRefundService();
 
 async function getDashboard(request) {
   if (!pool || !dbReady) {
@@ -2370,11 +2395,11 @@ async function getAgentSettings(request) {
     return {
       provider: "openai",
       model: "gpt-5-mini",
-      apiKeySecretRef: "OPENAI_API_KEY",
+      apiKeySecretRef: "AUDITA_OPENAI_API_KEY",
       systemPrompt:
         "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
       status: "draft",
-      configured: Boolean(process.env.OPENAI_API_KEY),
+      configured: Boolean(process.env.AUDITA_OPENAI_API_KEY),
     };
   }
 
@@ -2401,7 +2426,7 @@ async function getAgentSettings(request) {
     result.rows[0] || {
       provider: "openai",
       model: "gpt-5-mini",
-      apiKeySecretRef: "OPENAI_API_KEY",
+      apiKeySecretRef: "AUDITA_OPENAI_API_KEY",
       systemPrompt:
         "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
       status: "draft",
@@ -2429,7 +2454,7 @@ async function saveAgentSettings(request) {
 
   const body = await readJsonBody(request);
   const model = String(body.model || "gpt-5-mini").trim();
-  const apiKeySecretRef = String(body.apiKeySecretRef || "OPENAI_API_KEY").trim();
+  const apiKeySecretRef = String(body.apiKeySecretRef || "AUDITA_OPENAI_API_KEY").trim();
   const systemPrompt = String(body.systemPrompt || "").trim();
   const status = String(body.status || "draft").trim();
 
@@ -2562,11 +2587,54 @@ async function runChatConversation(request) {
 
   const body = await readJsonBody(request);
   const settings = await getAgentSettings(request);
-  const result = await runAuditaChat({
-    messages: body.messages,
-    settings,
-    userName: authContext.user?.name || "",
-  });
+  let result;
+  try {
+    result = await runAuditaChat({
+      messages: body.messages,
+      settings,
+      userName: authContext.user?.name || "",
+      caseContext: body.caseContext,
+    });
+  } catch (error) {
+    try {
+      await apiUsageService.record(authContext, {
+        provider: "openai",
+        service: "responses",
+        operation: "audita_chat",
+        model: String(process.env.AUDITA_CHAT_MODEL || settings.model || "gpt-5-mini").trim(),
+        status: error?.name === "AbortError" ? "cancelled" : "failed",
+        requestCount: 1,
+        referenceId: crypto.randomUUID(),
+        unitName: "token",
+        metadata: {
+          messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
+        },
+      });
+    } catch (usageError) {
+      console.error("[audita] failed to record failed chat usage", usageError);
+    }
+    throw error;
+  }
+
+  if (!result.invalid && !result.unavailable && result.usage) {
+    try {
+      await apiUsageService.record(authContext, {
+        provider: "openai",
+        service: "responses",
+        operation: "audita_chat",
+        model: result.model || "gpt-5-mini",
+        referenceId: crypto.randomUUID(),
+        unitName: "token",
+        metadata: {
+          messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
+          actionCount: Array.isArray(result.actions) ? result.actions.length : 0,
+        },
+        ...result.usage,
+      });
+    } catch (error) {
+      console.error("[audita] failed to record chat usage", error);
+    }
+  }
 
   if (!result.invalid && !result.unavailable && pool && dbReady && authContext.tenantId) {
     await pool.query(
@@ -3231,6 +3299,114 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/itau-refund/analyze" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const requestUrl = new URL(
+        request.url || pathname,
+        `http://${request.headers.host || "127.0.0.1"}`,
+      );
+      const buffer = await readBufferBody(request);
+      const result = await itauRefundService.analyze({
+        buffer,
+        fileName: requestUrl.searchParams.get("filename") || "fatura",
+        mimeType: request.headers["content-type"] || "",
+        tenantId: authContext.tenantId,
+        userId: authContext.user?.id || null,
+      });
+      if (result.invalid) {
+        const statusCode = result.reason === "document_too_large" ? 413 : 400;
+        sendJson(response, statusCode, {
+          error: result.reason,
+          maxBytes: result.maxBytes,
+        });
+        return true;
+      }
+      if (result.usage) {
+        await apiUsageService.record(authContext, {
+          provider: "openai",
+          service: "responses",
+          operation: "itau_statement_analysis",
+          model: result.model || process.env.ITAU_ANALYSIS_MODEL || "gpt-5-mini",
+          referenceId: result.case.id,
+          unitName: "token",
+          metadata: {
+            candidateCount: result.case.candidates.length,
+            mimeType: result.case.document.mimeType,
+          },
+          ...result.usage,
+        });
+      }
+      if (pool && dbReady && authContext.tenantId) {
+        await pool.query(
+          `INSERT INTO audita_app_events (tenant_id, event_type, payload)
+           VALUES ($1, 'itau.document.analyzed', $2)`,
+          [
+            authContext.tenantId,
+            JSON.stringify({
+              caseId: result.case.id,
+              status: result.case.status,
+              candidateCount: result.case.candidates.length,
+              processedBy: result.case.document.processedBy,
+            }),
+          ],
+        );
+      }
+      sendJson(response, 200, { case: result.case });
+    } catch (error) {
+      sendJson(response, error?.code === "BODY_TOO_LARGE" ? 413 : 500, {
+        error: error?.code === "BODY_TOO_LARGE" ? "document_too_large" : "itau_analysis_failed",
+        message:
+          error?.code === "BODY_TOO_LARGE"
+            ? "O arquivo excede o limite de 12 MB."
+            : "Nao foi possivel analisar o documento agora.",
+      });
+    }
+    return true;
+  }
+
+  const itauCaseMatch = pathname.match(/^\/api\/itau-refund\/cases\/([^/]+)$/);
+  if (itauCaseMatch && ["GET", "POST"].includes(request.method)) {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const auth = {
+        tenantId: authContext.tenantId,
+        userId: authContext.user?.id || null,
+      };
+      const result =
+        request.method === "POST"
+          ? itauRefundService.updateCase(
+              decodeURIComponent(itauCaseMatch[1]),
+              await readJsonBody(request),
+              auth,
+            )
+          : itauRefundService.getCase(decodeURIComponent(itauCaseMatch[1]), auth);
+      if (result.notFound) {
+        sendJson(response, 404, { error: "itau_case_not_found" });
+        return true;
+      }
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "itau_case_forbidden" });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch {
+      sendJson(response, 500, {
+        error: "itau_case_update_failed",
+        message: "Nao foi possivel atualizar a revisao agora.",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/chat" && request.method === "POST") {
     try {
       const result = await runChatConversation(request);
@@ -3245,7 +3421,7 @@ async function handleApi(request, response, pathname) {
       if (result.unavailable) {
         sendJson(response, 503, {
           error: result.reason || "chat_unavailable",
-          secretRef: result.secretRef || "OPENAI_API_KEY",
+          secretRef: result.secretRef || "AUDITA_OPENAI_API_KEY",
         });
         return true;
       }
@@ -3257,6 +3433,65 @@ async function handleApi(request, response, pathname) {
         message: timedOut
           ? "A Audita demorou mais que o esperado para responder."
           : "Nao foi possivel concluir esta conversa.",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/admin/api-usage" && request.method === "GET") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (authRequired && !canManageIntegrations(authContext.user)) {
+        sendJson(response, 403, { error: "insufficient_role" });
+        return true;
+      }
+      const requestUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+      const days = requestUrl.searchParams.get("days") || 30;
+      const [dashboard, officialOpenAI] = await Promise.all([
+        apiUsageService.getDashboard(authContext, {
+          days,
+          provider: requestUrl.searchParams.get("provider") || "",
+        }),
+        openAIOfficialUsageService.getUsage({
+          days,
+          force: requestUrl.searchParams.get("sync") === "1",
+        }),
+      ]);
+      sendJson(response, 200, { ...dashboard, officialOpenAI });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "api_usage_query_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/admin/api-pricing" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (authRequired && !canManageIntegrations(authContext.user)) {
+        sendJson(response, 403, { error: "insufficient_role" });
+        return true;
+      }
+      const pricing = await apiUsageService.savePricing(authContext, await readJsonBody(request));
+      if (pricing.invalid) {
+        sendJson(response, 400, { error: "invalid_api_pricing" });
+        return true;
+      }
+      sendJson(response, 200, { pricing });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "api_pricing_save_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
       });
     }
     return true;

@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS audita_agent_settings (
   tenant_id BIGINT,
   provider TEXT NOT NULL DEFAULT 'openai',
   model TEXT NOT NULL DEFAULT 'gpt-5-mini',
-  api_key_secret_ref TEXT NOT NULL DEFAULT 'OPENAI_API_KEY',
+  api_key_secret_ref TEXT NOT NULL DEFAULT 'AUDITA_OPENAI_API_KEY',
   system_prompt TEXT NOT NULL DEFAULT 'Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.',
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'testing', 'active', 'paused')),
   created_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
@@ -208,6 +208,54 @@ CREATE TABLE IF NOT EXISTS audita_credit_ledger (
   amount INTEGER NOT NULL,
   operation TEXT NOT NULL,
   reference_id TEXT NOT NULL,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_api_pricing (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE RESTRICT,
+  provider TEXT NOT NULL,
+  service TEXT NOT NULL,
+  model TEXT NOT NULL DEFAULT '',
+  display_name TEXT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'USD',
+  unit_name TEXT NOT NULL DEFAULT 'request',
+  input_cost_per_million NUMERIC(20, 10) NOT NULL DEFAULT 0 CHECK (input_cost_per_million >= 0),
+  cached_input_cost_per_million NUMERIC(20, 10) NOT NULL DEFAULT 0 CHECK (cached_input_cost_per_million >= 0),
+  output_cost_per_million NUMERIC(20, 10) NOT NULL DEFAULT 0 CHECK (output_cost_per_million >= 0),
+  request_cost NUMERIC(20, 10) NOT NULL DEFAULT 0 CHECK (request_cost >= 0),
+  unit_cost NUMERIC(20, 10) NOT NULL DEFAULT 0 CHECK (unit_cost >= 0),
+  active BOOLEAN NOT NULL DEFAULT true,
+  source TEXT NOT NULL DEFAULT 'admin',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (tenant_id, provider, service, model)
+);
+
+CREATE TABLE IF NOT EXISTS audita_api_usage (
+  id BIGSERIAL PRIMARY KEY,
+  public_id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE RESTRICT,
+  user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  provider TEXT NOT NULL,
+  service TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  model TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'success' CHECK (status IN ('success', 'failed', 'cancelled')),
+  request_count INTEGER NOT NULL DEFAULT 1 CHECK (request_count >= 0),
+  input_units BIGINT NOT NULL DEFAULT 0 CHECK (input_units >= 0),
+  cached_input_units BIGINT NOT NULL DEFAULT 0 CHECK (cached_input_units >= 0),
+  output_units BIGINT NOT NULL DEFAULT 0 CHECK (output_units >= 0),
+  total_units BIGINT NOT NULL DEFAULT 0 CHECK (total_units >= 0),
+  quantity NUMERIC(20, 6) NOT NULL DEFAULT 1 CHECK (quantity >= 0),
+  unit_name TEXT NOT NULL DEFAULT 'request',
+  currency TEXT NOT NULL DEFAULT 'USD',
+  estimated_cost NUMERIC(20, 10),
+  actual_cost NUMERIC(20, 10),
+  priced BOOLEAN NOT NULL DEFAULT false,
+  reference_id TEXT NOT NULL,
+  pricing_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -446,6 +494,11 @@ CREATE INDEX IF NOT EXISTS audita_audit_evidence_audit_idx ON audita_audit_evide
 CREATE INDEX IF NOT EXISTS audita_job_logs_audit_idx ON audita_job_logs(audit_query_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_credit_ledger_tenant_idx ON audita_credit_ledger(tenant_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS audita_credit_ledger_reference_idx ON audita_credit_ledger(tenant_id, reference_id, entry_type);
+CREATE INDEX IF NOT EXISTS audita_api_pricing_tenant_idx ON audita_api_pricing(tenant_id, provider, active);
+CREATE INDEX IF NOT EXISTS audita_api_usage_tenant_idx ON audita_api_usage(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS audita_api_usage_user_idx ON audita_api_usage(tenant_id, user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS audita_api_usage_provider_idx ON audita_api_usage(tenant_id, provider, service, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS audita_api_usage_reference_idx ON audita_api_usage(tenant_id, provider, reference_id);
 CREATE INDEX IF NOT EXISTS audita_property_searches_tenant_idx ON audita_property_searches(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_property_searches_subject_idx ON audita_property_searches(tenant_id, subject_hash);
 CREATE INDEX IF NOT EXISTS audita_property_evidence_search_idx ON audita_property_evidence(property_search_id, created_at);

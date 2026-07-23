@@ -6,6 +6,7 @@ import {
   buildAuditaChatInstructions,
   maskSensitiveIdentifiers,
   normalizeChatMessages,
+  normalizeItauCaseContext,
   runAuditaChat,
 } from "../services/chat-assistant.service.mjs";
 
@@ -47,6 +48,7 @@ test("chat capability registry exposes current module status and routes", () => 
   const stateCourts = AUDITA_CHAT_CAPABILITIES.find((item) => item.id === "state_courts");
   const propertySearch = AUDITA_CHAT_CAPABILITIES.find((item) => item.id === "property_search");
   const unavailability = AUDITA_CHAT_CAPABILITIES.find((item) => item.id === "asset_unavailability");
+  const itauRefund = AUDITA_CHAT_CAPABILITIES.find((item) => item.id === "itau_refund");
 
   assert.equal(stateCourts?.status, "active_assisted");
   assert.match(stateCourts?.statusLabel || "", /Ativa/);
@@ -55,6 +57,38 @@ test("chat capability registry exposes current module status and routes", () => 
   assert.match(propertySearch?.statusLabel || "", /homologacao/i);
   assert.equal(unavailability?.status, "provider_required");
   assert.match(unavailability?.statusLabel || "", /Aguardando provedor/i);
+  assert.equal(itauRefund?.status, "active");
+  assert.equal(itauRefund?.route, "/chat?tool=itau-refund");
+});
+
+test("chat receives only normalized Itau findings instead of the uploaded document", () => {
+  const context = normalizeItauCaseContext({
+    type: "itau_refund",
+    case: {
+      id: "internal-case-id",
+      status: "review_required",
+      document: { fileName: "CPF-49532724800.pdf", rawText: "conteudo sigiloso" },
+      candidates: [
+        {
+          label: "Seguro Fatura Protegida",
+          date: "2025-07-10",
+          amount: 18.9,
+          answer: "not_recognized",
+          evidence: "linha completa da fatura",
+        },
+      ],
+      answers: { priorComplaint: "yes", priorComplaintDate: "2025-10-01" },
+      evaluation: {
+        classification: "possible_unauthorized",
+        disputedCount: 1,
+        totalDisputed: 18.9,
+      },
+    },
+  });
+
+  assert.match(context, /Seguro Fatura Protegida/);
+  assert.doesNotMatch(context, /49532724800|conteudo sigiloso|linha completa/);
+  assert.doesNotMatch(context, /internal-case-id/);
 });
 
 test("chat reports configuration pending without importing or calling OpenAI", async () => {
@@ -65,7 +99,7 @@ test("chat reports configuration pending without importing or calling OpenAI", a
 
   assert.equal(result.unavailable, true);
   assert.equal(result.reason, "openai_not_configured");
-  assert.equal(result.secretRef, "OPENAI_API_KEY");
+  assert.equal(result.secretRef, "AUDITA_OPENAI_API_KEY");
 });
 
 test("chat rejects an empty or assistant-ended transcript", async () => {

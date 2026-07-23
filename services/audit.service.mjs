@@ -239,7 +239,13 @@ async function runCollectorWithCache({ collector, fonte, input, documentoHash, t
   return result;
 }
 
-export function createAuditService({ getDb, getAuthContext, logError = console.error, customCollectors = collectors } = {}) {
+export function createAuditService({
+  getDb,
+  getAuthContext,
+  recordApiUsage,
+  logError = console.error,
+  customCollectors = collectors,
+} = {}) {
   async function persistQuery(query, authContext) {
     const { pool, dbReady } = getDb ? getDb() : {};
     if (!pool || !dbReady) {
@@ -392,6 +398,12 @@ export function createAuditService({ getDb, getAuthContext, logError = console.e
           extraFields: query.extraFields || {},
           timeoutMs: envNumber("AUDIT_COLLECTOR_TIMEOUT_MS", 12000),
           retries: envNumber("AUDIT_COLLECTOR_RETRIES", 1),
+          usageContext: {
+            tenantId: query.tenantId,
+            userId: query.userId,
+            user: query.usageUser || null,
+          },
+          recordApiUsage,
         },
         documentoHash: query.documentoHash,
         tenantId: query.tenantId,
@@ -464,6 +476,13 @@ export function createAuditService({ getDb, getAuthContext, logError = console.e
       extraFields,
       tenantId: authContext.tenantId,
       userId: authContext.user?.id || null,
+      usageUser: authContext.user
+        ? {
+            id: authContext.user.id,
+            name: authContext.user.name,
+            email: authContext.user.email,
+          }
+        : null,
       resultados,
       scoreRisco: { nivel: "indefinido", motivos: ["Consulta ainda nao concluida."] },
       createdAt: new Date().toISOString(),

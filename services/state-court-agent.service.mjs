@@ -1,3 +1,5 @@
+import { extractOpenAIUsage } from "./api-usage.service.mjs";
+
 const DEFAULT_AGENT_ASSISTED_UFS = "AC,AP,MG,MT,PA,PI,RJ,RN,RO,RR,RS,SC";
 const agentSessions = new Map();
 const runningAgentTasks = new Map();
@@ -300,8 +302,16 @@ export function startStateCourtAgentSession(sessionId, options = {}) {
 
 async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
   if (session.status === "running") return;
-  const apiKeyRef = process.env.STATE_COURT_AGENT_API_KEY_SECRET || "OPENAI_API_KEY";
-  if (!process.env[apiKeyRef]) {
+  const preferredApiKeyRef = process.env.STATE_COURT_AGENT_API_KEY_SECRET || "AUDITA_OPENAI_API_KEY";
+  const apiKeyRef = process.env[preferredApiKeyRef]
+    ? preferredApiKeyRef
+    : process.env.AUDITA_OPENAI_API_KEY
+      ? "AUDITA_OPENAI_API_KEY"
+      : process.env.OPENAI_API_KEY
+        ? "OPENAI_API_KEY"
+        : preferredApiKeyRef;
+  const apiKey = process.env[apiKeyRef];
+  if (!apiKey) {
     session.status = "blocked";
     session.nextAction = "configure_openai";
     addMessage(session, "system", `Secret ${apiKeyRef} nao configurado. O navegador assistido continua disponivel, mas o agente IA nao pode executar.`);
@@ -314,6 +324,7 @@ async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
 
   try {
     const { Agent, Runner, tool } = await import("@openai/agents");
+    const { OpenAIProvider } = await import("@openai/agents-openai");
     const { z } = await import("zod");
     const tools = buildAgentTools({ session, tool, z });
     const agent = new Agent({
@@ -325,6 +336,11 @@ async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), envNumber("STATE_COURT_AGENT_RUN_TIMEOUT_MS", 180000));
     const runner = new Runner({
+      modelProvider: new OpenAIProvider({
+        apiKey,
+        useResponses: true,
+        cacheResponsesWebSocketModels: false,
+      }),
       tracingDisabled: true,
       traceIncludeSensitiveData: false,
     });
@@ -338,6 +354,10 @@ async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
       clearTimeout(timeout);
     }
     const finalText = String(result?.finalOutput || "").trim();
+    await recordAgentUsage(session, {
+      ...extractOpenAIUsage(result),
+      status: "success",
+    });
     if (finalText) {
       addMessage(session, "assistant", finalText);
     }
@@ -347,9 +367,31 @@ async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
       addMessage(session, "system", "Agente concluiu o turno. Revise a tela oficial ou continue a partir do painel.");
     }
   } catch (error) {
+    await recordAgentUsage(session, {
+      requestCount: 1,
+      status: error?.name === "AbortError" ? "cancelled" : "failed",
+    });
     session.status = "blocked";
     session.nextAction = "manual_review";
     addMessage(session, "system", `Falha ao executar agente: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+  }
+}
+
+async function recordAgentUsage(session, usage) {
+  if (typeof session?.input?.recordApiUsage !== "function") return;
+  try {
+    await session.input.recordApiUsage(session.input.usageContext || {}, {
+      provider: "openai",
+      service: "responses",
+      operation: "state_court_agent",
+      model: process.env.STATE_COURT_AGENT_MODEL || "gpt-5-mini",
+      referenceId: `${session.id}:${Date.now()}`,
+      unitName: "token",
+      metadata: { uf: session.uf, tribunal: session.tribunal },
+      ...usage,
+    });
+  } catch (error) {
+    console.error("[audita] failed to record state court agent usage", error);
   }
 }
 

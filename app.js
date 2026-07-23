@@ -29,6 +29,51 @@ const pageEyebrow = document.querySelector("#pageEyebrow");
 const profileName = document.querySelector("#profileName");
 const profileEmail = document.querySelector("#profileEmail");
 const profilePlan = document.querySelector("#profilePlan");
+const profileRole = document.querySelector("#profileRole");
+const adminUsageNav = document.querySelector("#adminUsageNav");
+const apiUsageDays = document.querySelector("#apiUsageDays");
+const apiUsageProvider = document.querySelector("#apiUsageProvider");
+const apiUsageRefresh = document.querySelector("#apiUsageRefresh");
+const apiUsageError = document.querySelector("#apiUsageError");
+const openaiOfficialStatus = document.querySelector("#openaiOfficialStatus");
+const openaiOfficialMessage = document.querySelector("#openaiOfficialMessage");
+const openaiOfficialCost = document.querySelector("#openaiOfficialCost");
+const openaiOfficialRequests = document.querySelector("#openaiOfficialRequests");
+const openaiOfficialModels = document.querySelector("#openaiOfficialModels");
+const openaiOfficialTokens = document.querySelector("#openaiOfficialTokens");
+const openaiOfficialTokenSplit = document.querySelector("#openaiOfficialTokenSplit");
+const openaiOfficialKey = document.querySelector("#openaiOfficialKey");
+const openaiOfficialProject = document.querySelector("#openaiOfficialProject");
+const openaiOfficialSync = document.querySelector("#openaiOfficialSync");
+const openaiOfficialLineItems = document.querySelector("#openaiOfficialLineItems");
+const openaiOfficialWarning = document.querySelector("#openaiOfficialWarning");
+const apiUsageCost = document.querySelector("#apiUsageCost");
+const apiUsageUnpriced = document.querySelector("#apiUsageUnpriced");
+const apiUsageRequests = document.querySelector("#apiUsageRequests");
+const apiUsageFailures = document.querySelector("#apiUsageFailures");
+const apiUsageTokens = document.querySelector("#apiUsageTokens");
+const apiUsageTokenSplit = document.querySelector("#apiUsageTokenSplit");
+const apiUsageUsers = document.querySelector("#apiUsageUsers");
+const apiUsageProviders = document.querySelector("#apiUsageProviders");
+const apiUsageProviderRows = document.querySelector("#apiUsageProviderRows");
+const apiUsageUserRows = document.querySelector("#apiUsageUserRows");
+const apiUsageRecentRows = document.querySelector("#apiUsageRecentRows");
+const apiPricingList = document.querySelector("#apiPricingList");
+const apiPricingForm = document.querySelector("#apiPricingForm");
+const apiPricingProvider = document.querySelector("#apiPricingProvider");
+const apiPricingService = document.querySelector("#apiPricingService");
+const apiPricingModel = document.querySelector("#apiPricingModel");
+const apiPricingDisplayName = document.querySelector("#apiPricingDisplayName");
+const apiPricingCurrency = document.querySelector("#apiPricingCurrency");
+const apiPricingUnitName = document.querySelector("#apiPricingUnitName");
+const apiPricingInputCost = document.querySelector("#apiPricingInputCost");
+const apiPricingCachedInputCost = document.querySelector("#apiPricingCachedInputCost");
+const apiPricingOutputCost = document.querySelector("#apiPricingOutputCost");
+const apiPricingRequestCost = document.querySelector("#apiPricingRequestCost");
+const apiPricingUnitCost = document.querySelector("#apiPricingUnitCost");
+const apiPricingSource = document.querySelector("#apiPricingSource");
+const apiPricingActive = document.querySelector("#apiPricingActive");
+const apiPricingClear = document.querySelector("#apiPricingClear");
 const navLinks = document.querySelectorAll(".nav-list a[href^='#'], .nav-list a[data-app-route]");
 const pageBlocks = document.querySelectorAll("[data-page]");
 const chatThreadList = document.querySelector("#chatThreadList");
@@ -43,6 +88,8 @@ const chatInput = document.querySelector("#chatInput");
 const chatSendButton = document.querySelector("#chatSendButton");
 const chatError = document.querySelector("#chatError");
 const chatSuggestionButtons = document.querySelectorAll("[data-chat-prompt]");
+const chatAttachment = document.querySelector("#chatAttachment");
+const chatAttachmentPreview = document.querySelector("#chatAttachmentPreview");
 const operationsPages = document.querySelector("#operationsPages");
 const consultationForm = document.querySelector("#consultationForm");
 const consultationModule = document.querySelector("#consultationModule");
@@ -169,6 +216,8 @@ const propertyWalletStatus = document.querySelector("#propertyWalletStatus");
 const propertyHistoryList = document.querySelector("#propertyHistoryList");
 const propertyHistoryCount = document.querySelector("#propertyHistoryCount");
 let selectedAuditViews = [];
+let apiUsageDashboardData = null;
+let currentAuthState = { authRequired: false, user: null };
 let currentDocumentAiContext = null;
 let currentPropertySearch = null;
 const assistedRemoteSessions = new Map();
@@ -848,6 +897,10 @@ const pageMeta = {
   "meu-painel": {
     title: "Meu painel",
     eyebrow: "Dados da conta",
+  },
+  "admin-consumo": {
+    title: "Consumo de APIs",
+    eyebrow: "Administra\u00e7\u00e3o e custos",
   },
 };
 
@@ -1774,6 +1827,7 @@ function escapeHtml(value) {
 const chatStorageKey = "audita.chat.threads.v1";
 let chatSending = false;
 let chatSendingThreadId = "";
+let chatPendingAttachment = null;
 
 function createChatId() {
   return globalThis.crypto?.randomUUID?.() || `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1814,6 +1868,25 @@ function loadChatState() {
 }
 
 let chatState = loadChatState();
+
+function initializeChatEntryContext() {
+  const params = new URLSearchParams(window.location.search);
+  if (window.location.pathname !== "/chat" || params.get("tool") !== "itau-refund") return;
+  const thread = getCurrentChatThread();
+  if (!thread || thread.messages.length) return;
+  thread.title = "Revisão de fatura Itaú";
+  thread.messages.push({
+    id: createChatId(),
+    role: "assistant",
+    content:
+      "Anexe uma fatura detalhada do cartão em PDF ou imagem. Eu vou localizar seguros e serviços candidatos, mas você confirma o que reconhece antes de qualquer conclusão.",
+    createdAt: new Date().toISOString(),
+  });
+  thread.updatedAt = new Date().toISOString();
+  saveChatState();
+}
+
+initializeChatEntryContext();
 
 function saveChatState() {
   try {
@@ -1882,6 +1955,197 @@ function renderChatSources(sources) {
   `;
 }
 
+function formatChatCurrency(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "";
+  return amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function itauChoiceOptions(value) {
+  const current = String(value || "pending");
+  return [
+    ["pending", "Selecione"],
+    ["yes", "Sim"],
+    ["no", "Não"],
+    ["unknown", "Não sei"],
+  ]
+    .map(
+      ([optionValue, label]) =>
+        `<option value="${optionValue}" ${current === optionValue ? "selected" : ""}>${label}</option>`,
+    )
+    .join("");
+}
+
+function itauClassificationLabel(evaluation = {}) {
+  const labels = {
+    review_required: "Revisão necessária",
+    no_candidate_found: "Nenhuma cobrança candidata identificada",
+    possible_unauthorized: "Possível cobrança não autorizada",
+    strong_indication: "Forte indício de irregularidade",
+    recognized_charges: "Cobranças reconhecidas",
+  };
+  return labels[evaluation.classification] || evaluation.classificationLabel || "Análise inicial";
+}
+
+function renderItauCaseCard(caseData) {
+  if (!caseData?.id) return "";
+  const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
+  const evaluation = caseData.evaluation || {};
+  const answers = caseData.answers || {};
+  const riskClass = ["alto", "medio", "baixo"].includes(evaluation.risk) ? evaluation.risk : "indefinido";
+  const candidateHtml = candidates.length
+    ? candidates
+        .map(
+          (candidate) => `
+            <article class="itau-charge-item">
+              <header>
+                <div>
+                  <span>${escapeHtml(candidate.category || "lançamento")}</span>
+                  <strong>${escapeHtml(candidate.label || candidate.description || "Cobrança a revisar")}</strong>
+                </div>
+                <b>${candidate.amount === null ? "Valor não identificado" : escapeHtml(formatChatCurrency(candidate.amount))}</b>
+              </header>
+              <p>
+                ${candidate.date ? `<time>${escapeHtml(candidate.date)}</time>` : ""}
+                ${escapeHtml(candidate.reason || "Confirme se você autorizou este produto ou serviço.")}
+              </p>
+              <div class="itau-recognition" role="group" aria-label="Você reconhece esta cobrança?">
+                <small>Você reconhece esta contratação?</small>
+                <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="recognized" class="${candidate.answer === "recognized" ? "active" : ""}">Reconheço</button>
+                <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="not_recognized" class="${candidate.answer === "not_recognized" ? "active danger" : ""}">Não reconheço</button>
+                <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="unknown" class="${candidate.answer === "unknown" ? "active" : ""}">Não sei</button>
+              </div>
+            </article>
+          `,
+        )
+        .join("")
+    : `
+        <div class="itau-no-candidates">
+          <strong>Nenhum seguro ou serviço conhecido foi identificado.</strong>
+          <p>Isso não prova que a fatura está correta. Revise o documento se ele estiver incompleto, digitalizado com baixa qualidade ou usar outra descrição.</p>
+        </div>
+      `;
+  const nextActions = Array.isArray(evaluation.nextActions) ? evaluation.nextActions : [];
+  const requestText = String(evaluation.administrativeRequest || "");
+
+  return `
+    <section class="itau-analysis-card" data-itau-card="${escapeHtml(caseData.id)}">
+      <header class="itau-analysis-header">
+        <div>
+          <span class="itau-module-label">ANÁLISE DE FATURA ITAÚ</span>
+          <h3>${escapeHtml(itauClassificationLabel(evaluation))}</h3>
+          <p>${escapeHtml(caseData.document?.fileName || "Documento analisado")} · ${
+            caseData.document?.processedBy === "openai_and_rules"
+              ? "IA + regras verificáveis"
+              : "regras locais"
+          }</p>
+        </div>
+        <span class="itau-risk ${riskClass}">Risco ${escapeHtml(evaluation.risk || "indefinido")}</span>
+      </header>
+
+      <div class="itau-analysis-metrics">
+        <span><strong>${candidates.length}</strong> candidatos</span>
+        <span><strong>${Number(evaluation.disputedCount || 0)}</strong> não reconhecidos</span>
+        <span><strong>${formatChatCurrency(evaluation.totalDisputed || 0)}</strong> em revisão</span>
+      </div>
+
+      <div class="itau-charge-list">${candidateHtml}</div>
+
+      ${
+        candidates.length
+          ? `
+            <form class="itau-review-form" data-itau-review-form="${escapeHtml(caseData.id)}">
+              <h4>Complete o contexto</h4>
+              <div class="itau-review-grid">
+                <label>
+                  <span>Reclamou ao banco até 18/12/2025?</span>
+                  <select name="priorComplaint">${itauChoiceOptions(answers.priorComplaint)}</select>
+                </label>
+                <label>
+                  <span>Data da reclamação</span>
+                  <input name="priorComplaintDate" type="date" value="${escapeHtml(answers.priorComplaintDate || "")}" />
+                </label>
+                <label>
+                  <span>Protocolo, se houver</span>
+                  <input name="priorComplaintProtocol" type="text" maxlength="80" value="${escapeHtml(answers.priorComplaintProtocol || "")}" placeholder="Opcional" />
+                </label>
+                <label>
+                  <span>Já pediu cancelamento?</span>
+                  <select name="cancellationRequested">${itauChoiceOptions(answers.cancellationRequested)}</select>
+                </label>
+                <label>
+                  <span>Data do cancelamento</span>
+                  <input name="cancellationDate" type="date" value="${escapeHtml(answers.cancellationDate || "")}" />
+                </label>
+                <label>
+                  <span>Continuou cobrando depois?</span>
+                  <select name="continuedAfterCancellation">${itauChoiceOptions(answers.continuedAfterCancellation)}</select>
+                </label>
+                <label>
+                  <span>O banco prometeu estorno?</span>
+                  <select name="bankPromisedRefund">${itauChoiceOptions(answers.bankPromisedRefund)}</select>
+                </label>
+                <label>
+                  <span>Há cobrança duplicada?</span>
+                  <select name="duplicateCharge">${itauChoiceOptions(answers.duplicateCharge)}</select>
+                </label>
+              </div>
+              <button class="itau-evaluate-button" type="submit">Atualizar análise</button>
+            </form>
+          `
+          : ""
+      }
+
+      <div class="itau-result-summary">
+        <div>
+          <small>Enquadramento no acordo coletivo</small>
+          <strong>${escapeHtml(evaluation.agreementLabel || "Ainda não avaliado")}</strong>
+        </div>
+        ${
+          nextActions.length
+            ? `<ol>${nextActions.map((action) => `<li>${escapeHtml(action)}</li>`).join("")}</ol>`
+            : ""
+        }
+      </div>
+
+      ${
+        requestText
+          ? `
+            <details class="itau-request-draft">
+              <summary>Ver pedido administrativo</summary>
+              <pre>${escapeHtml(requestText)}</pre>
+              <button type="button" data-itau-copy="${escapeHtml(caseData.id)}">Copiar pedido</button>
+            </details>
+          `
+          : ""
+      }
+
+      <footer>
+        <span>Triagem de apoio, não decisão judicial.</span>
+        ${(caseData.sources || [])
+          .map(
+            (source) =>
+              `<a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(source.name)}</a>`,
+          )
+          .join("")}
+      </footer>
+    </section>
+  `;
+}
+
+function findItauCaseMessage(caseId) {
+  for (const thread of chatState.threads) {
+    const message = thread.messages.find((item) => item.itauCase?.id === caseId);
+    if (message) return { thread, message };
+  }
+  return null;
+}
+
+function getLatestItauCase(thread = getCurrentChatThread()) {
+  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  return [...messages].reverse().find((message) => message.itauCase?.id)?.itauCase || null;
+}
+
 function renderChatThreads() {
   if (!chatThreadList) return;
   const threads = [...chatState.threads].sort((a, b) =>
@@ -1920,6 +2184,8 @@ function renderChatMessages() {
           <div class="chat-message-content">
             ${message.role === "assistant" ? "<strong>Audita IA</strong>" : ""}
             <div class="chat-message-body">${formatChatText(message.content)}</div>
+            ${message.attachment ? `<div class="chat-message-attachment">${escapeHtml(message.attachment.name)} <small>${escapeHtml(message.attachment.type || "arquivo")}</small></div>` : ""}
+            ${renderItauCaseCard(message.itauCase)}
             ${renderChatActions(message.actions)}
             ${renderChatSources(message.sources)}
           </div>
@@ -1977,16 +2243,95 @@ function resizeChatInput() {
   chatInput.style.height = `${Math.min(chatInput.scrollHeight, 176)}px`;
 }
 
-async function sendChatMessage(rawMessage) {
-  const content = String(rawMessage || "").trim();
-  if (!content || chatSending) return;
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderPendingChatAttachment() {
+  if (!chatAttachmentPreview) return;
+  chatAttachmentPreview.classList.toggle("hidden", !chatPendingAttachment);
+  chatAttachmentPreview.innerHTML = chatPendingAttachment
+    ? `
+        <span>
+          <strong>${escapeHtml(chatPendingAttachment.name)}</strong>
+          <small>${escapeHtml(formatFileSize(chatPendingAttachment.size))}</small>
+        </span>
+        <button type="button" data-chat-remove-attachment aria-label="Remover arquivo" title="Remover arquivo">&times;</button>
+      `
+    : "";
+}
+
+async function uploadItauDocument(file) {
+  const params = new URLSearchParams({ filename: file.name });
+  const response = await fetch(`/api/itau-refund/analyze?${params.toString()}`, {
+    method: "POST",
+    headers: {
+      "content-type": inferChatAttachmentType(file),
+      accept: "application/json",
+    },
+    body: file,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(data.message || data.error || "Falha ao analisar o documento.");
+    error.code = data.error || "itau_analysis_failed";
+    error.status = response.status;
+    throw error;
+  }
+  return data.case;
+}
+
+function inferChatAttachmentType(file) {
+  if (file?.type) return file.type;
+  const extension = String(file?.name || "").toLowerCase().split(".").pop();
+  return {
+    pdf: "application/pdf",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    csv: "text/csv",
+    txt: "text/plain",
+  }[extension] || "application/octet-stream";
+}
+
+function localItauAnalysisMessage(caseData) {
+  if (caseData.status === "unreadable") {
+    return "Não consegui ler o conteúdo desta fatura. Envie um PDF digital ou uma imagem mais nítida para eu tentar novamente.";
+  }
+  if (!caseData.candidates?.length) {
+    return "Concluí a primeira leitura e não localizei descrições conhecidas de seguros ou serviços. Isso não encerra a revisão: confira se o arquivo está completo e legível.";
+  }
+  return `Encontrei ${caseData.candidates.length} lançamento(s) que precisam da sua confirmação. Marque abaixo o que você reconhece; só depois disso a Audita classifica o caso e prepara o pedido administrativo.`;
+}
+
+async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment) {
+  const content =
+    String(rawMessage || "").trim() ||
+    (attachedFile
+      ? "Analise esta fatura do Itaú e me ajude a revisar possíveis cobranças de seguros ou serviços."
+      : "");
+  if ((!content && !attachedFile) || chatSending) return;
 
   const thread = getCurrentChatThread();
   if (!thread) return;
   const now = new Date().toISOString();
-  thread.messages.push({ id: createChatId(), role: "user", content, createdAt: now });
+  thread.messages.push({
+    id: createChatId(),
+    role: "user",
+    content,
+    attachment: attachedFile
+      ? { name: attachedFile.name, type: attachedFile.type, size: attachedFile.size }
+      : null,
+    createdAt: now,
+  });
   if (thread.title === "Nova conversa") {
-    thread.title = content.length > 46 ? `${content.slice(0, 43)}...` : content;
+    thread.title = attachedFile
+      ? "Revisão de fatura Itaú"
+      : content.length > 46
+        ? `${content.slice(0, 43)}...`
+        : content;
   }
   thread.updatedAt = now;
   chatSending = true;
@@ -1996,12 +2341,21 @@ async function sendChatMessage(rawMessage) {
   saveChatState();
   renderChatWorkspace();
 
+  let analyzedCase = null;
   try {
+    if (attachedFile) {
+      analyzedCase = await uploadItauDocument(attachedFile);
+      chatPendingAttachment = null;
+      if (chatAttachment) chatAttachment.value = "";
+      renderPendingChatAttachment();
+    }
+    const activeCase = analyzedCase || getLatestItauCase(thread);
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
         messages: thread.messages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
+        caseContext: activeCase ? { type: "itau_refund", case: activeCase } : null,
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -2014,7 +2368,20 @@ async function sendChatMessage(rawMessage) {
         openai_not_configured: "A conexao com a IA ainda nao esta configurada neste ambiente.",
         chat_timeout: "A analise demorou mais que o esperado. Tente novamente em instantes.",
       };
-      setChatError(errorMessages[data.error] || "Nao foi possivel concluir esta resposta agora.");
+      if (analyzedCase) {
+        thread.messages.push({
+          id: createChatId(),
+          role: "assistant",
+          content: localItauAnalysisMessage(analyzedCase),
+          itauCase: analyzedCase,
+          sources: analyzedCase.sources || [],
+          createdAt: new Date().toISOString(),
+        });
+        thread.updatedAt = new Date().toISOString();
+        setChatError("A leitura da fatura foi concluída, mas a resposta conversacional ficou indisponível.");
+      } else {
+        setChatError(errorMessages[data.error] || "Nao foi possivel concluir esta resposta agora.");
+      }
       return;
     }
 
@@ -2024,11 +2391,35 @@ async function sendChatMessage(rawMessage) {
       content: data.answer || "Nao consegui concluir a resposta.",
       actions: Array.isArray(data.actions) ? data.actions : [],
       sources: Array.isArray(data.sources) ? data.sources : [],
+      itauCase: analyzedCase,
       createdAt: new Date().toISOString(),
     });
     thread.updatedAt = new Date().toISOString();
-  } catch {
-    setChatError("Falha de comunicacao com a Audita IA. Verifique sua conexao e tente novamente.");
+  } catch (error) {
+    if (analyzedCase && !thread.messages.some((message) => message.itauCase?.id === analyzedCase.id)) {
+      thread.messages.push({
+        id: createChatId(),
+        role: "assistant",
+        content: localItauAnalysisMessage(analyzedCase),
+        itauCase: analyzedCase,
+        sources: analyzedCase.sources || [],
+        createdAt: new Date().toISOString(),
+      });
+      thread.updatedAt = new Date().toISOString();
+    }
+    if (error?.status === 401) {
+      showLogin("Entre para anexar e analisar sua fatura.");
+    } else {
+      const messages = {
+        document_too_large: "O arquivo excede o limite de 12 MB.",
+        unsupported_document_type: "Use PDF, PNG, JPG, CSV ou TXT.",
+        empty_document: "O arquivo está vazio.",
+      };
+      setChatError(
+        messages[error?.code] ||
+          "Falha ao processar a fatura. Verifique o arquivo e tente novamente.",
+      );
+    }
   } finally {
     chatSending = false;
     chatSendingThreadId = "";
@@ -2045,6 +2436,38 @@ chatForm?.addEventListener("submit", (event) => {
   if (chatInput) chatInput.value = "";
   resizeChatInput();
   sendChatMessage(content);
+});
+
+chatAttachment?.addEventListener("change", () => {
+  const file = chatAttachment.files?.[0] || null;
+  if (!file) return;
+  const allowedTypes = new Set([
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "text/csv",
+    "text/plain",
+  ]);
+  if (!allowedTypes.has(inferChatAttachmentType(file))) {
+    chatAttachment.value = "";
+    setChatError("Use uma fatura em PDF, PNG, JPG, CSV ou TXT.");
+    return;
+  }
+  if (file.size > 12 * 1024 * 1024) {
+    chatAttachment.value = "";
+    setChatError("O arquivo excede o limite de 12 MB.");
+    return;
+  }
+  chatPendingAttachment = file;
+  setChatError();
+  renderPendingChatAttachment();
+});
+
+chatAttachmentPreview?.addEventListener("click", (event) => {
+  if (!event.target.closest("[data-chat-remove-attachment]")) return;
+  chatPendingAttachment = null;
+  if (chatAttachment) chatAttachment.value = "";
+  renderPendingChatAttachment();
 });
 
 chatInput?.addEventListener("input", resizeChatInput);
@@ -2097,10 +2520,115 @@ chatThreadList?.addEventListener("click", (event) => {
   }
 });
 
+async function submitItauCaseReview(form) {
+  const caseId = form.dataset.itauReviewForm || "";
+  const found = findItauCaseMessage(caseId);
+  if (!found) return;
+  const submitButton = form.querySelector("button[type='submit']");
+  const formData = new FormData(form);
+  const payload = {
+    candidateAnswers: Object.fromEntries(
+      found.message.itauCase.candidates.map((candidate) => [candidate.id, candidate.answer]),
+    ),
+    priorComplaint: String(formData.get("priorComplaint") || "pending"),
+    priorComplaintDate: String(formData.get("priorComplaintDate") || ""),
+    priorComplaintProtocol: String(formData.get("priorComplaintProtocol") || ""),
+    cancellationRequested: String(formData.get("cancellationRequested") || "pending"),
+    cancellationDate: String(formData.get("cancellationDate") || ""),
+    continuedAfterCancellation: String(
+      formData.get("continuedAfterCancellation") || "pending",
+    ),
+    bankPromisedRefund: String(formData.get("bankPromisedRefund") || "pending"),
+    duplicateCharge: String(formData.get("duplicateCharge") || "pending"),
+  };
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Atualizando...";
+  }
+  setChatError();
+  try {
+    const response = await fetch(`/api/itau-refund/cases/${encodeURIComponent(caseId)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showLogin("Entre para continuar a análise.");
+      return;
+    }
+    if (!response.ok) {
+      setChatError(
+        data.error === "itau_case_not_found"
+          ? "Esta análise expirou. Anexe a fatura novamente para continuar."
+          : "Não foi possível atualizar a análise agora.",
+      );
+      return;
+    }
+    found.message.itauCase = data.case;
+    found.thread.updatedAt = new Date().toISOString();
+    saveChatState();
+    renderChatWorkspace();
+  } catch {
+    setChatError("Falha de comunicação ao atualizar a análise.");
+  } finally {
+    if (submitButton?.isConnected) {
+      submitButton.disabled = false;
+      submitButton.textContent = "Atualizar análise";
+    }
+  }
+}
+
 chatMessages?.addEventListener("click", (event) => {
+  const recognitionButton = event.target.closest("[data-itau-answer]");
+  if (recognitionButton) {
+    const found = findItauCaseMessage(recognitionButton.dataset.itauCase || "");
+    const candidate = found?.message.itauCase?.candidates?.find(
+      (item) => item.id === recognitionButton.dataset.itauCandidate,
+    );
+    if (!candidate) return;
+    candidate.answer = recognitionButton.dataset.itauAnswer;
+    recognitionButton
+      .closest(".itau-recognition")
+      ?.querySelectorAll("[data-itau-answer]")
+      .forEach((button) => {
+        button.classList.toggle("active", button === recognitionButton);
+        button.classList.toggle(
+          "danger",
+          button === recognitionButton && button.dataset.itauAnswer === "not_recognized",
+        );
+      });
+    saveChatState();
+    return;
+  }
+
+  const copyButton = event.target.closest("[data-itau-copy]");
+  if (copyButton) {
+    const found = findItauCaseMessage(copyButton.dataset.itauCopy || "");
+    const requestText = found?.message.itauCase?.evaluation?.administrativeRequest || "";
+    if (!requestText) return;
+    navigator.clipboard
+      ?.writeText(requestText)
+      .then(() => {
+        copyButton.textContent = "Copiado";
+        setTimeout(() => {
+          if (copyButton.isConnected) copyButton.textContent = "Copiar pedido";
+        }, 1800);
+      })
+      .catch(() => setChatError("Não foi possível copiar automaticamente."));
+    return;
+  }
+
   const actionButton = event.target.closest("[data-chat-route]");
   const route = actionButton?.dataset.chatRoute || "";
   if (route.startsWith("/")) window.location.assign(route);
+});
+
+chatMessages?.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-itau-review-form]");
+  if (!form) return;
+  event.preventDefault();
+  submitItauCaseReview(form);
 });
 
 renderChatWorkspace();
@@ -3931,7 +4459,7 @@ function renderAgentSettings(settings) {
   }
 
   agentModel.value = settings.model || "gpt-5-mini";
-  agentApiKeySecretRef.value = settings.apiKeySecretRef || "OPENAI_API_KEY";
+  agentApiKeySecretRef.value = settings.apiKeySecretRef || "AUDITA_OPENAI_API_KEY";
   agentProviderStatus.value = settings.status || "draft";
   agentSystemPrompt.value =
     settings.systemPrompt ||
@@ -3976,6 +4504,363 @@ function renderProfile(user) {
   }
   if (profilePlan) {
     profilePlan.textContent = "Ilimitado";
+  }
+  if (profileRole) {
+    const roleLabels = {
+      super_admin: "Super admin",
+      owner: "Propriet\u00e1rio",
+      admin: "Administrador",
+      analyst: "Analista",
+      member: "Usu\u00e1rio",
+    };
+    profileRole.textContent = roleLabels[user?.role] || (user ? "Usu\u00e1rio" : "Ambiente local");
+  }
+}
+
+function canAccessApiUsageAdmin(authState = currentAuthState) {
+  if (!authState?.authRequired) return true;
+  return ["super_admin", "owner", "admin"].includes(authState?.user?.role);
+}
+
+function configureApiUsageAdmin(authState) {
+  currentAuthState = authState || { authRequired: false, user: null };
+  const allowed = canAccessApiUsageAdmin(currentAuthState);
+  adminUsageNav?.classList.toggle("hidden", !allowed);
+  if (!allowed && getActivePage() === "admin-consumo") {
+    window.location.hash = "home";
+  }
+}
+
+function formatUsageNumber(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    notation: Math.abs(Number(value || 0)) >= 10000 ? "compact" : "standard",
+    maximumFractionDigits: 1,
+  }).format(Number(value || 0));
+}
+
+function formatUsageMoney(amount, currency = "USD") {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currency || "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: Number(amount || 0) > 0 && Number(amount || 0) < 0.01 ? 6 : 2,
+  }).format(Number(amount || 0));
+}
+
+function formatUsageCosts(costs = []) {
+  if (!Array.isArray(costs) || !costs.length) return "Sem custo calculado";
+  return costs.map((cost) => formatUsageMoney(cost.amount, cost.currency)).join(" + ");
+}
+
+function formatUsageDate(value) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function renderApiUsageProviderOptions(groups = []) {
+  if (!apiUsageProvider || apiUsageProvider.value) return;
+  const providers = [...new Set(groups.map((group) => group.provider).filter(Boolean))].sort();
+  apiUsageProvider.innerHTML = [
+    '<option value="">Todos</option>',
+    ...providers.map((provider) => `<option value="${escapeHtml(provider)}">${escapeHtml(provider)}</option>`),
+  ].join("");
+}
+
+function renderApiUsageTableRows(target, groups, type) {
+  if (!target) return;
+  if (!Array.isArray(groups) || !groups.length) {
+    target.innerHTML = '<tr><td class="api-usage-empty" colspan="4">Nenhum consumo registrado neste per\u00edodo.</td></tr>';
+    return;
+  }
+  target.innerHTML = groups
+    .map((group) => {
+      const isUser = type === "user";
+      const title = isUser ? group.userName || group.userEmail || "Sem usu\u00e1rio" : group.label;
+      const detail = isUser
+        ? group.userEmail || "Sem e-mail associado"
+        : [group.provider, group.service, group.model].filter(Boolean).join(" / ");
+      const units = isUser ? group.totalTokens : group.totalTokens || group.requests;
+      const unitLabel = group.totalTokens ? "tokens" : "unidades";
+      return `
+        <tr>
+          <td><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></td>
+          <td>${formatUsageNumber(group.requests)}</td>
+          <td>${formatUsageNumber(units)} <small>${unitLabel}</small></td>
+          <td><strong>${escapeHtml(formatUsageCosts(group.costs))}</strong>${group.unpricedRequests ? `<small>${formatUsageNumber(group.unpricedRequests)} sem tarifa</small>` : ""}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function renderApiUsageRecent(rows = []) {
+  if (!apiUsageRecentRows) return;
+  if (!rows.length) {
+    apiUsageRecentRows.innerHTML = '<tr><td class="api-usage-empty" colspan="7">As pr\u00f3ximas chamadas aparecer\u00e3o aqui automaticamente.</td></tr>';
+    return;
+  }
+  apiUsageRecentRows.innerHTML = rows
+    .map((row) => {
+      const units = row.totalUnits
+        ? `${formatUsageNumber(row.totalUnits)} tokens`
+        : `${formatUsageNumber(row.quantity || row.requestCount)} ${row.unitName || "unidade"}`;
+      const cost = row.actualCost ?? row.estimatedCost;
+      return `
+        <tr>
+          <td>${escapeHtml(formatUsageDate(row.createdAt))}</td>
+          <td><strong>${escapeHtml(row.userName || "Sem usu\u00e1rio")}</strong><small>${escapeHtml(row.userEmail || "")}</small></td>
+          <td><strong>${escapeHtml(row.provider)}</strong><small>${escapeHtml([row.service, row.model].filter(Boolean).join(" / "))}</small></td>
+          <td>${escapeHtml(row.operation)}</td>
+          <td>${escapeHtml(units)}</td>
+          <td><span class="api-usage-status ${escapeHtml(row.status)}">${escapeHtml(row.status)}</span></td>
+          <td>${cost === null ? "Sem tarifa" : escapeHtml(formatUsageMoney(cost, row.currency))}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function pricingSummary(pricing) {
+  const tokenPriced =
+    pricing.inputCostPerMillion || pricing.cachedInputCostPerMillion || pricing.outputCostPerMillion;
+  const pieces = [];
+  if (tokenPriced) {
+    pieces.push(`${formatUsageMoney(pricing.inputCostPerMillion, pricing.currency)} entrada`);
+    pieces.push(`${formatUsageMoney(pricing.outputCostPerMillion, pricing.currency)} sa\u00edda / 1M`);
+  }
+  if (pricing.requestCost) {
+    pieces.push(`${formatUsageMoney(pricing.requestCost, pricing.currency)} / requisi\u00e7\u00e3o`);
+  }
+  if (pricing.unitCost) {
+    pieces.push(`${formatUsageMoney(pricing.unitCost, pricing.currency)} / ${pricing.unitName}`);
+  }
+  return pieces.join(" \u00b7 ") || "Tarifa zerada";
+}
+
+function renderApiPricing(pricing = []) {
+  if (!apiPricingList) return;
+  if (!pricing.length) {
+    apiPricingList.innerHTML = '<span class="api-pricing-note">Nenhuma tarifa configurada.</span>';
+    return;
+  }
+  apiPricingList.innerHTML = pricing
+    .map(
+      (item, index) => `
+        <button class="api-pricing-item" type="button" data-api-pricing-index="${index}">
+          <strong>${escapeHtml(item.displayName || `${item.provider} / ${item.service}`)}</strong>
+          <small>${escapeHtml(pricingSummary(item))}</small>
+        </button>
+      `,
+    )
+    .join("");
+}
+
+function renderOpenAIOfficialUsage(data = {}) {
+  const status = data.status || "configuration_required";
+  const statusLabels = {
+    connected: "Conectado",
+    configuration_required: "Configuração pendente",
+    sync_failed: "Falha na sincronização",
+    disabled: "Desativado",
+    unavailable: "Indisponível",
+  };
+  if (openaiOfficialStatus) {
+    openaiOfficialStatus.className = `api-usage-status ${status}`;
+    openaiOfficialStatus.textContent = statusLabels[status] || "Verificando";
+  }
+  if (openaiOfficialMessage) {
+    openaiOfficialMessage.textContent = data.message || "Consumo oficial ainda não disponível.";
+  }
+
+  const connected = status === "connected";
+  const usage = data.usage || {};
+  const costTotals = data.costs?.totals || [];
+  if (openaiOfficialCost) {
+    openaiOfficialCost.textContent = connected
+      ? costTotals.length
+        ? formatUsageCosts(costTotals)
+        : formatUsageMoney(0, "USD")
+      : "--";
+  }
+  if (openaiOfficialRequests) {
+    openaiOfficialRequests.textContent = connected ? formatUsageNumber(usage.requests) : "--";
+  }
+  if (openaiOfficialModels) {
+    const modelCount = Array.isArray(usage.models) ? usage.models.length : 0;
+    openaiOfficialModels.textContent = connected
+      ? `${formatUsageNumber(modelCount)} modelo${modelCount === 1 ? "" : "s"}`
+      : "Usage API";
+  }
+  if (openaiOfficialTokens) {
+    openaiOfficialTokens.textContent = connected ? formatUsageNumber(usage.totalTokens) : "--";
+  }
+  if (openaiOfficialTokenSplit) {
+    openaiOfficialTokenSplit.textContent = connected
+      ? `${formatUsageNumber(usage.inputTokens)} entrada / ${formatUsageNumber(usage.outputTokens)} saída`
+      : "Aguardando credenciais";
+  }
+  if (openaiOfficialKey) {
+    openaiOfficialKey.textContent = data.configuration?.apiKeyId || "Não configurada";
+  }
+  if (openaiOfficialProject) {
+    openaiOfficialProject.textContent = `Projeto ${data.configuration?.projectId || "não configurado"}`;
+  }
+  if (openaiOfficialSync) {
+    openaiOfficialSync.textContent = data.syncedAt
+      ? `Sincronizado em ${formatUsageDate(data.syncedAt)}`
+      : "Ainda não sincronizado";
+  }
+  if (openaiOfficialLineItems) {
+    const lineItems = Array.isArray(data.costs?.lineItems) ? data.costs.lineItems : [];
+    openaiOfficialLineItems.textContent = connected && lineItems.length
+      ? lineItems
+          .slice(0, 3)
+          .map((item) => `${item.lineItem}: ${formatUsageMoney(item.amount, item.currency)}`)
+          .join(" · ")
+      : "";
+  }
+
+  if (openaiOfficialWarning) {
+    const warnings = [];
+    if (Array.isArray(data.missing) && data.missing.length) {
+      warnings.push(`Configuração pendente no servidor: ${data.missing.join(", ")}.`);
+    }
+    if (data.configuration?.chatUsesDedicatedKey === false) {
+      warnings.push("O chat ainda não está apontado para a chave dedicada.");
+    }
+    if (data.configuration?.agentUsesDedicatedKey === false) {
+      warnings.push("O agente navegador ainda não está apontado para a chave dedicada.");
+    }
+    openaiOfficialWarning.textContent = warnings.join(" ");
+    openaiOfficialWarning.classList.toggle("hidden", warnings.length === 0);
+  }
+}
+
+function renderApiUsageDashboard(data) {
+  apiUsageDashboardData = data;
+  renderOpenAIOfficialUsage(data?.officialOpenAI || {});
+  const summary = data?.summary || {};
+  if (apiUsageCost) apiUsageCost.textContent = formatUsageCosts(summary.costs);
+  if (apiUsageUnpriced) {
+    apiUsageUnpriced.textContent = summary.unpricedRequests
+      ? `${formatUsageNumber(summary.unpricedRequests)} chamadas sem tarifa`
+      : "Tudo com tarifa de rateio";
+  }
+  if (apiUsageRequests) apiUsageRequests.textContent = formatUsageNumber(summary.requests);
+  if (apiUsageFailures) {
+    apiUsageFailures.textContent = summary.failedRequests
+      ? `${formatUsageNumber(summary.failedRequests)} com falha`
+      : "Nenhuma falha";
+  }
+  if (apiUsageTokens) apiUsageTokens.textContent = formatUsageNumber(summary.totalTokens);
+  if (apiUsageTokenSplit) {
+    apiUsageTokenSplit.textContent = `${formatUsageNumber(summary.inputTokens)} entrada / ${formatUsageNumber(summary.outputTokens)} sa\u00edda`;
+  }
+  if (apiUsageUsers) apiUsageUsers.textContent = formatUsageNumber(summary.activeUsers);
+  if (apiUsageProviders) {
+    apiUsageProviders.textContent = `${formatUsageNumber(summary.providers)} fornecedor${summary.providers === 1 ? "" : "es"}`;
+  }
+  renderApiUsageProviderOptions(data?.byProvider || []);
+  renderApiUsageTableRows(apiUsageProviderRows, data?.byProvider || [], "provider");
+  renderApiUsageTableRows(apiUsageUserRows, data?.byUser || [], "user");
+  renderApiUsageRecent(data?.recent || []);
+  renderApiPricing(data?.pricing || []);
+}
+
+async function loadApiUsageDashboard() {
+  if (!canAccessApiUsageAdmin() || !apiUsageRefresh) return;
+  apiUsageError?.classList.add("hidden");
+  apiUsageRefresh.disabled = true;
+  apiUsageRefresh.textContent = "Atualizando...";
+  try {
+    const params = new URLSearchParams({ days: apiUsageDays?.value || "30", sync: "1" });
+    if (apiUsageProvider?.value) params.set("provider", apiUsageProvider.value);
+    const response = await fetch(`/api/admin/api-usage?${params}`, { headers: { accept: "application/json" } });
+    if (response.status === 401) {
+      showLogin("Entre para acessar o painel administrativo.");
+      return;
+    }
+    if (response.status === 403) {
+      configureApiUsageAdmin({ ...currentAuthState, authRequired: true });
+      throw new Error("Seu perfil n\u00e3o possui acesso ao consumo de APIs.");
+    }
+    if (!response.ok) throw new Error("N\u00e3o foi poss\u00edvel carregar o consumo das APIs.");
+    renderApiUsageDashboard(await response.json());
+  } catch (error) {
+    if (apiUsageError) {
+      apiUsageError.textContent = error.message || "Falha ao carregar o painel.";
+      apiUsageError.classList.remove("hidden");
+    }
+  } finally {
+    apiUsageRefresh.disabled = false;
+    apiUsageRefresh.textContent = "Atualizar";
+  }
+}
+
+function clearApiPricingForm() {
+  apiPricingForm?.reset();
+  if (apiPricingCurrency) apiPricingCurrency.value = "BRL";
+  if (apiPricingUnitName) apiPricingUnitName.value = "consulta";
+  if (apiPricingSource) apiPricingSource.value = "Contrato do provedor";
+  if (apiPricingActive) apiPricingActive.checked = true;
+}
+
+function fillApiPricingForm(pricing) {
+  if (!pricing) return;
+  apiPricingProvider.value = pricing.provider || "";
+  apiPricingService.value = pricing.service || "";
+  apiPricingModel.value = pricing.model || "";
+  apiPricingDisplayName.value = pricing.displayName || "";
+  apiPricingCurrency.value = pricing.currency || "USD";
+  apiPricingUnitName.value = pricing.unitName || "request";
+  apiPricingInputCost.value = pricing.inputCostPerMillion || 0;
+  apiPricingCachedInputCost.value = pricing.cachedInputCostPerMillion || 0;
+  apiPricingOutputCost.value = pricing.outputCostPerMillion || 0;
+  apiPricingRequestCost.value = pricing.requestCost || 0;
+  apiPricingUnitCost.value = pricing.unitCost || 0;
+  apiPricingSource.value = pricing.source || "admin";
+  apiPricingActive.checked = pricing.active !== false;
+  apiPricingProvider.focus();
+}
+
+async function saveApiPricing(event) {
+  event.preventDefault();
+  apiUsageError?.classList.add("hidden");
+  const submitButton = apiPricingForm?.querySelector("button[type='submit']");
+  if (submitButton) submitButton.disabled = true;
+  try {
+    const response = await fetch("/api/admin/api-pricing", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        provider: apiPricingProvider.value,
+        service: apiPricingService.value,
+        model: apiPricingModel.value,
+        displayName: apiPricingDisplayName.value,
+        currency: apiPricingCurrency.value,
+        unitName: apiPricingUnitName.value,
+        inputCostPerMillion: Number(apiPricingInputCost.value || 0),
+        cachedInputCostPerMillion: Number(apiPricingCachedInputCost.value || 0),
+        outputCostPerMillion: Number(apiPricingOutputCost.value || 0),
+        requestCost: Number(apiPricingRequestCost.value || 0),
+        unitCost: Number(apiPricingUnitCost.value || 0),
+        source: apiPricingSource.value,
+        active: apiPricingActive.checked,
+      }),
+    });
+    if (!response.ok) throw new Error("N\u00e3o foi poss\u00edvel salvar a tarifa.");
+    clearApiPricingForm();
+    await loadApiUsageDashboard();
+  } catch (error) {
+    if (apiUsageError) {
+      apiUsageError.textContent = error.message;
+      apiUsageError.classList.remove("hidden");
+    }
+  } finally {
+    if (submitButton) submitButton.disabled = false;
   }
 }
 
@@ -5411,10 +6296,25 @@ newQueryButton?.addEventListener("click", () => {
   window.location.assign("/chat");
 });
 
+apiUsageRefresh?.addEventListener("click", loadApiUsageDashboard);
+apiUsageDays?.addEventListener("change", loadApiUsageDashboard);
+apiUsageProvider?.addEventListener("change", loadApiUsageDashboard);
+apiPricingForm?.addEventListener("submit", saveApiPricing);
+apiPricingClear?.addEventListener("click", clearApiPricingForm);
+apiPricingList?.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-api-pricing-index]");
+  if (!button) return;
+  const pricing = apiUsageDashboardData?.pricing?.[Number(button.dataset.apiPricingIndex)];
+  fillApiPricingForm(pricing);
+});
+
 window.addEventListener("hashchange", () => {
   setActivePage(getActivePage());
   if (getActivePage() === "consulta-imoveis") {
     loadPropertyModule();
+  }
+  if (getActivePage() === "admin-consumo") {
+    loadApiUsageDashboard();
   }
 });
 
@@ -5443,6 +6343,7 @@ await loadDeployVersion();
 await loadModules();
 const authState = await loadAuthState();
 renderProfile(authState.user);
+configureApiUsageAdmin(authState);
 if (authState.authRequired && !authState.user) {
   showLogin();
 } else {
@@ -5465,4 +6366,7 @@ if (authState.authRequired && !authState.user) {
   await loadSources();
   await loadAgentSettings();
   await loadAssistantSources();
+  if (getActivePage() === "admin-consumo") {
+    await loadApiUsageDashboard();
+  }
 }
