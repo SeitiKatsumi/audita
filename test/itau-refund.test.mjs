@@ -100,6 +100,62 @@ test("a 2026 charge is outside the collective agreement regardless of prior comp
   assert.doesNotMatch(result.nextActions.join(" "), /reclamacao anterior.*18\/12\/2025/i);
 });
 
+test("an approximate prior complaint date advances while keeping evidence pending", () => {
+  const updated = updateItauCaseSnapshot(
+    {
+      id: "approximate-complaint",
+      status: "review_required",
+      candidates: [
+        {
+          id: "charge-1",
+          label: "Seguro Fatura Protegida",
+          date: "2025-07-10",
+          amount: 18.9,
+          answer: "not_recognized",
+        },
+      ],
+      answers: {
+        priorComplaint: "yes",
+      },
+    },
+    {
+      priorComplaintDateApproximate: "2025-11",
+      priorComplaintDateStatus: "approximate",
+      priorComplaintProtocolStatus: "unavailable",
+    },
+  );
+
+  assert.equal(updated.answers.priorComplaintDateApproximate, "2025-11");
+  assert.equal(updated.answers.priorComplaintDateStatus, "approximate");
+  assert.equal(updated.answers.priorComplaintProtocolStatus, "unavailable");
+  assert.equal(updated.evaluation.agreementStatus, "needs_prior_complaint_evidence");
+  assert.match(updated.evaluation.agreementLabel, /data aproximada/i);
+  assert.match(updated.evaluation.nextActions.join(" "), /e-mail|SMS/i);
+});
+
+test("an unknown prior complaint date does not masquerade as an exact date", () => {
+  const result = evaluateItauCase({
+    candidates: [
+      {
+        id: "charge-1",
+        label: "Seguro Fatura Protegida",
+        date: "2025-07-10",
+        amount: 18.9,
+        answer: "not_recognized",
+      },
+    ],
+    answers: {
+      priorComplaint: "yes",
+      priorComplaintDateStatus: "unknown",
+      priorComplaintProtocolStatus: "unavailable",
+    },
+  });
+
+  assert.equal(result.agreementStatus, "complaint_date_unknown");
+  assert.match(result.agreementLabel, /não disponível/i);
+  assert.doesNotMatch(result.agreementLabel, /informe a data/i);
+});
+
 test("a saved chat snapshot can continue after the in-memory case expires", () => {
   const updated = updateItauCaseSnapshot(
     {

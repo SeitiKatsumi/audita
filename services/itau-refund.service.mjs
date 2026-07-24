@@ -451,8 +451,19 @@ export function evaluateItauCase(caseView) {
       agreementLabel = "Cobrança fora do período principal do acordo";
     } else if (answers.priorComplaint === "yes") {
       if (!parseDate(answers.priorComplaintDate)) {
-        agreementStatus = "needs_prior_complaint_date";
-        agreementLabel = "Informe a data da reclamação anterior";
+        if (
+          answers.priorComplaintDateStatus === "approximate" &&
+          answers.priorComplaintDateApproximate
+        ) {
+          agreementStatus = "needs_prior_complaint_evidence";
+          agreementLabel = "Data aproximada informada; comprovação pendente";
+        } else if (answers.priorComplaintDateStatus === "unknown") {
+          agreementStatus = "complaint_date_unknown";
+          agreementLabel = "Data da reclamação não disponível para comprovação";
+        } else {
+          agreementStatus = "needs_prior_complaint_date";
+          agreementLabel = "Informe a data da reclamação anterior";
+        }
       } else if (
         !isOnOrBefore(answers.priorComplaintDate, ITAU_AGREEMENT.priorComplaintDeadline)
       ) {
@@ -486,6 +497,14 @@ export function evaluateItauCase(caseView) {
   if (agreementStatus === "outside_period") {
     nextActions.push(
       "A cobrança é posterior ao período do acordo coletivo; siga pela contestação administrativa comum.",
+    );
+  }
+  if (
+    agreementStatus === "needs_prior_complaint_evidence" ||
+    agreementStatus === "complaint_date_unknown"
+  ) {
+    nextActions.push(
+      "Se encontrar depois, guarde e-mail, SMS, histórico de atendimento ou outro comprovante da reclamação.",
     );
   }
   if (disputed.length) {
@@ -722,37 +741,68 @@ function applyAnswers(record, input = {}) {
       ]);
     }
   });
+  const currentAnswers = record.answers || {};
+  const priorComplaintDate = String(
+    input.priorComplaintDate ?? currentAnswers.priorComplaintDate ?? "",
+  ).slice(0, 10);
+  const priorComplaintDateApproximate = String(
+    input.priorComplaintDateApproximate ??
+      currentAnswers.priorComplaintDateApproximate ??
+      "",
+  ).slice(0, 7);
+  const priorComplaintProtocol = String(
+    input.priorComplaintProtocol ?? currentAnswers.priorComplaintProtocol ?? "",
+  ).slice(0, 80);
+  const priorComplaintDateStatus = normalizeAnswer(
+    input.priorComplaintDateStatus ??
+      currentAnswers.priorComplaintDateStatus ??
+      (priorComplaintDate
+        ? "known"
+        : priorComplaintDateApproximate
+          ? "approximate"
+          : "pending"),
+    ["pending", "known", "approximate", "unknown"],
+  );
+  const priorComplaintProtocolStatus = normalizeAnswer(
+    input.priorComplaintProtocolStatus ??
+      currentAnswers.priorComplaintProtocolStatus ??
+      (priorComplaintProtocol ? "known" : "pending"),
+    ["pending", "known", "unavailable"],
+  );
+
   record.answers = {
     historicalEvidence: normalizeAnswer(
-      input.historicalEvidence ?? record.answers.historicalEvidence,
+      input.historicalEvidence ?? currentAnswers.historicalEvidence,
     ),
-    priorComplaint: normalizeAnswer(input.priorComplaint ?? record.answers.priorComplaint),
-    priorComplaintDate: String(
-      input.priorComplaintDate ?? record.answers.priorComplaintDate ?? "",
-    ).slice(0, 10),
-    priorComplaintProtocol: String(
-      input.priorComplaintProtocol ?? record.answers.priorComplaintProtocol ?? "",
-    ).slice(0, 80),
+    historicalDocumentsAvailable: normalizeAnswer(
+      input.historicalDocumentsAvailable ?? currentAnswers.historicalDocumentsAvailable,
+    ),
+    priorComplaint: normalizeAnswer(input.priorComplaint ?? currentAnswers.priorComplaint),
+    priorComplaintDate,
+    priorComplaintDateApproximate,
+    priorComplaintDateStatus,
+    priorComplaintProtocol,
+    priorComplaintProtocolStatus,
     cancellationRequested: normalizeAnswer(
-      input.cancellationRequested ?? record.answers.cancellationRequested,
+      input.cancellationRequested ?? currentAnswers.cancellationRequested,
     ),
     cancellationDate: String(
-      input.cancellationDate ?? record.answers.cancellationDate ?? "",
+      input.cancellationDate ?? currentAnswers.cancellationDate ?? "",
     ).slice(0, 10),
     continuedAfterCancellation: normalizeAnswer(
-      input.continuedAfterCancellation ?? record.answers.continuedAfterCancellation,
+      input.continuedAfterCancellation ?? currentAnswers.continuedAfterCancellation,
     ),
     bankPromisedRefund: normalizeAnswer(
-      input.bankPromisedRefund ?? record.answers.bankPromisedRefund,
+      input.bankPromisedRefund ?? currentAnswers.bankPromisedRefund,
     ),
-    duplicateCharge: normalizeAnswer(input.duplicateCharge ?? record.answers.duplicateCharge),
+    duplicateCharge: normalizeAnswer(input.duplicateCharge ?? currentAnswers.duplicateCharge),
     administrativeDraftRequested: normalizeAnswer(
-      input.administrativeDraftRequested ?? record.answers.administrativeDraftRequested,
+      input.administrativeDraftRequested ?? currentAnswers.administrativeDraftRequested,
     ),
     bankResponseStatus: normalizeBankResponseStatus(
-      input.bankResponseStatus ?? record.answers.bankResponseStatus,
+      input.bankResponseStatus ?? currentAnswers.bankResponseStatus,
     ),
-    wantsJec: normalizeAnswer(input.wantsJec ?? record.answers.wantsJec),
+    wantsJec: normalizeAnswer(input.wantsJec ?? currentAnswers.wantsJec),
   };
 }
 
@@ -863,9 +913,13 @@ export function createItauRefundService({
       candidates,
       answers: {
         historicalEvidence: "pending",
+        historicalDocumentsAvailable: "pending",
         priorComplaint: "pending",
         priorComplaintDate: "",
+        priorComplaintDateApproximate: "",
+        priorComplaintDateStatus: "pending",
         priorComplaintProtocol: "",
+        priorComplaintProtocolStatus: "pending",
         cancellationRequested: "pending",
         cancellationDate: "",
         continuedAfterCancellation: "pending",

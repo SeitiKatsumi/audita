@@ -59,6 +59,7 @@ test("chat instructions prohibit invented results and personal data collection",
   assert.match(instructions, /no maximo 80 palavras/i);
   assert.match(instructions, /uma evidencia recente/i);
   assert.match(instructions, /uma pergunta curta por vez/i);
+  assert.match(instructions, /data estiver marcada como aproximada ou desconhecida/i);
 });
 
 test("Itau conversation advances from one recent finding to historical evidence", () => {
@@ -179,6 +180,194 @@ test("Itau understands that a charge only appeared this month", () => {
   });
 
   assert.equal(update?.payload.historicalEvidence, "no");
+});
+
+test("Itau records recurring charges even when older statements are unavailable", () => {
+  const caseData = {
+    id: "case-recurring-without-files",
+    status: "review_required",
+    candidates: [
+      { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+    ],
+    answers: {
+      historicalEvidence: "pending",
+      priorComplaint: "pending",
+    },
+  };
+  const update = inferItauChatCaseUpdate({
+    caseData,
+    messages: [
+      {
+        role: "assistant",
+        content: "Essa cobranca aparece em outros meses ou voce tem extratos anteriores para comparar?",
+      },
+      {
+        role: "user",
+        content: "Não tenho os extratos, mas já estou pagando isso a uns 3 anos.",
+      },
+    ],
+  });
+
+  assert.equal(update?.kind, "history");
+  assert.equal(update?.payload.historicalEvidence, "yes");
+  assert.equal(update?.payload.historicalDocumentsAvailable, "no");
+
+  const updatedCase = updateItauCaseSnapshot(caseData, update.payload);
+  assert.equal(inferItauConversationStage(updatedCase).phase, "prior_complaint");
+});
+
+test("Itau accepts an unknown complaint date and unavailable protocol without repeating", () => {
+  const caseData = {
+    id: "case-unknown-complaint-details",
+    status: "review_required",
+    candidates: [
+      { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+    ],
+    answers: {
+      historicalEvidence: "yes",
+      historicalDocumentsAvailable: "no",
+      priorComplaint: "yes",
+      bankResponseStatus: "pending",
+    },
+  };
+  const update = inferItauChatCaseUpdate({
+    caseData,
+    messages: [
+      {
+        role: "assistant",
+        content: "Em que data voce reclamou ao Itau? Se tiver o protocolo, pode informar junto.",
+      },
+      {
+        role: "user",
+        content:
+          "Nem me lembro e nao vou ter acesso ao protocolo porque nao tenho mais acesso a essa conta.",
+      },
+    ],
+  });
+
+  assert.equal(update?.kind, "complaint_details");
+  assert.equal(update?.payload.priorComplaintDateStatus, "unknown");
+  assert.equal(update?.payload.priorComplaintProtocolStatus, "unavailable");
+  assert.equal(update?.payload.priorComplaintProtocol, undefined);
+
+  const updatedCase = updateItauCaseSnapshot(caseData, update.payload);
+  assert.equal(inferItauConversationStage(updatedCase).phase, "follow_up_complaint");
+  const answer = buildItauTransitionAnswer(updatedCase, update);
+  assert.match(answer, /não lembra a data exata/i);
+  assert.match(answer, /protocolo não está disponível/i);
+  assert.match(answer, /Itau ja respondeu/i);
+  assert.doesNotMatch(answer, /Em que data/i);
+});
+
+test("Itau accepts an approximate complaint month and unavailable protocol", () => {
+  const caseData = {
+    id: "case-approximate-complaint-details",
+    status: "review_required",
+    candidates: [
+      { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+    ],
+    answers: {
+      historicalEvidence: "yes",
+      historicalDocumentsAvailable: "no",
+      priorComplaint: "yes",
+      bankResponseStatus: "pending",
+    },
+  };
+  const update = inferItauChatCaseUpdate({
+    caseData,
+    messages: [
+      {
+        role: "assistant",
+        content: "Em que data voce reclamou ao Itau? Se tiver o protocolo, pode informar junto.",
+      },
+      {
+        role: "user",
+        content: "Nao tenho o protocolo, acho que reclamei por volta de janeiro de 2026.",
+      },
+    ],
+  });
+
+  assert.equal(update?.kind, "complaint_details");
+  assert.equal(update?.payload.priorComplaintDateApproximate, "2026-01");
+  assert.equal(update?.payload.priorComplaintDateStatus, "approximate");
+  assert.equal(update?.payload.priorComplaintProtocolStatus, "unavailable");
+  assert.equal(update?.payload.priorComplaintProtocol, undefined);
+
+  const updatedCase = updateItauCaseSnapshot(caseData, update.payload);
+  assert.equal(inferItauConversationStage(updatedCase).phase, "follow_up_complaint");
+  const answer = buildItauTransitionAnswer(updatedCase, update);
+  assert.match(answer, /2026-01 como data aproximada/i);
+  assert.match(answer, /Itau ja respondeu/i);
+  assert.doesNotMatch(answer, /Em que data/i);
+});
+
+test("Itau completes the reported conversation sequence without entering a loop", () => {
+  let caseData = {
+    id: "case-reported-loop",
+    status: "review_required",
+    candidates: [
+      { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+    ],
+    answers: {
+      historicalEvidence: "pending",
+      priorComplaint: "pending",
+      bankResponseStatus: "pending",
+    },
+  };
+
+  const historyUpdate = inferItauChatCaseUpdate({
+    caseData,
+    messages: [
+      {
+        role: "assistant",
+        content: "Essa cobranca aparece em outros meses ou voce tem extratos anteriores para comparar?",
+      },
+      {
+        role: "user",
+        content: "Não tenho os extratos, mas já estou pagando isso a uns 3 anos.",
+      },
+    ],
+  });
+  caseData = updateItauCaseSnapshot(caseData, historyUpdate.payload);
+  assert.equal(inferItauConversationStage(caseData).phase, "prior_complaint");
+
+  const complaintUpdate = inferItauChatCaseUpdate({
+    caseData,
+    messages: [
+      {
+        role: "assistant",
+        content: "Voce ja reclamou ao Itau sobre essa cobranca atual?",
+      },
+      {
+        role: "user",
+        content: "Sim, reclamei no começo, mas nada foi feito.",
+      },
+    ],
+  });
+  caseData = updateItauCaseSnapshot(caseData, complaintUpdate.payload);
+  assert.equal(inferItauConversationStage(caseData).phase, "prior_complaint_details");
+
+  const detailsUpdate = inferItauChatCaseUpdate({
+    caseData,
+    messages: [
+      {
+        role: "assistant",
+        content: "Em que data voce reclamou ao Itau? Se tiver o protocolo, pode informar junto.",
+      },
+      {
+        role: "user",
+        content:
+          "Nem me lembro e não vou ter acesso ao protocolo porque não tenho mais acesso a essa conta.",
+      },
+    ],
+  });
+  caseData = updateItauCaseSnapshot(caseData, detailsUpdate.payload);
+  const stage = inferItauConversationStage(caseData);
+  const answer = buildItauTransitionAnswer(caseData, detailsUpdate);
+
+  assert.equal(stage.phase, "follow_up_complaint");
+  assert.match(answer, /Itau ja respondeu/i);
+  assert.doesNotMatch(answer, /Em que data|Se tiver o protocolo/i);
 });
 
 test("Itau does not confuse accepting a draft with having complained already", () => {
