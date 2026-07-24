@@ -1829,6 +1829,7 @@ let chatSending = false;
 let chatSendingThreadId = "";
 let chatPendingAttachment = null;
 const jecCaseStates = new Map();
+let pendingJecFocusCaseId = "";
 
 function createChatId() {
   return globalThis.crypto?.randomUUID?.() || `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1920,7 +1921,11 @@ function formatChatText(value) {
 
 function renderChatActions(actions) {
   const availableActions = Array.isArray(actions)
-    ? actions.filter((action) => action?.route && String(action.route).startsWith("/"))
+    ? actions.filter(
+        (action) =>
+          (action?.route && String(action.route).startsWith("/")) ||
+          (action?.kind === "jec_intake" && action?.caseId),
+      )
     : [];
   if (!availableActions.length) return "";
 
@@ -1934,7 +1939,11 @@ function renderChatActions(actions) {
                 <strong>${escapeHtml(action.title || "Continuar no Audita")}</strong>
                 <small>${escapeHtml(action.description || "Abra o modulo para continuar com seguranca.")}</small>
               </div>
-              <button type="button" data-chat-route="${escapeHtml(action.route)}">${escapeHtml(action.label || "Abrir")}</button>
+              ${
+                action.kind === "jec_intake"
+                  ? `<button type="button" data-chat-jec="${escapeHtml(action.caseId)}" data-chat-jec-uf="${escapeHtml(action.uf || "")}">${escapeHtml(action.label || "Continuar no JEC")}</button>`
+                  : `<button type="button" data-chat-route="${escapeHtml(action.route)}">${escapeHtml(action.label || "Abrir")}</button>`
+              }
             </article>
           `,
         )
@@ -2134,7 +2143,7 @@ function renderJecPetitionPanel(caseData = {}) {
   const prepared = state.prepared || null;
   const missingFields = Array.isArray(prepared?.missingFields) ? prepared.missingFields : [];
   return `
-    <details class="jec-petition-panel" ${state.session ? "open" : ""}>
+    <details class="jec-petition-panel" ${state.open || state.session ? "open" : ""}>
       <summary>Juizado Especial · preparação assistida</summary>
       <p>Use este formulário seguro para preparar o rascunho. Os dados não entram no histórico do chat.</p>
       ${
@@ -2450,6 +2459,27 @@ function getLatestItauCase(thread = getCurrentChatThread()) {
   return [...messages].reverse().find((message) => message.itauCase?.id)?.itauCase || null;
 }
 
+function activateJecIntake(action, { focus = true } = {}) {
+  const caseId = String(action?.caseId || "").trim();
+  const uf = String(action?.uf || "").trim().toUpperCase();
+  if (!caseId) return false;
+  const found = findItauCaseMessage(caseId);
+  if (!found?.message?.itauCase) return false;
+
+  const previous = jecCaseStates.get(caseId) || {};
+  jecCaseStates.set(caseId, {
+    ...previous,
+    open: true,
+    claimant: {
+      ...(previous.claimant || {}),
+      ...(uf ? { uf } : {}),
+    },
+    error: "",
+  });
+  if (focus) pendingJecFocusCaseId = caseId;
+  return true;
+}
+
 function renderChatThreads() {
   if (!chatThreadList) return;
   const threads = [...chatState.threads].sort((a, b) =>
@@ -2516,6 +2546,22 @@ function renderChatMessages() {
 
   requestAnimationFrame(() => {
     hydrateAssistedRemoteBrowsers();
+    if (pendingJecFocusCaseId) {
+      const caseId = pendingJecFocusCaseId;
+      pendingJecFocusCaseId = "";
+      const card = chatMessages.querySelector(
+        `[data-itau-card="${CSS.escape(caseId)}"]`,
+      );
+      const panel = card?.querySelector(".jec-petition-panel");
+      if (panel) {
+        panel.open = true;
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        panel.querySelector("input[name='city'], select[name='uf']")?.focus({
+          preventScroll: true,
+        });
+        return;
+      }
+    }
     chatMessages.scrollTop = chatMessages.scrollHeight;
   });
 }
@@ -2815,11 +2861,16 @@ async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment)
       }
     }
 
+    const responseActions = Array.isArray(data.actions) ? data.actions : [];
+    responseActions
+      .filter((action) => action?.kind === "jec_intake")
+      .forEach((action) => activateJecIntake(action));
+
     thread.messages.push({
       id: createChatId(),
       role: "assistant",
       content: data.answer || "Nao consegui concluir a resposta.",
-      actions: Array.isArray(data.actions) ? data.actions : [],
+      actions: responseActions,
       sources: Array.isArray(data.sources) ? data.sources : [],
       itauCase: analyzedCase,
       createdAt: new Date().toISOString(),
@@ -3154,6 +3205,22 @@ chatMessages?.addEventListener("click", async (event) => {
         }, 1800);
       })
       .catch(() => setChatError("Não foi possível copiar automaticamente."));
+    return;
+  }
+
+  const jecActionButton = event.target.closest("[data-chat-jec]");
+  if (jecActionButton) {
+    const activated = activateJecIntake({
+      caseId: jecActionButton.dataset.chatJec,
+      uf: jecActionButton.dataset.chatJecUf,
+    });
+    if (activated) {
+      renderChatWorkspace();
+    } else {
+      setChatError(
+        "Esta análise expirou. Anexe novamente a evidência para continuar no Juizado.",
+      );
+    }
     return;
   }
 

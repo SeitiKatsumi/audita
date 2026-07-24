@@ -147,6 +147,15 @@ function formatChargeFact(candidate) {
   return `${date ? `Em ${date}, ` : ""}foi identificado o lançamento "${label}", no valor de ${formatCurrency(candidate?.amount)}, que o consumidor informou não reconhecer.`;
 }
 
+function resolveJourney(caseData = {}) {
+  const availability = String(
+    caseData?.answers?.historicalDocumentsAvailable || "pending",
+  );
+  if (availability === "yes") return "with_historical_documents";
+  if (availability === "no") return "without_historical_documents";
+  return "undetermined";
+}
+
 function buildDraft({ caseData, claimant, portal }) {
   const disputed = (Array.isArray(caseData?.candidates) ? caseData.candidates : []).filter(
     (candidate) => candidate?.answer === "not_recognized",
@@ -156,8 +165,19 @@ function buildDraft({ caseData, claimant, portal }) {
     ? `O consumidor informa que apresentou reclamação ao banco${answers.priorComplaintDate ? ` em ${cleanText(answers.priorComplaintDate, 10)}` : ""}${answers.priorComplaintProtocol ? `, protocolo ${cleanText(answers.priorComplaintProtocol, 80)}` : ""}.`
     : "Ainda não foi registrada no Audita uma reclamação prévia enviada ao banco.";
   const historical = answers.historicalEvidence === "yes"
-    ? "O consumidor informou possuir evidências de recorrência em outros períodos."
+    ? "O consumidor relatou recorrência da cobrança em outros períodos."
     : "A extensão temporal da cobrança ainda precisa ser confirmada com extratos adicionais.";
+  const journey = resolveJourney(caseData);
+  const documentSituation =
+    journey === "without_historical_documents"
+      ? "O consumidor informou não possuir, neste momento, os extratos ou contratos históricos. O período e os valores anteriores ainda não estão comprovados."
+      : journey === "with_historical_documents"
+        ? "O consumidor informou possuir extratos históricos, que devem ser conferidos e organizados por período antes do protocolo."
+        : "A disponibilidade de extratos e contratos históricos ainda precisa ser confirmada.";
+  const evidenceRequest =
+    journey === "without_historical_documents"
+      ? "a) se juridicamente cabível, exibição dos extratos, contratos e autorizações que estejam sob posse da instituição, limitada ao período pertinente a ser revisado;"
+      : "a) conferência dos extratos, contratos e autorizações anexados, com delimitação das cobranças efetivamente comprovadas;";
   const claimantName = cleanText(claimant.fullName, 160) || "[NOME DO CONSUMIDOR]";
   const claimantDocument = normalizeDocument(claimant.document) || "[CPF]";
   const claimantCity = normalizeCity(claimant.city) || "[CIDADE]";
@@ -174,17 +194,21 @@ function buildDraft({ caseData, claimant, portal }) {
     ...disputed.map((candidate) => formatChargeFact(candidate)),
     complaint,
     historical,
+    documentSituation,
     "",
     "2. DOCUMENTOS A CONFERIR",
-    "Extratos/faturas completos do período, comprovantes da contestação, resposta do banco, documento pessoal e comprovante de endereço.",
+    journey === "without_historical_documents"
+      ? "Fatura ou evidência recente disponível, comprovantes da contestação, resposta do banco, documento pessoal e comprovante de endereço."
+      : "Extratos/faturas completos do período, comprovantes da contestação, resposta do banco, documento pessoal e comprovante de endereço.",
     "",
     "3. PEDIDOS PRELIMINARES",
-    "a) confirmação da inexistência ou da validade da contratação, conforme as provas;",
-    "b) cessação de cobranças futuras, se ainda estiverem ocorrendo;",
-    "c) restituição dos valores comprovadamente cobrados sem autorização, na forma definida pelo juízo;",
-    "d) demais providências que o consumidor decidir manter após revisar os fatos e documentos.",
+    evidenceRequest,
+    "b) confirmação da inexistência ou da validade da contratação, conforme as provas;",
+    "c) cessação de cobranças futuras, se ainda estiverem ocorrendo;",
+    "d) restituição dos valores comprovadamente cobrados sem autorização, na forma definida pelo juízo;",
+    "e) demais providências que o consumidor decidir manter após revisar os fatos e documentos.",
     "",
-    "O valor da causa e qualquer pedido indenizatório dependem do histórico completo e não foram calculados automaticamente.",
+    "O valor da causa, a incidência de devolução em dobro, juros, correção e qualquer pedido indenizatório dependem das provas e de revisão jurídica; não foram presumidos nem calculados automaticamente.",
     "",
     `Portal de referência: ${portal.name}.`,
   ].join("\n");
@@ -240,6 +264,7 @@ export function prepareJecPetition({ caseData = {}, claimant = {}, uf, city } = 
     disputedCount: disputed.length,
     knownAmountCount: knownAmounts.length,
     totalDisputed: knownAmounts.reduce((total, amount) => total + amount, 0),
+    journey: resolveJourney(caseData),
     warnings: [
       "Rascunho de apoio: revise fatos, competência territorial, pedidos e valor da causa.",
       "A restituição em dobro e eventual dano moral não são presumidos pelo Audita.",

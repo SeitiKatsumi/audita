@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   AUDITA_CHAT_CAPABILITIES,
   buildAuditaChatInstructions,
+  buildJecIntakeAction,
   buildItauToolUpdatePayload,
   cleanAuditaChatAnswer,
   inferItauChatCaseUpdate,
@@ -32,6 +33,12 @@ test("chat removes duplicated source labels from the conversational answer", () 
       'Você reconhece "Cartão Protegido"? Fonte: fatura do Itaú enviada pelo usuário.',
     ),
     'Você reconhece "Cartão Protegido"?',
+  );
+  assert.equal(
+    cleanAuditaChatAnswer(
+      "A preparação assistida foi aberta. (Fonte: módulo de preparação assistida)",
+    ),
+    "A preparação assistida foi aberta.",
   );
 });
 
@@ -63,6 +70,8 @@ test("chat instructions prohibit invented results and personal data collection",
   assert.match(instructions, /Nao simule um formulario nem siga um questionario rigido/i);
   assert.match(instructions, /memoria factual, nao um roteiro/i);
   assert.match(instructions, /registrar_fatos_caso_itau/i);
+  assert.match(instructions, /chame iniciar_preparacao_jec/i);
+  assert.match(instructions, /duas jornadas Itau/i);
 });
 
 test("Itau context is factual memory without a scripted next question", () => {
@@ -81,6 +90,7 @@ test("Itau context is factual memory without a scripted next question", () => {
   assert.equal(context.candidates[0].answer, "not_recognized");
   assert.equal(context.documentReview.recentEvidenceAnalyzed, true);
   assert.equal(context.answers.priorComplaint, "pending");
+  assert.equal(context.journey, "undetermined");
   assert.equal("conversation" in context, false);
   assert.equal("nextQuestion" in context, false);
 });
@@ -555,6 +565,37 @@ test("Itau factual memory preserves the agreement period classification without 
   assert.equal("nextQuestion" in context, false);
 });
 
+test("Itau factual memory distinguishes the journey without historical statements", () => {
+  const context = JSON.parse(
+    normalizeItauCaseContext({
+      type: "itau_refund",
+      case: {
+        candidates: [{ label: "Seguro", answer: "not_recognized" }],
+        answers: {
+          historicalEvidence: "yes",
+          historicalDocumentsAvailable: "no",
+        },
+      },
+    }),
+  );
+
+  assert.equal(context.journey, "without_historical_documents");
+  assert.equal(context.answers.historicalEvidence, "yes");
+  assert.equal(context.answers.historicalDocumentsAvailable, "no");
+});
+
+test("JEC action opens only a supported secure intake and never claims protocol", () => {
+  const action = buildJecIntakeAction({ uf: "sp", caseId: "case-jec-action" });
+
+  assert.equal(action?.kind, "jec_intake");
+  assert.equal(action?.moduleId, "jec_petition");
+  assert.equal(action?.uf, "SP");
+  assert.equal(action?.caseId, "case-jec-action");
+  assert.match(action?.description || "", /sem protocolar/i);
+  assert.equal(buildJecIntakeAction({ uf: "BA", caseId: "case-1" }), null);
+  assert.equal(buildJecIntakeAction({ uf: "SP" }), null);
+});
+
 test("Itau factual memory does not turn an unknown charge amount into zero", () => {
   const context = JSON.parse(
     normalizeItauCaseContext({
@@ -685,6 +726,40 @@ test("anti-repeat guard permits an explicit request to repeat", () => {
       },
     }),
     false,
+  );
+});
+
+test("conversational guard rejects a false JEC preparation without the JEC tool action", () => {
+  const answer =
+    "Pronto, preparei o módulo para protocolar no Procon-SP e no Juizado Especial.";
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer,
+      messages: [{ role: "user", content: "SP" }],
+      actions: [],
+    }),
+    true,
+  );
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer: "A preparação assistida do JEC-SP foi aberta para sua revisão.",
+      messages: [{ role: "user", content: "SP" }],
+      actions: [
+        buildJecIntakeAction({ uf: "SP", caseId: "case-jec-action" }),
+      ],
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer:
+        "A preparação foi aberta. Deseja que eu gere agora o rascunho da petição?",
+      messages: [{ role: "user", content: "SP" }],
+      actions: [
+        buildJecIntakeAction({ uf: "SP", caseId: "case-jec-action" }),
+      ],
+    }),
+    true,
   );
 });
 

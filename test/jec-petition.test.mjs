@@ -104,3 +104,69 @@ test("petition draft labels an unknown charge amount instead of inventing zero",
   assert.equal(prepared.knownAmountCount, 0);
   assert.equal(prepared.totalDisputed, 0);
 });
+
+test("journey without historical statements requests document exhibition without inventing totals", () => {
+  const prepared = prepareJecPetition({
+    caseData: {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        historicalEvidence: "yes",
+        historicalDocumentsAvailable: "no",
+      },
+    },
+    uf: "SP",
+    city: "São Paulo",
+    claimant: {
+      fullName: "Cliente Teste",
+      document: "52998224725",
+      email: "cliente@example.com",
+      address: "Rua de Teste, 100",
+      city: "São Paulo",
+      uf: "SP",
+    },
+  });
+
+  assert.equal(prepared.journey, "without_historical_documents");
+  assert.match(prepared.draft, /não possuir.*extratos ou contratos históricos/i);
+  assert.match(prepared.draft, /exibição dos extratos, contratos e autorizações/i);
+  assert.match(prepared.draft, /não foram presumidos nem calculados automaticamente/i);
+  assert.doesNotMatch(prepared.draft, /23\.?156|5\.?000/);
+});
+
+test("journey with historical statements asks for period-by-period evidence review", () => {
+  const prepared = prepareJecPetition({
+    caseData: {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        historicalDocumentsAvailable: "yes",
+      },
+    },
+    uf: "SP",
+    city: "São Paulo",
+    claimant: {
+      fullName: "Cliente Teste",
+      document: "52998224725",
+      email: "cliente@example.com",
+      address: "Rua de Teste, 100",
+      city: "São Paulo",
+      uf: "SP",
+    },
+  });
+
+  assert.equal(prepared.journey, "with_historical_documents");
+  assert.match(prepared.draft, /organizados por período/i);
+  assert.match(prepared.draft, /cobranças efetivamente comprovadas/i);
+});
+
+test("chat UI focuses the JEC secure intake returned by the AI tool", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../app.js", import.meta.url), "utf8");
+
+  assert.match(source, /data-chat-jec=/);
+  assert.match(source, /function activateJecIntake/);
+  assert.match(source, /pendingJecFocusCaseId/);
+  assert.match(source, /panel\.scrollIntoView/);
+  assert.match(source, /state\.open \|\| state\.session/);
+});

@@ -34,6 +34,28 @@ final permanece com o usuario.
 
 A resposta conversacional deve mostrar apenas o proximo passo. Regras completas, fontes e formulario de contexto ficam recolhidos e sao exibidos quando solicitados.
 
+## Duas jornadas documentais
+
+### Com extratos historicos
+
+- a evidencia recente inicia a triagem;
+- novos extratos podem ser anexados quando houver sinal concreto;
+- as cobrancas devem ser organizadas por periodo, sem duplicar lancamentos;
+- o laudo e o rascunho usam somente datas e valores comprovados;
+- devolucao em dobro, juros, correcao e dano moral dependem de revisao juridica e nao sao presumidos.
+
+### Sem extratos historicos
+
+- a falta dos documentos antigos nao encerra a conversa nem apaga o relato de recorrencia;
+- a Audita prepara um rascunho preliminar com a evidencia recente disponivel;
+- o rascunho pode incluir pedido de exibicao de extratos, contratos e autorizacoes, se juridicamente cabivel;
+- periodo, total pago e valor da causa permanecem como pontos a confirmar;
+- valores de simulacoes comerciais nao sao copiados automaticamente para o caso.
+
+O material de escopo menciona um paywall de `12x R$ 99,00`. Essa etapa comercial
+nao faz parte do fluxo tecnico atual e so deve ser ativada depois da definicao do
+produto de pagamento, das regras de credito e do momento exato de cobranca.
+
 ## Classificacao
 
 - `review_required`: foi encontrado um lancamento candidato, mas o consumidor ainda nao respondeu.
@@ -103,7 +125,13 @@ A conversa real foi validada ate:
 4. registro de data e protocolo;
 5. ausencia de resposta do banco;
 6. decisao de seguir ao JEC;
-7. exibicao do formulario seguro do JEC.
+7. escolha da UF;
+8. acionamento da ferramenta `iniciar_preparacao_jec`;
+9. abertura e foco automatico do formulario seguro do JEC.
+
+Depois da UF, a IA nao pede uma nova confirmacao de envio. O painel coleta os
+dados sensiveis, prepara o rascunho para revisao e so entao permite abrir o
+portal assistido.
 
 ## JEC entregue no MVP
 
