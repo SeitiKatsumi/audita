@@ -9,8 +9,6 @@ import { createOpenAIOfficialUsageService } from "./services/openai-official-usa
 import { createCreditsService } from "./services/credits.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
 import {
-  buildItauTransitionAnswer,
-  inferItauChatCaseUpdate,
   runAuditaChat,
 } from "./services/chat-assistant.service.mjs";
 import {
@@ -2604,52 +2602,40 @@ async function runChatConversation(request) {
   const settings = await getAgentSettings(request);
   let effectiveCaseContext = body.caseContext;
   let synchronizedCase = null;
-  let stateTransition = null;
+  const itauAuth = {
+    tenantId: authContext.tenantId,
+    userId: authContext.user?.id || null,
+  };
+
+  const applyItauCaseUpdate = async (payload) => {
+    const currentCase = synchronizedCase || effectiveCaseContext?.case;
+    if (!currentCase?.id || !payload || typeof payload !== "object") return null;
+
+    const updated = itauRefundService.updateCase(currentCase.id, payload, itauAuth);
+    if (updated.forbidden) {
+      throw new Error("itau_case_forbidden");
+    }
+    synchronizedCase = updated.case
+      ? updated.case
+      : updateItauCaseSnapshot(currentCase, payload);
+    effectiveCaseContext = { type: "itau_refund", case: synchronizedCase };
+    return synchronizedCase;
+  };
 
   if (body.caseContext?.type === "itau_refund" && body.caseContext?.case?.id) {
-    stateTransition = inferItauChatCaseUpdate({
-      caseData: body.caseContext.case,
-      messages: body.messages,
-    });
-    if (stateTransition?.payload) {
-      const updated = itauRefundService.updateCase(
-        body.caseContext.case.id,
-        stateTransition.payload,
-        {
-          tenantId: authContext.tenantId,
-          userId: authContext.user?.id || null,
-        },
-      );
-      if (updated.case) {
-        synchronizedCase = updated.case;
-        effectiveCaseContext = { type: "itau_refund", case: synchronizedCase };
-      } else if (updated.notFound) {
-        synchronizedCase = updateItauCaseSnapshot(
-          body.caseContext.case,
-          stateTransition.payload,
-        );
-        effectiveCaseContext = { type: "itau_refund", case: synchronizedCase };
-      }
-    }
+    synchronizedCase = body.caseContext.case;
   }
 
   let result;
   try {
-    result =
-      synchronizedCase && stateTransition
-        ? {
-            answer: buildItauTransitionAnswer(synchronizedCase, stateTransition),
-            actions: [],
-            sources: [],
-            model: "audita-itau-state-machine",
-            capabilities: [],
-          }
-        : await runAuditaChat({
-            messages: body.messages,
-            settings,
-            userName: authContext.user?.name || "",
-            caseContext: effectiveCaseContext,
-          });
+    result = await runAuditaChat({
+      messages: body.messages,
+      settings,
+      userName: authContext.user?.name || "",
+      caseContext: effectiveCaseContext,
+      getItauCase: () => synchronizedCase || effectiveCaseContext?.case || null,
+      onItauCaseUpdate: applyItauCaseUpdate,
+    });
   } catch (error) {
     try {
       await apiUsageService.record(authContext, {

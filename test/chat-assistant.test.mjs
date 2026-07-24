@@ -3,15 +3,15 @@ import test from "node:test";
 
 import {
   AUDITA_CHAT_CAPABILITIES,
-  buildItauTransitionAnswer,
   buildAuditaChatInstructions,
+  buildItauToolUpdatePayload,
   cleanAuditaChatAnswer,
   inferItauChatCaseUpdate,
-  inferItauConversationStage,
   maskSensitiveIdentifiers,
   normalizeChatMessages,
   normalizeItauCaseContext,
   runAuditaChat,
+  shouldRepairConversationalAnswer,
 } from "../services/chat-assistant.service.mjs";
 import { updateItauCaseSnapshot } from "../services/itau-refund.service.mjs";
 
@@ -60,27 +60,29 @@ test("chat instructions prohibit invented results and personal data collection",
   assert.match(instructions, /uma evidencia recente/i);
   assert.match(instructions, /uma pergunta curta por vez/i);
   assert.match(instructions, /data estiver marcada como aproximada ou desconhecida/i);
+  assert.match(instructions, /Nao simule um formulario nem siga um questionario rigido/i);
+  assert.match(instructions, /memoria factual, nao um roteiro/i);
+  assert.match(instructions, /registrar_fatos_caso_itau/i);
 });
 
-test("Itau conversation advances from one recent finding to historical evidence", () => {
-  assert.deepEqual(inferItauConversationStage({ status: "no_candidate_found", candidates: [] }), {
-    phase: "screening_no_signal",
-    nextQuestion: "Qual nome, valor ou detalhe do lancamento fez voce desconfiar?",
-  });
+test("Itau context is factual memory without a scripted next question", () => {
+  const context = JSON.parse(
+    normalizeItauCaseContext({
+      type: "itau_refund",
+      case: {
+        status: "review_required",
+        candidates: [{ label: "Cartao Protegido", answer: "not_recognized" }],
+        answers: { priorComplaint: "pending" },
+      },
+    }),
+  );
 
-  const confirmation = inferItauConversationStage({
-    status: "review_required",
-    candidates: [{ label: "Cartao Protegido", answer: "pending" }],
-  });
-  assert.equal(confirmation.phase, "confirm_candidate");
-  assert.match(confirmation.nextQuestion, /Cartao Protegido/);
-
-  const history = inferItauConversationStage({
-    status: "review_required",
-    candidates: [{ label: "Cartao Protegido", answer: "not_recognized" }],
-  });
-  assert.equal(history.phase, "collect_history");
-  assert.match(history.nextQuestion, /outros meses/i);
+  assert.equal(context.candidates[0].index, 0);
+  assert.equal(context.candidates[0].answer, "not_recognized");
+  assert.equal(context.documentReview.recentEvidenceAnalyzed, true);
+  assert.equal(context.answers.priorComplaint, "pending");
+  assert.equal("conversation" in context, false);
+  assert.equal("nextQuestion" in context, false);
 });
 
 test("Itau typed replies update the candidate asked by the assistant", () => {
@@ -213,7 +215,9 @@ test("Itau records recurring charges even when older statements are unavailable"
   assert.equal(update?.payload.historicalDocumentsAvailable, "no");
 
   const updatedCase = updateItauCaseSnapshot(caseData, update.payload);
-  assert.equal(inferItauConversationStage(updatedCase).phase, "prior_complaint");
+  assert.equal(updatedCase.answers.historicalEvidence, "yes");
+  assert.equal(updatedCase.answers.historicalDocumentsAvailable, "no");
+  assert.equal(updatedCase.answers.priorComplaint, "pending");
 });
 
 test("Itau accepts an unknown complaint date and unavailable protocol without repeating", () => {
@@ -251,12 +255,35 @@ test("Itau accepts an unknown complaint date and unavailable protocol without re
   assert.equal(update?.payload.priorComplaintProtocol, undefined);
 
   const updatedCase = updateItauCaseSnapshot(caseData, update.payload);
-  assert.equal(inferItauConversationStage(updatedCase).phase, "follow_up_complaint");
-  const answer = buildItauTransitionAnswer(updatedCase, update);
-  assert.match(answer, /não lembra a data exata/i);
-  assert.match(answer, /protocolo não está disponível/i);
-  assert.match(answer, /Itau ja respondeu/i);
-  assert.doesNotMatch(answer, /Em que data/i);
+  assert.equal(updatedCase.answers.priorComplaintDateStatus, "unknown");
+  assert.equal(updatedCase.answers.priorComplaintProtocolStatus, "unavailable");
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer: "Em que data voce reclamou ao Itau? Se tiver o protocolo, pode informar junto.",
+      messages: [
+        {
+          role: "assistant",
+          content: "Em que data voce reclamou ao Itau? Se tiver o protocolo, pode informar junto.",
+        },
+        {
+          role: "user",
+          content:
+            "Nem me lembro e nao vou ter acesso ao protocolo porque nao tenho mais acesso a essa conta.",
+        },
+      ],
+      caseContext: { type: "itau_refund", case: updatedCase },
+    }),
+    true,
+  );
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer:
+        "Entendi. A falta da data exata e do protocolo limita a prova, mas nao impede a triagem. O Itau chegou a responder ou estornar algum valor?",
+      messages: [{ role: "user", content: "Nao lembro a data e nao tenho o protocolo." }],
+      caseContext: { type: "itau_refund", case: updatedCase },
+    }),
+    false,
+  );
 });
 
 test("Itau accepts an approximate complaint month and unavailable protocol", () => {
@@ -294,11 +321,17 @@ test("Itau accepts an approximate complaint month and unavailable protocol", () 
   assert.equal(update?.payload.priorComplaintProtocol, undefined);
 
   const updatedCase = updateItauCaseSnapshot(caseData, update.payload);
-  assert.equal(inferItauConversationStage(updatedCase).phase, "follow_up_complaint");
-  const answer = buildItauTransitionAnswer(updatedCase, update);
-  assert.match(answer, /2026-01 como data aproximada/i);
-  assert.match(answer, /Itau ja respondeu/i);
-  assert.doesNotMatch(answer, /Em que data/i);
+  assert.equal(updatedCase.answers.priorComplaintDateApproximate, "2026-01");
+  assert.equal(updatedCase.answers.priorComplaintDateStatus, "approximate");
+  assert.equal(updatedCase.answers.priorComplaintProtocolStatus, "unavailable");
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer: "Qual foi a data exata da reclamacao e qual e o protocolo?",
+      messages: [{ role: "user", content: "Foi por volta de janeiro de 2026 e nao tenho protocolo." }],
+      caseContext: { type: "itau_refund", case: updatedCase },
+    }),
+    true,
+  );
 });
 
 test("Itau completes the reported conversation sequence without entering a loop", () => {
@@ -329,7 +362,8 @@ test("Itau completes the reported conversation sequence without entering a loop"
     ],
   });
   caseData = updateItauCaseSnapshot(caseData, historyUpdate.payload);
-  assert.equal(inferItauConversationStage(caseData).phase, "prior_complaint");
+  assert.equal(caseData.answers.historicalEvidence, "yes");
+  assert.equal(caseData.answers.historicalDocumentsAvailable, "no");
 
   const complaintUpdate = inferItauChatCaseUpdate({
     caseData,
@@ -345,7 +379,7 @@ test("Itau completes the reported conversation sequence without entering a loop"
     ],
   });
   caseData = updateItauCaseSnapshot(caseData, complaintUpdate.payload);
-  assert.equal(inferItauConversationStage(caseData).phase, "prior_complaint_details");
+  assert.equal(caseData.answers.priorComplaint, "yes");
 
   const detailsUpdate = inferItauChatCaseUpdate({
     caseData,
@@ -362,12 +396,26 @@ test("Itau completes the reported conversation sequence without entering a loop"
     ],
   });
   caseData = updateItauCaseSnapshot(caseData, detailsUpdate.payload);
-  const stage = inferItauConversationStage(caseData);
-  const answer = buildItauTransitionAnswer(caseData, detailsUpdate);
-
-  assert.equal(stage.phase, "follow_up_complaint");
-  assert.match(answer, /Itau ja respondeu/i);
-  assert.doesNotMatch(answer, /Em que data|Se tiver o protocolo/i);
+  assert.equal(caseData.answers.priorComplaintDateStatus, "unknown");
+  assert.equal(caseData.answers.priorComplaintProtocolStatus, "unavailable");
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer: "Anotei que voce reclamou. Em que data voce reclamou ao Itau?",
+      messages: [
+        {
+          role: "assistant",
+          content: "Em que data voce reclamou ao Itau? Se tiver o protocolo, pode informar junto.",
+        },
+        {
+          role: "user",
+          content:
+            "Nem me lembro e nao vou ter acesso ao protocolo porque nao tenho mais acesso a essa conta.",
+        },
+      ],
+      caseContext: { type: "itau_refund", case: caseData },
+    }),
+    true,
+  );
 });
 
 test("Itau does not confuse accepting a draft with having complained already", () => {
@@ -459,7 +507,7 @@ test("Itau advances from an unanswered bank complaint to the JEC decision", () =
     },
     noResponse.payload,
   );
-  assert.equal(inferItauConversationStage(updatedCase).phase, "consider_jec");
+  assert.equal(updatedCase.answers.bankResponseStatus, "no_response");
 
   const wantsJec = inferItauChatCaseUpdate({
     caseData: updatedCase,
@@ -475,10 +523,10 @@ test("Itau advances from an unanswered bank complaint to the JEC decision", () =
   assert.equal(wantsJec?.payload.bankResponseStatus, undefined);
 
   const jecCase = updateItauCaseSnapshot(updatedCase, wantsJec.payload);
-  assert.equal(inferItauConversationStage(jecCase).phase, "jec_intake");
+  assert.equal(jecCase.answers.wantsJec, "yes");
 });
 
-test("Itau transition answer does not apply the 2025 deadline to a 2026 charge", () => {
+test("Itau factual memory preserves the agreement period classification without scripting", () => {
   const caseData = {
     status: "evaluated",
     candidates: [
@@ -499,30 +547,34 @@ test("Itau transition answer does not apply the 2025 deadline to a 2026 charge",
     },
   };
 
-  const answer = buildItauTransitionAnswer(caseData, { kind: "complaint" });
-  assert.match(answer, /posterior a 18\/12\/2025/i);
-  assert.match(answer, /atendimento normal do Ita[uú]/i);
-  assert.doesNotMatch(answer, /exige reclamacao previa/i);
+  const context = JSON.parse(
+    normalizeItauCaseContext({ type: "itau_refund", case: caseData }),
+  );
+  assert.equal(context.evaluation.agreementStatus, "outside_period");
+  assert.equal("conversation" in context, false);
+  assert.equal("nextQuestion" in context, false);
 });
 
-test("Itau transition does not turn an unknown charge amount into zero", () => {
-  const answer = buildItauTransitionAnswer(
-    {
-      candidates: [
-        {
-          label: "Protecao Horizonte",
-          amount: null,
-          answer: "not_recognized",
+test("Itau factual memory does not turn an unknown charge amount into zero", () => {
+  const context = JSON.parse(
+    normalizeItauCaseContext({
+      type: "itau_refund",
+      case: {
+        candidates: [
+          {
+            label: "Protecao Horizonte",
+            amount: null,
+            answer: "not_recognized",
+          },
+        ],
+        answers: {
+          historicalEvidence: "pending",
         },
-      ],
-      answers: {
-        historicalEvidence: "pending",
       },
-    },
-    { kind: "candidate" },
+    }),
   );
 
-  assert.doesNotMatch(answer, /R\$\s*0,00/);
+  assert.equal(context.candidates[0].amount, null);
 });
 
 test("chat capability registry exposes current module status and routes", () => {
@@ -568,9 +620,150 @@ test("chat receives only normalized Itau findings instead of the uploaded docume
   });
 
   assert.match(context, /Seguro Fatura Protegida/);
-  assert.match(context, /follow_up_complaint/);
+  assert.doesNotMatch(context, /nextQuestion|conversation/);
   assert.doesNotMatch(context, /49532724800|conteudo sigiloso|linha completa/);
   assert.doesNotMatch(context, /internal-case-id/);
+});
+
+test("Itau AI tool records conversational facts by candidate index", () => {
+  const payload = buildItauToolUpdatePayload(
+    {
+      candidateUpdates: [{ candidateIndex: 0, answer: "not_recognized" }],
+      historicalEvidence: "yes",
+      historicalDocumentsAvailable: "no",
+      priorComplaint: "yes",
+      priorComplaintDateApproximate: "2026-01",
+      priorComplaintProtocolStatus: "unavailable",
+      reason: "Usuario explicou os fatos em linguagem livre.",
+    },
+    {
+      candidates: [{ id: "protection", label: "Protecao Horizonte" }],
+    },
+  );
+
+  assert.deepEqual(payload.candidateAnswers, { protection: "not_recognized" });
+  assert.equal(payload.historicalEvidence, "yes");
+  assert.equal(payload.historicalDocumentsAvailable, "no");
+  assert.equal(payload.priorComplaint, "yes");
+  assert.equal(payload.priorComplaintDateApproximate, "2026-01");
+  assert.equal(payload.priorComplaintDateStatus, "approximate");
+  assert.equal(payload.priorComplaintProtocolStatus, "unavailable");
+});
+
+test("Itau AI tool does not preserve an approximate complaint date without a value", () => {
+  const payload = buildItauToolUpdatePayload({
+    priorComplaintDateStatus: "approximate",
+  });
+
+  assert.equal(payload.priorComplaintDateStatus, "unknown");
+  assert.equal(payload.priorComplaintDateApproximate, undefined);
+});
+
+test("Itau AI tool leaves unmentioned binary facts pending instead of inventing unknowns", () => {
+  const payload = buildItauToolUpdatePayload({
+    cancellationRequested: "unknown",
+    duplicateCharge: "unknown",
+    wantsJec: "unknown",
+  });
+
+  assert.equal(payload.cancellationRequested, undefined);
+  assert.equal(payload.duplicateCharge, undefined);
+  assert.equal(payload.wantsJec, undefined);
+});
+
+test("anti-repeat guard permits an explicit request to repeat", () => {
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer: "Voce ja reclamou ao Itau sobre essa cobranca?",
+      messages: [
+        { role: "assistant", content: "Voce ja reclamou ao Itau sobre essa cobranca?" },
+        { role: "user", content: "Nao entendi a pergunta, pode repetir?" },
+      ],
+      caseContext: {
+        type: "itau_refund",
+        case: { answers: { priorComplaint: "pending" } },
+      },
+    }),
+    false,
+  );
+});
+
+test("anti-repeat guard prevents requesting a recent document that was already analyzed", () => {
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer:
+        "Quer que eu peca para anexar os extratos dos ultimos 12 meses para medir a recorrencia?",
+      messages: [
+        {
+          role: "user",
+          content: "Nao tenho os extratos antigos e nao tenho mais acesso a conta.",
+        },
+      ],
+      caseContext: {
+        type: "itau_refund",
+        case: {
+          candidates: [
+            {
+              id: "protection",
+              label: "Protecao Horizonte",
+              answer: "not_recognized",
+            },
+          ],
+          answers: {
+            historicalDocumentsAvailable: "no",
+          },
+        },
+      },
+    }),
+    true,
+  );
+});
+
+test("conversational guard rejects promises to retrieve bank statements through Audita", () => {
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer:
+        "Quer que eu abra pelo modulo da Audita um pedido ao banco para obter seus extratos?",
+      messages: [{ role: "user", content: "Nao tenho mais acesso a conta." }],
+      caseContext: {
+        type: "itau_refund",
+        case: {
+          candidates: [{ id: "protection", answer: "not_recognized" }],
+          answers: { historicalDocumentsAvailable: "no" },
+        },
+      },
+    }),
+    true,
+  );
+});
+
+test("conversational guard requires the promised complaint draft to be shown", () => {
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer:
+        "Preparei um rascunho de reclamacao administrativa. Agora anexe novamente a fatura.",
+      messages: [{ role: "user", content: "Sim, pode preparar." }],
+      caseContext: {
+        type: "itau_refund",
+        case: {
+          candidates: [{ id: "protection", answer: "not_recognized" }],
+          answers: { administrativeDraftRequested: "yes" },
+        },
+      },
+    }),
+    true,
+  );
+});
+
+test("server never substitutes the OpenAI answer with an Itau state-machine response", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
+
+  assert.doesNotMatch(
+    source,
+    /buildItauTransitionAnswer|audita-itau-state-machine|inferItauChatCaseUpdate/,
+  );
+  assert.match(source, /result = await runAuditaChat\(/);
 });
 
 test("chat reports configuration pending without importing or calling OpenAI", async () => {
