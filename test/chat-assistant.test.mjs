@@ -3,14 +3,17 @@ import test from "node:test";
 
 import {
   AUDITA_CHAT_CAPABILITIES,
+  buildItauTransitionAnswer,
   buildAuditaChatInstructions,
   cleanAuditaChatAnswer,
+  inferItauChatCaseUpdate,
   inferItauConversationStage,
   maskSensitiveIdentifiers,
   normalizeChatMessages,
   normalizeItauCaseContext,
   runAuditaChat,
 } from "../services/chat-assistant.service.mjs";
+import { updateItauCaseSnapshot } from "../services/itau-refund.service.mjs";
 
 test("chat masks CPF, CNPJ and email before model input", () => {
   const masked = maskSensitiveIdentifiers(
@@ -79,6 +82,260 @@ test("Itau conversation advances from one recent finding to historical evidence"
   assert.match(history.nextQuestion, /outros meses/i);
 });
 
+test("Itau typed replies update the candidate asked by the assistant", () => {
+  const update = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-1",
+      candidates: [
+        { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+        { id: "stream", label: "StreamPlay", answer: "pending" },
+      ],
+    },
+    messages: [
+      { role: "assistant", content: 'Voce reconhece a contratacao de "StreamPlay"?' },
+      { role: "user", content: "sim" },
+    ],
+  });
+
+  assert.equal(update?.kind, "candidate");
+  assert.deepEqual(update?.payload.candidateAnswers, { stream: "recognized" });
+});
+
+test("Itau understands that all other charges are recognized", () => {
+  const update = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-2",
+      candidates: [
+        { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+        { id: "stream", label: "StreamPlay", answer: "pending" },
+        { id: "tariff", label: "Tarifa bancaria", answer: "pending" },
+      ],
+    },
+    messages: [
+      { role: "assistant", content: 'Voce reconhece a contratacao de "StreamPlay"?' },
+      {
+        role: "user",
+        content: "As outras eu reconhco, apenas essa protecao acho que foi indevida",
+      },
+    ],
+  });
+
+  assert.deepEqual(update?.payload.candidateAnswers, {
+    stream: "recognized",
+    tariff: "recognized",
+  });
+});
+
+test("Itau persists a complaint reported naturally in chat", () => {
+  const update = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-3",
+      candidates: [
+        { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+      ],
+    },
+    messages: [
+      { role: "assistant", content: "Quer que eu prepare uma reclamacao para o Itau?" },
+      { role: "user", content: "ja fiz a reclamacao previa" },
+    ],
+  });
+
+  assert.equal(update?.kind, "complaint");
+  assert.equal(update?.payload.priorComplaint, "yes");
+});
+
+test("Itau gives precedence to a natural negative complaint reply", () => {
+  const update = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-negative-complaint",
+      candidates: [
+        { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+      ],
+    },
+    messages: [
+      { role: "assistant", content: "Voce ja reclamou ao Itau sobre essa cobranca atual?" },
+      { role: "user", content: "Não reclamei ainda." },
+    ],
+  });
+
+  assert.equal(update?.payload.priorComplaint, "no");
+});
+
+test("Itau understands that a charge only appeared this month", () => {
+  const update = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-single-month",
+      candidates: [
+        { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+      ],
+    },
+    messages: [
+      {
+        role: "assistant",
+        content: "Essa cobranca aparece em outros meses ou voce tem extratos anteriores para comparar?",
+      },
+      { role: "user", content: "Só apareceu esse mês." },
+    ],
+  });
+
+  assert.equal(update?.payload.historicalEvidence, "no");
+});
+
+test("Itau does not confuse accepting a draft with having complained already", () => {
+  const update = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-4",
+      candidates: [
+        { id: "protection", label: "Protecao Horizonte", answer: "not_recognized" },
+      ],
+    },
+    messages: [
+      { role: "assistant", content: "Quer que eu prepare uma reclamacao para o Itau?" },
+      { role: "user", content: "sim" },
+    ],
+  });
+
+  assert.equal(update?.kind, "complaint_draft");
+  assert.equal(update?.payload.administrativeDraftRequested, "yes");
+});
+
+test("Itau marks a generated complaint as sent when the user reports its protocol", () => {
+  const update = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-complaint-sent",
+      candidates: [
+        {
+          id: "protection",
+          label: "Protecao Horizonte",
+          answer: "not_recognized",
+        },
+      ],
+      answers: {
+        historicalEvidence: "no",
+        priorComplaint: "no",
+        administrativeDraftRequested: "yes",
+      },
+    },
+    messages: [
+      {
+        role: "assistant",
+        content:
+          "O rascunho administrativo esta pronto. Quando voce enviar ao Itau, me avise.",
+      },
+      {
+        role: "user",
+        content:
+          "Ja enviei a reclamacao em 23/07/2026, protocolo AUDITA-TESTE-20260723.",
+      },
+    ],
+  });
+
+  assert.equal(update?.kind, "complaint_details");
+  assert.equal(update?.payload.priorComplaint, "yes");
+  assert.equal(update?.payload.priorComplaintDate, "2026-07-23");
+  assert.equal(
+    update?.payload.priorComplaintProtocol,
+    "AUDITA-TESTE-20260723",
+  );
+});
+
+test("Itau advances from an unanswered bank complaint to the JEC decision", () => {
+  const noResponse = inferItauChatCaseUpdate({
+    caseData: {
+      id: "case-jec",
+      candidates: [{ id: "protection", label: "Protecao Horizonte", answer: "not_recognized" }],
+      answers: {
+        priorComplaint: "yes",
+        priorComplaintDate: "2026-07-23",
+        bankResponseStatus: "pending",
+      },
+    },
+    messages: [
+      { role: "assistant", content: "O Itau ja respondeu, cancelou ou estornou essa cobranca?" },
+      { role: "user", content: "não" },
+    ],
+  });
+
+  assert.equal(noResponse?.payload.bankResponseStatus, "no_response");
+  const updatedCase = updateItauCaseSnapshot(
+    {
+      id: "case-jec",
+      candidates: [{ id: "protection", label: "Protecao Horizonte", answer: "not_recognized" }],
+      answers: {
+        priorComplaint: "yes",
+        priorComplaintDate: "2026-07-23",
+        bankResponseStatus: "pending",
+        wantsJec: "pending",
+      },
+    },
+    noResponse.payload,
+  );
+  assert.equal(inferItauConversationStage(updatedCase).phase, "consider_jec");
+
+  const wantsJec = inferItauChatCaseUpdate({
+    caseData: updatedCase,
+    messages: [
+      {
+        role: "assistant",
+        content: "Como não houve solução integral, quer que eu prepare o caminho assistido para o Juizado Especial?",
+      },
+      { role: "user", content: "sim" },
+    ],
+  });
+  assert.equal(wantsJec?.payload.wantsJec, "yes");
+  assert.equal(wantsJec?.payload.bankResponseStatus, undefined);
+
+  const jecCase = updateItauCaseSnapshot(updatedCase, wantsJec.payload);
+  assert.equal(inferItauConversationStage(jecCase).phase, "jec_intake");
+});
+
+test("Itau transition answer does not apply the 2025 deadline to a 2026 charge", () => {
+  const caseData = {
+    status: "evaluated",
+    candidates: [
+      {
+        id: "protection",
+        label: "Protecao Horizonte",
+        date: "2026-07-22",
+        amount: 39.9,
+        answer: "not_recognized",
+      },
+    ],
+    answers: {
+      historicalEvidence: "no",
+      priorComplaint: "no",
+    },
+    evaluation: {
+      agreementStatus: "outside_period",
+    },
+  };
+
+  const answer = buildItauTransitionAnswer(caseData, { kind: "complaint" });
+  assert.match(answer, /posterior a 18\/12\/2025/i);
+  assert.match(answer, /atendimento normal do Ita[uú]/i);
+  assert.doesNotMatch(answer, /exige reclamacao previa/i);
+});
+
+test("Itau transition does not turn an unknown charge amount into zero", () => {
+  const answer = buildItauTransitionAnswer(
+    {
+      candidates: [
+        {
+          label: "Protecao Horizonte",
+          amount: null,
+          answer: "not_recognized",
+        },
+      ],
+      answers: {
+        historicalEvidence: "pending",
+      },
+    },
+    { kind: "candidate" },
+  );
+
+  assert.doesNotMatch(answer, /R\$\s*0,00/);
+});
+
 test("chat capability registry exposes current module status and routes", () => {
   const stateCourts = AUDITA_CHAT_CAPABILITIES.find((item) => item.id === "state_courts");
   const propertySearch = AUDITA_CHAT_CAPABILITIES.find((item) => item.id === "property_search");
@@ -122,7 +379,7 @@ test("chat receives only normalized Itau findings instead of the uploaded docume
   });
 
   assert.match(context, /Seguro Fatura Protegida/);
-  assert.match(context, /collect_history/);
+  assert.match(context, /follow_up_complaint/);
   assert.doesNotMatch(context, /49532724800|conteudo sigiloso|linha completa/);
   assert.doesNotMatch(context, /internal-case-id/);
 });

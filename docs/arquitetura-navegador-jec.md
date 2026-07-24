@@ -1,5 +1,32 @@
 # Navegador Copiloto para protocolo no JEC
 
+## Estado atual do MVP
+
+O MVP local esta funcional com Chromium/Playwright executado no backend e
+renderizado dentro do Audita por screenshots interativos. O agente pode
+observar, preencher por rotulo, selecionar opcoes, clicar por texto, rolar e
+pedir intervencao humana.
+
+Validacao real realizada em 24/07/2026, com dados sinteticos e sem protocolo:
+
+| UF | Portal oficial | Ponto validado |
+| --- | --- | --- |
+| SP | `portal.tjsp.jus.br/PeticionamentoEletronico` | Portal aberto, foro do JEC localizado e etapa reversivel iniciada. |
+| RJ | `www3.tjrj.jus.br/peticao-cidada/` | Fluxo iniciado e agente parado antes de escolher assunto juridico ambiguo. |
+| MG | formulario oficial de pre-atermacao de Belo Horizonte | Portal aberto e handoff realizado no login Google. |
+| PR | formulario virtual do TJPR para Curitiba | Portal aberto e pergunta inicial reversivel respondida com dados sinteticos. |
+
+Para os quatro portais, a API recusou a acao automatizada de envio final com
+`final_submission_requires_human`. Nenhuma peticao real foi protocolada.
+
+O controle compartilhado tambem foi validado em execucao: `Parar agente`
+cancela a rodada ativa sem novas acoes, `Devolver ao agente` retoma a
+observacao da tela real e qualquer clique, texto ou rolagem manual pausa o
+agente antes de liberar o controle ao usuario.
+
+O browser atual e funcional, mas ainda nao tem a fluidez de um navegador WebRTC.
+A arquitetura abaixo descreve a evolucao recomendada para essa experiencia.
+
 ## Objetivo
 
 Criar uma experiência em que a Audita prepara e preenche o protocolo no portal oficial do tribunal, enquanto o usuário acompanha a navegação ao vivo e pode assumir o controle instantaneamente. CAPTCHA, autenticação, certificado digital, pagamento e envio final permanecem com o humano.
@@ -101,9 +128,12 @@ Ao clicar em `Assumir controle`, o backend cancela a ação pendente antes de li
 - Política de retenção e exclusão de documentos.
 - Avaliações automáticas do comportamento do agente.
 
-## Decisão inicial
+## Decisao para a proxima etapa
 
-Para o piloto, usar **Steel Cloud + OpenAI Computer Use**, mantendo Playwright/CDP como executor auxiliar. Essa combinação entrega uma tela fluida por WebRTC, controle compartilhado e uma camada visual de IA sem reconstruir infraestrutura de streaming.
+Manter o MVP atual para validar regras e portais. Para o piloto de experiencia
+fluida, avaliar **Steel Cloud + OpenAI Computer Use**, mantendo Playwright/CDP
+como executor auxiliar. Essa combinacao adiciona tela WebRTC e controle
+compartilhado sem descartar o catalogo e os guardrails ja implementados.
 
 Se o piloto mostrar necessidade de uma operação totalmente gerenciada e menor manutenção, comparar com Browserbase antes da fase de escala. Se residência de dados ou custo justificar, avaliar o Steel open source apenas depois da prova técnica.
 

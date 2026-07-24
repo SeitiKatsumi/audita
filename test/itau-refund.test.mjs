@@ -5,6 +5,7 @@ import {
   createItauRefundService,
   detectItauCandidateCharges,
   evaluateItauCase,
+  updateItauCaseSnapshot,
 } from "../services/itau-refund.service.mjs";
 
 test("detects known insurance charges without classifying them as improper", () => {
@@ -77,6 +78,50 @@ test("continued billing after cancellation is treated as a strong signal", () =>
   assert.equal(result.agreementStatus, "potentially_eligible");
 });
 
+test("a 2026 charge is outside the collective agreement regardless of prior complaint", () => {
+  const result = evaluateItauCase({
+    candidates: [
+      {
+        id: "charge-2026",
+        label: "Protecao Horizonte",
+        date: "2026-07-22",
+        amount: 39.9,
+        answer: "not_recognized",
+      },
+    ],
+    answers: {
+      historicalEvidence: "no",
+      priorComplaint: "no",
+    },
+  });
+
+  assert.equal(result.agreementStatus, "outside_period");
+  assert.match(result.agreementLabel, /fora do per[ií]odo/i);
+  assert.doesNotMatch(result.nextActions.join(" "), /reclamacao anterior.*18\/12\/2025/i);
+});
+
+test("a saved chat snapshot can continue after the in-memory case expires", () => {
+  const updated = updateItauCaseSnapshot(
+    {
+      id: "expired-case",
+      status: "review_required",
+      candidates: [
+        { id: "protection", label: "Protecao Horizonte", date: "2026-07-22", answer: "not_recognized" },
+        { id: "stream", label: "StreamPlay", date: "2026-07-18", answer: "pending" },
+      ],
+      answers: { historicalEvidence: "pending", priorComplaint: "pending" },
+    },
+    {
+      candidateAnswers: { stream: "recognized" },
+      historicalEvidence: "no",
+    },
+  );
+
+  assert.equal(updated.candidates[1].answer, "recognized");
+  assert.equal(updated.answers.historicalEvidence, "no");
+  assert.equal(updated.evaluation.agreementStatus, "outside_period");
+});
+
 test("service keeps only normalized findings and supports an authenticated review", async () => {
   const service = createItauRefundService({
     now: () => Date.UTC(2026, 6, 23, 12),
@@ -118,6 +163,7 @@ test("service keeps only normalized findings and supports an authenticated revie
     analyzed.case.id,
     {
       candidateAnswers: { [candidate.id]: "not_recognized" },
+      historicalEvidence: "yes",
       priorComplaint: "yes",
       priorComplaintDate: "2025-10-01",
     },
@@ -125,6 +171,7 @@ test("service keeps only normalized findings and supports an authenticated revie
   );
   assert.equal(updated.case.evaluation.classification, "possible_unauthorized");
   assert.equal(updated.case.evaluation.agreementStatus, "potentially_eligible");
+  assert.equal(updated.case.answers.historicalEvidence, "yes");
 
   assert.equal(
     service.getCase(analyzed.case.id, { tenantId: "tenant-b", userId: "user-a" }).forbidden,
@@ -210,4 +257,25 @@ test("rejects unsupported document formats", async () => {
 
   assert.equal(result.invalid, true);
   assert.equal(result.reason, "unsupported_document_type");
+});
+
+test("times out a stalled visual analysis without reporting a false clean result", async () => {
+  const service = createItauRefundService({
+    env: { ITAU_ANALYSIS_TIMEOUT_MS: "20" },
+    aiAnalyzer: async () => new Promise(() => {}),
+  });
+
+  const startedAt = Date.now();
+  const result = await service.analyze({
+    buffer: Buffer.from("fake-image-bytes"),
+    fileName: "extrato.png",
+    mimeType: "image/png",
+  });
+
+  assert.ok(Date.now() - startedAt < 1_000);
+  assert.equal(result.case.status, "unreadable");
+  assert.equal(result.case.document.processedBy, "analysis_unavailable");
+  assert.equal(result.case.candidates.length, 0);
+  assert.match(result.aiError, /excedeu/i);
+  assert.match(result.case.notes.join(" "), /nenhum resultado foi presumido/i);
 });

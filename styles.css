@@ -4372,6 +4372,138 @@ body[data-active-page="chat"] .workspace {
   font-weight: 800;
 }
 
+.jec-petition-panel {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(82, 194, 230, 0.24);
+}
+
+.jec-petition-panel > summary {
+  color: #dff8ff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.jec-petition-panel > p {
+  margin: 8px 0 14px;
+  color: #9fc1d4;
+  font-size: 0.78rem;
+}
+
+.jec-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.jec-form-grid label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.jec-form-grid label > span,
+.jec-confirmation span {
+  color: #b8d5e4;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.jec-form-grid input,
+.jec-form-grid select {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #245a79;
+  border-radius: 6px;
+  background: #061a2e;
+  color: #effbff;
+}
+
+.jec-field-wide {
+  grid-column: 1 / -1;
+}
+
+.jec-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.jec-form-error,
+.jec-missing-fields {
+  margin: 10px 0;
+  color: #ffb8b8;
+  font-size: 0.76rem;
+}
+
+.jec-draft-summary {
+  display: grid;
+  gap: 3px;
+  margin-top: 16px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(82, 194, 230, 0.2);
+  border-bottom: 1px solid rgba(82, 194, 230, 0.2);
+}
+
+.jec-draft-summary span,
+.jec-draft-summary small {
+  color: #9fc1d4;
+}
+
+.jec-draft-preview {
+  margin-top: 12px;
+}
+
+.jec-draft-preview summary {
+  color: #72e7f1;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.jec-draft-preview pre {
+  max-height: 420px;
+  overflow: auto;
+  margin: 10px 0 0;
+  padding: 14px;
+  border: 1px solid #214f6b;
+  border-radius: 6px;
+  background: #041426;
+  color: #d9edf7;
+  white-space: pre-wrap;
+  font: 0.72rem/1.55 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.jec-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.jec-confirmation input {
+  margin-top: 2px;
+}
+
+.jec-assisted-browser {
+  margin-top: 16px;
+}
+
+.jec-human-checkpoint {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 0;
+  color: #abd0df;
+  font-size: 0.74rem;
+}
+
+.jec-human-checkpoint strong {
+  color: #6af7aa;
+}
+
 .itau-analysis-details > footer {
   display: flex;
   flex-wrap: wrap;
@@ -4626,6 +4758,18 @@ body[data-active-page="chat"] .workspace {
 
   .chat-composer {
     margin-bottom: 30px;
+  }
+
+  .jec-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .jec-field-wide {
+    grid-column: auto;
+  }
+
+  .jec-human-checkpoint {
+    flex-direction: column;
   }
 }
 

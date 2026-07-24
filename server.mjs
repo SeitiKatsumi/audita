@@ -8,18 +8,33 @@ import { createApiUsageService } from "./services/api-usage.service.mjs";
 import { createOpenAIOfficialUsageService } from "./services/openai-official-usage.service.mjs";
 import { createCreditsService } from "./services/credits.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
-import { runAuditaChat } from "./services/chat-assistant.service.mjs";
-import { createItauRefundService } from "./services/itau-refund.service.mjs";
+import {
+  buildItauTransitionAnswer,
+  inferItauChatCaseUpdate,
+  runAuditaChat,
+} from "./services/chat-assistant.service.mjs";
+import {
+  createItauRefundService,
+  updateItauCaseSnapshot,
+} from "./services/itau-refund.service.mjs";
 import {
   closeAssistedSession,
   getAssistedSessionView,
   inspectAssistedSessionResult,
   interactAssistedSession,
+  openAssistedBrowserSession,
 } from "./collectors/tjdft.collector.mjs";
 import {
-  getStateCourtAgentSession,
+  createStateCourtAgentSession,
+  getOwnedStateCourtAgentSession,
   handleStateCourtAgentAction,
+  startStateCourtAgentSession,
 } from "./services/state-court-agent.service.mjs";
+import {
+  buildJecAgentProfile,
+  listJecPortals,
+  prepareJecPetition,
+} from "./services/jec-petition.service.mjs";
 
 const root = resolve(".");
 loadLocalEnvFiles();
@@ -2587,14 +2602,54 @@ async function runChatConversation(request) {
 
   const body = await readJsonBody(request);
   const settings = await getAgentSettings(request);
+  let effectiveCaseContext = body.caseContext;
+  let synchronizedCase = null;
+  let stateTransition = null;
+
+  if (body.caseContext?.type === "itau_refund" && body.caseContext?.case?.id) {
+    stateTransition = inferItauChatCaseUpdate({
+      caseData: body.caseContext.case,
+      messages: body.messages,
+    });
+    if (stateTransition?.payload) {
+      const updated = itauRefundService.updateCase(
+        body.caseContext.case.id,
+        stateTransition.payload,
+        {
+          tenantId: authContext.tenantId,
+          userId: authContext.user?.id || null,
+        },
+      );
+      if (updated.case) {
+        synchronizedCase = updated.case;
+        effectiveCaseContext = { type: "itau_refund", case: synchronizedCase };
+      } else if (updated.notFound) {
+        synchronizedCase = updateItauCaseSnapshot(
+          body.caseContext.case,
+          stateTransition.payload,
+        );
+        effectiveCaseContext = { type: "itau_refund", case: synchronizedCase };
+      }
+    }
+  }
+
   let result;
   try {
-    result = await runAuditaChat({
-      messages: body.messages,
-      settings,
-      userName: authContext.user?.name || "",
-      caseContext: body.caseContext,
-    });
+    result =
+      synchronizedCase && stateTransition
+        ? {
+            answer: buildItauTransitionAnswer(synchronizedCase, stateTransition),
+            actions: [],
+            sources: [],
+            model: "audita-itau-state-machine",
+            capabilities: [],
+          }
+        : await runAuditaChat({
+            messages: body.messages,
+            settings,
+            userName: authContext.user?.name || "",
+            caseContext: effectiveCaseContext,
+          });
   } catch (error) {
     try {
       await apiUsageService.record(authContext, {
@@ -2652,7 +2707,7 @@ async function runChatConversation(request) {
     );
   }
 
-  return result;
+  return synchronizedCase ? { ...result, itauCase: synchronizedCase } : result;
 }
 
 async function handleApi(request, response, pathname) {
@@ -2882,6 +2937,177 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/jec/portals" && request.method === "GET") {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    sendJson(response, 200, { portals: listJecPortals() });
+    return true;
+  }
+
+  if (pathname === "/api/jec/petitions/prepare" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      let caseData = body.caseData || {};
+      if (body.caseId) {
+        const stored = itauRefundService.getCase(body.caseId, {
+          tenantId: authContext.tenantId,
+          userId: authContext.user?.id || null,
+        });
+        if (stored.forbidden) {
+          sendJson(response, 403, { error: "itau_case_forbidden" });
+          return true;
+        }
+        if (stored.case) caseData = stored.case;
+      }
+      const prepared = prepareJecPetition({
+        caseData,
+        claimant: body.claimant || {},
+        uf: body.uf,
+        city: body.city,
+      });
+      if (prepared.unsupported) {
+        sendJson(response, 422, {
+          error: "jec_state_not_supported",
+          supportedUfs: prepared.supportedUfs,
+        });
+        return true;
+      }
+      sendJson(response, 200, { prepared });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "jec_petition_prepare_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/jec/sessions" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      if (body.reviewConfirmed !== true || body.transmissionAuthorized !== true) {
+        sendJson(response, 400, { error: "jec_review_and_authorization_required" });
+        return true;
+      }
+      let caseData = body.caseData || {};
+      if (body.caseId) {
+        const stored = itauRefundService.getCase(body.caseId, {
+          tenantId: authContext.tenantId,
+          userId: authContext.user?.id || null,
+        });
+        if (stored.forbidden) {
+          sendJson(response, 403, { error: "itau_case_forbidden" });
+          return true;
+        }
+        if (stored.case) caseData = stored.case;
+      }
+      const prepared = prepareJecPetition({
+        caseData,
+        claimant: body.claimant || {},
+        uf: body.uf,
+        city: body.city,
+      });
+      if (prepared.unsupported) {
+        sendJson(response, 422, {
+          error: "jec_state_not_supported",
+          supportedUfs: prepared.supportedUfs,
+        });
+        return true;
+      }
+      if (!prepared.ready) {
+        sendJson(response, 400, {
+          error: "jec_required_fields_missing",
+          missingFields: prepared.missingFields,
+        });
+        return true;
+      }
+
+      const profile = buildJecAgentProfile(prepared);
+      const owner = {
+        tenantId: authContext.tenantId || null,
+        userId: authContext.user?.id || null,
+      };
+      const claimant = prepared.claimant;
+      const input = {
+        tipoDocumento: claimant.document.length === 14 ? "cnpj" : "cpf",
+        documento: claimant.document,
+        extraFields: {
+          stateCourtFields: {
+            fullName: claimant.fullName,
+            email: claimant.email,
+            phone: claimant.phone,
+            address: claimant.address,
+            city: claimant.city,
+            stateUf: claimant.uf,
+          },
+        },
+        usageContext: authContext,
+        recordApiUsage: (context, usage) => apiUsageService.record(context, usage),
+      };
+      const opened = await openAssistedBrowserSession({
+        portalUrl: prepared.portal.startUrl,
+        courtName: prepared.portal.tribunal,
+        courtUf: prepared.portal.uf,
+        input,
+        profile,
+        results: [],
+        owner,
+        purpose: "jec_petition",
+        allowedHosts: prepared.portal.allowedHosts,
+        finalSubmissionHumanOnly: true,
+      });
+      if (!opened.sessionId) {
+        sendJson(response, opened.invalid ? 400 : 502, {
+          error: opened.reason || "jec_portal_open_failed",
+          message: opened.message || "",
+        });
+        return true;
+      }
+
+      const agent = createStateCourtAgentSession({
+        uf: prepared.portal.uf,
+        tribunal: prepared.portal.tribunal,
+        portalUrl: prepared.portal.startUrl,
+        assistedSession: opened.sessionId,
+        input,
+        profile,
+        requestedCertificates: [],
+        getView: getAssistedSessionView,
+        interact: interactAssistedSession,
+        owner,
+      });
+      startStateCourtAgentSession(agent.id, {
+        userMessage:
+          "Observe o portal e avance somente por etapas reversiveis. Pare antes de login, escolha juridica ambigua ou envio final.",
+      });
+      sendJson(response, 201, {
+        session: opened.session,
+        agent,
+        portal: prepared.portal,
+        finalSubmissionHumanOnly: true,
+      });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "jec_session_start_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
   const assistedSessionResultMatch = pathname.match(/^\/api\/assisted-sessions\/([A-Za-z0-9_-]+)\/result$/);
   if (assistedSessionResultMatch && request.method === "GET") {
     try {
@@ -2890,9 +3116,16 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
       }
-      const result = await inspectAssistedSessionResult(assistedSessionResultMatch[1]);
+      const result = await inspectAssistedSessionResult(
+        assistedSessionResultMatch[1],
+        authContext,
+      );
       if (result.notFound) {
         sendJson(response, 404, { error: "assisted_session_not_found" });
+        return true;
+      }
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "assisted_session_forbidden" });
         return true;
       }
       sendJson(response, 200, { result });
@@ -2913,9 +3146,16 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
       }
-      const session = getStateCourtAgentSession(stateCourtAgentSessionMatch[1]);
+      const session = getOwnedStateCourtAgentSession(
+        stateCourtAgentSessionMatch[1],
+        authContext,
+      );
       if (!session) {
         sendJson(response, 404, { error: "state_court_agent_session_not_found" });
+        return true;
+      }
+      if (session.forbidden) {
+        sendJson(response, 403, { error: "state_court_agent_session_forbidden" });
         return true;
       }
       sendJson(response, 200, { session });
@@ -2936,13 +3176,21 @@ async function handleApi(request, response, pathname) {
         return true;
       }
       const body = await readJsonBody(request);
-      const session = await handleStateCourtAgentAction(stateCourtAgentSessionMatch[1], body);
+      const session = await handleStateCourtAgentAction(
+        stateCourtAgentSessionMatch[1],
+        body,
+        authContext,
+      );
       if (session.notFound) {
         sendJson(response, 404, { error: "state_court_agent_session_not_found" });
         return true;
       }
       if (session.invalid) {
         sendJson(response, 400, { error: "invalid_state_court_agent_action" });
+        return true;
+      }
+      if (session.forbidden) {
+        sendJson(response, 403, { error: "state_court_agent_session_forbidden" });
         return true;
       }
       sendJson(response, 200, { session });
@@ -2963,9 +3211,13 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
       }
-      const view = await getAssistedSessionView(assistedSessionMatch[1]);
+      const view = await getAssistedSessionView(assistedSessionMatch[1], authContext);
       if (view.notFound) {
         sendJson(response, 404, { error: "assisted_session_not_found" });
+        return true;
+      }
+      if (view.forbidden) {
+        sendJson(response, 403, { error: "assisted_session_forbidden" });
         return true;
       }
       sendJson(response, 200, { session: view });
@@ -2987,14 +3239,20 @@ async function handleApi(request, response, pathname) {
       }
       const body = await readJsonBody(request);
       const result = body?.type === "close"
-        ? await closeAssistedSession(assistedSessionMatch[1])
-        : await interactAssistedSession(assistedSessionMatch[1], body);
+        ? await closeAssistedSession(assistedSessionMatch[1], authContext)
+        : await interactAssistedSession(assistedSessionMatch[1], body, authContext);
       if (result.notFound) {
         sendJson(response, 404, { error: "assisted_session_not_found" });
         return true;
       }
       if (result.invalid) {
-        sendJson(response, 400, { error: "invalid_assisted_session_action" });
+        sendJson(response, 400, {
+          error: result.reason || "invalid_assisted_session_action",
+        });
+        return true;
+      }
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "assisted_session_forbidden" });
         return true;
       }
       sendJson(response, 200, { session: result });

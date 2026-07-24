@@ -1828,6 +1828,7 @@ const chatStorageKey = "audita.chat.threads.v1";
 let chatSending = false;
 let chatSendingThreadId = "";
 let chatPendingAttachment = null;
+const jecCaseStates = new Map();
 
 function createChatId() {
   return globalThis.crypto?.randomUUID?.() || `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -1992,6 +1993,9 @@ function itauClassificationLabel(evaluation = {}) {
 
 function itauConversationGuidance(caseData = {}) {
   const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
+  const answers = caseData.answers || {};
+  const historicalEvidence = answers.historicalEvidence || "pending";
+  const priorComplaint = answers.priorComplaint || "pending";
   if (caseData.status === "unreadable") {
     return "Envie uma imagem mais nítida ou um PDF digital desta cobrança.";
   }
@@ -2002,12 +2006,272 @@ function itauConversationGuidance(caseData = {}) {
     return "Confirme apenas se você reconhece a contratação encontrada.";
   }
   if (candidates.some((candidate) => candidate.answer === "not_recognized")) {
+    if (!["yes", "no", "unknown"].includes(historicalEvidence)) {
+      return "Há sinal para investigar. Verifique se a cobrança aparece em outros meses.";
+    }
+    if (historicalEvidence === "yes" && priorComplaint === "pending") {
+      return "Compare outro extrato ou fatura para medir a duração da cobrança.";
+    }
+    if (priorComplaint === "pending") {
+      return caseData.evaluation?.agreementStatus === "outside_period"
+        ? "Confirme se você já contestou esta cobrança atual com o Itaú."
+        : "Confirme se houve reclamação anterior dentro do prazo do acordo.";
+    }
+    if (priorComplaint === "yes" && !answers.priorComplaintDate) {
+      return "Informe a data da reclamação feita ao Itaú.";
+    }
+    if (priorComplaint === "no" && answers.administrativeDraftRequested === "yes") {
+      return "Revise o rascunho administrativo e registre o envio quando ele for feito.";
+    }
+    if (priorComplaint === "yes" && answers.bankResponseStatus === "pending") {
+      return "Informe se o banco respondeu ou resolveu a contestação.";
+    }
+    if (
+      ["no_response", "rejected", "partial"].includes(answers.bankResponseStatus) &&
+      answers.wantsJec === "yes"
+    ) {
+      return "Prepare o rascunho judicial e abra o portal oficial sem protocolar automaticamente.";
+    }
     return "Há sinal para investigar. O próximo passo é comparar extratos de outros meses.";
   }
   if (candidates.some((candidate) => candidate.answer === "unknown")) {
     return "Procure contrato, apólice ou autorização antes de concluir.";
   }
   return "As cobranças desta evidência foram reconhecidas. Você pode mostrar outra suspeita.";
+}
+
+function itauComplaintQuestion(caseData = {}) {
+  return caseData.evaluation?.agreementStatus === "outside_period"
+    ? "Já reclamou ao Itaú sobre esta cobrança?"
+    : "Reclamou ao banco até 18/12/2025?";
+}
+
+function jecMissingFieldLabel(field) {
+  const labels = {
+    fullName: "nome completo",
+    document: "CPF ou CNPJ",
+    city: "cidade",
+    uf: "estado",
+    address: "endereço completo",
+    email: "e-mail",
+    disputedCharge: "ao menos uma cobrança não reconhecida",
+  };
+  return labels[field] || field;
+}
+
+function shouldShowJecPanel(caseData = {}) {
+  const answers = caseData.answers || {};
+  return (
+    answers.wantsJec === "yes" ||
+    ["no_response", "rejected", "partial"].includes(answers.bankResponseStatus)
+  );
+}
+
+function renderJecAssistedBrowser(state = {}) {
+  const sessionId = state.session?.id || "";
+  if (!sessionId) return "";
+  const cachedSession = assistedRemoteSessions.get(sessionId) || state.session || {};
+  const agentSessionId = state.agent?.id || "";
+  const screenshot = cachedSession.screenshot || "";
+  const status = cachedSession.title || cachedSession.url || "Carregando portal oficial...";
+  return `
+    <section class="jec-assisted-browser assisted-remote-browser" data-assisted-session="${escapeHtml(sessionId)}">
+      <div class="assisted-portal-head">
+        <div>
+          <strong>Portal JEC assistido · ${escapeHtml(state.portal?.tribunal || "")}</strong>
+          <small>A IA pode avançar etapas reversíveis. Login, CAPTCHA, revisão jurídica e protocolo são humanos.</small>
+        </div>
+        <div class="assisted-remote-actions">
+          <button class="secondary-action" type="button" data-assisted-action="refresh">Atualizar tela</button>
+          <button class="secondary-action" type="button" data-assisted-action="recover">Reabrir portal</button>
+          <button class="secondary-action" type="button" data-assisted-action="close">Fechar</button>
+        </div>
+      </div>
+      <div class="assisted-remote-meta">
+        <span>${escapeHtml(state.portal?.name || "Portal oficial")}</span>
+        <span>Envio final bloqueado para a IA</span>
+        <span data-assisted-form-state>${
+          cachedSession.formState?.filledCount
+            ? `${escapeHtml(String(cachedSession.formState.filledCount))} campos preenchidos`
+            : "Lendo campos"
+        }</span>
+      </div>
+      ${renderStateCourtAgentPanel(agentSessionId, {
+        agentStatus: state.agent?.status,
+        agentMessages: state.agent?.messages,
+        agentNextAction: state.agent?.nextAction,
+      })}
+      <div class="jec-human-checkpoint">
+        <strong>Você mantém o controle</strong>
+        <span>${escapeHtml(state.portal?.checkpoint || "Revise o portal antes de continuar.")}</span>
+      </div>
+      <button class="assisted-remote-screen" type="button" data-assisted-action="click" aria-label="Tela remota do portal JEC">
+        <span>${escapeHtml(status)}</span>
+        <img alt="Tela remota do portal JEC" draggable="false" ${screenshot ? `src="${escapeHtml(screenshot)}" data-remote-screenshot="${escapeHtml(screenshot)}"` : ""} />
+      </button>
+      <details class="assisted-manual-controls">
+        <summary>Assumir controle manual</summary>
+        <div class="assisted-remote-type">
+          <input name="remoteText" type="text" autocomplete="off" placeholder="Texto para o campo focado" />
+          <button class="primary-action" type="button" data-assisted-send-text>Enviar texto</button>
+        </div>
+        <div class="assisted-remote-keys">
+          <button class="secondary-action" type="button" data-assisted-key="Enter">Enter</button>
+          <button class="secondary-action" type="button" data-assisted-key="Tab">Tab</button>
+          <button class="secondary-action" type="button" data-assisted-key="Backspace">Backspace</button>
+          <button class="secondary-action" type="button" data-assisted-scroll="-520">Rolar acima</button>
+          <button class="secondary-action" type="button" data-assisted-scroll="520">Rolar abaixo</button>
+        </div>
+      </details>
+    </section>
+  `;
+}
+
+function renderJecPetitionPanel(caseData = {}) {
+  if (!caseData?.id || !shouldShowJecPanel(caseData)) return "";
+  const state = jecCaseStates.get(caseData.id) || {};
+  const claimant = state.claimant || {};
+  const prepared = state.prepared || null;
+  const missingFields = Array.isArray(prepared?.missingFields) ? prepared.missingFields : [];
+  return `
+    <details class="jec-petition-panel" ${state.session ? "open" : ""}>
+      <summary>Juizado Especial · preparação assistida</summary>
+      <p>Use este formulário seguro para preparar o rascunho. Os dados não entram no histórico do chat.</p>
+      ${
+        state.error
+          ? `<div class="jec-form-error" role="alert">${escapeHtml(state.error)}</div>`
+          : ""
+      }
+      <form data-jec-form="${escapeHtml(caseData.id)}">
+        <div class="jec-form-grid">
+          <label>
+            <span>Estado</span>
+            <select name="uf" required>
+              <option value="">Selecione</option>
+              ${["SP", "RJ", "MG", "PR"]
+                .map(
+                  (uf) =>
+                    `<option value="${uf}" ${String(claimant.uf || "") === uf ? "selected" : ""}>${uf}</option>`,
+                )
+                .join("")}
+            </select>
+          </label>
+          <label>
+            <span>Cidade</span>
+            <input name="city" required maxlength="100" value="${escapeHtml(claimant.city || "")}" />
+          </label>
+          <label>
+            <span>Nome completo</span>
+            <input name="fullName" required maxlength="160" value="${escapeHtml(claimant.fullName || "")}" />
+          </label>
+          <label>
+            <span>CPF ou CNPJ</span>
+            <input name="document" required inputmode="numeric" maxlength="18" value="${escapeHtml(claimant.document || "")}" />
+          </label>
+          <label>
+            <span>E-mail</span>
+            <input name="email" required type="email" maxlength="160" value="${escapeHtml(claimant.email || "")}" />
+          </label>
+          <label>
+            <span>Telefone</span>
+            <input name="phone" inputmode="tel" maxlength="40" value="${escapeHtml(claimant.phone || "")}" />
+          </label>
+          <label class="jec-field-wide">
+            <span>Endereço completo</span>
+            <input name="address" required maxlength="240" value="${escapeHtml(claimant.address || "")}" />
+          </label>
+        </div>
+        ${
+          missingFields.length
+            ? `<p class="jec-missing-fields">Revise: ${missingFields
+                .map(jecMissingFieldLabel)
+                .map(escapeHtml)
+                .join(", ")}.</p>`
+            : ""
+        }
+        ${
+          prepared
+            ? `
+              <div class="jec-draft-summary">
+                <strong>${prepared.ready ? "Rascunho pronto para revisão" : "Rascunho preliminar"}</strong>
+                <span>${escapeHtml(prepared.portal?.name || "")}</span>
+                <small>${Number(prepared.disputedCount || 0)} cobrança não reconhecida · ${
+                  Number(prepared.knownAmountCount || 0) > 0
+                    ? escapeHtml(formatChatCurrency(prepared.totalDisputed))
+                    : "valor a confirmar"
+                }</small>
+              </div>
+              <details class="jec-draft-preview">
+                <summary>Revisar rascunho</summary>
+                <pre>${escapeHtml(prepared.draft || "")}</pre>
+              </details>
+              <label class="jec-confirmation">
+                <input name="reviewConfirmed" type="checkbox" />
+                <span>Revisei o rascunho e os dados acima.</span>
+              </label>
+              <label class="jec-confirmation">
+                <input name="transmissionAuthorized" type="checkbox" />
+                <span>Autorizo abrir o portal oficial. Sei que o protocolo final será feito por mim.</span>
+              </label>
+            `
+            : ""
+        }
+        <div class="jec-form-actions">
+          <button class="secondary-action" type="submit" data-jec-action="prepare">Preparar rascunho</button>
+          ${
+            prepared?.ready && !state.session
+              ? `<button class="primary-action" type="submit" data-jec-action="open">Abrir portal assistido</button>`
+              : ""
+          }
+        </div>
+      </form>
+      ${renderJecAssistedBrowser(state)}
+    </details>
+  `;
+}
+
+function getJecStateByAssistedSession(sessionId) {
+  for (const [caseId, state] of jecCaseStates.entries()) {
+    if (state?.session?.id === sessionId) {
+      return { caseId, state };
+    }
+  }
+  return null;
+}
+
+async function closeJecAssistedSession(sessionId) {
+  const entry = getJecStateByAssistedSession(sessionId);
+  const agentSessionId = entry?.state?.agent?.id || "";
+  if (agentSessionId) {
+    await sendStateCourtAgentAction(agentSessionId, { type: "stop" });
+  }
+  const closed = await sendAssistedRemoteAction(sessionId, { type: "close" });
+  if (!closed || !entry) return closed;
+
+  stopAssistedRemoteAutoRefresh(sessionId);
+  assistedRemoteSessions.delete(sessionId);
+  if (agentSessionId) {
+    stopStateCourtAgentAutoRefresh(agentSessionId);
+    stateCourtAgentSessions.delete(agentSessionId);
+  }
+  jecCaseStates.set(entry.caseId, {
+    ...entry.state,
+    session: null,
+    agent: null,
+    error: "",
+  });
+  renderChatWorkspace();
+  return true;
+}
+
+async function pauseJecAgentForManualControl(sessionId) {
+  const entry = getJecStateByAssistedSession(sessionId);
+  const agentSessionId = entry?.state?.agent?.id || "";
+  if (!agentSessionId) return;
+  const agent = stateCourtAgentSessions.get(agentSessionId) || entry.state.agent;
+  if (!["stopped", "waiting_user_action", "waiting_user_input", "blocked", "completed"].includes(agent?.status)) {
+    await sendStateCourtAgentAction(agentSessionId, { type: "stop" });
+  }
 }
 
 function renderItauCaseCard(caseData) {
@@ -2073,6 +2337,8 @@ function renderItauCaseCard(caseData) {
 
       <div class="itau-charge-list">${candidateHtml}</div>
 
+      ${renderJecPetitionPanel(caseData)}
+
       ${
         candidates.length
           ? `
@@ -2082,7 +2348,11 @@ function renderItauCaseCard(caseData) {
                 <p>Use estes campos somente quando a Audita pedir o dado correspondente.</p>
                 <div class="itau-review-grid">
                   <label>
-                    <span>Reclamou ao banco até 18/12/2025?</span>
+                    <span>A cobrança aparece em outros meses?</span>
+                    <select name="historicalEvidence">${itauChoiceOptions(answers.historicalEvidence)}</select>
+                  </label>
+                  <label>
+                    <span>${escapeHtml(itauComplaintQuestion(caseData))}</span>
                     <select name="priorComplaint">${itauChoiceOptions(answers.priorComplaint)}</select>
                   </label>
                   <label>
@@ -2245,6 +2515,7 @@ function renderChatMessages() {
   }
 
   requestAnimationFrame(() => {
+    hydrateAssistedRemoteBrowsers();
     chatMessages.scrollTop = chatMessages.scrollHeight;
   });
 }
@@ -2315,6 +2586,124 @@ async function uploadItauDocument(file) {
     throw error;
   }
   return data.case;
+}
+
+function readJecClaimant(form) {
+  const data = new FormData(form);
+  return {
+    uf: String(data.get("uf") || "").trim().toUpperCase(),
+    city: String(data.get("city") || "").trim(),
+    fullName: String(data.get("fullName") || "").trim(),
+    document: String(data.get("document") || "").trim(),
+    email: String(data.get("email") || "").trim(),
+    phone: String(data.get("phone") || "").trim(),
+    address: String(data.get("address") || "").trim(),
+  };
+}
+
+async function submitJecPetitionForm(form, action) {
+  const caseId = form?.dataset.jecForm || "";
+  const found = findItauCaseMessage(caseId);
+  if (!found?.message?.itauCase) return;
+  const claimant = readJecClaimant(form);
+  const previous = jecCaseStates.get(caseId) || {};
+  const submitButton = form.querySelector(`[data-jec-action="${CSS.escape(action)}"]`);
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = action === "open" ? "Abrindo portal..." : "Preparando...";
+  }
+  jecCaseStates.set(caseId, { ...previous, claimant, error: "" });
+
+  try {
+    const payload = {
+      caseId,
+      caseData: found.message.itauCase,
+      claimant,
+      uf: claimant.uf,
+      city: claimant.city,
+    };
+    if (action === "open") {
+      const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
+      const transmissionAuthorized = Boolean(form.elements.transmissionAuthorized?.checked);
+      if (!reviewConfirmed || !transmissionAuthorized) {
+        throw new Error("Confirme a revisão e a autorização antes de abrir o portal.");
+      }
+      const response = await fetch("/api/jec/sessions", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          reviewConfirmed,
+          transmissionAuthorized,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        showLogin("Entre para abrir o portal assistido.");
+        return;
+      }
+      if (!response.ok) {
+        const missing = Array.isArray(data.missingFields)
+          ? ` Revise: ${data.missingFields.map(jecMissingFieldLabel).join(", ")}.`
+          : "";
+        throw new Error(
+          data.message || `Não foi possível abrir o portal oficial.${missing}`,
+        );
+      }
+      if (data.session?.id) {
+        assistedRemoteSessions.set(data.session.id, data.session);
+      }
+      if (data.agent?.id) {
+        stateCourtAgentSessions.set(data.agent.id, data.agent);
+      }
+      jecCaseStates.set(caseId, {
+        ...previous,
+        claimant,
+        prepared: previous.prepared,
+        session: data.session,
+        agent: data.agent,
+        portal: data.portal,
+        error: "",
+      });
+      renderChatWorkspace();
+      return;
+    }
+
+    const response = await fetch("/api/jec/petitions/prepare", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showLogin("Entre para preparar o rascunho.");
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(data.message || "Não foi possível preparar o rascunho agora.");
+    }
+    jecCaseStates.set(caseId, {
+      ...previous,
+      claimant,
+      prepared: data.prepared,
+      portal: data.prepared?.portal,
+      error: "",
+    });
+    renderChatWorkspace();
+  } catch (error) {
+    jecCaseStates.set(caseId, {
+      ...previous,
+      claimant,
+      error: error instanceof Error ? error.message : "Falha ao preparar o fluxo JEC.",
+    });
+    renderChatWorkspace();
+  } finally {
+    if (submitButton?.isConnected) {
+      submitButton.disabled = false;
+      submitButton.textContent =
+        action === "open" ? "Abrir portal assistido" : "Preparar rascunho";
+    }
+  }
 }
 
 function inferChatAttachmentType(file) {
@@ -2417,6 +2806,13 @@ async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment)
         setChatError(errorMessages[data.error] || "Nao foi possivel concluir esta resposta agora.");
       }
       return;
+    }
+
+    if (data.itauCase?.id) {
+      const synchronized = findItauCaseMessage(data.itauCase.id);
+      if (synchronized) {
+        synchronized.message.itauCase = data.itauCase;
+      }
     }
 
     thread.messages.push({
@@ -2564,6 +2960,7 @@ async function submitItauCaseReview(form) {
     candidateAnswers: Object.fromEntries(
       found.message.itauCase.candidates.map((candidate) => [candidate.id, candidate.answer]),
     ),
+    historicalEvidence: String(formData.get("historicalEvidence") || "pending"),
     priorComplaint: String(formData.get("priorComplaint") || "pending"),
     priorComplaintDate: String(formData.get("priorComplaintDate") || ""),
     priorComplaintProtocol: String(formData.get("priorComplaintProtocol") || ""),
@@ -2614,6 +3011,78 @@ async function submitItauCaseReview(form) {
 }
 
 chatMessages?.addEventListener("click", async (event) => {
+  const remotePanel = event.target.closest("[data-assisted-session]");
+  if (remotePanel) {
+    const sessionId = remotePanel.dataset.assistedSession;
+    const agentButton = event.target.closest("[data-state-court-agent-action]");
+    if (agentButton) {
+      const agentPanel = agentButton.closest("[data-state-court-agent-session]");
+      const agentSessionId = agentPanel?.dataset.stateCourtAgentSession;
+      const action = agentButton.dataset.stateCourtAgentAction;
+      if (action === "message") {
+        const input = agentPanel?.querySelector("input[name='stateCourtAgentMessage']");
+        const message = input?.value || "";
+        if (!message.trim()) return;
+        input.value = "";
+        await sendStateCourtAgentAction(agentSessionId, { type: "message", message });
+        return;
+      }
+      await sendStateCourtAgentAction(agentSessionId, { type: action });
+      return;
+    }
+
+    const keyButton = event.target.closest("[data-assisted-key]");
+    if (keyButton) {
+      await pauseJecAgentForManualControl(sessionId);
+      await sendAssistedRemoteAction(sessionId, {
+        type: "press",
+        key: keyButton.dataset.assistedKey,
+      });
+      return;
+    }
+    const scrollButton = event.target.closest("[data-assisted-scroll]");
+    if (scrollButton) {
+      await pauseJecAgentForManualControl(sessionId);
+      await sendAssistedRemoteAction(sessionId, {
+        type: "scroll",
+        deltaY: Number(scrollButton.dataset.assistedScroll || 0),
+      });
+      return;
+    }
+    const sendTextButton = event.target.closest("[data-assisted-send-text]");
+    if (sendTextButton) {
+      await pauseJecAgentForManualControl(sessionId);
+      await sendAssistedRemoteTextFromControl(sendTextButton);
+      return;
+    }
+    const assistedAction = event.target.closest("[data-assisted-action]");
+    if (assistedAction) {
+      const action = assistedAction.dataset.assistedAction;
+      if (action === "refresh") {
+        await loadAssistedRemoteSession(sessionId, { force: true });
+      } else if (action === "recover") {
+        await sendAssistedRemoteAction(sessionId, { type: "recover" });
+      } else if (action === "close") {
+        if (getJecStateByAssistedSession(sessionId)) {
+          await closeJecAssistedSession(sessionId);
+        } else {
+          await sendAssistedRemoteAction(sessionId, { type: "close" });
+        }
+      } else if (action === "click") {
+        const point = getAssistedRemotePoint(assistedAction, event);
+        if (!point) return;
+        await pauseJecAgentForManualControl(sessionId);
+        setActiveAssistedRemotePanel(remotePanel);
+        await sendAssistedRemoteAction(sessionId, {
+          type: "click",
+          x: point.x,
+          y: point.y,
+        });
+      }
+      return;
+    }
+  }
+
   const recognitionButton = event.target.closest("[data-itau-answer]");
   if (recognitionButton) {
     const found = findItauCaseMessage(recognitionButton.dataset.itauCase || "");
@@ -2694,6 +3163,13 @@ chatMessages?.addEventListener("click", async (event) => {
 });
 
 chatMessages?.addEventListener("submit", (event) => {
+  const jecForm = event.target.closest("[data-jec-form]");
+  if (jecForm) {
+    event.preventDefault();
+    const action = event.submitter?.dataset.jecAction || "prepare";
+    submitJecPetitionForm(jecForm, action);
+    return;
+  }
   const form = event.target.closest("[data-itau-review-form]");
   if (!form) return;
   event.preventDefault();
@@ -3540,7 +4016,7 @@ async function sendStateCourtAgentAction(sessionId, action) {
 }
 
 async function sendAssistedRemoteAction(sessionId, action) {
-  if (!sessionId) return;
+  if (!sessionId) return false;
   const panel = document.querySelector(`[data-assisted-session="${CSS.escape(sessionId)}"]`);
   const status = panel?.querySelector(".assisted-remote-screen span");
   const cached = assistedRemoteSessions.get(sessionId);
@@ -3553,7 +4029,7 @@ async function sendAssistedRemoteAction(sessionId, action) {
     });
     if (response.status === 401) {
       showLogin("Entre para controlar a sessao assistida.");
-      return;
+      return false;
     }
     if (!response.ok) {
       if (status) {
@@ -3564,12 +4040,14 @@ async function sendAssistedRemoteAction(sessionId, action) {
               ? "Nao foi possivel recuperar o portal."
               : "Comando nao executado.";
       }
-      return;
+      return false;
     }
     const data = await response.json();
     updateAssistedRemotePanel(sessionId, data.session);
+    return true;
   } catch {
     if (status) status.textContent = "Falha ao enviar comando.";
+    return false;
   }
 }
 
@@ -4277,7 +4755,7 @@ async function loadCnibResult(consultaId, attempts = 60) {
       if (cnibError) {
         cnibError.textContent = "Nao foi possivel acompanhar a consulta CNIB.";
       }
-      return;
+      return false;
     }
     const audit = await response.json();
     renderCnibResult(audit);

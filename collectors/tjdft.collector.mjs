@@ -1521,7 +1521,19 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
   }
 }
 
-function createAssistedSession({ browser, context, courtName, courtUf, portalUrl, input, profile, results }) {
+function createAssistedSession({
+  browser,
+  context,
+  courtName,
+  courtUf,
+  portalUrl,
+  input = {},
+  profile,
+  results,
+  owner = null,
+  purpose = "state_certificate",
+  finalSubmissionHumanOnly = false,
+}) {
   const sessionId = cryptoRandomId();
   const session = {
     browser,
@@ -1529,9 +1541,12 @@ function createAssistedSession({ browser, context, courtName, courtUf, portalUrl
     courtName,
     courtUf,
     portalUrl,
-    consultaId: input.consultaId,
+    consultaId: input?.consultaId,
     input,
     profile,
+    owner,
+    purpose,
+    finalSubmissionHumanOnly,
     createdAt: new Date().toISOString(),
     results,
     downloads: [],
@@ -1572,6 +1587,17 @@ async function recordAssistedSessionDownload(session, download) {
 
 function getAssistedSession(sessionId) {
   return assistedSessions.get(String(sessionId || ""));
+}
+
+function assistedSessionForbidden(session, auth) {
+  if (!session?.owner || !auth) return false;
+  const ownerTenant = String(session.owner.tenantId || "");
+  const ownerUser = String(session.owner.userId || "");
+  const authTenant = String(auth.tenantId || "");
+  const authUser = String(auth.userId || auth.user?.id || "");
+  if (ownerTenant && ownerTenant !== authTenant) return true;
+  if (ownerUser && ownerUser !== authUser) return true;
+  return false;
 }
 
 function getAssistedSessionPage(session) {
@@ -1771,10 +1797,13 @@ function mergeAssistedFormStates(mainState, frameStates) {
   };
 }
 
-export async function getAssistedSessionView(sessionId) {
+export async function getAssistedSessionView(sessionId, auth) {
   const session = getAssistedSession(sessionId);
   if (!session) {
     return { notFound: true };
+  }
+  if (assistedSessionForbidden(session, auth)) {
+    return { forbidden: true };
   }
   const page = getAssistedSessionPage(session);
   if (!page) {
@@ -1786,6 +1815,8 @@ export async function getAssistedSessionView(sessionId) {
       portalUrl: session.portalUrl,
       consultaId: session.consultaId,
       createdAt: session.createdAt,
+      purpose: session.purpose,
+      finalSubmissionHumanOnly: session.finalSubmissionHumanOnly,
     };
   }
 
@@ -1873,6 +1904,8 @@ export async function getAssistedSessionView(sessionId) {
     portalUrl: session.portalUrl,
     consultaId: session.consultaId,
     createdAt: session.createdAt,
+    purpose: session.purpose,
+    finalSubmissionHumanOnly: session.finalSubmissionHumanOnly,
     title: await page.title().catch(() => ""),
     url: page.url(),
     viewport,
@@ -1882,10 +1915,13 @@ export async function getAssistedSessionView(sessionId) {
   };
 }
 
-export async function interactAssistedSession(sessionId, action = {}) {
+export async function interactAssistedSession(sessionId, action = {}, auth) {
   const session = getAssistedSession(sessionId);
   if (!session) {
     return { notFound: true };
+  }
+  if (assistedSessionForbidden(session, auth)) {
+    return { forbidden: true };
   }
   const page = getAssistedSessionPage(session);
   if (!page) {
@@ -1893,6 +1929,27 @@ export async function interactAssistedSession(sessionId, action = {}) {
   }
 
   const type = String(action.type || "").trim();
+  const isJecSession = session.purpose === "jec_petition";
+  const actionLabel = String(action.label || action.text || action.name || "");
+  if (isJecSession && type === "submit") {
+    return { invalid: true, reason: "final_submission_requires_human" };
+  }
+  if (
+    isJecSession &&
+    type === "clickText" &&
+    /enviar\s*formul[aá]rio|protocolar|ajuizar|assinar|confirmar\s*envio|finalizar\s*(?:pedido|peti[cç][aã]o|processo)/i.test(
+      actionLabel,
+    )
+  ) {
+    return { invalid: true, reason: "final_submission_requires_human" };
+  }
+  if (
+    isJecSession &&
+    String(action.actor || "").toLowerCase() === "agent" &&
+    ["click", "drag"].includes(type)
+  ) {
+    return { invalid: true, reason: "agent_coordinate_click_disabled_for_jec" };
+  }
   if (type === "click") {
     await page.mouse.click(Number(action.x || 0), Number(action.y || 0));
   } else if (type === "drag") {
@@ -2578,10 +2635,13 @@ async function typeAssistedSessionText(page, text) {
   return true;
 }
 
-export async function inspectAssistedSessionResult(sessionId) {
+export async function inspectAssistedSessionResult(sessionId, auth) {
   const session = getAssistedSession(sessionId);
   if (!session) {
     return { notFound: true };
+  }
+  if (assistedSessionForbidden(session, auth)) {
+    return { forbidden: true };
   }
   const page = getAssistedSessionPage(session);
   if (!page) {
@@ -3033,15 +3093,101 @@ function assistedPdfFileName(session, link) {
     .replace(/-+/g, "-");
 }
 
-export async function closeAssistedSession(sessionId) {
+export async function closeAssistedSession(sessionId, auth) {
   const session = getAssistedSession(sessionId);
   if (!session) {
     return { notFound: true };
+  }
+  if (assistedSessionForbidden(session, auth)) {
+    return { forbidden: true };
   }
   assistedSessions.delete(String(sessionId || ""));
   await session.context?.close?.().catch(() => {});
   await session.browser?.close?.().catch(() => {});
   return { id: sessionId, ok: true, closed: true };
+}
+
+export async function openAssistedBrowserSession({
+  portalUrl,
+  courtName,
+  courtUf,
+  input = {},
+  profile = {},
+  results = [],
+  owner = null,
+  purpose = "generic_assisted",
+  allowedHosts = [],
+  finalSubmissionHumanOnly = false,
+} = {}) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(String(portalUrl || ""));
+  } catch {
+    return { invalid: true, reason: "invalid_portal_url" };
+  }
+  const normalizedHosts = allowedHosts.map((host) => String(host || "").trim().toLowerCase()).filter(Boolean);
+  if (
+    parsedUrl.protocol !== "https:" ||
+    (normalizedHosts.length && !normalizedHosts.includes(parsedUrl.hostname.toLowerCase()))
+  ) {
+    return { invalid: true, reason: "portal_not_allowed" };
+  }
+
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return { unavailable: true, reason: "playwright_not_installed" };
+  }
+
+  const browser = await chromium.launch({
+    headless: getAssistedHeadless(profile),
+    slowMo: envNumber("ASSISTED_BROWSER_SLOW_MO_MS", 0),
+  });
+  const context = await browser.newContext({
+    acceptDownloads: true,
+    ignoreHTTPSErrors: true,
+    locale: "pt-BR",
+    timezoneId: "America/Sao_Paulo",
+    viewport: { width: 1365, height: 768 },
+    userAgent: STANDARD_CHROME_USER_AGENT,
+    extraHTTPHeaders: {
+      "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+    },
+  });
+
+  try {
+    const page = await context.newPage();
+    await page.goto(parsedUrl.href, {
+      waitUntil: "domcontentloaded",
+      timeout: envNumber("ASSISTED_BROWSER_NAV_TIMEOUT_MS", 45_000),
+    });
+    const sessionId = createAssistedSession({
+      browser,
+      context,
+      courtName,
+      courtUf,
+      portalUrl: parsedUrl.href,
+      input,
+      profile,
+      results,
+      owner,
+      purpose,
+      finalSubmissionHumanOnly,
+    });
+    return {
+      sessionId,
+      session: await getAssistedSessionView(sessionId),
+    };
+  } catch (error) {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+    return {
+      failed: true,
+      reason: "portal_navigation_failed",
+      message: error instanceof Error ? error.message : "Falha ao abrir o portal.",
+    };
+  }
 }
 
 function cryptoRandomId() {

@@ -3,6 +3,7 @@ import { extractOpenAIUsage } from "./api-usage.service.mjs";
 const DEFAULT_AGENT_ASSISTED_UFS = "AC,AP,MG,MT,PA,PI,RJ,RN,RO,RR,RS,SC";
 const agentSessions = new Map();
 const runningAgentTasks = new Map();
+const runningAgentControllers = new Map();
 
 function envNumber(name, fallback) {
   const parsed = Number(process.env[name]);
@@ -188,6 +189,7 @@ export function createStateCourtAgentSession({
   requestedCertificates,
   getView,
   interact,
+  owner = null,
 }) {
   const id = agentSessionId();
   const documentValue =
@@ -207,6 +209,7 @@ export function createStateCourtAgentSession({
     requestedCertificates,
     getView,
     interact,
+    owner,
     messages: [],
     nextAction: "agent_continue",
     result: null,
@@ -226,12 +229,32 @@ export function getStateCourtAgentSession(sessionId) {
   return publicSession(agentSessions.get(String(sessionId || "")));
 }
 
-export async function handleStateCourtAgentAction(sessionId, action = {}) {
+function agentSessionForbidden(session, auth) {
+  if (!session?.owner || !auth) return false;
+  const ownerTenant = String(session.owner.tenantId || "");
+  const ownerUser = String(session.owner.userId || "");
+  const authTenant = String(auth.tenantId || "");
+  const authUser = String(auth.userId || auth.user?.id || "");
+  if (ownerTenant && ownerTenant !== authTenant) return true;
+  if (ownerUser && ownerUser !== authUser) return true;
+  return false;
+}
+
+export function getOwnedStateCourtAgentSession(sessionId, auth) {
+  const session = agentSessions.get(String(sessionId || ""));
+  if (!session) return null;
+  if (agentSessionForbidden(session, auth)) return { forbidden: true };
+  return publicSession(session);
+}
+
+export async function handleStateCourtAgentAction(sessionId, action = {}, auth) {
   const session = agentSessions.get(String(sessionId || ""));
   if (!session) return { notFound: true };
+  if (agentSessionForbidden(session, auth)) return { forbidden: true };
 
   const type = String(action.type || action.action || "").trim();
   if (type === "stop") {
+    runningAgentControllers.get(session.id)?.abort("user_stop");
     session.status = "stopped";
     session.nextAction = "";
     addMessage(session, "system", "Agente parado pelo usuario.");
@@ -271,14 +294,13 @@ export function startStateCourtAgentSession(sessionId, options = {}) {
     return publicSession(session);
   }
   const timeoutMs = envNumber("STATE_COURT_AGENT_RUN_TIMEOUT_MS", 180000);
-  const hardTimeout = setTimeout(() => {
-    if (session.status === "running") {
-      session.status = "blocked";
-      session.nextAction = "agent_continue";
-      addMessage(session, "system", `Agente excedeu ${Math.round(timeoutMs / 1000)}s. A sessao assistida continua aberta para uso manual ou nova tentativa.`);
-    }
-  }, timeoutMs + 2500);
-  const task = runStateCourtAgentSession(session, options)
+  const controller = new AbortController();
+  runningAgentControllers.set(session.id, controller);
+  const hardTimeout = setTimeout(() => controller.abort("timeout"), timeoutMs);
+  const task = runStateCourtAgentSession(session, {
+    ...options,
+    signal: controller.signal,
+  })
     .catch((error) => {
       const message = error instanceof Error ? error.message : "erro desconhecido";
       const aborted = /aborted|abort/i.test(message);
@@ -295,12 +317,15 @@ export function startStateCourtAgentSession(sessionId, options = {}) {
     .finally(() => {
       clearTimeout(hardTimeout);
       runningAgentTasks.delete(session.id);
+      if (runningAgentControllers.get(session.id) === controller) {
+        runningAgentControllers.delete(session.id);
+      }
     });
   runningAgentTasks.set(session.id, task);
   return publicSession(session);
 }
 
-async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
+async function runStateCourtAgentSession(session, { userMessage = "", signal } = {}) {
   if (session.status === "running") return;
   const preferredApiKeyRef = process.env.STATE_COURT_AGENT_API_KEY_SECRET || "AUDITA_OPENAI_API_KEY";
   const apiKeyRef = process.env[preferredApiKeyRef]
@@ -333,8 +358,14 @@ async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
       instructions: buildStateCourtAgentInstructions(session),
       tools,
     });
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), envNumber("STATE_COURT_AGENT_RUN_TIMEOUT_MS", 180000));
+    const localController = signal ? null : new AbortController();
+    const runSignal = signal || localController.signal;
+    const localTimeout = localController
+      ? setTimeout(
+          () => localController.abort("timeout"),
+          envNumber("STATE_COURT_AGENT_RUN_TIMEOUT_MS", 180000),
+        )
+      : null;
     const runner = new Runner({
       modelProvider: new OpenAIProvider({
         apiKey,
@@ -348,10 +379,10 @@ async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
     try {
       result = await runner.run(agent, buildAgentInput(session), {
         maxTurns: envNumber("STATE_COURT_AGENT_MAX_TURNS", 24),
-        signal: controller.signal,
+        signal: runSignal,
       });
     } finally {
-      clearTimeout(timeout);
+      if (localTimeout) clearTimeout(localTimeout);
     }
     const finalText = String(result?.finalOutput || "").trim();
     await recordAgentUsage(session, {
@@ -371,9 +402,22 @@ async function runStateCourtAgentSession(session, { userMessage = "" } = {}) {
       requestCount: 1,
       status: error?.name === "AbortError" ? "cancelled" : "failed",
     });
+    if (session.status === "stopped") {
+      return;
+    }
+    const aborted =
+      signal?.aborted ||
+      error?.name === "AbortError" ||
+      /aborted|abort/i.test(String(error?.message || ""));
     session.status = "blocked";
-    session.nextAction = "manual_review";
-    addMessage(session, "system", `Falha ao executar agente: ${error instanceof Error ? error.message : "erro desconhecido"}.`);
+    session.nextAction = aborted ? "agent_continue" : "manual_review";
+    addMessage(
+      session,
+      "system",
+      aborted
+        ? "Agente atingiu o limite desta rodada. A sessao oficial continua aberta; use Devolver ao agente para retomar."
+        : `Falha ao executar agente: ${error instanceof Error ? error.message : "erro desconhecido"}.`,
+    );
   }
 }
 
@@ -396,6 +440,21 @@ async function recordAgentUsage(session, usage) {
 }
 
 function buildStateCourtAgentInstructions(session) {
+  if (session.profile?.agentPurpose === "jec_petition") {
+    return [
+      "Voce e o copiloto navegador do Audita para iniciar uma peticao no Juizado Especial Civel.",
+      "Seu objetivo e avancar com seguranca, preencher apenas dados recebidos e registrar claramente o ponto de parada.",
+      "Nunca invente fatos, pedidos, valores, competencia, classe, assunto, dados pessoais ou documentos.",
+      "Nunca clique no comando final de enviar, protocolar, ajuizar, assinar ou confirmar a peticao.",
+      "Pare em login, gov.br, CAPTCHA, certificado, upload sensivel, pagamento, ambiguidade juridica e revisao final.",
+      "Use handoff_human para pedir a intervencao da pessoa e explique uma unica acao objetiva.",
+      "Prefira observar, preencher por rotulo, selecionar por rotulo e clicar por texto.",
+      "Nao use clique por coordenadas neste fluxo.",
+      String(session.profile?.agentInstructions || ""),
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
   return [
     "Voce e um agente navegador do Audita para portais oficiais de tribunais estaduais.",
     "Objetivo: avancar a emissao de certidoes oficiais usando dados pre-carregados e registrar o ponto de parada.",
@@ -603,7 +662,7 @@ function buildAgentTools({ session, tool, z }) {
           };
         }
         addMessage(session, "tool", `Clique por texto: ${label}${reason ? ` (${reason})` : ""}.`);
-        return summarizeToolView(await session.interact(session.assistedSession, { type: "clickText", label }));
+        return summarizeToolView(await session.interact(session.assistedSession, { type: "clickText", label, actor: "agent" }));
       },
     }),
     tool({
@@ -613,7 +672,7 @@ function buildAgentTools({ session, tool, z }) {
       execute: async ({ label, value, reason }) => {
         const safeValue = normalizeToolFieldValue(session, label, value);
         addMessage(session, "tool", `Campo preenchido por rotulo: ${label}${reason ? ` (${reason})` : ""}.`);
-        return summarizeToolView(await session.interact(session.assistedSession, { type: "fillField", label, value: safeValue }));
+        return summarizeToolView(await session.interact(session.assistedSession, { type: "fillField", label, value: safeValue, actor: "agent" }));
       },
     }),
     tool({
@@ -622,7 +681,7 @@ function buildAgentTools({ session, tool, z }) {
       parameters: z.object({ label: z.string(), value: z.string(), reason: z.string().optional() }),
       execute: async ({ label, value, reason }) => {
         addMessage(session, "tool", `Selecao por rotulo: ${label} = ${value}${reason ? ` (${reason})` : ""}.`);
-        return summarizeToolView(await session.interact(session.assistedSession, { type: "selectField", label, value }));
+        return summarizeToolView(await session.interact(session.assistedSession, { type: "selectField", label, value, actor: "agent" }));
       },
     }),
     tool({
@@ -631,7 +690,7 @@ function buildAgentTools({ session, tool, z }) {
       parameters: z.object({ x: z.number(), y: z.number(), reason: z.string().optional() }),
       execute: async ({ x, y, reason }) => {
         addMessage(session, "tool", `Clique solicitado pelo agente: ${reason || `${x},${y}`}.`);
-        return summarizeToolView(await session.interact(session.assistedSession, { type: "click", x, y }));
+        return summarizeToolView(await session.interact(session.assistedSession, { type: "click", x, y, actor: "agent" }));
       },
     }),
     tool({
@@ -640,7 +699,7 @@ function buildAgentTools({ session, tool, z }) {
       parameters: z.object({ text: z.string(), reason: z.string().optional() }),
       execute: async ({ text, reason }) => {
         addMessage(session, "tool", `Texto enviado ao campo focado: ${reason || "preenchimento"}.`);
-        return summarizeToolView(await session.interact(session.assistedSession, { type: "type", text }));
+        return summarizeToolView(await session.interact(session.assistedSession, { type: "type", text, actor: "agent" }));
       },
     }),
     tool({
@@ -649,7 +708,7 @@ function buildAgentTools({ session, tool, z }) {
       parameters: z.object({ key: z.string(), reason: z.string().optional() }),
       execute: async ({ key, reason }) => {
         addMessage(session, "tool", `Tecla enviada: ${key}${reason ? ` (${reason})` : ""}.`);
-        return summarizeToolView(await session.interact(session.assistedSession, { type: "press", key }));
+        return summarizeToolView(await session.interact(session.assistedSession, { type: "press", key, actor: "agent" }));
       },
     }),
     tool({
@@ -658,7 +717,7 @@ function buildAgentTools({ session, tool, z }) {
       parameters: z.object({ deltaY: z.number(), reason: z.string().optional() }),
       execute: async ({ deltaY, reason }) => {
         addMessage(session, "tool", `Rolagem solicitada: ${deltaY}${reason ? ` (${reason})` : ""}.`);
-        return summarizeToolView(await session.interact(session.assistedSession, { type: "scroll", deltaY }));
+        return summarizeToolView(await session.interact(session.assistedSession, { type: "scroll", deltaY, actor: "agent" }));
       },
     }),
     tool({
