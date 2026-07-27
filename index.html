@@ -168,9 +168,17 @@
             <div class="chat-error hidden" id="chatError" role="alert"></div>
             <form class="chat-composer" id="chatForm">
               <div class="chat-attachment-preview hidden" id="chatAttachmentPreview"></div>
-              <label class="chat-attach-button" for="chatAttachment" aria-label="Anexar evid&ecirc;ncia" title="Anexar evid&ecirc;ncia">
-                <span aria-hidden="true">+</span>
-              </label>
+              <button
+                class="chat-attach-button"
+                id="chatAttachmentButton"
+                type="button"
+                aria-controls="chatAttachment"
+                aria-label="Enviar anexo"
+                title="Enviar anexo"
+              >
+                <span class="chat-attach-icon" aria-hidden="true">+</span>
+                <span>Enviar anexo</span>
+              </button>
               <input
                 class="hidden"
                 id="chatAttachment"

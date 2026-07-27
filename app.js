@@ -89,6 +89,7 @@ const chatSendButton = document.querySelector("#chatSendButton");
 const chatError = document.querySelector("#chatError");
 const chatSuggestionButtons = document.querySelectorAll("[data-chat-prompt]");
 const chatAttachment = document.querySelector("#chatAttachment");
+const chatAttachmentButton = document.querySelector("#chatAttachmentButton");
 const chatAttachmentPreview = document.querySelector("#chatAttachmentPreview");
 const operationsPages = document.querySelector("#operationsPages");
 const consultationForm = document.querySelector("#consultationForm");
@@ -2569,6 +2570,7 @@ function renderChatMessages() {
 function renderChatWorkspace() {
   renderChatThreads();
   renderChatMessages();
+  renderChatAttachmentControl();
 }
 
 function setChatError(message = "") {
@@ -2612,6 +2614,15 @@ function renderPendingChatAttachment() {
         <button type="button" data-chat-remove-attachment aria-label="Remover arquivo" title="Remover arquivo">&times;</button>
       `
     : "";
+}
+
+function renderChatAttachmentControl() {
+  const isLoading = chatSending && chatSendingThreadId === getCurrentChatThread()?.id;
+  if (chatAttachmentButton) {
+    chatAttachmentButton.disabled = isLoading;
+    chatAttachmentButton.setAttribute("aria-busy", isLoading ? "true" : "false");
+  }
+  if (chatAttachment) chatAttachment.disabled = isLoading;
 }
 
 async function uploadItauDocument(file) {
@@ -2917,6 +2928,10 @@ chatForm?.addEventListener("submit", (event) => {
   if (chatInput) chatInput.value = "";
   resizeChatInput();
   sendChatMessage(content);
+});
+
+chatAttachmentButton?.addEventListener("click", () => {
+  if (!chatAttachmentButton.disabled) chatAttachment?.click();
 });
 
 chatAttachment?.addEventListener("change", () => {

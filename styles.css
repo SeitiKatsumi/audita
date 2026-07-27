@@ -4561,7 +4561,7 @@ body[data-active-page="chat"] .workspace {
   display: grid;
   width: min(900px, calc(100% - 36px));
   min-height: 58px;
-  grid-template-columns: 40px minmax(0, 1fr) 42px;
+  grid-template-columns: auto minmax(0, 1fr) 42px;
   gap: 8px;
   align-items: end;
   margin: 0 auto 32px;
@@ -4573,23 +4573,41 @@ body[data-active-page="chat"] .workspace {
 }
 
 .chat-attach-button {
-  display: grid;
-  width: 40px;
+  display: inline-flex;
+  min-width: 124px;
   height: 40px;
   align-self: end;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
   border: 1px solid rgba(143, 215, 255, 0.28);
   border-radius: 7px;
   color: var(--aqua);
-  font-size: 1.35rem;
-  font-weight: 500;
+  font-size: 0.78rem;
+  font-weight: 700;
   cursor: pointer;
   background: rgba(73, 169, 255, 0.06);
 }
 
-.chat-attach-button:hover {
+.chat-attach-icon {
+  font-size: 1.15rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.chat-attach-button:hover:not(:disabled) {
   border-color: rgba(143, 215, 255, 0.58);
   background: rgba(73, 169, 255, 0.12);
+}
+
+.chat-attach-button:disabled {
+  cursor: wait;
+  opacity: 0.52;
+}
+
+.chat-attach-button[aria-busy="true"] .chat-attach-icon {
+  animation: chatThinking 1.1s ease-in-out infinite;
 }
 
 .chat-attachment-preview {
@@ -4780,6 +4798,12 @@ body[data-active-page="chat"] .workspace {
 
   .chat-tools-button {
     padding-inline: 9px;
+  }
+
+  .chat-attach-button {
+    min-width: 116px;
+    padding-inline: 10px;
+    font-size: 0.74rem;
   }
 
   .chat-message-row {
