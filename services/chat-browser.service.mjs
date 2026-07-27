@@ -455,6 +455,10 @@ export function createChatBrowserService({
       sessions.set(id, session);
       return { sessionId: id, session: publicSession(session) };
     } catch (error) {
+      console.error("[chat-browser] Steel session startup failed", {
+        stage: providerSession?.id ? "connect_or_navigate" : "create_session",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
       await browser?.close().catch(() => {});
       if (providerSession?.id) {
         await fetchImpl(`${baseUrl}/v1/sessions/${encodeURIComponent(providerSession.id)}/release`, {
