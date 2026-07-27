@@ -272,6 +272,91 @@ function formatPetitionMoney(value) {
     : "";
 }
 
+function formatSuggestedMoney(value) {
+  return Number.isFinite(value) ? formatPetitionMoney(value) : "";
+}
+
+export function suggestJecClaimValues({ caseData = {}, claimant = {} } = {}) {
+  const disputed = (Array.isArray(caseData?.candidates) ? caseData.candidates : []).filter(
+    (candidate) => candidate?.answer === "not_recognized",
+  );
+  const knownAmounts = disputed
+    .map((candidate) => normalizeMoney(candidate?.amount))
+    .filter((amount) => Number.isFinite(amount) && amount > 0);
+  const evidencedPrincipal = Number(
+    knownAmounts.reduce((total, amount) => total + amount, 0).toFixed(2),
+  );
+  const hasEvidencedAmount = evidencedPrincipal > 0;
+
+  const suppliedDoubleRefund = normalizeMoney(claimant.doubleRefundAmount);
+  const suppliedLostProfits =
+    normalizeMoney(claimant.lostProfitsAmount) ??
+    normalizeMoney(caseData?.answers?.reportedLostProfitsAmount);
+  const suppliedMoralDamages =
+    normalizeMoney(claimant.moralDamagesAmount) ??
+    normalizeMoney(caseData?.answers?.requestedMoralDamagesAmount);
+  const suppliedCaseValue = normalizeMoney(claimant.caseValue);
+
+  const doubleRefundAmount =
+    suppliedDoubleRefund ??
+    (hasEvidencedAmount ? Number((evidencedPrincipal * 2).toFixed(2)) : null);
+  const lostProfitsAmount = suppliedLostProfits ?? 0;
+  const moralDamagesAmount = suppliedMoralDamages ?? 0;
+  const calculatedCaseValue =
+    Number.isFinite(doubleRefundAmount)
+      ? Number((doubleRefundAmount + lostProfitsAmount + moralDamagesAmount).toFixed(2))
+      : null;
+  const caseValue = suppliedCaseValue ?? calculatedCaseValue;
+
+  const historicalEvidence = String(caseData?.answers?.historicalEvidence || "pending");
+  const historicalDocuments = String(
+    caseData?.answers?.historicalDocumentsAvailable || "pending",
+  );
+  const notes = [];
+
+  if (hasEvidencedAmount) {
+    notes.push(
+      `Repetição em dobro estimada sobre R$ ${formatSuggestedMoney(evidencedPrincipal)} em cobranças não reconhecidas com valor identificado.`,
+    );
+  } else {
+    notes.push(
+      "Não foi sugerido valor de repetição em dobro porque nenhuma cobrança não reconhecida possui valor identificado.",
+    );
+  }
+  notes.push(
+    suppliedLostProfits !== null
+      ? "Lucros cessantes mantidos conforme o valor informado para revisão."
+      : "Lucros cessantes sugeridos como R$ 0,00 porque não há perda de renda quantificada no caso.",
+  );
+  notes.push(
+    suppliedMoralDamages !== null
+      ? "Danos morais mantidos conforme o valor informado para revisão."
+      : "Danos morais sugeridos como R$ 0,00 porque dependem dos fatos e de revisão jurídica individual.",
+  );
+  if (historicalEvidence === "yes" && historicalDocuments !== "yes") {
+    notes.push(
+      "O relato de cobranças recorrentes não entrou no cálculo porque os extratos históricos ainda não foram apresentados.",
+    );
+  }
+
+  return {
+    source: "audita_case_analysis",
+    reviewRequired: true,
+    evidencedPrincipal,
+    disputedCount: disputed.length,
+    knownAmountCount: knownAmounts.length,
+    values: {
+      doubleRefundAmount: formatSuggestedMoney(doubleRefundAmount),
+      lostProfitsAmount: formatSuggestedMoney(lostProfitsAmount),
+      moralDamagesAmount: formatSuggestedMoney(moralDamagesAmount),
+      caseValue: formatSuggestedMoney(caseValue),
+    },
+    notes,
+    disclaimer:
+      "Estimativa inicial baseada apenas nos fatos e valores disponíveis. A repetição em dobro, os danos e o valor da causa dependem de revisão jurídica e decisão judicial.",
+  };
+}
+
 function formatPetitionDate(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";

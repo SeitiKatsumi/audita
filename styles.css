@@ -4800,6 +4800,37 @@ body[data-active-page="chat"] .workspace {
   line-height: 1.45;
 }
 
+.jec-ai-suggestion {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(82, 230, 166, 0.28);
+  border-radius: 6px;
+  background: rgba(13, 74, 67, 0.22);
+}
+
+.jec-ai-suggestion strong {
+  color: #6fffc1;
+  font-size: 0.74rem;
+}
+
+.jec-ai-suggestion ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: #c7e6ed;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.jec-ai-suggestion small {
+  color: #8eb7c8;
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
 .jec-form-actions {
   display: flex;
   flex-wrap: wrap;

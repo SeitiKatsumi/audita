@@ -1,4 +1,5 @@
 import { extractOpenAIUsage } from "./api-usage.service.mjs";
+import { suggestJecClaimValues } from "./jec-petition.service.mjs";
 
 const DEFAULT_MODEL = "gpt-5-mini";
 const DEFAULT_TIMEOUT_MS = 90000;
@@ -90,7 +91,7 @@ const MODULE_ACTIONS = {
 
 const SUPPORTED_JEC_UFS = Object.freeze(["SP", "RJ", "MG", "PR"]);
 
-export function buildJecIntakeAction({ uf, caseId } = {}) {
+export function buildJecIntakeAction({ uf, caseId, suggestion = null } = {}) {
   const normalizedUf = String(uf || "").trim().toUpperCase();
   const normalizedCaseId = String(caseId || "").trim();
   if (!SUPPORTED_JEC_UFS.includes(normalizedUf) || !normalizedCaseId) return null;
@@ -104,6 +105,7 @@ export function buildJecIntakeAction({ uf, caseId } = {}) {
     title: "Preparação assistida para o Juizado Especial",
     description:
       "Revise seus dados e o rascunho. Depois, a Audita abre o portal oficial dentro da aplicação, sem protocolar por você.",
+    ...(suggestion ? { suggestion } : {}),
   };
 }
 
@@ -189,6 +191,7 @@ export function buildAuditaChatInstructions(customPrompt = "") {
     "O contexto estruturado do caso e memoria factual, nao um roteiro. Use-o para saber o que ja foi confirmado, mas decida a resposta e a proxima acao de forma conversacional.",
     "Quando a memoria indicar recentEvidenceAnalyzed=true ou trouxer cobrancas candidatas, uma evidencia recente ja foi analisada. Nao peca para anexar novamente a mesma fatura, foto, print ou extrato.",
     "No fluxo Itau, use registrar_fatos_caso_itau sempre que o usuario confirmar, negar, corrigir ou complementar um fato relevante. Depois responda naturalmente, sem narrar nomes internos de campos.",
+    "Se o usuario quantificar expressamente uma perda de renda ou um valor de dano moral que deseja revisar, registre esses valores. Nunca atribua um valor por conta propria no chat.",
     "Nunca exija reclamacao feita ate 18/12/2025 para uma cobranca posterior a essa data. Nesse caso, explique que ela esta fora do periodo do acordo coletivo e siga pela reclamacao administrativa comum.",
     "Respostas curtas ja refletidas no contexto estruturado foram persistidas pelo Audita. Nao volte a perguntar por uma cobranca ou reclamacao que ja esteja marcada como respondida.",
     "Se a data estiver marcada como aproximada ou desconhecida, ou o protocolo como indisponivel, aceite essa limitacao e avance. Nao repita a mesma pergunta para exigir precisao que o usuario informou nao ter.",
@@ -196,7 +199,7 @@ export function buildAuditaChatInstructions(customPrompt = "") {
     "Quando ja houver informacao suficiente para uma conclusao preliminar, sintetize o entendimento e ofereca a proxima acao em vez de continuar interrogando.",
     "Existem duas jornadas Itau. Com extratos historicos, a IA organiza as cobrancas comprovadas periodo a periodo. Sem extratos historicos, ela pode preparar um rascunho preliminar que mencione a necessidade de exibicao dos documentos, sem inventar valores ou afirmar que a exibicao sera deferida.",
     "O acordo coletivo do MPMG trata de seguros ou servicos sem consentimento. Nao generalize esse acordo automaticamente para toda tarifa bancaria, RMC, ADP ou outro produto sem base documental e juridica especifica.",
-    "Valores de exemplos comerciais, inclusive danos morais ou total estimado, nao sao resultados do caso. Nunca use um valor fixo ou prometa repeticao em dobro; apresente apenas valores comprovados e deixe juros, correcao, dobra e dano moral para revisao juridica.",
+    "Valores de exemplos comerciais, inclusive danos morais ou total estimado, nao sao resultados do caso. A Audita pode sugerir no painel JEC uma estimativa revisavel baseada somente nas cobrancas nao reconhecidas com valor identificado. Nunca use valor fixo, inclua recorrencia sem documentos ou prometa repeticao em dobro; juros, correcao, lucros cessantes e dano moral dependem dos fatos e de revisao juridica.",
     "A Audita nao acessa conta bancaria nem solicita ou recupera extratos diretamente do Itau. Ela pode analisar arquivos fornecidos, organizar evidencias e preparar um rascunho de reclamacao.",
     "Quando o usuario aceitar a preparacao de uma reclamacao, registre administrativeDraftRequested=yes e entregue o texto do rascunho na mesma resposta. Nunca diga apenas que preparou sem mostrar o documento.",
     "Quando o usuario aceitar seguir ao Juizado Especial, registre wantsJec=yes. Se ainda nao souber a UF, pergunte somente a UF.",
@@ -784,6 +787,18 @@ export function normalizeItauCaseContext(caseContext) {
       ),
       bankResponseStatus: String(caseData.answers?.bankResponseStatus || "pending"),
       wantsJec: String(caseData.answers?.wantsJec || "pending"),
+      reportedLostProfitsAmount:
+        caseData.answers?.reportedLostProfitsAmount !== null &&
+        caseData.answers?.reportedLostProfitsAmount !== undefined &&
+        Number.isFinite(Number(caseData.answers.reportedLostProfitsAmount))
+        ? Number(caseData.answers.reportedLostProfitsAmount)
+        : null,
+      requestedMoralDamagesAmount:
+        caseData.answers?.requestedMoralDamagesAmount !== null &&
+        caseData.answers?.requestedMoralDamagesAmount !== undefined &&
+        Number.isFinite(Number(caseData.answers.requestedMoralDamagesAmount))
+        ? Number(caseData.answers.requestedMoralDamagesAmount)
+        : null,
     },
     evaluation: {
       classification: String(evaluation.classification || ""),
@@ -977,6 +992,14 @@ export function buildItauToolUpdatePayload(input = {}, caseData = {}) {
     payload.bankResponseStatus = bankResponseStatus;
   }
 
+  for (const field of ["reportedLostProfitsAmount", "requestedMoralDamagesAmount"]) {
+    if (input[field] === "" || input[field] === null || input[field] === undefined) continue;
+    const amount = Number(input[field]);
+    if (Number.isFinite(amount) && amount >= 0 && amount <= 1_000_000) {
+      payload[field] = Number(amount.toFixed(2));
+    }
+  }
+
   const candidateAnswers = {};
   const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
   for (const update of Array.isArray(input.candidateUpdates) ? input.candidateUpdates : []) {
@@ -1165,6 +1188,22 @@ function buildChatTools({
               "Somente se o usuario falou expressamente sobre duplicidade. Uma cobranca mensal recorrente nao e duplicidade.",
             )
             .optional(),
+          reportedLostProfitsAmount: z
+            .number()
+            .min(0)
+            .max(1_000_000)
+            .describe(
+              "Somente o valor de perda de renda que o usuario quantificou expressamente. Nao estime.",
+            )
+            .optional(),
+          requestedMoralDamagesAmount: z
+            .number()
+            .min(0)
+            .max(1_000_000)
+            .describe(
+              "Somente o valor de dano moral que o usuario informou expressamente querer revisar. Nao estime.",
+            )
+            .optional(),
           administrativeDraftRequested: z.enum(["yes", "no"]).optional(),
           bankResponseStatus: z
             .enum(["responded", "no_response", "rejected", "resolved", "partial", "unknown"])
@@ -1226,6 +1265,7 @@ function buildChatTools({
           const action = buildJecIntakeAction({
             uf,
             caseId: updatedCase?.id || currentCase.id,
+            suggestion: suggestJecClaimValues({ caseData: updatedCase || currentCase }),
           });
           addUniqueAction(actions, action);
           return {

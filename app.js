@@ -2420,6 +2420,7 @@ function renderJecPetitionPanel(caseData = {}) {
   const state = jecCaseStates.get(caseData.id) || {};
   const claimant = state.claimant || {};
   const prepared = state.prepared || null;
+  const suggestion = state.suggestion || null;
   const missingFields = Array.isArray(prepared?.missingFields) ? prepared.missingFields : [];
   const historicalDocumentsAvailable =
     claimant.historicalDocumentsAvailable ||
@@ -2499,7 +2500,20 @@ function renderJecPetitionPanel(caseData = {}) {
         </div>
         <details class="jec-petition-values" ${prepared ? "open" : ""}>
           <summary>Valores dos pedidos para revisão</summary>
-          <p>Informe somente valores já apurados e revisados. A Audita não presume indenização, juros ou repetição em dobro.</p>
+          <p>A Audita sugere uma estimativa inicial com base no que foi confirmado na conversa. Revise e edite os valores antes de gerar o rascunho.</p>
+          ${
+            suggestion
+              ? `
+                <div class="jec-ai-suggestion" role="note">
+                  <strong>Sugestão da IA</strong>
+                  <ul>${(Array.isArray(suggestion.notes) ? suggestion.notes : [])
+                    .map((note) => `<li>${escapeHtml(note)}</li>`)
+                    .join("")}</ul>
+                  <small>${escapeHtml(suggestion.disclaimer || "")}</small>
+                </div>
+              `
+              : ""
+          }
           <div class="jec-form-grid">
             <label>
               <span>Repetição em dobro (R$)</span>
@@ -2832,10 +2846,16 @@ function activateJecIntake(action, { focus = true } = {}) {
   if (!found?.message?.itauCase) return false;
 
   const previous = jecCaseStates.get(caseId) || {};
+  const suggestedValues =
+    action?.suggestion && typeof action.suggestion.values === "object"
+      ? action.suggestion.values
+      : {};
   jecCaseStates.set(caseId, {
     ...previous,
     open: true,
+    suggestion: action?.suggestion || previous.suggestion || null,
     claimant: {
+      ...suggestedValues,
       ...(previous.claimant || {}),
       ...(uf ? { uf } : {}),
     },

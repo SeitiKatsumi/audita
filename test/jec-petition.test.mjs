@@ -6,6 +6,7 @@ import {
   getJecPortal,
   listJecPortals,
   prepareJecPetition,
+  suggestJecClaimValues,
 } from "../services/jec-petition.service.mjs";
 
 const sampleCase = {
@@ -97,6 +98,72 @@ test("petition draft uses the supplied audited-values model", () => {
   assert.match(profile.agentInstructions, /Confirmar ajuizamento/i);
 });
 
+test("AI claim suggestion uses only evidenced disputed amounts", () => {
+  const suggestion = suggestJecClaimValues({ caseData: sampleCase });
+
+  assert.deepEqual(suggestion.values, {
+    doubleRefundAmount: "79,80",
+    lostProfitsAmount: "0,00",
+    moralDamagesAmount: "0,00",
+    caseValue: "79,80",
+  });
+  assert.equal(suggestion.evidencedPrincipal, 39.9);
+  assert.equal(suggestion.reviewRequired, true);
+  assert.match(suggestion.notes.join("\n"), /R\$ 39,90/);
+  assert.match(suggestion.disclaimer, /revisão jurídica/i);
+});
+
+test("AI claim suggestion does not capitalize unsupported historical recurrence", () => {
+  const suggestion = suggestJecClaimValues({
+    caseData: {
+      ...sampleCase,
+      candidates: [{ ...sampleCase.candidates[0], amount: null }],
+      answers: {
+        ...sampleCase.answers,
+        historicalEvidence: "yes",
+        historicalDocumentsAvailable: "no",
+      },
+    },
+  });
+
+  assert.equal(suggestion.values.doubleRefundAmount, "");
+  assert.equal(suggestion.values.caseValue, "");
+  assert.equal(suggestion.values.lostProfitsAmount, "0,00");
+  assert.equal(suggestion.values.moralDamagesAmount, "0,00");
+  assert.match(suggestion.notes.join("\n"), /não entrou no cálculo/i);
+});
+
+test("AI claim suggestion preserves amounts already supplied for human review", () => {
+  const suggestion = suggestJecClaimValues({
+    caseData: sampleCase,
+    claimant: completeClaimant,
+  });
+
+  assert.equal(suggestion.values.doubleRefundAmount, "79,80");
+  assert.equal(suggestion.values.lostProfitsAmount, "0,00");
+  assert.equal(suggestion.values.moralDamagesAmount, "5.000,00");
+  assert.equal(suggestion.values.caseValue, "5.079,80");
+});
+
+test("AI claim suggestion uses losses expressly quantified in conversation", () => {
+  const suggestion = suggestJecClaimValues({
+    caseData: {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        reportedLostProfitsAmount: 350,
+        requestedMoralDamagesAmount: 2_000,
+      },
+    },
+  });
+
+  assert.equal(suggestion.values.doubleRefundAmount, "79,80");
+  assert.equal(suggestion.values.lostProfitsAmount, "350,00");
+  assert.equal(suggestion.values.moralDamagesAmount, "2.000,00");
+  assert.equal(suggestion.values.caseValue, "2.429,80");
+  assert.match(suggestion.notes.join("\n"), /valor informado/i);
+});
+
 test("PR guide routes Curitiba banking matters to the official banking option", () => {
   const portal = getJecPortal("PR", { city: "Curitiba" });
   assert.match(portal.guide.steps.join("\n"), /BANCÁRIO/i);
@@ -186,4 +253,6 @@ test("chat UI focuses the JEC secure intake returned by the AI tool", async () =
   assert.match(source, /state\.open \|\| state\.session/);
   assert.match(source, /\/api\/jec\/petitions\/pdf/);
   assert.match(source, /Baixar PDF para revisão/);
+  assert.match(source, /Sugestão da IA/);
+  assert.match(source, /suggestion\.notes/);
 });

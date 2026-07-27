@@ -657,12 +657,19 @@ test("Itau factual memory distinguishes the journey without historical statement
 });
 
 test("JEC action opens only a supported secure intake and never claims protocol", () => {
-  const action = buildJecIntakeAction({ uf: "sp", caseId: "case-jec-action" });
+  const action = buildJecIntakeAction({
+    uf: "sp",
+    caseId: "case-jec-action",
+    suggestion: {
+      values: { doubleRefundAmount: "79,80", caseValue: "79,80" },
+    },
+  });
 
   assert.equal(action?.kind, "jec_intake");
   assert.equal(action?.moduleId, "jec_petition");
   assert.equal(action?.uf, "SP");
   assert.equal(action?.caseId, "case-jec-action");
+  assert.equal(action?.suggestion?.values?.doubleRefundAmount, "79,80");
   assert.match(action?.description || "", /sem protocolar/i);
   assert.equal(buildJecIntakeAction({ uf: "BA", caseId: "case-1" }), null);
   assert.equal(buildJecIntakeAction({ uf: "SP" }), null);
@@ -782,6 +789,24 @@ test("Itau AI tool leaves unmentioned binary facts pending instead of inventing 
   assert.equal(payload.cancellationRequested, undefined);
   assert.equal(payload.duplicateCharge, undefined);
   assert.equal(payload.wantsJec, undefined);
+});
+
+test("Itau AI tool records only claim amounts expressly supplied by the user", () => {
+  const payload = buildItauToolUpdatePayload(
+    {
+      reportedLostProfitsAmount: 350,
+      requestedMoralDamagesAmount: 2000,
+    },
+    { candidates: [] },
+  );
+
+  assert.equal(payload.reportedLostProfitsAmount, 350);
+  assert.equal(payload.requestedMoralDamagesAmount, 2000);
+  assert.equal(
+    buildItauToolUpdatePayload({ reportedLostProfitsAmount: -1 }, { candidates: [] })
+      .reportedLostProfitsAmount,
+    undefined,
+  );
 });
 
 test("anti-repeat guard permits an explicit request to repeat", () => {

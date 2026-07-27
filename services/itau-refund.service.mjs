@@ -718,6 +718,14 @@ function normalizeAnswer(value, allowed = ["pending", "yes", "no", "unknown"]) {
   return allowed.includes(normalized) ? normalized : "pending";
 }
 
+function normalizeOptionalClaimAmount(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 && amount <= 1_000_000
+    ? Number(amount.toFixed(2))
+    : null;
+}
+
 function normalizeBankResponseStatus(value) {
   const normalized = String(value || "").trim();
   return ["pending", "responded", "no_response", "rejected", "resolved", "partial", "unknown"].includes(
@@ -796,6 +804,12 @@ function applyAnswers(record, input = {}) {
       input.bankPromisedRefund ?? currentAnswers.bankPromisedRefund,
     ),
     duplicateCharge: normalizeAnswer(input.duplicateCharge ?? currentAnswers.duplicateCharge),
+    reportedLostProfitsAmount: normalizeOptionalClaimAmount(
+      input.reportedLostProfitsAmount ?? currentAnswers.reportedLostProfitsAmount,
+    ),
+    requestedMoralDamagesAmount: normalizeOptionalClaimAmount(
+      input.requestedMoralDamagesAmount ?? currentAnswers.requestedMoralDamagesAmount,
+    ),
     administrativeDraftRequested: normalizeAnswer(
       input.administrativeDraftRequested ?? currentAnswers.administrativeDraftRequested,
     ),
