@@ -11,6 +11,7 @@ import {
   maskSensitiveIdentifiers,
   normalizeChatMessages,
   normalizeItauCaseContext,
+  normalizeJecBrowserContext,
   runAuditaChat,
   shouldRepairConversationalAnswer,
 } from "../services/chat-assistant.service.mjs";
@@ -39,6 +40,12 @@ test("chat removes duplicated source labels from the conversational answer", () 
       "A preparação assistida foi aberta. (Fonte: módulo de preparação assistida)",
     ),
     "A preparação assistida foi aberta.",
+  );
+  assert.equal(
+    cleanAuditaChatAnswer(
+      'Selecione "searchForo" e depois "searchCompetencia".',
+    ),
+    'Selecione "Foro/Comarca" e depois "Competência".',
   );
 });
 
@@ -72,6 +79,71 @@ test("chat instructions prohibit invented results and personal data collection",
   assert.match(instructions, /registrar_fatos_caso_itau/i);
   assert.match(instructions, /chame iniciar_preparacao_jec/i);
   assert.match(instructions, /duas jornadas Itau/i);
+  assert.match(instructions, /conversa continua ativa/i);
+  assert.match(instructions, /uma unica acao concreta/i);
+  assert.match(instructions, /Assumir controle/i);
+  assert.match(instructions, /searchForo/i);
+  assert.match(instructions, /nomes tecnicos de HTML/i);
+  assert.match(instructions, /Confirmar ajuizamento/i);
+});
+
+test("live JEC browser context exposes screen structure without field values", () => {
+  const normalized = JSON.parse(
+    normalizeJecBrowserContext({
+      status: "live",
+      transport: "live",
+      controlMode: "human",
+      courtName: "TJSP",
+      courtUf: "SP",
+      title: "Peticionamento Eletrônico",
+      url: "https://portal.tjsp.jus.br/PeticionamentoEletronico",
+      outcome: { status: "in_progress" },
+      formState: {
+        filledCount: 1,
+        totalCount: 2,
+        controls: [
+          {
+            label: "CPF",
+            type: "text",
+            filled: true,
+            valuePreview: "49532724800",
+          },
+          {
+            label: "Rito",
+            type: "select",
+            filled: false,
+            options: ["Juizado Especial", "Procedimento Comum"],
+          },
+        ],
+        actions: [
+          {
+            label: "Petição inicial",
+            tag: "a",
+            href: "https://portal.tjsp.jus.br/segredo",
+          },
+        ],
+      },
+      portalGuide: {
+        name: "Juizado Especial Cível de São Paulo",
+        steps: ["Acesse Petição inicial."],
+        humanOnly: ["Confirmar ajuizamento."],
+        sources: ["https://www.tjsp.jus.br/juizadosespeciais"],
+      },
+    }),
+  );
+
+  assert.equal(normalized.controlMode, "human");
+  assert.equal(normalized.transport, "live");
+  assert.equal(normalized.visibleForm.controls[0].label, "CPF");
+  assert.equal(normalized.visibleForm.controls[0].filled, true);
+  assert.deepEqual(normalized.visibleForm.controls[1].options, [
+    "Juizado Especial",
+    "Procedimento Comum",
+  ]);
+  assert.equal(normalized.visibleForm.actions[0].label, "Petição inicial");
+  assert.equal(normalized.visibleForm.controls[0].valuePreview, undefined);
+  assert.equal(normalized.visibleForm.actions[0].href, undefined);
+  assert.doesNotMatch(JSON.stringify(normalized), /49532724800|segredo/);
 });
 
 test("Itau context is factual memory without a scripted next question", () => {

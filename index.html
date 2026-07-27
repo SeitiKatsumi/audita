@@ -123,6 +123,9 @@
                 </div>
               </a>
               <div class="chat-header-actions">
+                <button class="chat-browser-mobile-open hidden" id="chatBrowserMobileOpen" type="button">
+                  Navegador <span aria-hidden="true"></span>
+                </button>
                 <button class="chat-tools-button" id="chatToolsButton" type="button" aria-expanded="false" aria-controls="chatToolsPanel">
                   Ferramentas <span id="chatToolCount">6</span>
                 </button>
@@ -196,6 +199,57 @@
               <small>Arquivos anexados s&atilde;o processados para esta an&aacute;lise e n&atilde;o ficam armazenados pelo m&oacute;dulo.</small>
             </form>
           </div>
+
+          <div
+            class="chat-browser-splitter hidden"
+            id="chatBrowserSplitter"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Redimensionar conversa e navegador"
+            tabindex="0"
+          ></div>
+
+          <aside class="chat-browser-pane hidden" id="chatBrowserPane" aria-label="Navegador assistido">
+            <header class="chat-browser-header">
+              <div class="chat-browser-heading">
+                <span class="chat-browser-live" aria-hidden="true"></span>
+                <div>
+                  <strong id="chatBrowserTitle">Portal oficial</strong>
+                  <small id="chatBrowserLocation">Sess&atilde;o segura da Audita</small>
+                </div>
+              </div>
+              <div class="chat-browser-actions">
+                <span class="chat-browser-control-status" id="chatBrowserControlStatus">IA controlando</span>
+                <button id="chatBrowserTakeover" type="button">Assumir controle</button>
+                <button class="hidden" id="chatBrowserReturn" type="button">Devolver &agrave; IA</button>
+                <button class="chat-browser-icon-button" id="chatBrowserFullscreen" type="button" aria-label="Tela cheia" title="Tela cheia">&#x26F6;</button>
+                <button class="chat-browser-icon-button" id="chatBrowserClose" type="button" aria-label="Fechar navegador" title="Fechar navegador">&times;</button>
+              </div>
+            </header>
+            <div class="chat-browser-mobile-tabs" role="tablist" aria-label="Visualiza&ccedil;&atilde;o">
+              <button type="button" data-chat-browser-mobile-view="chat" role="tab">Conversa</button>
+              <button type="button" class="active" data-chat-browser-mobile-view="browser" role="tab">Navegador</button>
+            </div>
+            <div class="chat-browser-stage">
+              <div class="chat-browser-loading" id="chatBrowserLoading">
+                <span></span>
+                <strong id="chatBrowserLoadingText">Conectando ao navegador seguro...</strong>
+                <button class="hidden" id="chatBrowserReconnect" type="button">
+                  Tentar novamente
+                </button>
+              </div>
+              <iframe
+                id="chatBrowserFrame"
+                title="Portal oficial no navegador assistido"
+                allow="clipboard-read; clipboard-write"
+                referrerpolicy="no-referrer"
+              ></iframe>
+            </div>
+            <footer class="chat-browser-footer">
+              <span id="chatBrowserHint">A IA pode observar e agir nesta mesma sess&atilde;o.</span>
+              <b>Envio final sempre humano</b>
+            </footer>
+          </aside>
         </section>
 
         <section class="home-hero" id="home" data-page="home">

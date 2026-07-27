@@ -3,9 +3,11 @@ import crypto from "node:crypto";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
+import WebSocket, { WebSocketServer } from "ws";
 import { createAuditService } from "./services/audit.service.mjs";
 import { createApiUsageService } from "./services/api-usage.service.mjs";
 import { createOpenAIOfficialUsageService } from "./services/openai-official-usage.service.mjs";
+import { createChatBrowserService } from "./services/chat-browser.service.mjs";
 import { createCreditsService } from "./services/credits.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
 import {
@@ -30,9 +32,11 @@ import {
 } from "./services/state-court-agent.service.mjs";
 import {
   buildJecAgentProfile,
+  getJecPortal,
   listJecPortals,
   prepareJecPetition,
 } from "./services/jec-petition.service.mjs";
+import { createJecPetitionPdf } from "./services/jec-petition-pdf.service.mjs";
 
 const root = resolve(".");
 loadLocalEnvFiles();
@@ -1285,6 +1289,7 @@ const propertyAssetsService = createPropertyAssetsService({
   creditsService,
 });
 const itauRefundService = createItauRefundService();
+const chatBrowserService = createChatBrowserService();
 
 async function getDashboard(request) {
   if (!pool || !dbReady) {
@@ -2606,6 +2611,54 @@ async function runChatConversation(request) {
     tenantId: authContext.tenantId,
     userId: authContext.user?.id || null,
   };
+  let browserContext = null;
+  const browserSessionId = String(body.browserSessionId || "").trim();
+
+  if (/^[A-Za-z0-9_-]{1,100}$/.test(browserSessionId)) {
+    let browserView = await chatBrowserService.getView(browserSessionId, itauAuth);
+    let browserTransport = "live";
+    if (browserView.notFound) {
+      browserView = await getAssistedSessionView(browserSessionId, itauAuth);
+      browserTransport = "assisted";
+    }
+    if (!browserView.notFound && !browserView.forbidden) {
+      const portal = getJecPortal(browserView.courtUf || "");
+      const agentSession = browserView.agentSessionId
+        ? getOwnedStateCourtAgentSession(browserView.agentSessionId, itauAuth)
+        : null;
+      browserContext = {
+        sessionId: browserSessionId,
+        status: browserView.status || (browserView.closed ? "offline" : "live"),
+        closed: browserView.closed === true,
+        controlMode: browserView.controlMode || (browserTransport === "assisted" ? "human" : ""),
+        transport: browserTransport,
+        courtName: browserView.courtName,
+        courtUf: browserView.courtUf,
+        title: browserView.title,
+        url: browserView.url,
+        outcome: browserView.outcome,
+        formState: browserView.formState,
+        agent: agentSession && !agentSession.forbidden
+          ? {
+              status: agentSession.status,
+              nextAction: agentSession.nextAction,
+              resultStatus: agentSession.result?.status || "",
+            }
+          : null,
+        portalGuide: portal
+          ? {
+              name: portal.name,
+              checkpoint: portal.checkpoint,
+              requirements: portal.requirements,
+              steps: portal.guide?.steps || portal.instructions,
+              humanOnly: portal.guide?.humanOnly || [],
+              caseNotes: portal.guide?.caseNotes || [],
+              sources: portal.guide?.sources || [portal.officialUrl],
+            }
+          : null,
+      };
+    }
+  }
 
   const applyItauCaseUpdate = async (payload) => {
     const currentCase = synchronizedCase || effectiveCaseContext?.case;
@@ -2633,6 +2686,7 @@ async function runChatConversation(request) {
       settings,
       userName: authContext.user?.name || "",
       caseContext: effectiveCaseContext,
+      browserContext,
       getItauCase: () => synchronizedCase || effectiveCaseContext?.case || null,
       onItauCaseUpdate: applyItauCaseUpdate,
     });
@@ -2976,6 +3030,70 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/jec/petitions/pdf" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      if (body.reviewConfirmed !== true) {
+        sendJson(response, 400, { error: "jec_review_required" });
+        return true;
+      }
+      let caseData = body.caseData || {};
+      if (body.caseId) {
+        const stored = itauRefundService.getCase(body.caseId, {
+          tenantId: authContext.tenantId,
+          userId: authContext.user?.id || null,
+        });
+        if (stored.forbidden) {
+          sendJson(response, 403, { error: "itau_case_forbidden" });
+          return true;
+        }
+        if (stored.case) caseData = stored.case;
+      }
+      const prepared = prepareJecPetition({
+        caseData,
+        claimant: body.claimant || {},
+        uf: body.uf,
+        city: body.city,
+      });
+      if (prepared.unsupported) {
+        sendJson(response, 422, {
+          error: "jec_state_not_supported",
+          supportedUfs: prepared.supportedUfs,
+        });
+        return true;
+      }
+      if (!prepared.ready) {
+        sendJson(response, 422, {
+          error: "jec_petition_incomplete",
+          missingFields: prepared.missingFields,
+        });
+        return true;
+      }
+      const pdf = Buffer.from(await createJecPetitionPdf(prepared));
+      const modelNumber = Number(prepared.template?.sourceModel || 0) || 1;
+      const fileName = `peticao-jec-itau-modelo-${modelNumber}.pdf`;
+      response.writeHead(200, {
+        "content-type": "application/pdf",
+        "content-disposition": `attachment; filename="${fileName}"`,
+        "content-length": pdf.length,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(pdf);
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "jec_petition_pdf_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/jec/sessions" && request.method === "POST") {
     try {
       const authContext = await getTenantIdForRequest(request);
@@ -3043,18 +3161,43 @@ async function handleApi(request, response, pathname) {
         usageContext: authContext,
         recordApiUsage: (context, usage) => apiUsageService.record(context, usage),
       };
-      const opened = await openAssistedBrowserSession({
+      let liveBrowserFallbackReason = "";
+      let getBrowserView = getAssistedSessionView;
+      let interactWithBrowser = interactAssistedSession;
+      let opened = await chatBrowserService.open({
         portalUrl: prepared.portal.startUrl,
         courtName: prepared.portal.tribunal,
         courtUf: prepared.portal.uf,
-        input,
-        profile,
-        results: [],
         owner,
         purpose: "jec_petition",
         allowedHosts: prepared.portal.allowedHosts,
         finalSubmissionHumanOnly: true,
       });
+      if (!opened.sessionId && opened.invalid) {
+        sendJson(response, 400, {
+          error: opened.reason || "jec_portal_url_invalid",
+          message: opened.message || "",
+        });
+        return true;
+      }
+      if (!opened.sessionId) {
+        liveBrowserFallbackReason = opened.reason || "live_browser_unavailable";
+        opened = await openAssistedBrowserSession({
+          portalUrl: prepared.portal.startUrl,
+          courtName: prepared.portal.tribunal,
+          courtUf: prepared.portal.uf,
+          input,
+          profile,
+          results: [],
+          owner,
+          purpose: "jec_petition",
+          allowedHosts: prepared.portal.allowedHosts,
+          finalSubmissionHumanOnly: true,
+        });
+      } else {
+        getBrowserView = chatBrowserService.getView;
+        interactWithBrowser = chatBrowserService.interact;
+      }
       if (!opened.sessionId) {
         sendJson(response, opened.invalid ? 400 : 502, {
           error: opened.reason || "jec_portal_open_failed",
@@ -3071,10 +3214,14 @@ async function handleApi(request, response, pathname) {
         input,
         profile,
         requestedCertificates: [],
-        getView: getAssistedSessionView,
-        interact: interactAssistedSession,
+        getView: getBrowserView,
+        interact: interactWithBrowser,
         owner,
       });
+      if (opened.session?.live) {
+        chatBrowserService.attachAgent(opened.sessionId, agent.id);
+        opened.session = await chatBrowserService.get(opened.sessionId, authContext);
+      }
       startStateCourtAgentSession(agent.id, {
         userMessage:
           "Observe o portal e avance somente por etapas reversiveis. Pare antes de login, escolha juridica ambigua ou envio final.",
@@ -3084,6 +3231,7 @@ async function handleApi(request, response, pathname) {
         agent,
         portal: prepared.portal,
         finalSubmissionHumanOnly: true,
+        liveBrowserFallbackReason,
       });
     } catch (error) {
       sendJson(response, 500, {
@@ -3091,6 +3239,145 @@ async function handleApi(request, response, pathname) {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
+    return true;
+  }
+
+  if (pathname === "/api/chat-browser/status" && request.method === "GET") {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    sendJson(response, 200, await chatBrowserService.health());
+    return true;
+  }
+
+  const chatBrowserViewerMatch = pathname.match(
+    /^\/api\/chat-browser-sessions\/([A-Za-z0-9_-]+)\/view$/,
+  );
+  if (chatBrowserViewerMatch && request.method === "GET") {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    const forwardedProtocol = String(request.headers["x-forwarded-proto"] || "")
+      .split(",")[0]
+      .trim()
+      .toLowerCase();
+    const websocketProtocol =
+      forwardedProtocol === "https" || request.socket.encrypted ? "wss" : "ws";
+    const websocketUrl = `${websocketProtocol}://${request.headers.host}/api/chat-browser-sessions/${encodeURIComponent(
+      chatBrowserViewerMatch[1],
+    )}/cast`;
+    const viewer = await chatBrowserService.viewerHtml(
+      chatBrowserViewerMatch[1],
+      authContext,
+      websocketUrl,
+    );
+    if (viewer.notFound) {
+      sendJson(response, 404, { error: "chat_browser_session_not_found" });
+      return true;
+    }
+    if (viewer.forbidden) {
+      sendJson(response, 403, { error: "chat_browser_session_forbidden" });
+      return true;
+    }
+    if (!viewer.html) {
+      sendJson(response, 502, {
+        error: viewer.reason || "chat_browser_viewer_unavailable",
+      });
+      return true;
+    }
+    response.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-frame-options": "SAMEORIGIN",
+      "content-security-policy":
+        "default-src 'self' data: blob:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:; frame-ancestors 'self';",
+      "referrer-policy": "no-referrer",
+    });
+    response.end(viewer.html);
+    return true;
+  }
+
+  const chatBrowserSessionMatch = pathname.match(
+    /^\/api\/chat-browser-sessions\/([A-Za-z0-9_-]+)$/,
+  );
+  if (chatBrowserSessionMatch && request.method === "GET") {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    const session = await chatBrowserService.get(chatBrowserSessionMatch[1], authContext);
+    if (session.notFound) {
+      sendJson(response, 404, { error: "chat_browser_session_not_found" });
+      return true;
+    }
+    if (session.forbidden) {
+      sendJson(response, 403, { error: "chat_browser_session_forbidden" });
+      return true;
+    }
+    sendJson(response, 200, { session });
+    return true;
+  }
+
+  if (chatBrowserSessionMatch && request.method === "POST") {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    const body = await readJsonBody(request);
+    const action = String(body.action || body.type || "");
+    const current = await chatBrowserService.get(chatBrowserSessionMatch[1], authContext);
+    if (current.notFound) {
+      sendJson(response, 404, { error: "chat_browser_session_not_found" });
+      return true;
+    }
+    if (current.forbidden) {
+      sendJson(response, 403, { error: "chat_browser_session_forbidden" });
+      return true;
+    }
+    if (action === "close") {
+      const closed = await chatBrowserService.close(chatBrowserSessionMatch[1], authContext);
+      if (current.agentSessionId) {
+        await handleStateCourtAgentAction(current.agentSessionId, { type: "stop" }, authContext)
+          .catch(() => null);
+      }
+      sendJson(response, 200, { session: closed });
+      return true;
+    }
+    if (action === "takeover") {
+      const session = await chatBrowserService.setControl(
+        chatBrowserSessionMatch[1],
+        "human",
+        authContext,
+      );
+      if (current.agentSessionId) {
+        await handleStateCourtAgentAction(current.agentSessionId, { type: "stop" }, authContext);
+      }
+      sendJson(response, 200, { session });
+      return true;
+    }
+    if (action === "return") {
+      const session = await chatBrowserService.setControl(
+        chatBrowserSessionMatch[1],
+        "agent",
+        authContext,
+      );
+      if (current.agentSessionId) {
+        await handleStateCourtAgentAction(
+          current.agentSessionId,
+          { type: "continue" },
+          authContext,
+        );
+      }
+      sendJson(response, 200, { session });
+      return true;
+    }
+    sendJson(response, 400, { error: "invalid_chat_browser_action" });
     return true;
   }
 
@@ -3922,6 +4209,7 @@ async function handleApi(request, response, pathname) {
   return false;
 }
 
+const chatBrowserWss = new WebSocketServer({ noServer: true });
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host}`);
   if (await handleApi(request, response, url.pathname)) {
@@ -3949,6 +4237,71 @@ const server = http.createServer(async (request, response) => {
   });
 
   createReadStream(filePath).pipe(response);
+});
+
+server.on("upgrade", async (request, socket, head) => {
+  try {
+    const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    const match = url.pathname.match(
+      /^\/api\/chat-browser-sessions\/([A-Za-z0-9_-]+)\/cast$/,
+    );
+    if (!match) {
+      socket.destroy();
+      return;
+    }
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    const owned = chatBrowserService.getRawOwnedSession(match[1], authContext);
+    if (owned.notFound || owned.forbidden) {
+      socket.write(
+        `HTTP/1.1 ${owned.forbidden ? "403 Forbidden" : "404 Not Found"}\r\nConnection: close\r\n\r\n`,
+      );
+      socket.destroy();
+      return;
+    }
+    const upstreamUrl = chatBrowserService.upstreamCastUrl(match[1], request.url);
+    if (!upstreamUrl) {
+      socket.destroy();
+      return;
+    }
+    chatBrowserWss.handleUpgrade(request, socket, head, (client) => {
+      const upstream = new WebSocket(upstreamUrl, { perMessageDeflate: false });
+      const pending = [];
+      let closed = false;
+      const closeBoth = (code = 1000, reason = "") => {
+        if (closed) return;
+        closed = true;
+        if (client.readyState === WebSocket.OPEN) client.close(code, reason);
+        if (upstream.readyState === WebSocket.OPEN) upstream.close(code, reason);
+        if (upstream.readyState === WebSocket.CONNECTING) upstream.terminate();
+      };
+      client.on("message", (data, isBinary) => {
+        if (upstream.readyState === WebSocket.OPEN) {
+          upstream.send(data, { binary: isBinary });
+        } else if (upstream.readyState === WebSocket.CONNECTING && pending.length < 100) {
+          pending.push({ data, isBinary });
+        }
+      });
+      upstream.on("open", () => {
+        for (const item of pending.splice(0)) {
+          upstream.send(item.data, { binary: item.isBinary });
+        }
+      });
+      upstream.on("message", (data, isBinary) => {
+        if (client.readyState === WebSocket.OPEN) client.send(data, { binary: isBinary });
+      });
+      client.on("close", (code, reason) => closeBoth(code, reason.toString()));
+      upstream.on("close", (code, reason) => closeBoth(code, reason.toString()));
+      client.on("error", () => closeBoth(1011, "client_error"));
+      upstream.on("error", () => closeBoth(1011, "upstream_error"));
+    });
+  } catch {
+    socket.destroy();
+  }
 });
 
 await initializeDatabase();

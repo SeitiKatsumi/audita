@@ -91,6 +91,22 @@ const chatSuggestionButtons = document.querySelectorAll("[data-chat-prompt]");
 const chatAttachment = document.querySelector("#chatAttachment");
 const chatAttachmentButton = document.querySelector("#chatAttachmentButton");
 const chatAttachmentPreview = document.querySelector("#chatAttachmentPreview");
+const chatPage = document.querySelector(".chat-page");
+const chatBrowserPane = document.querySelector("#chatBrowserPane");
+const chatBrowserSplitter = document.querySelector("#chatBrowserSplitter");
+const chatBrowserFrame = document.querySelector("#chatBrowserFrame");
+const chatBrowserLoading = document.querySelector("#chatBrowserLoading");
+const chatBrowserLoadingText = document.querySelector("#chatBrowserLoadingText");
+const chatBrowserReconnect = document.querySelector("#chatBrowserReconnect");
+const chatBrowserTitle = document.querySelector("#chatBrowserTitle");
+const chatBrowserLocation = document.querySelector("#chatBrowserLocation");
+const chatBrowserControlStatus = document.querySelector("#chatBrowserControlStatus");
+const chatBrowserTakeover = document.querySelector("#chatBrowserTakeover");
+const chatBrowserReturn = document.querySelector("#chatBrowserReturn");
+const chatBrowserFullscreen = document.querySelector("#chatBrowserFullscreen");
+const chatBrowserClose = document.querySelector("#chatBrowserClose");
+const chatBrowserMobileOpen = document.querySelector("#chatBrowserMobileOpen");
+const chatBrowserMobileViewButtons = document.querySelectorAll("[data-chat-browser-mobile-view]");
 const operationsPages = document.querySelector("#operationsPages");
 const consultationForm = document.querySelector("#consultationForm");
 const consultationModule = document.querySelector("#consultationModule");
@@ -230,6 +246,11 @@ let assistedRemoteDragState = null;
 let assistedRemoteSkipNextClick = false;
 const stateCourtAgentSessions = new Map();
 const stateCourtAgentRefreshTimers = new Map();
+let activeChatBrowserSession = null;
+let chatBrowserRequestPending = false;
+let chatBrowserMobileView = "browser";
+let chatBrowserMonitorTimer = null;
+let chatBrowserConnectionFailures = 0;
 let propertySearchConfig = null;
 let currentPropertySearchId = sessionStorage.getItem("audita:lastPropertySearchId") || "";
 
@@ -2059,11 +2080,21 @@ function itauComplaintQuestion(caseData = {}) {
 function jecMissingFieldLabel(field) {
   const labels = {
     fullName: "nome completo",
-    document: "CPF ou CNPJ",
+    document: "CPF",
+    rg: "RG",
+    nationality: "nacionalidade",
+    maritalStatus: "estado civil",
+    profession: "profissão",
     city: "cidade",
     uf: "estado",
     address: "endereço completo",
     email: "e-mail",
+    phone: "telefone",
+    historicalDocumentsAvailable: "disponibilidade dos extratos históricos",
+    doubleRefundAmount: "valor pretendido para repetição em dobro",
+    lostProfitsAmount: "valor pretendido para lucros cessantes",
+    moralDamagesAmount: "valor pretendido para danos morais",
+    caseValue: "valor da causa",
     disputedCharge: "ao menos uma cobrança não reconhecida",
   };
   return labels[field] || field;
@@ -2077,11 +2108,258 @@ function shouldShowJecPanel(caseData = {}) {
   );
 }
 
+function chatBrowserHostname(url) {
+  try {
+    return new URL(String(url || "")).hostname;
+  } catch {
+    return String(url || "");
+  }
+}
+
+function setChatBrowserConnectionState(state, message = "") {
+  if (chatBrowserPane) chatBrowserPane.dataset.connection = state;
+  if (chatBrowserLoadingText) {
+    chatBrowserLoadingText.textContent =
+      message ||
+      (state === "offline"
+        ? "A sessÃ£o do navegador foi interrompida."
+        : "Conectando ao navegador seguro...");
+  }
+  chatBrowserLoading?.classList.toggle("hidden", state === "online");
+  chatBrowserLoading?.classList.toggle("error", state === "offline");
+  chatBrowserReconnect?.classList.toggle("hidden", state !== "offline");
+}
+
+function stopChatBrowserMonitor() {
+  if (chatBrowserMonitorTimer) {
+    window.clearInterval(chatBrowserMonitorTimer);
+    chatBrowserMonitorTimer = null;
+  }
+  chatBrowserConnectionFailures = 0;
+}
+
+function clearExpiredChatBrowserSession(message) {
+  const sessionId = activeChatBrowserSession?.id || "";
+  const entry = sessionId ? getJecStateByAssistedSession(sessionId) : null;
+  if (entry) {
+    assistedRemoteSessions.delete(sessionId);
+    if (entry.state.agent?.id) {
+      stateCourtAgentSessions.delete(entry.state.agent.id);
+    }
+    jecCaseStates.set(entry.caseId, {
+      ...entry.state,
+      session: null,
+      agent: null,
+      open: true,
+    });
+    pendingJecFocusCaseId = entry.caseId;
+  }
+  activeChatBrowserSession = null;
+  stopChatBrowserMonitor();
+  renderChatWorkspace();
+  syncChatBrowserUi();
+  setChatError(
+    message ||
+      "A sessÃ£o do navegador terminou. Revise a autorizaÃ§Ã£o e abra uma nova sessÃ£o.",
+  );
+}
+
+async function checkChatBrowserConnection({ reload = false } = {}) {
+  const sessionId = activeChatBrowserSession?.id;
+  if (!sessionId) return false;
+  try {
+    const response = await fetch(
+      `/api/chat-browser-sessions/${encodeURIComponent(sessionId)}`,
+      { headers: { accept: "application/json" } },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showLogin("Entre para continuar no navegador assistido.");
+      return false;
+    }
+    if (response.status === 404 || data.session?.closed) {
+      clearExpiredChatBrowserSession();
+      return false;
+    }
+    if (!response.ok || !data.session?.id) {
+      throw new Error("browser_session_unavailable");
+    }
+    chatBrowserConnectionFailures = 0;
+    activeChatBrowserSession = {
+      ...activeChatBrowserSession,
+      ...data.session,
+    };
+    if (reload && chatBrowserFrame) {
+      setChatBrowserConnectionState("connecting");
+      chatBrowserFrame.src = `${data.session.viewerUrl}?v=${Date.now()}`;
+    }
+    syncChatBrowserUi();
+    return true;
+  } catch {
+    chatBrowserConnectionFailures += 1;
+    if (chatBrowserConnectionFailures >= 2) {
+      setChatBrowserConnectionState(
+        "offline",
+        "A conexÃ£o foi interrompida. Verifique o servidor e tente novamente.",
+      );
+    }
+    return false;
+  }
+}
+
+function startChatBrowserMonitor() {
+  stopChatBrowserMonitor();
+  chatBrowserMonitorTimer = window.setInterval(
+    () => checkChatBrowserConnection(),
+    4000,
+  );
+}
+
+function syncChatBrowserUi() {
+  const session = activeChatBrowserSession;
+  const open = Boolean(session?.id);
+  chatPage?.classList.toggle("browser-open", open);
+  chatPage?.classList.toggle(
+    "mobile-browser-view-chat",
+    open && chatBrowserMobileView === "chat",
+  );
+  chatBrowserPane?.classList.toggle("hidden", !open);
+  chatBrowserSplitter?.classList.toggle("hidden", !open);
+  chatBrowserMobileOpen?.classList.toggle("hidden", !open);
+  if (!open) {
+    stopChatBrowserMonitor();
+    chatPage?.classList.remove("browser-fullscreen", "mobile-browser-view-chat");
+    if (chatBrowserFrame) {
+      chatBrowserFrame.removeAttribute("src");
+      delete chatBrowserFrame.dataset.sessionId;
+    }
+    if (chatBrowserPane) delete chatBrowserPane.dataset.connection;
+    return;
+  }
+
+  const humanControl = session.controlMode === "human";
+  if (chatBrowserPane) chatBrowserPane.dataset.control = humanControl ? "human" : "agent";
+  if (chatBrowserTitle) {
+    chatBrowserTitle.textContent = session.title || session.courtName || "Portal oficial";
+  }
+  if (chatBrowserLocation) {
+    chatBrowserLocation.textContent =
+      chatBrowserHostname(session.url || session.portalUrl) || "Sessão segura da Audita";
+  }
+  if (chatBrowserControlStatus) {
+    chatBrowserControlStatus.textContent = humanControl
+      ? "Você está controlando"
+      : "IA controlando";
+  }
+  chatBrowserTakeover?.classList.toggle("hidden", humanControl);
+  chatBrowserReturn?.classList.toggle("hidden", !humanControl);
+  chatBrowserTakeover && (chatBrowserTakeover.disabled = chatBrowserRequestPending);
+  chatBrowserReturn && (chatBrowserReturn.disabled = chatBrowserRequestPending);
+  chatBrowserClose && (chatBrowserClose.disabled = chatBrowserRequestPending);
+  chatBrowserMobileViewButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.chatBrowserMobileView === chatBrowserMobileView);
+  });
+  if (
+    chatBrowserFrame &&
+    chatBrowserFrame.dataset.sessionId !== session.id
+  ) {
+    setChatBrowserConnectionState("connecting");
+    chatBrowserFrame.dataset.sessionId = session.id;
+    chatBrowserFrame.src = `${session.viewerUrl}?v=${encodeURIComponent(session.updatedAt || Date.now())}`;
+    startChatBrowserMonitor();
+  }
+}
+
+function openChatBrowserPane(session) {
+  if (!session?.id || !session.live || !session.viewerUrl) return false;
+  activeChatBrowserSession = { ...session };
+  chatBrowserMobileView = "browser";
+  syncChatBrowserUi();
+  return true;
+}
+
+async function chatBrowserAction(action) {
+  const sessionId = activeChatBrowserSession?.id;
+  if (!sessionId || chatBrowserRequestPending) return null;
+  chatBrowserRequestPending = true;
+  syncChatBrowserUi();
+  setChatError();
+  try {
+    const response = await fetch(
+      `/api/chat-browser-sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ action }),
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showLogin("Entre para continuar no navegador assistido.");
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error(data.message || "Não foi possível atualizar o navegador assistido.");
+    }
+    if (action === "close") {
+      const entry = getJecStateByAssistedSession(sessionId);
+      if (entry) {
+        assistedRemoteSessions.delete(sessionId);
+        if (entry.state.agent?.id) {
+          stateCourtAgentSessions.delete(entry.state.agent.id);
+        }
+        jecCaseStates.set(entry.caseId, {
+          ...entry.state,
+          session: null,
+          agent: null,
+        });
+      }
+      activeChatBrowserSession = null;
+      renderChatWorkspace();
+      syncChatBrowserUi();
+      return data.session;
+    }
+    activeChatBrowserSession = {
+      ...activeChatBrowserSession,
+      ...(data.session || {}),
+    };
+    if (data.session?.id) assistedRemoteSessions.set(data.session.id, data.session);
+    syncChatBrowserUi();
+    return data.session;
+  } catch (error) {
+    setChatBrowserConnectionState(
+      "offline",
+      "NÃ£o foi possÃ­vel comunicar com a sessÃ£o do navegador.",
+    );
+    setChatError(
+      error instanceof Error
+        ? error.message
+        : "Falha de comunicação com o navegador assistido.",
+    );
+    return null;
+  } finally {
+    chatBrowserRequestPending = false;
+    syncChatBrowserUi();
+  }
+}
+
 function renderJecAssistedBrowser(state = {}) {
   const sessionId = state.session?.id || "";
   if (!sessionId) return "";
   const cachedSession = assistedRemoteSessions.get(sessionId) || state.session || {};
   const agentSessionId = state.agent?.id || "";
+  if (cachedSession.live) {
+    return `
+      <section class="jec-live-browser-summary">
+        <div>
+          <span><i aria-hidden="true"></i>Navegador ao vivo</span>
+          <strong>${escapeHtml(state.portal?.tribunal || cachedSession.courtName || "Portal oficial")}</strong>
+          <small>A IA e você compartilham a mesma sessão. O envio final continua exclusivamente humano.</small>
+        </div>
+        <button type="button" data-chat-browser-open="${escapeHtml(sessionId)}">Ver navegador</button>
+      </section>
+    `;
+  }
   const screenshot = cachedSession.screenshot || "";
   const status = cachedSession.title || cachedSession.url || "Carregando portal oficial...";
   return `
@@ -2143,6 +2421,10 @@ function renderJecPetitionPanel(caseData = {}) {
   const claimant = state.claimant || {};
   const prepared = state.prepared || null;
   const missingFields = Array.isArray(prepared?.missingFields) ? prepared.missingFields : [];
+  const historicalDocumentsAvailable =
+    claimant.historicalDocumentsAvailable ||
+    caseData.answers?.historicalDocumentsAvailable ||
+    "";
   return `
     <details class="jec-petition-panel" ${state.open || state.session ? "open" : ""}>
       <summary>Juizado Especial · preparação assistida</summary>
@@ -2175,8 +2457,24 @@ function renderJecPetitionPanel(caseData = {}) {
             <input name="fullName" required maxlength="160" value="${escapeHtml(claimant.fullName || "")}" />
           </label>
           <label>
-            <span>CPF ou CNPJ</span>
+            <span>CPF</span>
             <input name="document" required inputmode="numeric" maxlength="18" value="${escapeHtml(claimant.document || "")}" />
+          </label>
+          <label>
+            <span>RG</span>
+            <input name="rg" required maxlength="40" value="${escapeHtml(claimant.rg || "")}" />
+          </label>
+          <label>
+            <span>Nacionalidade</span>
+            <input name="nationality" required maxlength="80" value="${escapeHtml(claimant.nationality || "")}" />
+          </label>
+          <label>
+            <span>Estado civil</span>
+            <input name="maritalStatus" required maxlength="80" value="${escapeHtml(claimant.maritalStatus || "")}" />
+          </label>
+          <label>
+            <span>Profissão</span>
+            <input name="profession" required maxlength="120" value="${escapeHtml(claimant.profession || "")}" />
           </label>
           <label>
             <span>E-mail</span>
@@ -2190,7 +2488,37 @@ function renderJecPetitionPanel(caseData = {}) {
             <span>Endereço completo</span>
             <input name="address" required maxlength="240" value="${escapeHtml(claimant.address || "")}" />
           </label>
+          <label class="jec-field-wide">
+            <span>Documentos históricos</span>
+            <select name="historicalDocumentsAvailable" required>
+              <option value="">Selecione</option>
+              <option value="yes" ${historicalDocumentsAvailable === "yes" ? "selected" : ""}>Tenho os extratos/faturas para auditoria concluída</option>
+              <option value="no" ${historicalDocumentsAvailable === "no" ? "selected" : ""}>Não tenho os extratos/faturas históricos</option>
+            </select>
+          </label>
         </div>
+        <details class="jec-petition-values" ${prepared ? "open" : ""}>
+          <summary>Valores dos pedidos para revisão</summary>
+          <p>Informe somente valores já apurados e revisados. A Audita não presume indenização, juros ou repetição em dobro.</p>
+          <div class="jec-form-grid">
+            <label>
+              <span>Repetição em dobro (R$)</span>
+              <input name="doubleRefundAmount" inputmode="decimal" value="${escapeHtml(claimant.doubleRefundAmount ?? "")}" />
+            </label>
+            <label>
+              <span>Lucros cessantes (R$)</span>
+              <input name="lostProfitsAmount" inputmode="decimal" value="${escapeHtml(claimant.lostProfitsAmount ?? "")}" />
+            </label>
+            <label>
+              <span>Danos morais (R$)</span>
+              <input name="moralDamagesAmount" inputmode="decimal" value="${escapeHtml(claimant.moralDamagesAmount ?? "")}" />
+            </label>
+            <label>
+              <span>Valor da causa (R$)</span>
+              <input name="caseValue" inputmode="decimal" value="${escapeHtml(claimant.caseValue ?? "")}" />
+            </label>
+          </div>
+        </details>
         ${
           missingFields.length
             ? `<p class="jec-missing-fields">Revise: ${missingFields
@@ -2204,7 +2532,7 @@ function renderJecPetitionPanel(caseData = {}) {
             ? `
               <div class="jec-draft-summary">
                 <strong>${prepared.ready ? "Rascunho pronto para revisão" : "Rascunho preliminar"}</strong>
-                <span>${escapeHtml(prepared.portal?.name || "")}</span>
+                <span>${escapeHtml(prepared.template?.label || prepared.portal?.name || "")}</span>
                 <small>${Number(prepared.disputedCount || 0)} cobrança não reconhecida · ${
                   Number(prepared.knownAmountCount || 0) > 0
                     ? escapeHtml(formatChatCurrency(prepared.totalDisputed))
@@ -2219,6 +2547,13 @@ function renderJecPetitionPanel(caseData = {}) {
                 <input name="reviewConfirmed" type="checkbox" />
                 <span>Revisei o rascunho e os dados acima.</span>
               </label>
+              ${
+                Array.isArray(prepared.warnings) && prepared.warnings.length
+                  ? `<ul class="jec-template-warnings">${prepared.warnings
+                      .map((warning) => `<li>${escapeHtml(warning)}</li>`)
+                      .join("")}</ul>`
+                  : ""
+              }
               <label class="jec-confirmation">
                 <input name="transmissionAuthorized" type="checkbox" />
                 <span>Autorizo abrir o portal oficial. Sei que o protocolo final será feito por mim.</span>
@@ -2230,7 +2565,10 @@ function renderJecPetitionPanel(caseData = {}) {
           <button class="secondary-action" type="submit" data-jec-action="prepare">Preparar rascunho</button>
           ${
             prepared?.ready && !state.session
-              ? `<button class="primary-action" type="submit" data-jec-action="open">Abrir portal assistido</button>`
+              ? `
+                <button class="secondary-action" type="submit" data-jec-action="pdf">Baixar PDF para revisão</button>
+                <button class="primary-action" type="submit" data-jec-action="open">Abrir portal assistido</button>
+              `
               : ""
           }
         </div>
@@ -2347,8 +2685,6 @@ function renderItauCaseCard(caseData) {
 
       <div class="itau-charge-list">${candidateHtml}</div>
 
-      ${renderJecPetitionPanel(caseData)}
-
       ${
         candidates.length
           ? `
@@ -2447,6 +2783,34 @@ function renderItauCaseCard(caseData) {
   `;
 }
 
+function getActiveJecFlow(thread = getCurrentChatThread()) {
+  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  for (const message of [...messages].reverse()) {
+    const caseData = message?.itauCase;
+    if (!caseData?.id) continue;
+    const state = jecCaseStates.get(caseData.id);
+    if (state?.open || state?.prepared || state?.session || state?.error) {
+      return { caseData, state };
+    }
+  }
+  return null;
+}
+
+function renderActiveJecFlow(thread) {
+  const active = getActiveJecFlow(thread);
+  if (!active) return "";
+  return `
+    <article class="chat-message-row assistant chat-jec-flow-row" data-jec-flow-case="${escapeHtml(active.caseData.id)}">
+      <span class="chat-message-avatar"><img src="assets/audita-logo-white.svg" alt="" /></span>
+      <div class="chat-message-content">
+        <strong>Audita IA</strong>
+        <div class="chat-message-body">Complete os dados seguros abaixo para continuarmos no portal oficial.</div>
+        ${renderJecPetitionPanel(active.caseData)}
+      </div>
+    </article>
+  `;
+}
+
 function findItauCaseMessage(caseId) {
   for (const thread of chatState.threads) {
     const message = thread.messages.find((item) => item.itauCase?.id === caseId);
@@ -2529,6 +2893,7 @@ function renderChatMessages() {
     )
     .join("");
   chatMessages.insertAdjacentHTML("beforeend", messageHtml);
+  chatMessages.insertAdjacentHTML("beforeend", renderActiveJecFlow(thread));
 
   if (chatSending && chatSendingThreadId === thread?.id) {
     chatMessages.insertAdjacentHTML(
@@ -2550,10 +2915,10 @@ function renderChatMessages() {
     if (pendingJecFocusCaseId) {
       const caseId = pendingJecFocusCaseId;
       pendingJecFocusCaseId = "";
-      const card = chatMessages.querySelector(
-        `[data-itau-card="${CSS.escape(caseId)}"]`,
+      const flow = chatMessages.querySelector(
+        `[data-jec-flow-case="${CSS.escape(caseId)}"]`,
       );
-      const panel = card?.querySelector(".jec-petition-panel");
+      const panel = flow?.querySelector(".jec-petition-panel");
       if (panel) {
         panel.open = true;
         panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2652,9 +3017,20 @@ function readJecClaimant(form) {
     city: String(data.get("city") || "").trim(),
     fullName: String(data.get("fullName") || "").trim(),
     document: String(data.get("document") || "").trim(),
+    rg: String(data.get("rg") || "").trim(),
+    nationality: String(data.get("nationality") || "").trim(),
+    maritalStatus: String(data.get("maritalStatus") || "").trim(),
+    profession: String(data.get("profession") || "").trim(),
     email: String(data.get("email") || "").trim(),
     phone: String(data.get("phone") || "").trim(),
     address: String(data.get("address") || "").trim(),
+    historicalDocumentsAvailable: String(
+      data.get("historicalDocumentsAvailable") || "",
+    ).trim(),
+    doubleRefundAmount: String(data.get("doubleRefundAmount") || "").trim(),
+    lostProfitsAmount: String(data.get("lostProfitsAmount") || "").trim(),
+    moralDamagesAmount: String(data.get("moralDamagesAmount") || "").trim(),
+    caseValue: String(data.get("caseValue") || "").trim(),
   };
 }
 
@@ -2667,7 +3043,12 @@ async function submitJecPetitionForm(form, action) {
   const submitButton = form.querySelector(`[data-jec-action="${CSS.escape(action)}"]`);
   if (submitButton) {
     submitButton.disabled = true;
-    submitButton.textContent = action === "open" ? "Abrindo portal..." : "Preparando...";
+    submitButton.textContent =
+      action === "open"
+        ? "Abrindo portal..."
+        : action === "pdf"
+          ? "Gerando PDF..."
+          : "Preparando...";
   }
   jecCaseStates.set(caseId, { ...previous, claimant, error: "" });
 
@@ -2679,6 +3060,44 @@ async function submitJecPetitionForm(form, action) {
       uf: claimant.uf,
       city: claimant.city,
     };
+    if (action === "pdf") {
+      const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
+      if (!reviewConfirmed) {
+        throw new Error("Confirme a revisão do rascunho antes de gerar o PDF.");
+      }
+      const response = await fetch("/api/jec/petitions/pdf", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/pdf" },
+        body: JSON.stringify({
+          ...payload,
+          reviewConfirmed,
+        }),
+      });
+      if (response.status === 401) {
+        showLogin("Entre para gerar o PDF da petição.");
+        return;
+      }
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const missing = Array.isArray(data.missingFields)
+          ? ` Revise: ${data.missingFields.map(jecMissingFieldLabel).join(", ")}.`
+          : "";
+        throw new Error(data.message || `Não foi possível gerar o PDF.${missing}`);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") || "";
+      const fileName =
+        disposition.match(/filename="([^"]+)"/i)?.[1] || "peticao-jec-itau.pdf";
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      return;
+    }
     if (action === "open") {
       const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
       const transmissionAuthorized = Boolean(form.elements.transmissionAuthorized?.checked);
@@ -2722,6 +3141,13 @@ async function submitJecPetitionForm(form, action) {
         portal: data.portal,
         error: "",
       });
+      if (data.session?.live) {
+        openChatBrowserPane(data.session);
+      } else if (data.liveBrowserFallbackReason) {
+        setChatError(
+          "O navegador ao vivo não está disponível neste ambiente. A sessão foi aberta no modo assistido compatível.",
+        );
+      }
       renderChatWorkspace();
       return;
     }
@@ -2758,7 +3184,11 @@ async function submitJecPetitionForm(form, action) {
     if (submitButton?.isConnected) {
       submitButton.disabled = false;
       submitButton.textContent =
-        action === "open" ? "Abrir portal assistido" : "Preparar rascunho";
+        action === "open"
+          ? "Abrir portal assistido"
+          : action === "pdf"
+            ? "Baixar PDF para revisão"
+            : "Preparar rascunho";
     }
   }
 }
@@ -2836,6 +3266,7 @@ async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment)
       body: JSON.stringify({
         messages: thread.messages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
         caseContext: activeCase ? { type: "itau_refund", case: activeCase } : null,
+        browserSessionId: activeChatBrowserSession?.id || null,
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -2987,6 +3418,88 @@ chatToolsButton?.addEventListener("click", () => {
   chatToolsPanel?.classList.toggle("hidden", expanded);
 });
 
+chatBrowserFrame?.addEventListener("load", () => {
+  if (chatBrowserPane?.dataset.connection !== "offline") {
+    setChatBrowserConnectionState("connecting", "Estabelecendo a sessÃ£o ao vivo...");
+  }
+});
+
+window.addEventListener("message", (event) => {
+  if (
+    event.origin !== window.location.origin ||
+    event.source !== chatBrowserFrame?.contentWindow ||
+    event.data?.type !== "audita-browser-status"
+  ) {
+    return;
+  }
+  if (event.data.status === "online") {
+    chatBrowserConnectionFailures = 0;
+    setChatBrowserConnectionState("online");
+  } else if (event.data.status === "offline") {
+    setChatBrowserConnectionState(
+      "offline",
+      "A sessÃ£o perdeu a conexÃ£o. Tente reconectar sem fechar a conversa.",
+    );
+  }
+});
+
+chatBrowserTakeover?.addEventListener("click", () => chatBrowserAction("takeover"));
+chatBrowserReturn?.addEventListener("click", () => chatBrowserAction("return"));
+chatBrowserClose?.addEventListener("click", () => chatBrowserAction("close"));
+chatBrowserReconnect?.addEventListener("click", () =>
+  checkChatBrowserConnection({ reload: true }),
+);
+chatBrowserFullscreen?.addEventListener("click", () => {
+  chatPage?.classList.toggle("browser-fullscreen");
+  chatBrowserFullscreen.setAttribute(
+    "aria-label",
+    chatPage?.classList.contains("browser-fullscreen") ? "Sair da tela cheia" : "Tela cheia",
+  );
+});
+chatBrowserMobileOpen?.addEventListener("click", () => {
+  chatBrowserMobileView = "browser";
+  syncChatBrowserUi();
+});
+chatBrowserMobileViewButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    chatBrowserMobileView = button.dataset.chatBrowserMobileView || "browser";
+    syncChatBrowserUi();
+  });
+});
+
+chatBrowserSplitter?.addEventListener("pointerdown", (event) => {
+  if (!chatPage?.classList.contains("browser-open")) return;
+  event.preventDefault();
+  chatBrowserSplitter.setPointerCapture(event.pointerId);
+  chatBrowserSplitter.classList.add("dragging");
+  const resize = (moveEvent) => {
+    const width = chatPage.getBoundingClientRect().right - moveEvent.clientX;
+    const minimum = 500;
+    const maximum = Math.max(minimum, chatPage.clientWidth - 360);
+    chatPage.style.setProperty(
+      "--chat-browser-width",
+      `${Math.min(maximum, Math.max(minimum, width))}px`,
+    );
+  };
+  const finish = () => {
+    chatBrowserSplitter.classList.remove("dragging");
+    chatBrowserSplitter.removeEventListener("pointermove", resize);
+    chatBrowserSplitter.removeEventListener("pointerup", finish);
+    chatBrowserSplitter.removeEventListener("pointercancel", finish);
+  };
+  chatBrowserSplitter.addEventListener("pointermove", resize);
+  chatBrowserSplitter.addEventListener("pointerup", finish);
+  chatBrowserSplitter.addEventListener("pointercancel", finish);
+});
+
+chatBrowserSplitter?.addEventListener("keydown", (event) => {
+  if (!["ArrowLeft", "ArrowRight"].includes(event.key) || !chatPage) return;
+  event.preventDefault();
+  const current = chatBrowserPane?.getBoundingClientRect().width || window.innerWidth * 0.58;
+  const delta = event.key === "ArrowLeft" ? 24 : -24;
+  chatPage.style.setProperty("--chat-browser-width", `${Math.max(500, current + delta)}px`);
+});
+
 document.addEventListener("click", (event) => {
   if (!chatToolsPanel || chatToolsPanel.classList.contains("hidden")) return;
   if (chatToolsPanel.contains(event.target) || chatToolsButton?.contains(event.target)) return;
@@ -3077,6 +3590,14 @@ async function submitItauCaseReview(form) {
 }
 
 chatMessages?.addEventListener("click", async (event) => {
+  const liveBrowserButton = event.target.closest("[data-chat-browser-open]");
+  if (liveBrowserButton) {
+    const sessionId = liveBrowserButton.dataset.chatBrowserOpen;
+    const session = assistedRemoteSessions.get(sessionId);
+    if (session?.live) openChatBrowserPane(session);
+    return;
+  }
+
   const remotePanel = event.target.closest("[data-assisted-session]");
   if (remotePanel) {
     const sessionId = remotePanel.dataset.assistedSession;
@@ -3259,6 +3780,7 @@ chatMessages?.addEventListener("submit", (event) => {
 });
 
 renderChatWorkspace();
+syncChatBrowserUi();
 
 function renderDashboard(data) {
   const metrics = data.metrics || {};
@@ -6917,6 +7439,9 @@ consultationForm.addEventListener("submit", async (event) => {
 });
 
 logoutButton.addEventListener("click", async () => {
+  if (activeChatBrowserSession?.id) {
+    await chatBrowserAction("close");
+  }
   await fetch("/api/auth/logout", { method: "POST" });
   showLogin("Sessão encerrada.");
 });
