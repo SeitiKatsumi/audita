@@ -86,8 +86,8 @@ function createRuntime() {
     async close() {},
   };
   const chromiumImpl = {
-    async connectOverCDP(url) {
-      calls.push({ type: "cdp", url });
+    async connectOverCDP(url, options) {
+      calls.push({ type: "cdp", url, options });
       return browser;
     },
   };
@@ -141,6 +141,31 @@ test("portal URL must be HTTPS and belong to the explicit allowlist", () => {
     validateChatBrowserPortalUrl("https://example.com/teste", ["tjsp.jus.br"]).reason,
     "portal_host_not_allowed",
   );
+});
+
+test("Steel CDP connection uses a localhost Host header behind private service DNS", async () => {
+  const { calls, chromiumImpl, fetchImpl } = createRuntime();
+  const service = createChatBrowserService({
+    chromiumImpl,
+    fetchImpl,
+    config: {
+      enabled: true,
+      baseUrl: "http://srv-captain--audita-steel:3000",
+    },
+  });
+
+  const opened = await service.open({
+    portalUrl: "https://esaj.tjsp.jus.br/teste",
+    courtName: "TJSP",
+    courtUf: "SP",
+    allowedHosts: ["tjsp.jus.br"],
+  });
+
+  assert.ok(opened.sessionId);
+  const cdp = calls.find((call) => call.type === "cdp");
+  assert.equal(cdp.url, "ws://srv-captain--audita-steel:3000/");
+  assert.equal(cdp.options.headers.Host, "localhost:3000");
+  await service.close(opened.sessionId);
 });
 
 test("Steel viewer is rewritten to use the authenticated Audita websocket", () => {

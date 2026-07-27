@@ -82,6 +82,13 @@ function replaceOrigin(rawUrl, baseUrl, protocol) {
   return parsed.toString();
 }
 
+function steelWebSocketHeaders(baseUrl) {
+  const target = new URL(baseUrl);
+  return {
+    Host: `localhost${target.port ? `:${target.port}` : ""}`,
+  };
+}
+
 function getPage(session) {
   if (!session?.browser) return null;
   const contexts = session.browser.contexts();
@@ -424,7 +431,10 @@ export function createChatBrowserService({
       }
       providerSession = await createResponse.json();
       const cdpUrl = replaceOrigin(providerSession.websocketUrl || baseUrl, baseUrl, "ws:");
-      browser = await chromiumImpl.connectOverCDP(cdpUrl, { timeout: 30000 });
+      browser = await chromiumImpl.connectOverCDP(cdpUrl, {
+        timeout: 30000,
+        headers: steelWebSocketHeaders(baseUrl),
+      });
       const contexts = browser.contexts();
       const context = contexts[0] || await browser.newContext();
       const page = context.pages().at(-1) || await context.newPage();
