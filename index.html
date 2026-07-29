@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260720-api-usage-1" />
+    <link rel="stylesheet" href="styles.css?v=20260728-browser-status-1" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -168,6 +168,21 @@
               </section>
             </main>
 
+            <section
+              class="chat-browser-activity hidden"
+              id="chatBrowserActivity"
+              role="status"
+              aria-live="polite"
+            >
+              <span class="chat-browser-activity-indicator" aria-hidden="true"></span>
+              <div>
+                <strong id="chatBrowserActivityTitle">Utilizando o navegador</strong>
+                <small id="chatBrowserActivityDetail">A IA est&aacute; observando o portal oficial.</small>
+              </div>
+              <button class="hidden" id="chatBrowserActivityAction" type="button">
+                Assumir controle
+              </button>
+            </section>
             <div class="chat-error hidden" id="chatError" role="alert"></div>
             <form class="chat-composer" id="chatForm">
               <div class="chat-attachment-preview hidden" id="chatAttachmentPreview"></div>
@@ -231,6 +246,13 @@
               <button type="button" class="active" data-chat-browser-mobile-view="browser" role="tab">Navegador</button>
             </div>
             <div class="chat-browser-stage">
+              <section class="chat-browser-handoff hidden" id="chatBrowserHandoff" role="status" aria-live="polite">
+                <div>
+                  <strong id="chatBrowserHandoffTitle">A IA pausou nesta etapa</strong>
+                  <small id="chatBrowserHandoffDetail">Agora voc&ecirc; pode assumir o controle do navegador.</small>
+                </div>
+                <button id="chatBrowserHandoffAction" type="button">Assumir controle</button>
+              </section>
               <div class="chat-browser-loading" id="chatBrowserLoading">
                 <span></span>
                 <strong id="chatBrowserLoadingText">Conectando ao navegador seguro...</strong>
@@ -1377,6 +1399,6 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260724-itau-jec-1"></script>
+    <script type="module" src="app.js?v=20260728-browser-status-1"></script>
   </body>
 </html>

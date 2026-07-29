@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildJecAgentProfile,
+  getJecManualFilingGuide,
   getJecPortal,
   listJecPortals,
   prepareJecPetition,
@@ -68,6 +69,16 @@ test("capital-specific forms are used only for Belo Horizonte and Curitiba", () 
   assert.match(getJecPortal("MG", { city: "Uberlandia" }).startUrl, /tjmg\.jus\.br/);
   assert.match(getJecPortal("PR", { city: "Curitiba" }).startUrl, /idFormulario=6953/);
   assert.match(getJecPortal("PR", { city: "Londrina" }).startUrl, /ejud\.tjpr\.jus\.br/);
+});
+
+test("manual filing guide exposes official links and keeps final submission human", () => {
+  const guide = getJecManualFilingGuide("SP", { city: "Sao Paulo" });
+
+  assert.equal(guide.tribunal, "TJSP");
+  assert.equal(guide.finalActionHumanOnly, true);
+  assert.match(guide.portalUrl, /^https:\/\/.*tjsp\.jus\.br/);
+  assert.ok(guide.steps.length >= 5);
+  assert.match(guide.steps.at(-1), /pessoalmente/i);
 });
 
 test("petition draft uses the supplied audited-values model", () => {
@@ -182,6 +193,65 @@ test("petition preparation reports every field needed before PDF generation", ()
   assert.equal(unsupported.unsupported, true);
 });
 
+test("petition replaces optional monetary placeholders with reviewable legal wording", () => {
+  const prepared = prepareJecPetition({
+    caseData: {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        historicalDocumentsAvailable: "no",
+      },
+    },
+    uf: "SP",
+    city: "São Paulo",
+    claimant: {
+      ...completeClaimant,
+      historicalDocumentsAvailable: "no",
+      lostProfitsAmount: "",
+      moralDamagesAmount: "",
+      caseValue: "79,80",
+    },
+  });
+
+  assert.equal(prepared.ready, true);
+  assert.doesNotMatch(prepared.draft, /\[PENDENTE: (?:LOST_PROFITS|MORAL_DAMAGES)\]/);
+  assert.match(prepared.draft, /valor a ser apurado mediante prova documental/i);
+  assert.match(prepared.draft, /valor a ser arbitrado pelo Juízo/i);
+  assert.match(prepared.warnings.join("\n"), /Sem valor informado para danos morais/i);
+});
+
+test("petition validates CPF and composes a structured address", () => {
+  const structured = prepareJecPetition({
+    caseData: sampleCase,
+    uf: "SP",
+    city: "São Paulo",
+    claimant: {
+      ...completeClaimant,
+      address: "",
+      postalCode: "01310-100",
+      street: "Avenida Paulista",
+      addressNumber: "1000",
+      addressComplement: "Conjunto 10",
+      district: "Bela Vista",
+    },
+  });
+
+  assert.equal(structured.ready, true);
+  assert.equal(
+    structured.claimant.address,
+    "Avenida Paulista, 1000 - Conjunto 10 - Bela Vista - São Paulo/SP - 01310-100",
+  );
+  assert.match(structured.draft, /529\.982\.247-25/);
+  assert.match(structured.draft, /\(11\) 99999-9999/);
+
+  const invalidCpf = prepareJecPetition({
+    caseData: sampleCase,
+    uf: "SP",
+    claimant: { ...completeClaimant, document: "111.111.111-11" },
+  });
+  assert.ok(invalidCpf.missingFields.includes("document"));
+});
+
 test("petition metadata does not invent a total for a charge without amount", () => {
   const prepared = prepareJecPetition({
     caseData: {
@@ -250,9 +320,28 @@ test("chat UI focuses the JEC secure intake returned by the AI tool", async () =
   assert.match(source, /function activateJecIntake/);
   assert.match(source, /pendingJecFocusCaseId/);
   assert.match(source, /panel\.scrollIntoView/);
-  assert.match(source, /state\.open \|\| state\.session/);
+  assert.match(source, /state\.open \|\| state\.prepared/);
   assert.match(source, /\/api\/jec\/petitions\/pdf/);
   assert.match(source, /Baixar PDF para revisão/);
+  assert.match(source, /data-jec-monitoring-form/);
+  assert.match(source, /\/api\/integrations\/direct-data\/tj\/processes/);
+  assert.match(source, /Acessar portal oficial/);
+  assert.match(source, /Conhecer suporte profissional/);
+  assert.doesNotMatch(source, /data-jec-action="open"/);
+  assert.doesNotMatch(source, /Abrir portal assistido/);
   assert.match(source, /Sugestão da IA/);
   assert.match(source, /suggestion\.notes/);
+  assert.match(source, /\/api\/user\/profile/);
+  assert.match(source, /data-jec-mask="cpf"/);
+  assert.match(source, /name="postalCode"/);
+  assert.match(source, /Salvar estes dados no meu perfil/);
+});
+
+test("JEC browser is disabled by default while PDF and manual filing stay available", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
+
+  assert.match(source, /AUDITA_JEC_BROWSER_ENABLED/);
+  assert.match(source, /jec_browser_temporarily_disabled/);
+  assert.match(source, /O envio assistido esta temporariamente desativado/);
 });

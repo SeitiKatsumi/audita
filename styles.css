@@ -3715,6 +3715,80 @@ body[data-active-page="chat"] .workspace {
   background: #030b14;
 }
 
+.chat-browser-activity {
+  display: grid;
+  width: min(900px, calc(100% - 36px));
+  min-height: 54px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  margin: 0 auto 8px;
+  padding: 9px 11px;
+  border: 1px solid rgba(73, 169, 255, 0.28);
+  border-radius: 7px;
+  background: rgba(7, 29, 48, 0.96);
+}
+
+.chat-browser-activity-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--aqua);
+  box-shadow: 0 0 12px rgba(85, 207, 255, 0.58);
+}
+
+.chat-browser-activity[data-state="running"] .chat-browser-activity-indicator {
+  animation: chat-browser-activity-pulse 1.2s ease-in-out infinite;
+}
+
+.chat-browser-activity[data-state="waiting"] .chat-browser-activity-indicator,
+.chat-browser-activity[data-state="human"] .chat-browser-activity-indicator {
+  background: #ffd166;
+  box-shadow: 0 0 12px rgba(255, 209, 102, 0.5);
+}
+
+.chat-browser-activity[data-state="offline"] .chat-browser-activity-indicator {
+  background: #ff637d;
+  box-shadow: 0 0 12px rgba(255, 99, 125, 0.5);
+}
+
+.chat-browser-activity > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.chat-browser-activity strong {
+  color: #e9f7ff;
+  font-size: 0.76rem;
+}
+
+.chat-browser-activity small {
+  overflow: hidden;
+  color: #a9c4d8;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-browser-activity button,
+.chat-browser-handoff button {
+  min-height: 34px;
+  border: 1px solid rgba(116, 255, 154, 0.48);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #04131f;
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+  background: var(--lime);
+}
+
+@keyframes chat-browser-activity-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.82); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
 .chat-browser-header {
   display: flex;
   min-height: 68px;
@@ -3814,6 +3888,19 @@ body[data-active-page="chat"] .workspace {
   background: rgba(85, 207, 255, 0.1);
 }
 
+.chat-browser-pane[data-agent-state="waiting"] .chat-browser-control-status,
+.chat-browser-pane[data-agent-state="human"] .chat-browser-control-status {
+  border-color: rgba(255, 209, 102, 0.42);
+  color: #ffe39b;
+  background: rgba(255, 209, 102, 0.1);
+}
+
+.chat-browser-pane[data-agent-state="offline"] .chat-browser-control-status {
+  border-color: rgba(255, 99, 125, 0.42);
+  color: #ffc4ce;
+  background: rgba(255, 99, 125, 0.1);
+}
+
 .chat-browser-icon-button {
   width: 34px;
   padding: 0 !important;
@@ -3825,6 +3912,43 @@ body[data-active-page="chat"] .workspace {
   min-height: 0;
   overflow: hidden;
   background: #111;
+}
+
+.chat-browser-handoff {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  left: 12px;
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 209, 102, 0.52);
+  border-radius: 7px;
+  color: #f5fbff;
+  background: rgba(7, 22, 36, 0.96);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
+}
+
+.chat-browser-handoff > div {
+  display: grid;
+  gap: 3px;
+}
+
+.chat-browser-handoff strong {
+  font-size: 0.76rem;
+}
+
+.chat-browser-handoff small {
+  color: #c1d8e7;
+  font-size: 0.68rem;
+}
+
+.chat-browser-handoff[data-state="offline"] {
+  border-color: rgba(255, 99, 125, 0.5);
 }
 
 .chat-browser-stage iframe {
@@ -4666,41 +4790,6 @@ body[data-active-page="chat"] .workspace {
   font-size: 0.72rem;
 }
 
-.itau-request-draft {
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(73, 169, 255, 0.16);
-}
-
-.itau-request-draft summary {
-  color: var(--aqua);
-  font-size: 0.78rem;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.itau-request-draft pre {
-  max-height: 320px;
-  overflow: auto;
-  margin: 12px 0;
-  padding: 12px;
-  border: 1px solid rgba(73, 169, 255, 0.2);
-  border-radius: 6px;
-  color: #dcecf8;
-  font: inherit;
-  font-size: 0.72rem;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  background: #051624;
-}
-
-.itau-request-draft button {
-  min-height: 34px;
-  padding: 0 10px;
-  color: var(--lime);
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
 .jec-petition-panel {
   margin-top: 18px;
   padding-top: 16px;
@@ -4774,8 +4863,64 @@ body[data-active-page="chat"] .workspace {
   color: #effbff;
 }
 
+.jec-form-grid input:focus,
+.jec-form-grid select:focus {
+  border-color: #55d9f1;
+  outline: 2px solid rgba(85, 217, 241, 0.2);
+  outline-offset: 1px;
+}
+
+.jec-form-grid input:user-invalid,
+.jec-form-grid select:user-invalid {
+  border-color: #d96868;
+}
+
 .jec-field-wide {
   grid-column: 1 / -1;
+}
+
+.jec-form-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(82, 194, 230, 0.18);
+}
+
+.jec-form-section-title strong {
+  color: #dff8ff;
+  font-size: 0.78rem;
+}
+
+.jec-form-section-title span {
+  color: #8eb7c8;
+  font-size: 0.68rem;
+  text-align: right;
+}
+
+.jec-profile-save {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 14px;
+  color: #b8d5e4;
+  font-size: 0.72rem;
+}
+
+.jec-profile-save input {
+  margin-top: 2px;
+}
+
+.jec-profile-save input:disabled + span {
+  color: #7897a8;
+}
+
+.jec-profile-status {
+  margin: 8px 0 0;
+  color: #6fffc1;
+  font-size: 0.72rem;
 }
 
 .jec-petition-values {
@@ -4903,6 +5048,219 @@ body[data-active-page="chat"] .workspace {
 
 .jec-template-warnings li + li {
   margin-top: 4px;
+}
+
+.jec-manual-filing {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(82, 230, 166, 0.3);
+}
+
+.jec-manual-filing-heading,
+.jec-next-option-heading,
+.jec-monitoring-result-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.jec-manual-filing-heading > div,
+.jec-next-option-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.jec-manual-filing-heading span,
+.jec-read-only-badge {
+  width: fit-content;
+  color: #6fffc1;
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.jec-manual-filing-heading strong {
+  color: #ecfbff;
+  font-size: 0.94rem;
+}
+
+.jec-manual-filing-heading .primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  text-decoration: none;
+}
+
+.jec-manual-filing > ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 22px;
+  color: #c7e2ed;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.jec-manual-filing > p,
+.jec-next-option p,
+.jec-monitoring-result p {
+  margin: 0;
+  color: #9fc1d4;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.jec-official-info {
+  width: fit-content;
+  color: #70def2;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.jec-next-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(82, 194, 230, 0.2);
+}
+
+.jec-next-option {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding-left: 14px;
+  border-left: 2px solid rgba(82, 194, 230, 0.28);
+}
+
+.jec-next-option > strong,
+.jec-next-option-heading strong {
+  color: #dff8ff;
+  font-size: 0.8rem;
+}
+
+.jec-next-option > .secondary-action {
+  width: fit-content;
+}
+
+.jec-read-only-badge {
+  padding: 4px 7px;
+  border: 1px solid rgba(111, 255, 193, 0.32);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.jec-monitoring-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 10px;
+}
+
+.jec-monitoring-form label:not(.jec-confirmation) {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.jec-monitoring-form label > span {
+  color: #b8d5e4;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.jec-monitoring-form input,
+.jec-monitoring-form select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #245a79;
+  border-radius: 6px;
+  background: #061a2e;
+  color: #effbff;
+}
+
+.jec-monitoring-form .jec-form-actions {
+  align-items: center;
+  margin-top: 0;
+}
+
+.jec-monitoring-form .jec-form-actions small {
+  color: #789eaf;
+  font-size: 0.64rem;
+}
+
+.jec-monitoring-result {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(82, 194, 230, 0.18);
+}
+
+.jec-monitoring-result-heading strong {
+  color: #ecfbff;
+  font-size: 0.78rem;
+}
+
+.jec-monitoring-result-heading span,
+.jec-monitoring-result > small {
+  color: #8eb7c8;
+  font-size: 0.65rem;
+}
+
+.jec-process-list {
+  display: grid;
+  gap: 8px;
+}
+
+.jec-process-item {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid rgba(82, 194, 230, 0.22);
+  border-radius: 6px;
+  background: rgba(3, 17, 32, 0.52);
+}
+
+.jec-process-item > strong {
+  color: #70def2;
+  font-size: 0.76rem;
+}
+
+.jec-process-item > span,
+.jec-process-item > small {
+  color: #c7e2ed;
+  font-size: 0.68rem;
+}
+
+.jec-process-item dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+.jec-process-item dl div {
+  min-width: 0;
+}
+
+.jec-process-item dt {
+  color: #789eaf;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+}
+
+.jec-process-item dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  color: #b8d5e4;
+  font-size: 0.66rem;
 }
 
 .jec-assisted-browser {
@@ -5288,6 +5646,29 @@ body[data-active-page="chat"] .workspace {
     display: none;
   }
 
+  .chat-browser-activity {
+    width: calc(100% - 26px);
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .chat-browser-activity small {
+    white-space: normal;
+  }
+
+  .chat-browser-activity button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .chat-browser-handoff {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chat-browser-handoff button {
+    width: 100%;
+  }
+
   .chat-messages {
     padding: 24px 13px 18px;
   }
@@ -5331,6 +5712,27 @@ body[data-active-page="chat"] .workspace {
   }
 
   .jec-field-wide {
+    grid-column: auto;
+  }
+
+  .jec-manual-filing-heading,
+  .jec-next-option-heading,
+  .jec-monitoring-result-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .jec-manual-filing-heading .primary-action {
+    width: 100%;
+  }
+
+  .jec-next-options,
+  .jec-monitoring-form,
+  .jec-process-item dl {
+    grid-template-columns: 1fr;
+  }
+
+  .jec-monitoring-form .jec-field-wide {
     grid-column: auto;
   }
 

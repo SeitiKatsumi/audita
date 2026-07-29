@@ -4,11 +4,16 @@ import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import WebSocket, { WebSocketServer } from "ws";
+import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
 import { createApiUsageService } from "./services/api-usage.service.mjs";
 import { createOpenAIOfficialUsageService } from "./services/openai-official-usage.service.mjs";
-import { createChatBrowserService } from "./services/chat-browser.service.mjs";
+import {
+  createChatBrowserService,
+  normalizeWebSocketCloseCode,
+} from "./services/chat-browser.service.mjs";
 import { createCreditsService } from "./services/credits.service.mjs";
+import { createDirectDataCourtService } from "./services/direct-data-court.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
 import {
   runAuditaChat,
@@ -37,6 +42,14 @@ import {
   prepareJecPetition,
 } from "./services/jec-petition.service.mjs";
 import { createJecPetitionPdf } from "./services/jec-petition-pdf.service.mjs";
+import {
+  decryptUserProfile,
+  encryptUserProfile,
+  normalizeUserProfile,
+  profileForClient,
+  resolveProfileEncryptionKey,
+  UserProfileValidationError,
+} from "./services/user-profile.service.mjs";
 
 const root = resolve(".");
 loadLocalEnvFiles();
@@ -49,6 +62,9 @@ const sessionCookieName = "audita_session";
 const appVersion = process.env.APP_VERSION || resolveGitVersion() || "local";
 const appEnv = process.env.APP_ENV || "local";
 const appUrl = process.env.APP_URL || "";
+let profileEncryptionKey = resolveProfileEncryptionKey(
+  process.env.AUDITA_PROFILE_ENCRYPTION_KEY,
+);
 let pool;
 let dbReady = false;
 let dbError = null;
@@ -1149,6 +1165,21 @@ async function readJsonBody(request) {
   return body ? JSON.parse(body) : {};
 }
 
+async function initializeProfileEncryptionKey() {
+  if (profileEncryptionKey || appEnv !== "local") return;
+  const keyPath = join(root, "storage", "profile-encryption.key");
+  let secret = "";
+  try {
+    secret = (await readFile(keyPath, "utf8")).trim();
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    secret = crypto.randomBytes(48).toString("base64");
+    await mkdir(dirname(keyPath), { recursive: true });
+    await writeFile(keyPath, `${secret}\n`, { encoding: "utf8", mode: 0o600 });
+  }
+  profileEncryptionKey = resolveProfileEncryptionKey(secret);
+}
+
 async function readBufferBody(request, maxBytes = 12 * 1024 * 1024) {
   const chunks = [];
   let size = 0;
@@ -1235,6 +1266,90 @@ function publicUser(user) {
   };
 }
 
+function profileEncryptionContext(user) {
+  return `${user?.tenant_id || "local"}:${user?.id || "anonymous"}`;
+}
+
+async function loadUserProfile(user) {
+  const account = { name: user?.name || "", email: user?.email || "" };
+  if (!profileEncryptionKey) {
+    return {
+      profile: profileForClient({}, account),
+      stored: false,
+      storageConfigured: false,
+    };
+  }
+
+  let encryptedPayload = "";
+  if (!pool || !dbReady) {
+    await loadFallbackAuth();
+    encryptedPayload = fallbackUsers.get(user.id)?.profile_encrypted || "";
+  } else {
+    const result = await pool.query(
+      `SELECT encrypted_payload
+       FROM audita_user_profiles
+       WHERE tenant_id = $1 AND user_id = $2
+       LIMIT 1`,
+      [user.tenant_id, user.id],
+    );
+    encryptedPayload = result.rows[0]?.encrypted_payload || "";
+  }
+
+  const profile = encryptedPayload
+    ? decryptUserProfile(
+        encryptedPayload,
+        profileEncryptionKey,
+        profileEncryptionContext(user),
+      )
+    : {};
+  return {
+    profile: profileForClient(profile, account),
+    stored: Boolean(encryptedPayload),
+    storageConfigured: true,
+  };
+}
+
+async function saveUserProfile(user, input) {
+  if (!profileEncryptionKey) {
+    const error = new Error("profile_encryption_not_configured");
+    error.code = "profile_encryption_not_configured";
+    throw error;
+  }
+  const profile = normalizeUserProfile(input);
+  const encryptedPayload = encryptUserProfile(
+    profile,
+    profileEncryptionKey,
+    profileEncryptionContext(user),
+  );
+
+  if (!pool || !dbReady) {
+    await loadFallbackAuth();
+    const fallbackUser = fallbackUsers.get(user.id);
+    if (!fallbackUser) throw new Error("profile_user_not_found");
+    fallbackUser.profile_encrypted = encryptedPayload;
+    await saveFallbackAuth();
+  } else {
+    await pool.query(
+      `INSERT INTO audita_user_profiles (
+         tenant_id, user_id, encrypted_payload, payload_version, created_at, updated_at
+       )
+       VALUES ($1, $2, $3, 1, NOW(), NOW())
+       ON CONFLICT (user_id)
+       DO UPDATE SET
+         tenant_id = EXCLUDED.tenant_id,
+         encrypted_payload = EXCLUDED.encrypted_payload,
+         payload_version = EXCLUDED.payload_version,
+         updated_at = NOW()`,
+      [user.tenant_id, user.id, encryptedPayload],
+    );
+  }
+
+  return profileForClient(profile, {
+    name: user.name,
+    email: user.email,
+  });
+}
+
 function canManageIntegrations(user) {
   return ["super_admin", "owner", "admin"].includes(user?.role);
 }
@@ -1283,6 +1398,11 @@ const auditService = createAuditService({
   recordApiUsage: (usageContext, event) => apiUsageService.record(usageContext, event),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
+const directDataCourtService = createDirectDataCourtService({
+  creditsService,
+  recordApiUsage: (usageContext, event) =>
+    apiUsageService.record(usageContext, event),
+});
 const propertyAssetsService = createPropertyAssetsService({
   getDb: () => ({ pool, dbReady }),
   getAuthContext: getTenantIdForRequest,
@@ -2613,8 +2733,14 @@ async function runChatConversation(request) {
   };
   let browserContext = null;
   const browserSessionId = String(body.browserSessionId || "").trim();
+  const jecBrowserEnabled =
+    String(process.env.AUDITA_JEC_BROWSER_ENABLED || "false").toLowerCase() ===
+    "true";
 
-  if (/^[A-Za-z0-9_-]{1,100}$/.test(browserSessionId)) {
+  if (
+    jecBrowserEnabled &&
+    /^[A-Za-z0-9_-]{1,100}$/.test(browserSessionId)
+  ) {
     let browserView = await chatBrowserService.getView(browserSessionId, itauAuth);
     let browserTransport = "live";
     if (browserView.notFound) {
@@ -2977,6 +3103,83 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (
+    pathname === "/api/integrations/direct-data/tj/status" &&
+    request.method === "GET"
+  ) {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    sendJson(response, 200, {
+      configuration: directDataCourtService.getStatus(),
+    });
+    return true;
+  }
+
+  if (
+    pathname === "/api/integrations/direct-data/tj/processes" &&
+    request.method === "POST"
+  ) {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const result = await directDataCourtService.search(
+        await readJsonBody(request),
+        authContext,
+      );
+      if (result.unavailable) {
+        sendJson(response, 503, {
+          error: result.reason || "direct_data_unavailable",
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, {
+          error: result.reason || "invalid_direct_data_query",
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.unsupported) {
+        sendJson(response, 422, {
+          error: result.reason || "direct_data_uf_unsupported",
+          supportedUfs: result.supportedUfs,
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.insufficientCredits) {
+        sendJson(response, 402, {
+          error: "insufficient_credits",
+          creditCost: result.creditCost,
+          wallet: result.wallet,
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.failed) {
+        sendJson(response, 502, {
+          error: result.reason || "direct_data_query_failed",
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch {
+      sendJson(response, 500, {
+        error: "direct_data_query_failed",
+        message: "Nao foi possivel consultar o acompanhamento processual agora.",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/jec/portals" && request.method === "GET") {
     const authContext = await getTenantIdForRequest(request);
     if (authContext.unauthorized) {
@@ -3096,6 +3299,17 @@ async function handleApi(request, response, pathname) {
 
   if (pathname === "/api/jec/sessions" && request.method === "POST") {
     try {
+      if (
+        String(process.env.AUDITA_JEC_BROWSER_ENABLED || "false").toLowerCase() !==
+        "true"
+      ) {
+        sendJson(response, 410, {
+          error: "jec_browser_temporarily_disabled",
+          message:
+            "O envio assistido esta temporariamente desativado. Use o PDF e o guia do portal oficial.",
+        });
+        return true;
+      }
       const authContext = await getTenantIdForRequest(request);
       if (authContext.unauthorized) {
         sendJson(response, 401, { error: "authentication_required" });
@@ -3569,6 +3783,57 @@ async function handleApi(request, response, pathname) {
       user: publicUser(await getSessionUser(request)),
       authRequired,
     });
+    return true;
+  }
+
+  if (pathname === "/api/user/profile" && request.method === "GET") {
+    try {
+      const user = await getSessionUser(request);
+      if (!user) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, await loadUserProfile(user));
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "user_profile_load_failed",
+        message: "Não foi possível carregar o perfil cadastral.",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/user/profile" && request.method === "PUT") {
+    try {
+      const user = await getSessionUser(request);
+      if (!user) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      const profile = await saveUserProfile(user, body.profile || body);
+      sendJson(response, 200, { profile, stored: true, storageConfigured: true });
+    } catch (error) {
+      if (error instanceof UserProfileValidationError) {
+        sendJson(response, 400, {
+          error: error.code,
+          message: error.message,
+          fields: error.errors,
+        });
+        return true;
+      }
+      if (error?.code === "profile_encryption_not_configured") {
+        sendJson(response, 503, {
+          error: error.code,
+          message: "O armazenamento seguro do perfil ainda não está configurado.",
+        });
+        return true;
+      }
+      sendJson(response, 500, {
+        error: "user_profile_save_failed",
+        message: "Não foi possível salvar o perfil cadastral.",
+      });
+    }
     return true;
   }
 
@@ -4216,13 +4481,17 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (url.pathname === "/chat/") {
-    response.writeHead(302, { location: "/chat" });
+  const uiRoute = resolveUiRoute(url.pathname);
+  if (uiRoute.type === "redirect") {
+    response.writeHead(302, {
+      location: uiRoute.location,
+      "cache-control": "no-store",
+    });
     response.end();
     return;
   }
 
-  const requestedPath = url.pathname === "/" || url.pathname === "/chat" ? "/index.html" : url.pathname;
+  const requestedPath = uiRoute.path;
   const filePath = resolve(join(root, requestedPath));
 
   if (!filePath.startsWith(root) || !existsSync(filePath)) {
@@ -4275,8 +4544,17 @@ server.on("upgrade", async (request, socket, head) => {
       const closeBoth = (code = 1000, reason = "") => {
         if (closed) return;
         closed = true;
-        if (client.readyState === WebSocket.OPEN) client.close(code, reason);
-        if (upstream.readyState === WebSocket.OPEN) upstream.close(code, reason);
+        const safeCode = normalizeWebSocketCloseCode(code);
+        const safeClose = (websocket) => {
+          if (websocket.readyState !== WebSocket.OPEN) return;
+          try {
+            websocket.close(safeCode);
+          } catch {
+            websocket.terminate();
+          }
+        };
+        safeClose(client);
+        safeClose(upstream);
         if (upstream.readyState === WebSocket.CONNECTING) upstream.terminate();
       };
       client.on("message", (data, isBinary) => {
@@ -4304,6 +4582,7 @@ server.on("upgrade", async (request, socket, head) => {
   }
 });
 
+await initializeProfileEncryptionKey();
 await initializeDatabase();
 
 server.listen(port, host, () => {

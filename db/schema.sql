@@ -25,6 +25,16 @@ ALTER TABLE audita_users
   ADD CONSTRAINT audita_users_role_check
   CHECK (role IN ('super_admin', 'owner', 'admin', 'analyst', 'member'));
 
+CREATE TABLE IF NOT EXISTS audita_user_profiles (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL UNIQUE REFERENCES audita_users(id) ON DELETE CASCADE,
+  encrypted_payload TEXT NOT NULL,
+  payload_version SMALLINT NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS audita_sessions (
   id BIGSERIAL PRIMARY KEY,
   user_id BIGINT NOT NULL REFERENCES audita_users(id) ON DELETE CASCADE,
@@ -482,6 +492,7 @@ CREATE INDEX IF NOT EXISTS audita_sources_tenant_idx ON audita_sources(tenant_id
 CREATE INDEX IF NOT EXISTS audita_audit_events_tenant_idx ON audita_audit_events(tenant_id, status, severity);
 CREATE INDEX IF NOT EXISTS audita_reports_tenant_idx ON audita_reports(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_sessions_token_hash_idx ON audita_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS audita_user_profiles_tenant_idx ON audita_user_profiles(tenant_id, user_id);
 CREATE INDEX IF NOT EXISTS audita_consultation_requests_tenant_idx ON audita_consultation_requests(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_consultation_requests_subject_idx ON audita_consultation_requests(tenant_id, subject_identifier_hash);
 CREATE INDEX IF NOT EXISTS audita_api_sources_tenant_idx ON audita_api_sources(tenant_id, status, category);

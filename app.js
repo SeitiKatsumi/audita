@@ -92,6 +92,10 @@ const chatAttachment = document.querySelector("#chatAttachment");
 const chatAttachmentButton = document.querySelector("#chatAttachmentButton");
 const chatAttachmentPreview = document.querySelector("#chatAttachmentPreview");
 const chatPage = document.querySelector(".chat-page");
+const chatBrowserActivity = document.querySelector("#chatBrowserActivity");
+const chatBrowserActivityTitle = document.querySelector("#chatBrowserActivityTitle");
+const chatBrowserActivityDetail = document.querySelector("#chatBrowserActivityDetail");
+const chatBrowserActivityAction = document.querySelector("#chatBrowserActivityAction");
 const chatBrowserPane = document.querySelector("#chatBrowserPane");
 const chatBrowserSplitter = document.querySelector("#chatBrowserSplitter");
 const chatBrowserFrame = document.querySelector("#chatBrowserFrame");
@@ -105,6 +109,10 @@ const chatBrowserTakeover = document.querySelector("#chatBrowserTakeover");
 const chatBrowserReturn = document.querySelector("#chatBrowserReturn");
 const chatBrowserFullscreen = document.querySelector("#chatBrowserFullscreen");
 const chatBrowserClose = document.querySelector("#chatBrowserClose");
+const chatBrowserHandoff = document.querySelector("#chatBrowserHandoff");
+const chatBrowserHandoffTitle = document.querySelector("#chatBrowserHandoffTitle");
+const chatBrowserHandoffDetail = document.querySelector("#chatBrowserHandoffDetail");
+const chatBrowserHandoffAction = document.querySelector("#chatBrowserHandoffAction");
 const chatBrowserMobileOpen = document.querySelector("#chatBrowserMobileOpen");
 const chatBrowserMobileViewButtons = document.querySelectorAll("[data-chat-browser-mobile-view]");
 const operationsPages = document.querySelector("#operationsPages");
@@ -251,6 +259,8 @@ let chatBrowserRequestPending = false;
 let chatBrowserMobileView = "browser";
 let chatBrowserMonitorTimer = null;
 let chatBrowserConnectionFailures = 0;
+let chatBrowserAgentRequestPending = false;
+let activeChatBrowserAgentStatus = null;
 let propertySearchConfig = null;
 let currentPropertySearchId = sessionStorage.getItem("audita:lastPropertySearchId") || "";
 
@@ -1852,6 +1862,158 @@ let chatSendingThreadId = "";
 let chatPendingAttachment = null;
 const jecCaseStates = new Map();
 let pendingJecFocusCaseId = "";
+let currentUserProfile = null;
+let userProfileStorageConfigured = false;
+let directDataCourtConfiguration = null;
+let directDataCourtConfigurationLoading = false;
+
+function formatJecCpf(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  return digits
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+}
+
+function formatJecPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits ? `(${digits}` : "";
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function formatJecPostalCode(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+  return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+}
+
+function normalizeJecText(value) {
+  return String(value || "").normalize("NFC").replace(/\s+/g, " ").trim();
+}
+
+function buildJecAddress(claimant = {}) {
+  const streetLine = [claimant.street, claimant.addressNumber]
+    .map(normalizeJecText)
+    .filter(Boolean)
+    .join(", ");
+  return [
+    streetLine,
+    normalizeJecText(claimant.addressComplement),
+    normalizeJecText(claimant.district),
+    [normalizeJecText(claimant.city), normalizeJecText(claimant.uf)]
+      .filter(Boolean)
+      .join("/"),
+    formatJecPostalCode(claimant.postalCode),
+  ]
+    .filter(Boolean)
+    .join(" - ");
+}
+
+async function loadDirectDataCourtConfiguration({ force = false } = {}) {
+  if (directDataCourtConfigurationLoading) return directDataCourtConfiguration;
+  if (directDataCourtConfiguration && !force) return directDataCourtConfiguration;
+
+  directDataCourtConfigurationLoading = true;
+  try {
+    const response = await fetch("/api/integrations/direct-data/tj/status", {
+      headers: { accept: "application/json" },
+    });
+    if (response.status === 401) {
+      directDataCourtConfiguration = {
+        configured: false,
+        authenticationRequired: true,
+        supportedUfs: [],
+      };
+    } else {
+      const data = await response.json().catch(() => ({}));
+      directDataCourtConfiguration = response.ok
+        ? data.configuration || null
+        : {
+            configured: false,
+            supportedUfs: [],
+          };
+    }
+  } catch {
+    directDataCourtConfiguration = {
+      configured: false,
+      unavailable: true,
+      supportedUfs: [],
+    };
+  } finally {
+    directDataCourtConfigurationLoading = false;
+  }
+
+  renderChatWorkspace();
+  return directDataCourtConfiguration;
+}
+
+async function loadCurrentUserProfile() {
+  currentUserProfile = currentAuthState?.user
+    ? {
+        fullName: currentAuthState.user.name || "",
+        email: currentAuthState.user.email || "",
+      }
+    : null;
+  userProfileStorageConfigured = false;
+  if (!currentAuthState?.user) return currentUserProfile;
+
+  try {
+    const response = await fetch("/api/user/profile", {
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return currentUserProfile;
+    const data = await response.json();
+    currentUserProfile = {
+      ...currentUserProfile,
+      ...(data.profile || {}),
+    };
+    userProfileStorageConfigured = data.storageConfigured === true;
+  } catch {
+    // Nome e e-mail da sessão ainda permanecem disponíveis como preenchimento básico.
+  }
+  return currentUserProfile;
+}
+
+async function saveCurrentUserProfile(claimant) {
+  const response = await fetch("/api/user/profile", {
+    method: "PUT",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({
+      profile: {
+        fullName: claimant.fullName,
+        document: claimant.document,
+        rg: claimant.rg,
+        nationality: claimant.nationality,
+        maritalStatus: claimant.maritalStatus,
+        profession: claimant.profession,
+        email: claimant.email,
+        phone: claimant.phone,
+        postalCode: claimant.postalCode,
+        street: claimant.street,
+        addressNumber: claimant.addressNumber,
+        addressComplement: claimant.addressComplement,
+        district: claimant.district,
+        city: claimant.city,
+        uf: claimant.uf,
+      },
+    }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const fieldMessage = data.fields
+      ? Object.values(data.fields).filter(Boolean).join(" ")
+      : "";
+    throw new Error(
+      fieldMessage || data.message || "Não foi possível salvar o perfil cadastral.",
+    );
+  }
+  currentUserProfile = data.profile || currentUserProfile;
+  userProfileStorageConfigured = data.storageConfigured === true;
+  return data.profile;
+}
 
 function createChatId() {
   return globalThis.crypto?.randomUUID?.() || `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -2026,7 +2188,6 @@ function itauConversationGuidance(caseData = {}) {
   const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
   const answers = caseData.answers || {};
   const historicalEvidence = answers.historicalEvidence || "pending";
-  const priorComplaint = answers.priorComplaint || "pending";
   if (caseData.status === "unreadable") {
     return "Envie uma imagem mais nítida ou um PDF digital desta cobrança.";
   }
@@ -2040,41 +2201,21 @@ function itauConversationGuidance(caseData = {}) {
     if (!["yes", "no", "unknown"].includes(historicalEvidence)) {
       return "Há sinal para investigar. Verifique se a cobrança aparece em outros meses.";
     }
-    if (historicalEvidence === "yes" && priorComplaint === "pending") {
+    if (
+      historicalEvidence === "yes" &&
+      answers.historicalDocumentsAvailable !== "no"
+    ) {
       return "Compare outro extrato ou fatura para medir a duração da cobrança.";
     }
-    if (priorComplaint === "pending") {
-      return caseData.evaluation?.agreementStatus === "outside_period"
-        ? "Confirme se você já contestou esta cobrança atual com o Itaú."
-        : "Confirme se houve reclamação anterior dentro do prazo do acordo.";
-    }
-    if (priorComplaint === "yes" && !answers.priorComplaintDate) {
-      return "Informe a data da reclamação feita ao Itaú.";
-    }
-    if (priorComplaint === "no" && answers.administrativeDraftRequested === "yes") {
-      return "Revise o rascunho administrativo e registre o envio quando ele for feito.";
-    }
-    if (priorComplaint === "yes" && answers.bankResponseStatus === "pending") {
-      return "Informe se o banco respondeu ou resolveu a contestação.";
-    }
-    if (
-      ["no_response", "rejected", "partial"].includes(answers.bankResponseStatus) &&
-      answers.wantsJec === "yes"
-    ) {
+    if (answers.wantsJec === "yes") {
       return "Prepare o rascunho judicial e abra o portal oficial sem protocolar automaticamente.";
     }
-    return "Há sinal para investigar. O próximo passo é comparar extratos de outros meses.";
+    return "A análise pode seguir diretamente para a preparação judicial. Informe a UF quando decidir prosseguir.";
   }
   if (candidates.some((candidate) => candidate.answer === "unknown")) {
     return "Procure contrato, apólice ou autorização antes de concluir.";
   }
   return "As cobranças desta evidência foram reconhecidas. Você pode mostrar outra suspeita.";
-}
-
-function itauComplaintQuestion(caseData = {}) {
-  return caseData.evaluation?.agreementStatus === "outside_period"
-    ? "Já reclamou ao Itaú sobre esta cobrança?"
-    : "Reclamou ao banco até 18/12/2025?";
 }
 
 function jecMissingFieldLabel(field) {
@@ -2102,10 +2243,7 @@ function jecMissingFieldLabel(field) {
 
 function shouldShowJecPanel(caseData = {}) {
   const answers = caseData.answers || {};
-  return (
-    answers.wantsJec === "yes" ||
-    ["no_response", "rejected", "partial"].includes(answers.bankResponseStatus)
-  );
+  return answers.wantsJec === "yes";
 }
 
 function chatBrowserHostname(url) {
@@ -2122,12 +2260,165 @@ function setChatBrowserConnectionState(state, message = "") {
     chatBrowserLoadingText.textContent =
       message ||
       (state === "offline"
-        ? "A sessÃ£o do navegador foi interrompida."
+        ? "A sessão do navegador foi interrompida."
         : "Conectando ao navegador seguro...");
   }
   chatBrowserLoading?.classList.toggle("hidden", state === "online");
   chatBrowserLoading?.classList.toggle("error", state === "offline");
   chatBrowserReconnect?.classList.toggle("hidden", state !== "offline");
+  syncChatBrowserActivityUi();
+}
+
+function latestAgentInstruction(agent = {}) {
+  const messages = Array.isArray(agent.messages) ? agent.messages : [];
+  const message = [...messages]
+    .reverse()
+    .find((item) => item?.role === "assistant" && String(item.content || "").trim());
+  return String(message?.content || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
+}
+
+function chatBrowserActivityState() {
+  const session = activeChatBrowserSession;
+  const connection = chatBrowserPane?.dataset.connection || "connecting";
+  const agent = activeChatBrowserAgentStatus || {};
+  const agentStatus = String(agent.status || "");
+  const humanControl = session?.controlMode === "human";
+  const instruction = latestAgentInstruction(agent);
+  const humanRequired = [
+    "waiting_user_action",
+    "waiting_user_input",
+    "blocked",
+    "stopped",
+  ].includes(agentStatus);
+
+  if (connection === "offline") {
+    return {
+      state: "offline",
+      title: "Navegador desconectado",
+      detail: "A sessão perdeu a conexão. Tente novamente antes de continuar.",
+      action: "reconnect",
+      actionLabel: "Tentar novamente",
+      handoff: true,
+    };
+  }
+  if (humanControl) {
+    return {
+      state: "human",
+      title: "Você está controlando o navegador",
+      detail:
+        instruction ||
+        "Conclua a etapa necessária e depois devolva o controle para a IA continuar.",
+      action: "return",
+      actionLabel: "Devolver à IA",
+      handoff: true,
+    };
+  }
+  if (humanRequired) {
+    return {
+      state: "waiting",
+      title: "A IA pausou e precisa de você",
+      detail: instruction
+        ? `Agora você pode assumir o controle do navegador. ${instruction}`
+        : "Agora você pode assumir o controle do navegador e concluir esta etapa.",
+      action: "takeover",
+      actionLabel: "Assumir controle",
+      handoff: true,
+    };
+  }
+  if (agentStatus === "completed") {
+    return {
+      state: "completed",
+      title: "Navegação concluída",
+      detail: instruction || "Revise o resultado apresentado no portal oficial.",
+      action: "",
+      actionLabel: "",
+      handoff: false,
+    };
+  }
+  if (connection !== "online") {
+    return {
+      state: "connecting",
+      title: "Conectando ao navegador",
+      detail: "Aguarde enquanto a sessão segura é preparada.",
+      action: "",
+      actionLabel: "",
+      handoff: false,
+    };
+  }
+  return {
+    state: "running",
+    title: "Utilizando o navegador",
+    detail: "A IA está observando o portal e avançando somente em etapas reversíveis.",
+    action: "",
+    actionLabel: "",
+    handoff: false,
+  };
+}
+
+function syncChatBrowserActivityUi() {
+  const open = Boolean(activeChatBrowserSession?.id);
+  chatBrowserActivity?.classList.toggle("hidden", !open);
+  if (!open) {
+    chatBrowserHandoff?.classList.add("hidden");
+    if (chatBrowserPane) delete chatBrowserPane.dataset.agentState;
+    return;
+  }
+
+  const activity = chatBrowserActivityState();
+  if (chatBrowserPane) chatBrowserPane.dataset.agentState = activity.state;
+  if (chatBrowserActivity) chatBrowserActivity.dataset.state = activity.state;
+  if (chatBrowserActivityTitle) chatBrowserActivityTitle.textContent = activity.title;
+  if (chatBrowserActivityDetail) chatBrowserActivityDetail.textContent = activity.detail;
+  if (chatBrowserActivityAction) {
+    chatBrowserActivityAction.textContent = activity.actionLabel;
+    chatBrowserActivityAction.dataset.chatBrowserActivityAction = activity.action;
+    chatBrowserActivityAction.classList.toggle("hidden", !activity.action);
+  }
+
+  chatBrowserHandoff?.classList.toggle("hidden", !activity.handoff);
+  if (chatBrowserHandoff) chatBrowserHandoff.dataset.state = activity.state;
+  if (chatBrowserHandoffTitle) chatBrowserHandoffTitle.textContent = activity.title;
+  if (chatBrowserHandoffDetail) chatBrowserHandoffDetail.textContent = activity.detail;
+  if (chatBrowserHandoffAction) {
+    const canTakeOver = activity.action === "takeover";
+    chatBrowserHandoffAction.textContent = activity.actionLabel || "Assumir controle";
+    chatBrowserHandoffAction.classList.toggle("hidden", !canTakeOver);
+  }
+  if (chatBrowserControlStatus) {
+    chatBrowserControlStatus.textContent = activity.title;
+  }
+}
+
+async function refreshActiveChatBrowserAgentStatus() {
+  const agentSessionId = activeChatBrowserSession?.agentSessionId;
+  if (!agentSessionId || chatBrowserAgentRequestPending) {
+    syncChatBrowserActivityUi();
+    return;
+  }
+  chatBrowserAgentRequestPending = true;
+  try {
+    const response = await fetch(
+      `/api/state-court-agent-sessions/${encodeURIComponent(agentSessionId)}`,
+      { headers: { accept: "application/json" } },
+    );
+    if (!response.ok) return;
+    const data = await response.json().catch(() => ({}));
+    if (data.session) {
+      activeChatBrowserAgentStatus = {
+        ...(activeChatBrowserAgentStatus || {}),
+        ...data.session,
+      };
+      stateCourtAgentSessions.set(agentSessionId, activeChatBrowserAgentStatus);
+    }
+  } catch {
+    // Browser connectivity remains authoritative if the agent status endpoint is unavailable.
+  } finally {
+    chatBrowserAgentRequestPending = false;
+    syncChatBrowserActivityUi();
+  }
 }
 
 function stopChatBrowserMonitor() {
@@ -2155,12 +2446,13 @@ function clearExpiredChatBrowserSession(message) {
     pendingJecFocusCaseId = entry.caseId;
   }
   activeChatBrowserSession = null;
+  activeChatBrowserAgentStatus = null;
   stopChatBrowserMonitor();
   renderChatWorkspace();
   syncChatBrowserUi();
   setChatError(
     message ||
-      "A sessÃ£o do navegador terminou. Revise a autorizaÃ§Ã£o e abra uma nova sessÃ£o.",
+      "A sessão do navegador terminou. Revise a autorização e abra uma nova sessão.",
   );
 }
 
@@ -2189,6 +2481,7 @@ async function checkChatBrowserConnection({ reload = false } = {}) {
       ...activeChatBrowserSession,
       ...data.session,
     };
+    await refreshActiveChatBrowserAgentStatus();
     if (reload && chatBrowserFrame) {
       setChatBrowserConnectionState("connecting");
       chatBrowserFrame.src = `${data.session.viewerUrl}?v=${Date.now()}`;
@@ -2200,7 +2493,7 @@ async function checkChatBrowserConnection({ reload = false } = {}) {
     if (chatBrowserConnectionFailures >= 2) {
       setChatBrowserConnectionState(
         "offline",
-        "A conexÃ£o foi interrompida. Verifique o servidor e tente novamente.",
+        "A conexão foi interrompida. Verifique o servidor e tente novamente.",
       );
     }
     return false;
@@ -2234,6 +2527,8 @@ function syncChatBrowserUi() {
       delete chatBrowserFrame.dataset.sessionId;
     }
     if (chatBrowserPane) delete chatBrowserPane.dataset.connection;
+    activeChatBrowserAgentStatus = null;
+    syncChatBrowserActivityUi();
     return;
   }
 
@@ -2268,13 +2563,17 @@ function syncChatBrowserUi() {
     chatBrowserFrame.src = `${session.viewerUrl}?v=${encodeURIComponent(session.updatedAt || Date.now())}`;
     startChatBrowserMonitor();
   }
+  syncChatBrowserActivityUi();
 }
 
 function openChatBrowserPane(session) {
   if (!session?.id || !session.live || !session.viewerUrl) return false;
   activeChatBrowserSession = { ...session };
+  activeChatBrowserAgentStatus =
+    stateCourtAgentSessions.get(session.agentSessionId) || null;
   chatBrowserMobileView = "browser";
   syncChatBrowserUi();
+  refreshActiveChatBrowserAgentStatus();
   return true;
 }
 
@@ -2315,6 +2614,7 @@ async function chatBrowserAction(action) {
         });
       }
       activeChatBrowserSession = null;
+      activeChatBrowserAgentStatus = null;
       renderChatWorkspace();
       syncChatBrowserUi();
       return data.session;
@@ -2325,11 +2625,12 @@ async function chatBrowserAction(action) {
     };
     if (data.session?.id) assistedRemoteSessions.set(data.session.id, data.session);
     syncChatBrowserUi();
+    refreshActiveChatBrowserAgentStatus();
     return data.session;
   } catch (error) {
     setChatBrowserConnectionState(
       "offline",
-      "NÃ£o foi possÃ­vel comunicar com a sessÃ£o do navegador.",
+      "Não foi possível comunicar com a sessão do navegador.",
     );
     setChatError(
       error instanceof Error
@@ -2415,6 +2716,171 @@ function renderJecAssistedBrowser(state = {}) {
   `;
 }
 
+function renderJecCourtMonitoringResult(monitoring = {}) {
+  const result = monitoring.result;
+  if (!result) return "";
+  const processes = Array.isArray(result.processes) ? result.processes : [];
+  const statusLabel =
+    result.status === "found"
+      ? `${processes.length} processo${processes.length === 1 ? "" : "s"} encontrado${processes.length === 1 ? "" : "s"}`
+      : "Nenhum processo encontrado";
+  return `
+    <div class="jec-monitoring-result ${result.status === "found" ? "found" : "empty"}" role="status">
+      <div class="jec-monitoring-result-heading">
+        <strong>${escapeHtml(statusLabel)}</strong>
+        <span>${escapeHtml(result.provider || "Direct Data")}</span>
+      </div>
+      ${
+        processes.length
+          ? `<div class="jec-process-list">${processes
+              .map(
+                (process) => `
+                  <article class="jec-process-item">
+                    <strong>${escapeHtml(process.processNumber || "Número não informado")}</strong>
+                    <span>${escapeHtml(process.className || "Classe não informada")}</span>
+                    ${
+                      process.subject
+                        ? `<small>${escapeHtml(process.subject)}</small>`
+                        : ""
+                    }
+                    <dl>
+                      <div><dt>Órgão</dt><dd>${escapeHtml(process.courtUnit || process.courtLocation || "Não informado")}</dd></div>
+                      <div><dt>Último movimento</dt><dd>${escapeHtml(process.lastMovement?.title || "Não informado")}</dd></div>
+                    </dl>
+                  </article>
+                `,
+              )
+              .join("")}</div>`
+          : `<p>A consulta não localizou o processo com esses dados. Confira número, grau e UF antes de tentar novamente.</p>`
+      }
+      <small>Consulta em ${escapeHtml(formatDateTime(result.queriedAt))}. ${escapeHtml(result.disclaimer || "")}</small>
+    </div>
+  `;
+}
+
+function renderJecCourtMonitoring(caseData = {}, state = {}) {
+  const prepared = state.prepared;
+  const uf = String(prepared?.claimant?.uf || state.claimant?.uf || "").toUpperCase();
+  const configuration = directDataCourtConfiguration;
+  const supportedUfs = Array.isArray(configuration?.supportedUfs)
+    ? configuration.supportedUfs
+    : [];
+  const supported = supportedUfs.includes(uf);
+  const monitoring = state.courtMonitoring || {};
+
+  if (!configuration) {
+    return `
+      <section class="jec-next-option">
+        <strong>Acompanhar o processo no TJ</strong>
+        <p>Verificando a disponibilidade da consulta processual...</p>
+      </section>
+    `;
+  }
+
+  if (configuration.authenticationRequired) {
+    return `
+      <section class="jec-next-option">
+        <strong>Acompanhar o processo no TJ</strong>
+        <p>Entre na sua conta para consultar um processo já protocolado.</p>
+      </section>
+    `;
+  }
+
+  if (!supported) {
+    return `
+      <section class="jec-next-option">
+        <strong>Acompanhar o processo no TJ</strong>
+        <p>A cobertura contratada da Direct Data ainda não inclui ${escapeHtml(uf || "esta UF")}. UFs disponíveis: ${escapeHtml(supportedUfs.join(", ") || "nenhuma")}.</p>
+      </section>
+    `;
+  }
+
+  if (!configuration.configured) {
+    return `
+      <section class="jec-next-option">
+        <strong>Acompanhar o processo no TJ</strong>
+        <p>A integração está pronta, mas a credencial e a contratação da Direct Data ainda não estão ativas neste ambiente.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="jec-next-option">
+      <div class="jec-next-option-heading">
+        <div>
+          <strong>Acompanhar o processo no TJ</strong>
+          <p>Depois que o tribunal gerar o número, consulte movimentações sem sair da Audita.</p>
+        </div>
+        <span class="jec-read-only-badge">Somente leitura</span>
+      </div>
+      ${
+        monitoring.error
+          ? `<div class="jec-form-error" role="alert">${escapeHtml(monitoring.error)}</div>`
+          : ""
+      }
+      <form class="jec-monitoring-form" data-jec-monitoring-form="${escapeHtml(caseData.id)}">
+        <label class="jec-field-wide">
+          <span>Número do processo</span>
+          <input name="processNumber" required inputmode="numeric" autocomplete="off" maxlength="30" placeholder="0000000-00.0000.0.00.0000" value="${escapeHtml(monitoring.processNumber || "")}" />
+        </label>
+        <label>
+          <span>Grau</span>
+          <select name="degree" required>
+            <option value="1" ${Number(monitoring.degree || 1) === 1 ? "selected" : ""}>1º grau</option>
+            <option value="2" ${Number(monitoring.degree || 1) === 2 ? "selected" : ""}>2º grau</option>
+          </select>
+        </label>
+        <label class="jec-confirmation jec-field-wide">
+          <input name="authorizationConfirmed" type="checkbox" required />
+          <span>Confirmo que tenho autorização/base legal para consultar este processo.</span>
+        </label>
+        <div class="jec-form-actions jec-field-wide">
+          <button class="secondary-action" type="submit" ${monitoring.loading ? "disabled" : ""}>
+            ${monitoring.loading ? "Consultando..." : "Consultar andamento"}
+          </button>
+          <small>${Number(configuration.creditCost || 0)} crédito do plano por retorno localizado.</small>
+        </div>
+      </form>
+      ${renderJecCourtMonitoringResult(monitoring)}
+    </section>
+  `;
+}
+
+function renderJecManualFiling(caseData = {}, state = {}) {
+  const prepared = state.prepared;
+  const guide = prepared?.manualFiling;
+  if (!prepared?.ready || !state.pdfDownloadedAt || !guide) return "";
+
+  return `
+    <section class="jec-manual-filing" aria-label="Próximos passos para protocolo manual">
+      <div class="jec-manual-filing-heading">
+        <div>
+          <span>PDF gerado</span>
+          <strong>${escapeHtml(guide.title || "Protocolo manual")}</strong>
+        </div>
+        <a class="primary-action" href="${escapeHtml(guide.portalUrl)}" target="_blank" rel="noreferrer">Acessar portal oficial</a>
+      </div>
+      <ol>${(Array.isArray(guide.steps) ? guide.steps : [])
+        .map((step) => `<li>${escapeHtml(step)}</li>`)
+        .join("")}</ol>
+      <p>${escapeHtml(guide.note || "")}</p>
+      ${
+        guide.informationUrl
+          ? `<a class="jec-official-info" href="${escapeHtml(guide.informationUrl)}" target="_blank" rel="noreferrer">Ver orientações oficiais do tribunal</a>`
+          : ""
+      }
+      <div class="jec-next-options">
+        ${renderJecCourtMonitoring(caseData, state)}
+        <section class="jec-next-option">
+          <strong>Precisa de suporte profissional?</strong>
+          <p>A IA continua disponível para dúvidas. Se preferir, conheça também o atendimento opcional de um advogado da Audita.</p>
+          <button class="secondary-action" type="button" data-chat-prompt="Quero entender como funciona o suporte profissional de um advogado da Audita para revisar meu caso.">Conhecer suporte profissional</button>
+        </section>
+      </div>
+    </section>
+  `;
+}
+
 function renderJecPetitionPanel(caseData = {}) {
   if (!caseData?.id || !shouldShowJecPanel(caseData)) return "";
   const state = jecCaseStates.get(caseData.id) || {};
@@ -2427,9 +2893,9 @@ function renderJecPetitionPanel(caseData = {}) {
     caseData.answers?.historicalDocumentsAvailable ||
     "";
   return `
-    <details class="jec-petition-panel" ${state.open || state.session ? "open" : ""}>
-      <summary>Juizado Especial · preparação assistida</summary>
-      <p>Use este formulário seguro para preparar o rascunho. Os dados não entram no histórico do chat.</p>
+    <details class="jec-petition-panel" ${state.open || state.prepared ? "open" : ""}>
+      <summary>Juizado Especial · petição e protocolo manual</summary>
+      <p>Use este formulário seguro para preparar a petição em PDF. Os dados não entram no histórico do chat.</p>
       ${
         state.error
           ? `<div class="jec-form-error" role="alert">${escapeHtml(state.error)}</div>`
@@ -2451,43 +2917,79 @@ function renderJecPetitionPanel(caseData = {}) {
           </label>
           <label>
             <span>Cidade</span>
-            <input name="city" required maxlength="100" value="${escapeHtml(claimant.city || "")}" />
+            <input name="city" required maxlength="100" autocomplete="address-level2" value="${escapeHtml(claimant.city || "")}" />
           </label>
           <label>
             <span>Nome completo</span>
-            <input name="fullName" required maxlength="160" value="${escapeHtml(claimant.fullName || "")}" />
+            <input name="fullName" required maxlength="160" autocomplete="name" value="${escapeHtml(claimant.fullName || "")}" />
           </label>
           <label>
             <span>CPF</span>
-            <input name="document" required inputmode="numeric" maxlength="18" value="${escapeHtml(claimant.document || "")}" />
+            <input name="document" required inputmode="numeric" maxlength="14" autocomplete="off" data-jec-mask="cpf" placeholder="000.000.000-00" value="${escapeHtml(formatJecCpf(claimant.document || ""))}" />
           </label>
           <label>
             <span>RG</span>
-            <input name="rg" required maxlength="40" value="${escapeHtml(claimant.rg || "")}" />
+            <input name="rg" required maxlength="20" autocomplete="off" spellcheck="false" placeholder="Número e dígito" value="${escapeHtml(claimant.rg || "")}" />
           </label>
           <label>
             <span>Nacionalidade</span>
-            <input name="nationality" required maxlength="80" value="${escapeHtml(claimant.nationality || "")}" />
+            <select name="nationality" required>
+              <option value="">Selecione</option>
+              ${["Brasileiro(a)", "Estrangeiro(a)"]
+                .map(
+                  (value) =>
+                    `<option value="${value}" ${String(claimant.nationality || "").toLocaleLowerCase("pt-BR").startsWith(value.slice(0, 8).toLocaleLowerCase("pt-BR")) ? "selected" : ""}>${value}</option>`,
+                )
+                .join("")}
+            </select>
           </label>
           <label>
             <span>Estado civil</span>
-            <input name="maritalStatus" required maxlength="80" value="${escapeHtml(claimant.maritalStatus || "")}" />
+            <select name="maritalStatus" required>
+              <option value="">Selecione</option>
+              ${["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "Separado(a)", "União estável"]
+                .map(
+                  (value) =>
+                    `<option value="${value}" ${String(claimant.maritalStatus || "").toLocaleLowerCase("pt-BR").startsWith(value.replace("(a)", "").slice(0, 5).toLocaleLowerCase("pt-BR")) ? "selected" : ""}>${value}</option>`,
+                )
+                .join("")}
+            </select>
           </label>
           <label>
             <span>Profissão</span>
-            <input name="profession" required maxlength="120" value="${escapeHtml(claimant.profession || "")}" />
+            <input name="profession" required maxlength="120" autocomplete="organization-title" value="${escapeHtml(claimant.profession || "")}" />
           </label>
           <label>
             <span>E-mail</span>
-            <input name="email" required type="email" maxlength="160" value="${escapeHtml(claimant.email || "")}" />
+            <input name="email" required type="email" maxlength="160" autocomplete="email" value="${escapeHtml(claimant.email || "")}" />
           </label>
           <label>
             <span>Telefone</span>
-            <input name="phone" inputmode="tel" maxlength="40" value="${escapeHtml(claimant.phone || "")}" />
+            <input name="phone" required inputmode="tel" maxlength="15" autocomplete="tel" data-jec-mask="phone" placeholder="(00) 00000-0000" value="${escapeHtml(formatJecPhone(claimant.phone || ""))}" />
+          </label>
+          <div class="jec-form-section-title jec-field-wide">
+            <strong>Endereço</strong>
+            <span>Informe os campos separadamente para uso consistente nos portais.</span>
+          </div>
+          <label>
+            <span>CEP</span>
+            <input name="postalCode" required inputmode="numeric" maxlength="9" autocomplete="postal-code" data-jec-mask="postalCode" placeholder="00000-000" value="${escapeHtml(formatJecPostalCode(claimant.postalCode || ""))}" />
+          </label>
+          <label>
+            <span>Bairro</span>
+            <input name="district" required maxlength="80" autocomplete="address-level3" value="${escapeHtml(claimant.district || "")}" />
           </label>
           <label class="jec-field-wide">
-            <span>Endereço completo</span>
-            <input name="address" required maxlength="240" value="${escapeHtml(claimant.address || "")}" />
+            <span>Logradouro</span>
+            <input name="street" required maxlength="160" autocomplete="address-line1" placeholder="Rua, avenida, alameda..." value="${escapeHtml(claimant.street || "")}" />
+          </label>
+          <label>
+            <span>Número</span>
+            <input name="addressNumber" required maxlength="20" autocomplete="address-line2" value="${escapeHtml(claimant.addressNumber || "")}" />
+          </label>
+          <label>
+            <span>Complemento</span>
+            <input name="addressComplement" maxlength="80" autocomplete="address-line3" value="${escapeHtml(claimant.addressComplement || "")}" />
           </label>
           <label class="jec-field-wide">
             <span>Documentos históricos</span>
@@ -2498,6 +3000,25 @@ function renderJecPetitionPanel(caseData = {}) {
             </select>
           </label>
         </div>
+        ${
+          currentAuthState?.user
+            ? `
+              <label class="jec-profile-save">
+                <input name="saveProfile" type="checkbox" ${userProfileStorageConfigured ? "checked" : "disabled"} />
+                <span>${
+                  userProfileStorageConfigured
+                    ? "Salvar estes dados no meu perfil para as próximas etapas."
+                    : "O armazenamento seguro do perfil ainda não está configurado."
+                }</span>
+              </label>
+            `
+            : ""
+        }
+        ${
+          state.profileStored
+            ? `<p class="jec-profile-status" role="status">Dados cadastrais atualizados no seu perfil.</p>`
+            : ""
+        }
         <details class="jec-petition-values" ${prepared ? "open" : ""}>
           <summary>Valores dos pedidos para revisão</summary>
           <p>A Audita sugere uma estimativa inicial com base no que foi confirmado na conversa. Revise e edite os valores antes de gerar o rascunho.</p>
@@ -2520,11 +3041,11 @@ function renderJecPetitionPanel(caseData = {}) {
               <input name="doubleRefundAmount" inputmode="decimal" value="${escapeHtml(claimant.doubleRefundAmount ?? "")}" />
             </label>
             <label>
-              <span>Lucros cessantes (R$)</span>
+              <span>Lucros cessantes (R$, se houver)</span>
               <input name="lostProfitsAmount" inputmode="decimal" value="${escapeHtml(claimant.lostProfitsAmount ?? "")}" />
             </label>
             <label>
-              <span>Danos morais (R$)</span>
+              <span>Danos morais (R$, se definido)</span>
               <input name="moralDamagesAmount" inputmode="decimal" value="${escapeHtml(claimant.moralDamagesAmount ?? "")}" />
             </label>
             <label>
@@ -2568,26 +3089,21 @@ function renderJecPetitionPanel(caseData = {}) {
                       .join("")}</ul>`
                   : ""
               }
-              <label class="jec-confirmation">
-                <input name="transmissionAuthorized" type="checkbox" />
-                <span>Autorizo abrir o portal oficial. Sei que o protocolo final será feito por mim.</span>
-              </label>
             `
             : ""
         }
         <div class="jec-form-actions">
           <button class="secondary-action" type="submit" data-jec-action="prepare">Preparar rascunho</button>
           ${
-            prepared?.ready && !state.session
+            prepared?.ready
               ? `
                 <button class="secondary-action" type="submit" data-jec-action="pdf">Baixar PDF para revisão</button>
-                <button class="primary-action" type="submit" data-jec-action="open">Abrir portal assistido</button>
               `
               : ""
           }
         </div>
       </form>
-      ${renderJecAssistedBrowser(state)}
+      ${renderJecManualFiling(caseData, state)}
     </details>
   `;
 }
@@ -2675,8 +3191,6 @@ function renderItauCaseCard(caseData) {
         </div>
       `;
   const nextActions = Array.isArray(evaluation.nextActions) ? evaluation.nextActions : [];
-  const requestText = String(evaluation.administrativeRequest || "");
-
   return `
     <section class="itau-analysis-card" data-itau-card="${escapeHtml(caseData.id)}">
       <header class="itau-analysis-header">
@@ -2710,18 +3224,6 @@ function renderItauCaseCard(caseData) {
                   <label>
                     <span>A cobrança aparece em outros meses?</span>
                     <select name="historicalEvidence">${itauChoiceOptions(answers.historicalEvidence)}</select>
-                  </label>
-                  <label>
-                    <span>${escapeHtml(itauComplaintQuestion(caseData))}</span>
-                    <select name="priorComplaint">${itauChoiceOptions(answers.priorComplaint)}</select>
-                  </label>
-                  <label>
-                    <span>Data da reclamação</span>
-                    <input name="priorComplaintDate" type="date" value="${escapeHtml(answers.priorComplaintDate || "")}" />
-                  </label>
-                  <label>
-                    <span>Protocolo, se houver</span>
-                    <input name="priorComplaintProtocol" type="text" maxlength="80" value="${escapeHtml(answers.priorComplaintProtocol || "")}" placeholder="Opcional" />
                   </label>
                   <label>
                     <span>Já pediu cancelamento?</span>
@@ -2771,18 +3273,6 @@ function renderItauCaseCard(caseData) {
           }
         </div>
 
-        ${
-          requestText
-            ? `
-              <details class="itau-request-draft">
-                <summary>Ver pedido administrativo</summary>
-                <pre>${escapeHtml(requestText)}</pre>
-                <button type="button" data-itau-copy="${escapeHtml(caseData.id)}">Copiar pedido</button>
-              </details>
-            `
-            : ""
-        }
-
         <footer>
           <span>Triagem de apoio, não decisão judicial.</span>
           ${(caseData.sources || [])
@@ -2803,7 +3293,7 @@ function getActiveJecFlow(thread = getCurrentChatThread()) {
     const caseData = message?.itauCase;
     if (!caseData?.id) continue;
     const state = jecCaseStates.get(caseData.id);
-    if (state?.open || state?.prepared || state?.session || state?.error) {
+    if (state?.open || state?.prepared || state?.error) {
       return { caseData, state };
     }
   }
@@ -2818,7 +3308,7 @@ function renderActiveJecFlow(thread) {
       <span class="chat-message-avatar"><img src="assets/audita-logo-white.svg" alt="" /></span>
       <div class="chat-message-content">
         <strong>Audita IA</strong>
-        <div class="chat-message-body">Complete os dados seguros abaixo para continuarmos no portal oficial.</div>
+        <div class="chat-message-body">Complete os dados seguros abaixo para gerar a petição em PDF. Depois você receberá o link e o passo a passo do tribunal.</div>
         ${renderJecPetitionPanel(active.caseData)}
       </div>
     </article>
@@ -2855,12 +3345,14 @@ function activateJecIntake(action, { focus = true } = {}) {
     open: true,
     suggestion: action?.suggestion || previous.suggestion || null,
     claimant: {
+      ...(currentUserProfile || {}),
       ...suggestedValues,
       ...(previous.claimant || {}),
       ...(uf ? { uf } : {}),
     },
     error: "",
   });
+  void loadDirectDataCourtConfiguration();
   if (focus) pendingJecFocusCaseId = caseId;
   return true;
 }
@@ -2888,12 +3380,32 @@ function renderChatMessages() {
   if (!chatMessages || !chatEmptyState) return;
   const thread = getCurrentChatThread();
   const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  const activeJecFlow = getActiveJecFlow(thread);
+  const activeJecCaseId = activeJecFlow?.caseData?.id || "";
+  let jecFlowAnchorIndex = -1;
+  if (activeJecCaseId) {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const actions = Array.isArray(messages[index]?.actions)
+        ? messages[index].actions
+        : [];
+      if (
+        actions.some(
+          (action) =>
+            action?.kind === "jec_intake" &&
+            String(action.caseId || "") === activeJecCaseId,
+        )
+      ) {
+        jecFlowAnchorIndex = index;
+        break;
+      }
+    }
+  }
   chatEmptyState.classList.toggle("hidden", messages.length > 0);
   chatMessages.querySelectorAll(".chat-message-row").forEach((element) => element.remove());
 
   const messageHtml = messages
     .map(
-      (message) => `
+      (message, index) => `
         <article class="chat-message-row ${message.role === "user" ? "user" : "assistant"}">
           ${
             message.role === "assistant"
@@ -2909,11 +3421,18 @@ function renderChatMessages() {
             ${renderChatSources(message.sources)}
           </div>
         </article>
+        ${
+          index === jecFlowAnchorIndex
+            ? renderActiveJecFlow(thread)
+            : ""
+        }
       `,
     )
     .join("");
   chatMessages.insertAdjacentHTML("beforeend", messageHtml);
-  chatMessages.insertAdjacentHTML("beforeend", renderActiveJecFlow(thread));
+  if (activeJecFlow && jecFlowAnchorIndex < 0) {
+    chatMessages.insertAdjacentHTML("beforeend", renderActiveJecFlow(thread));
+  }
 
   if (chatSending && chatSendingThreadId === thread?.id) {
     chatMessages.insertAdjacentHTML(
@@ -3032,18 +3551,22 @@ async function uploadItauDocument(file) {
 
 function readJecClaimant(form) {
   const data = new FormData(form);
-  return {
+  const claimant = {
     uf: String(data.get("uf") || "").trim().toUpperCase(),
-    city: String(data.get("city") || "").trim(),
-    fullName: String(data.get("fullName") || "").trim(),
-    document: String(data.get("document") || "").trim(),
-    rg: String(data.get("rg") || "").trim(),
-    nationality: String(data.get("nationality") || "").trim(),
-    maritalStatus: String(data.get("maritalStatus") || "").trim(),
-    profession: String(data.get("profession") || "").trim(),
-    email: String(data.get("email") || "").trim(),
-    phone: String(data.get("phone") || "").trim(),
-    address: String(data.get("address") || "").trim(),
+    city: normalizeJecText(data.get("city")),
+    fullName: normalizeJecText(data.get("fullName")),
+    document: String(data.get("document") || "").replace(/\D/g, "").slice(0, 11),
+    rg: normalizeJecText(data.get("rg")).toLocaleUpperCase("pt-BR"),
+    nationality: normalizeJecText(data.get("nationality")),
+    maritalStatus: normalizeJecText(data.get("maritalStatus")),
+    profession: normalizeJecText(data.get("profession")),
+    email: normalizeJecText(data.get("email")).toLocaleLowerCase("pt-BR"),
+    phone: String(data.get("phone") || "").replace(/\D/g, "").slice(0, 11),
+    postalCode: String(data.get("postalCode") || "").replace(/\D/g, "").slice(0, 8),
+    street: normalizeJecText(data.get("street")),
+    addressNumber: normalizeJecText(data.get("addressNumber")),
+    addressComplement: normalizeJecText(data.get("addressComplement")),
+    district: normalizeJecText(data.get("district")),
     historicalDocumentsAvailable: String(
       data.get("historicalDocumentsAvailable") || "",
     ).trim(),
@@ -3051,6 +3574,11 @@ function readJecClaimant(form) {
     lostProfitsAmount: String(data.get("lostProfitsAmount") || "").trim(),
     moralDamagesAmount: String(data.get("moralDamagesAmount") || "").trim(),
     caseValue: String(data.get("caseValue") || "").trim(),
+  };
+  return {
+    ...claimant,
+    address: buildJecAddress(claimant),
+    saveProfile: Boolean(form.elements.saveProfile?.checked),
   };
 }
 
@@ -3064,15 +3592,20 @@ async function submitJecPetitionForm(form, action) {
   if (submitButton) {
     submitButton.disabled = true;
     submitButton.textContent =
-      action === "open"
-        ? "Abrindo portal..."
-        : action === "pdf"
-          ? "Gerando PDF..."
-          : "Preparando...";
+      action === "pdf" ? "Gerando PDF..." : "Preparando...";
   }
   jecCaseStates.set(caseId, { ...previous, claimant, error: "" });
 
   try {
+    let profileStored = previous.profileStored || false;
+    if (claimant.saveProfile) {
+      const savedProfile = await saveCurrentUserProfile(claimant);
+      Object.assign(claimant, savedProfile, {
+        saveProfile: true,
+        address: buildJecAddress(savedProfile),
+      });
+      profileStored = true;
+    }
     const payload = {
       caseId,
       caseData: found.message.itauCase,
@@ -3116,58 +3649,15 @@ async function submitJecPetitionForm(form, action) {
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
-      return;
-    }
-    if (action === "open") {
-      const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
-      const transmissionAuthorized = Boolean(form.elements.transmissionAuthorized?.checked);
-      if (!reviewConfirmed || !transmissionAuthorized) {
-        throw new Error("Confirme a revisão e a autorização antes de abrir o portal.");
-      }
-      const response = await fetch("/api/jec/sessions", {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({
-          ...payload,
-          reviewConfirmed,
-          transmissionAuthorized,
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        showLogin("Entre para abrir o portal assistido.");
-        return;
-      }
-      if (!response.ok) {
-        const missing = Array.isArray(data.missingFields)
-          ? ` Revise: ${data.missingFields.map(jecMissingFieldLabel).join(", ")}.`
-          : "";
-        throw new Error(
-          data.message || `Não foi possível abrir o portal oficial.${missing}`,
-        );
-      }
-      if (data.session?.id) {
-        assistedRemoteSessions.set(data.session.id, data.session);
-      }
-      if (data.agent?.id) {
-        stateCourtAgentSessions.set(data.agent.id, data.agent);
-      }
       jecCaseStates.set(caseId, {
         ...previous,
         claimant,
+        profileStored,
         prepared: previous.prepared,
-        session: data.session,
-        agent: data.agent,
-        portal: data.portal,
+        pdfDownloadedAt: new Date().toISOString(),
         error: "",
       });
-      if (data.session?.live) {
-        openChatBrowserPane(data.session);
-      } else if (data.liveBrowserFallbackReason) {
-        setChatError(
-          "O navegador ao vivo não está disponível neste ambiente. A sessão foi aberta no modo assistido compatível.",
-        );
-      }
+      void loadDirectDataCourtConfiguration();
       renderChatWorkspace();
       return;
     }
@@ -3188,6 +3678,7 @@ async function submitJecPetitionForm(form, action) {
     jecCaseStates.set(caseId, {
       ...previous,
       claimant,
+      profileStored,
       prepared: data.prepared,
       portal: data.prepared?.portal,
       error: "",
@@ -3204,13 +3695,117 @@ async function submitJecPetitionForm(form, action) {
     if (submitButton?.isConnected) {
       submitButton.disabled = false;
       submitButton.textContent =
-        action === "open"
-          ? "Abrir portal assistido"
-          : action === "pdf"
-            ? "Baixar PDF para revisão"
-            : "Preparar rascunho";
+        action === "pdf" ? "Baixar PDF para revisão" : "Preparar rascunho";
     }
   }
+}
+
+function directDataCourtErrorMessage(data = {}, status = 0) {
+  const messages = {
+    authorization_required: "Confirme a autorização/base legal antes da consulta.",
+    invalid_process_number: "Informe um número de processo válido.",
+    invalid_degree: "Selecione o grau do processo.",
+    unsupported_uf: `A cobertura atual não inclui esta UF. Disponíveis: ${(data.supportedUfs || []).join(", ")}.`,
+    direct_data_disabled: "A consulta processual ainda não está habilitada neste ambiente.",
+    direct_data_token_missing: "A credencial da Direct Data ainda não foi configurada.",
+    provider_permission_or_balance_required:
+      "A conta da Direct Data não possui permissão ou saldo para esta consulta.",
+    provider_temporarily_unavailable:
+      "A Direct Data está temporariamente indisponível. Tente novamente mais tarde.",
+    provider_timeout: "A consulta demorou além do limite. Tente novamente.",
+    insufficient_credits: "Seu plano não possui créditos suficientes para esta consulta.",
+  };
+  return (
+    messages[data.error] ||
+    data.message ||
+    (status >= 500
+      ? "Não foi possível consultar o andamento agora."
+      : "Revise os dados da consulta.")
+  );
+}
+
+async function submitJecCourtMonitoring(form) {
+  const caseId = form?.dataset.jecMonitoringForm || "";
+  const previous = jecCaseStates.get(caseId) || {};
+  const prepared = previous.prepared;
+  if (!prepared) return;
+
+  const data = new FormData(form);
+  const processNumber = String(data.get("processNumber") || "").trim().slice(0, 30);
+  const degree = Number(data.get("degree") || 1);
+  const authorizationConfirmed = Boolean(
+    form.elements.authorizationConfirmed?.checked,
+  );
+  const uf = String(prepared.claimant?.uf || previous.claimant?.uf || "")
+    .trim()
+    .toUpperCase();
+  const queryKey = `${uf}:${degree}:${processNumber.replace(/\D/g, "")}`;
+  const requestId =
+    previous.courtMonitoring?.queryKey === queryKey
+      ? previous.courtMonitoring.requestId
+      : createChatId();
+  const monitoring = {
+    ...(previous.courtMonitoring || {}),
+    processNumber,
+    degree,
+    queryKey,
+    requestId,
+    loading: true,
+    error: "",
+  };
+
+  jecCaseStates.set(caseId, {
+    ...previous,
+    courtMonitoring: monitoring,
+  });
+  renderChatWorkspace();
+
+  try {
+    const response = await fetch("/api/integrations/direct-data/tj/processes", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        requestId,
+        uf,
+        degree,
+        processNumber,
+        authorizationConfirmed,
+      }),
+    });
+    const responseData = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showLogin("Entre para acompanhar o processo.");
+      throw new Error("Entre na sua conta para continuar.");
+    }
+    if (!response.ok) {
+      throw new Error(directDataCourtErrorMessage(responseData, response.status));
+    }
+    if (responseData.configuration) {
+      directDataCourtConfiguration = responseData.configuration;
+    }
+    jecCaseStates.set(caseId, {
+      ...(jecCaseStates.get(caseId) || previous),
+      courtMonitoring: {
+        ...monitoring,
+        loading: false,
+        result: responseData.result || null,
+        error: "",
+      },
+    });
+  } catch (error) {
+    jecCaseStates.set(caseId, {
+      ...(jecCaseStates.get(caseId) || previous),
+      courtMonitoring: {
+        ...monitoring,
+        loading: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível consultar o andamento agora.",
+      },
+    });
+  }
+  renderChatWorkspace();
 }
 
 function inferChatAttachmentType(file) {
@@ -3440,7 +4035,7 @@ chatToolsButton?.addEventListener("click", () => {
 
 chatBrowserFrame?.addEventListener("load", () => {
   if (chatBrowserPane?.dataset.connection !== "offline") {
-    setChatBrowserConnectionState("connecting", "Estabelecendo a sessÃ£o ao vivo...");
+    setChatBrowserConnectionState("connecting", "Estabelecendo a sessão ao vivo...");
   }
 });
 
@@ -3458,13 +4053,20 @@ window.addEventListener("message", (event) => {
   } else if (event.data.status === "offline") {
     setChatBrowserConnectionState(
       "offline",
-      "A sessÃ£o perdeu a conexÃ£o. Tente reconectar sem fechar a conversa.",
+      "A sessão perdeu a conexão. Tente reconectar sem fechar a conversa.",
     );
   }
 });
 
 chatBrowserTakeover?.addEventListener("click", () => chatBrowserAction("takeover"));
 chatBrowserReturn?.addEventListener("click", () => chatBrowserAction("return"));
+chatBrowserHandoffAction?.addEventListener("click", () => chatBrowserAction("takeover"));
+chatBrowserActivityAction?.addEventListener("click", () => {
+  const action = chatBrowserActivityAction.dataset.chatBrowserActivityAction;
+  if (action === "takeover") chatBrowserAction("takeover");
+  if (action === "return") chatBrowserAction("return");
+  if (action === "reconnect") checkChatBrowserConnection({ reload: true });
+});
 chatBrowserClose?.addEventListener("click", () => chatBrowserAction("close"));
 chatBrowserReconnect?.addEventListener("click", () =>
   checkChatBrowserConnection({ reload: true }),
@@ -3560,9 +4162,6 @@ async function submitItauCaseReview(form) {
       found.message.itauCase.candidates.map((candidate) => [candidate.id, candidate.answer]),
     ),
     historicalEvidence: String(formData.get("historicalEvidence") || "pending"),
-    priorComplaint: String(formData.get("priorComplaint") || "pending"),
-    priorComplaintDate: String(formData.get("priorComplaintDate") || ""),
-    priorComplaintProtocol: String(formData.get("priorComplaintProtocol") || ""),
     cancellationRequested: String(formData.get("cancellationRequested") || "pending"),
     cancellationDate: String(formData.get("cancellationDate") || ""),
     continuedAfterCancellation: String(
@@ -3610,6 +4209,12 @@ async function submitItauCaseReview(form) {
 }
 
 chatMessages?.addEventListener("click", async (event) => {
+  const promptButton = event.target.closest("[data-chat-prompt]");
+  if (promptButton) {
+    sendChatMessage(promptButton.dataset.chatPrompt || "", null);
+    return;
+  }
+
   const liveBrowserButton = event.target.closest("[data-chat-browser-open]");
   if (liveBrowserButton) {
     const sessionId = liveBrowserButton.dataset.chatBrowserOpen;
@@ -3747,23 +4352,6 @@ chatMessages?.addEventListener("click", async (event) => {
     return;
   }
 
-  const copyButton = event.target.closest("[data-itau-copy]");
-  if (copyButton) {
-    const found = findItauCaseMessage(copyButton.dataset.itauCopy || "");
-    const requestText = found?.message.itauCase?.evaluation?.administrativeRequest || "";
-    if (!requestText) return;
-    navigator.clipboard
-      ?.writeText(requestText)
-      .then(() => {
-        copyButton.textContent = "Copiado";
-        setTimeout(() => {
-          if (copyButton.isConnected) copyButton.textContent = "Copiar pedido";
-        }, 1800);
-      })
-      .catch(() => setChatError("Não foi possível copiar automaticamente."));
-    return;
-  }
-
   const jecActionButton = event.target.closest("[data-chat-jec]");
   if (jecActionButton) {
     const activated = activateJecIntake({
@@ -3786,6 +4374,12 @@ chatMessages?.addEventListener("click", async (event) => {
 });
 
 chatMessages?.addEventListener("submit", (event) => {
+  const monitoringForm = event.target.closest("[data-jec-monitoring-form]");
+  if (monitoringForm) {
+    event.preventDefault();
+    submitJecCourtMonitoring(monitoringForm);
+    return;
+  }
   const jecForm = event.target.closest("[data-jec-form]");
   if (jecForm) {
     event.preventDefault();
@@ -3797,6 +4391,18 @@ chatMessages?.addEventListener("submit", (event) => {
   if (!form) return;
   event.preventDefault();
   submitItauCaseReview(form);
+});
+
+chatMessages?.addEventListener("input", (event) => {
+  const input = event.target.closest("[data-jec-mask]");
+  if (!input) return;
+  const formatters = {
+    cpf: formatJecCpf,
+    phone: formatJecPhone,
+    postalCode: formatJecPostalCode,
+  };
+  const formatter = formatters[input.dataset.jecMask];
+  if (formatter) input.value = formatter(input.value);
 });
 
 renderChatWorkspace();
@@ -4569,6 +5175,10 @@ function updateStateCourtAgentPanel(sessionId, session) {
   const panel = document.querySelector(`[data-state-court-agent-session="${CSS.escape(sessionId)}"]`);
   const merged = { ...(stateCourtAgentSessions.get(sessionId) || {}), ...(session || {}), loading: false };
   stateCourtAgentSessions.set(sessionId, merged);
+  if (activeChatBrowserSession?.agentSessionId === sessionId) {
+    activeChatBrowserAgentStatus = merged;
+    syncChatBrowserActivityUi();
+  }
   if (!panel) return;
   const status = panel.querySelector("[data-state-court-agent-status]");
   const messagesTarget = panel.querySelector("[data-state-court-agent-messages]");
@@ -7518,6 +8128,7 @@ await loadModules();
 const authState = await loadAuthState();
 renderProfile(authState.user);
 configureApiUsageAdmin(authState);
+await loadCurrentUserProfile();
 if (authState.authRequired && !authState.user) {
   showLogin();
 } else {

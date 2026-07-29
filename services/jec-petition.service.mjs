@@ -2,6 +2,12 @@ import {
   getJecPetitionTemplate,
   renderJecPetitionTemplate,
 } from "./jec-petition-templates.mjs";
+import {
+  buildProfileAddress,
+  formatProfileCpf,
+  formatProfilePhone,
+  validateProfileCpf,
+} from "./user-profile.service.mjs";
 
 const JEC_PORTALS = Object.freeze({
   SP: {
@@ -191,6 +197,37 @@ const JEC_PORTALS = Object.freeze({
 });
 
 const SUPPORTED_UFS = Object.freeze(Object.keys(JEC_PORTALS));
+const MANUAL_FILING_STEPS = Object.freeze({
+  SP: Object.freeze([
+    "Acesse o Peticionamento Eletrônico do TJSP e selecione o Foro/Comarca e a competência do Juizado Especial Cível.",
+    "Entre no eproc com a sua própria conta e escolha Petição inicial.",
+    "Revise comarca, rito, classe, assunto, valor da causa, sigilo e gratuidade antes de avançar.",
+    "Cadastre autor e réu com dados conferidos. Não invente documento ou endereço ausente.",
+    "Anexe o PDF da petição e as provas que você decidiu apresentar.",
+    "Confira o resumo completo e finalize o protocolo pessoalmente.",
+  ]),
+  RJ: Object.freeze([
+    "Acesse o Petição Cidadã do TJRJ e confirme a categoria adequada para a cobrança relatada.",
+    "Entre com a sua própria conta gov.br prata ou ouro.",
+    "Revise os dados do autor e do réu e anexe apenas documentos escolhidos por você.",
+    "Cole ou anexe os fatos, fundamentos, pedidos e valores do PDF revisado.",
+    "Confira integralmente a petição e envie pessoalmente.",
+  ]),
+  MG: Object.freeze([
+    "Acesse a página oficial dos Juizados Especiais do TJMG.",
+    "Para Belo Horizonte, use a pré-atermação da capital. No interior, confirme a unidade competente.",
+    "Preencha autor, réu, fatos, pedidos e valor da causa com os dados revisados.",
+    "Anexe o PDF, os documentos pessoais e as provas escolhidas por você.",
+    "Confira a unidade e o resumo antes de enviar pessoalmente.",
+  ]),
+  PR: Object.freeze([
+    "Acesse o Formulário Virtual dos Juizados Especiais do TJPR.",
+    "Em Curitiba, use a opção BANCÁRIO para matéria bancária. Em outra cidade, selecione a comarca.",
+    "Preencha os dados do autor e do réu e revise fatos, pedidos e valor da causa.",
+    "Anexe o PDF, identificação, comprovante de residência e as provas escolhidas por você.",
+    "Confira todos os dados e envie o formulário pessoalmente.",
+  ]),
+});
 
 function cleanText(value, maxLength = 400) {
   return String(value || "")
@@ -237,6 +274,24 @@ export function getJecPortal(uf, { city = "" } = {}) {
   const normalizedUf = normalizeUf(uf);
   const portal = JEC_PORTALS[normalizedUf];
   return portal ? publicPortal(portal, city) : null;
+}
+
+export function getJecManualFilingGuide(uf, { city = "" } = {}) {
+  const portal = getJecPortal(uf, { city });
+  if (!portal) return null;
+  return {
+    uf: portal.uf,
+    tribunal: portal.tribunal,
+    title: `Protocolo manual no ${portal.tribunal}`,
+    portalUrl: portal.startUrl,
+    informationUrl: portal.officialUrl,
+    steps: [...(MANUAL_FILING_STEPS[portal.uf] || [])],
+    requirements: [...(portal.requirements || [])],
+    verifiedAt: portal.guide?.verifiedAt || "",
+    finalActionHumanOnly: true,
+    note:
+      "A Audita prepara o PDF e orienta o caminho. Login, anexos, escolhas jurídicas e protocolo final são feitos pelo usuário.",
+  };
 }
 
 function resolveJourney(caseData = {}, claimant = {}) {
@@ -377,16 +432,24 @@ function buildDraft({ claimant, templateId, generatedAt }) {
     MARITAL_STATUS: claimant.maritalStatus,
     PROFESSION: claimant.profession,
     RG: claimant.rg,
-    DOCUMENT: claimant.document,
+    DOCUMENT: formatProfileCpf(claimant.document),
     ADDRESS: claimant.address,
     EMAIL: claimant.email,
-    PHONE: claimant.phone,
+    PHONE: formatProfilePhone(claimant.phone),
     DOUBLE_REFUND: formatPetitionMoney(claimant.doubleRefundAmount),
     LOST_PROFITS: formatPetitionMoney(claimant.lostProfitsAmount),
     MORAL_DAMAGES: formatPetitionMoney(claimant.moralDamagesAmount),
     CASE_VALUE: formatPetitionMoney(claimant.caseValue),
     DATE: formatPetitionDate(generatedAt),
-  });
+  })
+    .replace(
+      /no valor estimado de R\$ \[PENDENTE: LOST_PROFITS\]/g,
+      "em valor a ser apurado mediante prova documental",
+    )
+    .replace(
+      /no valor de R\$ \[PENDENTE: MORAL_DAMAGES\]/g,
+      "em valor a ser arbitrado pelo Juízo",
+    );
 }
 
 export function prepareJecPetition({
@@ -413,6 +476,9 @@ export function prepareJecPetition({
     .map((candidate) => Number(candidate?.amount))
     .filter((amount) => Number.isFinite(amount) && amount > 0);
   const document = normalizeDocument(claimant.document);
+  const phone = normalizeDocument(claimant.phone).slice(0, 11);
+  const structuredAddress = buildProfileAddress(claimant);
+  const normalizedAddress = structuredAddress || cleanText(claimant.address, 300);
   const journey = resolveJourney(caseData, claimant);
   const templateId =
     journey === "with_historical_documents"
@@ -421,16 +487,18 @@ export function prepareJecPetition({
   const template = getJecPetitionTemplate(templateId);
   const missingFields = [];
   if (!cleanText(claimant.fullName, 160)) missingFields.push("fullName");
-  if (document.length !== 11) missingFields.push("document");
+  if (!validateProfileCpf(document)) missingFields.push("document");
   if (!cleanText(claimant.rg, 40)) missingFields.push("rg");
   if (!cleanText(claimant.nationality, 80)) missingFields.push("nationality");
   if (!cleanText(claimant.maritalStatus, 80)) missingFields.push("maritalStatus");
   if (!cleanText(claimant.profession, 120)) missingFields.push("profession");
   if (!normalizedCity) missingFields.push("city");
   if (!normalizedUf) missingFields.push("uf");
-  if (!cleanText(claimant.address, 240)) missingFields.push("address");
-  if (!cleanText(claimant.email, 160)) missingFields.push("email");
-  if (!cleanText(claimant.phone, 40)) missingFields.push("phone");
+  if (!normalizedAddress) missingFields.push("address");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanText(claimant.email, 160))) {
+    missingFields.push("email");
+  }
+  if (![10, 11].includes(phone.length)) missingFields.push("phone");
   if (!disputed.length) missingFields.push("disputedCharge");
   if (journey === "undetermined") missingFields.push("historicalDocumentsAvailable");
 
@@ -451,8 +519,13 @@ export function prepareJecPetition({
     maritalStatus: cleanText(claimant.maritalStatus, 80),
     profession: cleanText(claimant.profession, 120),
     email: cleanText(claimant.email, 160),
-    phone: cleanText(claimant.phone, 40),
-    address: cleanText(claimant.address, 240),
+    phone,
+    postalCode: normalizeDocument(claimant.postalCode).slice(0, 8),
+    street: cleanText(claimant.street, 160),
+    addressNumber: cleanText(claimant.addressNumber, 20),
+    addressComplement: cleanText(claimant.addressComplement, 80),
+    district: cleanText(claimant.district, 80),
+    address: normalizedAddress,
     city: normalizedCity,
     uf: normalizedUf,
     historicalDocumentsAvailable:
@@ -471,6 +544,9 @@ export function prepareJecPetition({
     ready: missingFields.length === 0,
     missingFields,
     portal,
+    manualFiling: getJecManualFilingGuide(normalizedUf, {
+      city: normalizedCity,
+    }),
     claimant: normalizedClaimant,
     draft: buildDraft({
       claimant: normalizedClaimant,
@@ -491,6 +567,16 @@ export function prepareJecPetition({
     warnings: [
       "Rascunho baseado no modelo fornecido: revise fatos, competência territorial, pedidos e valor da causa.",
       "Os valores jurídicos não são calculados nem presumidos pelo Audita; devem ser informados e revisados.",
+      ...(!Number.isFinite(lostProfitsAmount)
+        ? [
+            "Sem valor informado para lucros cessantes, o rascunho usa pedido a apurar mediante prova documental.",
+          ]
+        : []),
+      ...(!Number.isFinite(moralDamagesAmount)
+        ? [
+            "Sem valor informado para danos morais, o rascunho usa pedido a ser arbitrado pelo Juízo.",
+          ]
+        : []),
       ...template.reviewNotes,
       "A IA não assina nem protocola; a ação final exige revisão e confirmação humana.",
     ],

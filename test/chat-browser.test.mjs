@@ -4,9 +4,19 @@ import test from "node:test";
 
 import {
   createChatBrowserService,
+  normalizeWebSocketCloseCode,
   rewriteSteelViewerHtml,
   validateChatBrowserPortalUrl,
 } from "../services/chat-browser.service.mjs";
+
+test("normalizes reserved WebSocket close codes before proxying them", () => {
+  assert.equal(normalizeWebSocketCloseCode(1000), 1000);
+  assert.equal(normalizeWebSocketCloseCode(1013), 1013);
+  assert.equal(normalizeWebSocketCloseCode(3001), 3001);
+  assert.equal(normalizeWebSocketCloseCode(1006), 1011);
+  assert.equal(normalizeWebSocketCloseCode(999), 1011);
+  assert.equal(normalizeWebSocketCloseCode(undefined), 1011);
+});
 
 function createRuntime() {
   const calls = [];
@@ -323,8 +333,13 @@ test("chat UI contains a dedicated live browser pane without changing certificat
   assert.match(html, /id="chatBrowserPane"/);
   assert.match(html, /id="chatBrowserTakeover"/);
   assert.match(html, /id="chatBrowserReconnect"/);
+  assert.match(html, /id="chatBrowserActivity"/);
+  assert.match(html, /id="chatBrowserHandoff"/);
   assert.match(app, /openChatBrowserPane/);
   assert.match(app, /chatBrowserAction\("takeover"\)/);
+  assert.match(app, /A IA pausou e precisa de voc/);
+  assert.match(app, /Agora voc.*pode assumir o controle do navegador/);
+  assert.match(app, /refreshActiveChatBrowserAgentStatus/);
   assert.match(app, /renderActiveJecFlow/);
   assert.match(app, /browserSessionId:\s*activeChatBrowserSession\?\.id/);
   assert.doesNotMatch(
@@ -333,5 +348,7 @@ test("chat UI contains a dedicated live browser pane without changing certificat
   );
   assert.match(css, /\.chat-page\.browser-open/);
   assert.match(css, /\.chat-browser-pane\[data-control="human"\]/);
+  assert.match(css, /\.chat-browser-activity\[data-state="running"\]/);
+  assert.match(css, /\.chat-browser-handoff/);
   assert.match(html, /id="auditForm"/);
 });

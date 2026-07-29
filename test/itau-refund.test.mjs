@@ -49,8 +49,9 @@ test("consumer confirmation changes a candidate into a possible unauthorized cha
   assert.equal(result.classification, "possible_unauthorized");
   assert.equal(result.risk, "medio");
   assert.equal(result.totalDisputed, 18.9);
-  assert.match(result.administrativeRequest, /Pedido de revisão e restituição/i);
-  assert.match(result.administrativeRequest, /não é petição judicial/i);
+  assert.equal(result.administrativeRequest, undefined);
+  assert.match(result.nextActions.join(" "), /Juizado Especial/i);
+  assert.doesNotMatch(result.nextActions.join(" "), /administrativ|protocolo/i);
 });
 
 test("continued billing after cancellation is treated as a strong signal", () => {
@@ -75,7 +76,8 @@ test("continued billing after cancellation is treated as a strong signal", () =>
 
   assert.equal(result.classification, "strong_indication");
   assert.equal(result.risk, "alto");
-  assert.equal(result.agreementStatus, "potentially_eligible");
+  assert.equal(result.agreementStatus, "historical_context_only");
+  assert.match(result.agreementLabel, /via judicial/i);
 });
 
 test("a 2026 charge is outside the collective agreement regardless of prior complaint", () => {
@@ -100,7 +102,7 @@ test("a 2026 charge is outside the collective agreement regardless of prior comp
   assert.doesNotMatch(result.nextActions.join(" "), /reclamacao anterior.*18\/12\/2025/i);
 });
 
-test("an approximate prior complaint date advances while keeping evidence pending", () => {
+test("legacy complaint evidence is preserved without blocking the judicial path", () => {
   const updated = updateItauCaseSnapshot(
     {
       id: "approximate-complaint",
@@ -128,12 +130,13 @@ test("an approximate prior complaint date advances while keeping evidence pendin
   assert.equal(updated.answers.priorComplaintDateApproximate, "2025-11");
   assert.equal(updated.answers.priorComplaintDateStatus, "approximate");
   assert.equal(updated.answers.priorComplaintProtocolStatus, "unavailable");
-  assert.equal(updated.evaluation.agreementStatus, "needs_prior_complaint_evidence");
-  assert.match(updated.evaluation.agreementLabel, /data aproximada/i);
-  assert.match(updated.evaluation.nextActions.join(" "), /e-mail|SMS/i);
+  assert.equal(updated.evaluation.agreementStatus, "historical_context_only");
+  assert.match(updated.evaluation.agreementLabel, /via judicial/i);
+  assert.match(updated.evaluation.nextActions.join(" "), /Juizado Especial/i);
+  assert.doesNotMatch(updated.evaluation.nextActions.join(" "), /e-mail|SMS|administrativ/i);
 });
 
-test("an unknown prior complaint date does not masquerade as an exact date", () => {
+test("legacy complaint date is not used to gate the current judicial path", () => {
   const result = evaluateItauCase({
     candidates: [
       {
@@ -151,9 +154,9 @@ test("an unknown prior complaint date does not masquerade as an exact date", () 
     },
   });
 
-  assert.equal(result.agreementStatus, "complaint_date_unknown");
-  assert.match(result.agreementLabel, /não disponível/i);
-  assert.doesNotMatch(result.agreementLabel, /informe a data/i);
+  assert.equal(result.agreementStatus, "historical_context_only");
+  assert.match(result.agreementLabel, /via judicial/i);
+  assert.doesNotMatch(result.agreementLabel, /reclamação|informe a data/i);
 });
 
 test("a saved chat snapshot can continue after the in-memory case expires", () => {
@@ -226,7 +229,7 @@ test("service keeps only normalized findings and supports an authenticated revie
     { tenantId: "tenant-a", userId: "user-a" },
   );
   assert.equal(updated.case.evaluation.classification, "possible_unauthorized");
-  assert.equal(updated.case.evaluation.agreementStatus, "potentially_eligible");
+  assert.equal(updated.case.evaluation.agreementStatus, "historical_context_only");
   assert.equal(updated.case.answers.historicalEvidence, "yes");
 
   assert.equal(

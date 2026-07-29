@@ -15,6 +15,18 @@ function envNumber(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+export function normalizeWebSocketCloseCode(value, fallback = 1011) {
+  const code = Number(value);
+  const validStandardCode =
+    Number.isInteger(code) &&
+    code >= 1000 &&
+    code <= 1014 &&
+    ![1004, 1005, 1006].includes(code);
+  const validApplicationCode =
+    Number.isInteger(code) && code >= 3000 && code <= 4999;
+  return validStandardCode || validApplicationCode ? code : fallback;
+}
+
 function normalizeBaseUrl(value) {
   return String(value || "http://127.0.0.1:3000").replace(/\/+$/, "");
 }

@@ -343,66 +343,11 @@ function parseDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function isOnOrBefore(value, limit) {
-  const date = parseDate(value);
-  const limitDate = parseDate(limit);
-  return Boolean(date && limitDate && date <= limitDate);
-}
-
 function isWithinAgreementPeriod(value) {
   const date = parseDate(value);
   const start = parseDate(ITAU_AGREEMENT.chargePeriodStart);
   const end = parseDate(ITAU_AGREEMENT.chargePeriodEnd);
   return Boolean(date && start && end && date >= start && date <= end);
-}
-
-function formatCurrency(value) {
-  return Number(value || 0).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
-
-function buildAdministrativeRequest(caseView) {
-  const disputed = caseView.candidates.filter((candidate) => candidate.answer === "not_recognized");
-  if (!disputed.length) return "";
-  const list = disputed
-    .map((candidate) => {
-      const details = [
-        candidate.label,
-        candidate.date ? `data ${candidate.date}` : "",
-        candidate.amount !== null ? `valor ${formatCurrency(candidate.amount)}` : "",
-      ].filter(Boolean);
-      return `- ${details.join(", ")}`;
-    })
-    .join("\n");
-
-  return [
-    "Assunto: Pedido de revisão e restituição de cobranças de seguros ou serviços",
-    "",
-    "Eu, [NOME COMPLETO], titular do cartão final [QUATRO DÍGITOS], solicito a revisão dos lançamentos abaixo, pois não reconheço contratação ou autorização válida:",
-    "",
-    list,
-    "",
-    caseView.answers.cancellationRequested === "yes"
-      ? `Informo que já solicitei o cancelamento${caseView.answers.cancellationDate ? ` em ${caseView.answers.cancellationDate}` : ""}, mas a situação precisa ser revista.`
-      : "Solicito que o banco apresente a proposta, o aceite, o certificado ou outro registro que demonstre minha autorização expressa.",
-    caseView.answers.priorComplaint === "yes"
-      ? `Também registro que já houve reclamação anterior${caseView.answers.priorComplaintDate ? ` em ${caseView.answers.priorComplaintDate}` : ""}${caseView.answers.priorComplaintProtocol ? `, protocolo ${caseView.answers.priorComplaintProtocol}` : ""}.`
-      : "",
-    "",
-    "Requeiro:",
-    "1. identificação completa da origem e do contrato de cada cobrança;",
-    "2. cancelamento de eventual produto ainda ativo;",
-    "3. restituição dos valores cobrados sem autorização, conforme as regras aplicáveis;",
-    "4. resposta escrita com protocolo e memória de cálculo.",
-    "",
-    "Anexos: faturas, comprovantes de pagamento, protocolos e demais evidências disponíveis.",
-    "",
-    "Este texto é um pedido administrativo gerado a partir das informações confirmadas pelo consumidor. Ele não é petição judicial nem substitui orientação jurídica individual.",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
 }
 
 export function evaluateItauCase(caseView) {
@@ -449,69 +394,21 @@ export function evaluateItauCase(caseView) {
     if (!hasAgreementCharge && !hasUndatedDispute) {
       agreementStatus = "outside_period";
       agreementLabel = "Cobrança fora do período principal do acordo";
-    } else if (answers.priorComplaint === "yes") {
-      if (!parseDate(answers.priorComplaintDate)) {
-        if (
-          answers.priorComplaintDateStatus === "approximate" &&
-          answers.priorComplaintDateApproximate
-        ) {
-          agreementStatus = "needs_prior_complaint_evidence";
-          agreementLabel = "Data aproximada informada; comprovação pendente";
-        } else if (answers.priorComplaintDateStatus === "unknown") {
-          agreementStatus = "complaint_date_unknown";
-          agreementLabel = "Data da reclamação não disponível para comprovação";
-        } else {
-          agreementStatus = "needs_prior_complaint_date";
-          agreementLabel = "Informe a data da reclamação anterior";
-        }
-      } else if (
-        !isOnOrBefore(answers.priorComplaintDate, ITAU_AGREEMENT.priorComplaintDeadline)
-      ) {
-        agreementStatus = "complaint_after_deadline";
-        agreementLabel = "Reclamação posterior ao prazo do acordo coletivo";
-      } else {
-        agreementStatus = hasAgreementCharge ? "potentially_eligible" : "needs_charge_date";
-        agreementLabel =
-          agreementStatus === "potentially_eligible"
-            ? "Possível enquadramento no acordo coletivo"
-            : "Informe a data da cobrança para avaliar o acordo";
-      }
-    } else if (answers.priorComplaint === "no") {
-      agreementStatus = "no_prior_complaint";
-      agreementLabel = "Sem reclamação prévia para o acordo coletivo";
     } else {
-      agreementStatus = "needs_prior_complaint";
-      agreementLabel = "Confirme se houve reclamação até 18/12/2025";
+      agreementStatus = "historical_context_only";
+      agreementLabel = "Acordo coletivo como contexto; jornada segue pela via judicial";
     }
   }
 
   const nextActions = [];
   if (pending.length) nextActions.push("Confirme se reconhece cada cobrança encontrada.");
-  if (
-    disputed.length &&
-    (hasAgreementCharge || hasUndatedDispute) &&
-    !["yes", "no"].includes(answers.priorComplaint)
-  ) {
-    nextActions.push("Informe se houve reclamação anterior ao banco até 18/12/2025.");
-  }
-  if (agreementStatus === "outside_period") {
-    nextActions.push(
-      "A cobrança é posterior ao período do acordo coletivo; siga pela contestação administrativa comum.",
-    );
-  }
-  if (
-    agreementStatus === "needs_prior_complaint_evidence" ||
-    agreementStatus === "complaint_date_unknown"
-  ) {
-    nextActions.push(
-      "Se encontrar depois, guarde e-mail, SMS, histórico de atendimento ou outro comprovante da reclamação.",
-    );
-  }
   if (disputed.length) {
-    nextActions.push("Separe faturas, comprovantes de pagamento, protocolos e eventual pedido de cancelamento.");
+    nextActions.push("Separe faturas, comprovantes de pagamento e eventual pedido de cancelamento.");
   }
   if (!pending.length && disputed.length) {
-    nextActions.push(`Envie o pedido administrativo ao Itaú e guarde o protocolo. Canal citado pelo MPMG: ${ITAU_AGREEMENT.email}.`);
+    nextActions.push(
+      "Escolha a UF para preparar a petição e seguir ao Juizado Especial em fluxo assistido.",
+    );
   }
 
   const evaluation = {
@@ -526,10 +423,7 @@ export function evaluateItauCase(caseView) {
     agreementLabel,
     nextActions,
   };
-  return {
-    ...evaluation,
-    administrativeRequest: buildAdministrativeRequest({ ...caseView, evaluation }),
-  };
+  return evaluation;
 }
 
 function openAIResultSchema() {

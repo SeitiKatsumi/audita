@@ -62,6 +62,18 @@ Checklist inicial:
 - Registrar eventos de seguranca relevantes.
 - Definir retencao de logs.
 
+## Perfil cadastral
+
+- CPF, RG, telefone e endereco reutilizaveis ficam em payload AES-256-GCM.
+- A chave `AUDITA_PROFILE_ENCRYPTION_KEY` deve ter pelo menos 32 caracteres e
+  existir somente no secret manager/CapRover.
+- A chave nao pode ser rotacionada sem uma migracao de descriptografia e
+  recriptografia dos perfis existentes.
+- Valores juridicos, respostas do chat e documentos anexados nao pertencem ao
+  perfil cadastral.
+- Endpoints de perfil exigem sessao autenticada e sempre usam `tenant_id` e
+  `user_id` do servidor, nunca os enviados pelo cliente.
+
 ## Autenticacao
 
 - Habilitar `AUDITA_AUTH_REQUIRED=true` em staging/producao.

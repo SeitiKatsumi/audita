@@ -73,18 +73,17 @@ test("chat instructions prohibit invented results and personal data collection",
   assert.match(instructions, /no maximo 80 palavras/i);
   assert.match(instructions, /uma evidencia recente/i);
   assert.match(instructions, /uma pergunta curta por vez/i);
-  assert.match(instructions, /data estiver marcada como aproximada ou desconhecida/i);
   assert.match(instructions, /Nao simule um formulario nem siga um questionario rigido/i);
   assert.match(instructions, /memoria factual, nao um roteiro/i);
   assert.match(instructions, /registrar_fatos_caso_itau/i);
-  assert.match(instructions, /chame iniciar_preparacao_jec/i);
+  assert.match(instructions, /chame preparar_peticao_jec/i);
   assert.match(instructions, /duas jornadas Itau/i);
-  assert.match(instructions, /conversa continua ativa/i);
-  assert.match(instructions, /uma unica acao concreta/i);
-  assert.match(instructions, /Assumir controle/i);
-  assert.match(instructions, /searchForo/i);
-  assert.match(instructions, /nomes tecnicos de HTML/i);
-  assert.match(instructions, /Confirmar ajuizamento/i);
+  assert.match(instructions, /reclamacao administrativa ao Itau nao faz parte/i);
+  assert.match(instructions, /ofereca diretamente a preparacao judicial/i);
+  assert.match(instructions, /navegador interno e o protocolo automatico nao fazem parte/i);
+  assert.match(instructions, /link oficial e o passo a passo manual/i);
+  assert.match(instructions, /acompanhamento no TJ via Direct Data/i);
+  assert.match(instructions, /advogado da Audita/i);
 });
 
 test("live JEC browser context exposes screen structure without field values", () => {
@@ -161,7 +160,7 @@ test("Itau context is factual memory without a scripted next question", () => {
   assert.equal(context.candidates[0].index, 0);
   assert.equal(context.candidates[0].answer, "not_recognized");
   assert.equal(context.documentReview.recentEvidenceAnalyzed, true);
-  assert.equal(context.answers.priorComplaint, "pending");
+  assert.equal(context.answers.priorComplaint, undefined);
   assert.equal(context.journey, "undetermined");
   assert.equal("conversation" in context, false);
   assert.equal("nextQuestion" in context, false);
@@ -670,7 +669,7 @@ test("JEC action opens only a supported secure intake and never claims protocol"
   assert.equal(action?.uf, "SP");
   assert.equal(action?.caseId, "case-jec-action");
   assert.equal(action?.suggestion?.values?.doubleRefundAmount, "79,80");
-  assert.match(action?.description || "", /sem protocolar/i);
+  assert.match(action?.description || "", /protocolo será feito por você/i);
   assert.equal(buildJecIntakeAction({ uf: "BA", caseId: "case-1" }), null);
   assert.equal(buildJecIntakeAction({ uf: "SP" }), null);
 });
@@ -751,9 +750,6 @@ test("Itau AI tool records conversational facts by candidate index", () => {
       candidateUpdates: [{ candidateIndex: 0, answer: "not_recognized" }],
       historicalEvidence: "yes",
       historicalDocumentsAvailable: "no",
-      priorComplaint: "yes",
-      priorComplaintDateApproximate: "2026-01",
-      priorComplaintProtocolStatus: "unavailable",
       reason: "Usuario explicou os fatos em linguagem livre.",
     },
     {
@@ -764,10 +760,6 @@ test("Itau AI tool records conversational facts by candidate index", () => {
   assert.deepEqual(payload.candidateAnswers, { protection: "not_recognized" });
   assert.equal(payload.historicalEvidence, "yes");
   assert.equal(payload.historicalDocumentsAvailable, "no");
-  assert.equal(payload.priorComplaint, "yes");
-  assert.equal(payload.priorComplaintDateApproximate, "2026-01");
-  assert.equal(payload.priorComplaintDateStatus, "approximate");
-  assert.equal(payload.priorComplaintProtocolStatus, "unavailable");
 });
 
 test("Itau AI tool does not preserve an approximate complaint date without a value", () => {
@@ -839,7 +831,7 @@ test("conversational guard rejects a false JEC preparation without the JEC tool 
   );
   assert.equal(
     shouldRepairConversationalAnswer({
-      answer: "A preparação assistida do JEC-SP foi aberta para sua revisão.",
+      answer: "O painel da petição do JEC-SP foi aberto para sua revisão.",
       messages: [{ role: "user", content: "SP" }],
       actions: [
         buildJecIntakeAction({ uf: "SP", caseId: "case-jec-action" }),
@@ -852,6 +844,23 @@ test("conversational guard rejects a false JEC preparation without the JEC tool 
       answer:
         "A preparação foi aberta. Deseja que eu gere agora o rascunho da petição?",
       messages: [{ role: "user", content: "SP" }],
+      actions: [
+        buildJecIntakeAction({ uf: "SP", caseId: "case-jec-action" }),
+      ],
+    }),
+    true,
+  );
+});
+
+test("conversational guard rejects claims that the JEC browser was opened", () => {
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer: "Abri o navegador do tribunal e vou protocolar a petição.",
+      messages: [{ role: "user", content: "Pode continuar em SP." }],
+      caseContext: {
+        type: "itau_refund",
+        case: { answers: { wantsJec: "yes" } },
+      },
       actions: [
         buildJecIntakeAction({ uf: "SP", caseId: "case-jec-action" }),
       ],
@@ -909,11 +918,37 @@ test("conversational guard rejects promises to retrieve bank statements through 
   );
 });
 
-test("conversational guard requires the promised complaint draft to be shown", () => {
+test("conversational guard rejects offering to request old statements for the user", () => {
   assert.equal(
     shouldRepairConversationalAnswer({
       answer:
-        "Preparei um rascunho de reclamacao administrativa. Agora anexe novamente a fatura.",
+        "Quer que eu peca os extratos antigos para verificar a recorrencia?",
+      messages: [
+        {
+          role: "user",
+          content: "Eu pago essa cobranca ha tres anos, mas so tenho a fatura atual.",
+        },
+      ],
+      caseContext: {
+        type: "itau_refund",
+        case: {
+          candidates: [{ id: "protection", answer: "not_recognized" }],
+          answers: {
+            historicalEvidence: "yes",
+            historicalDocumentsAvailable: "unknown",
+          },
+        },
+      },
+    }),
+    true,
+  );
+});
+
+test("conversational guard rejects the removed administrative complaint step", () => {
+  assert.equal(
+    shouldRepairConversationalAnswer({
+      answer:
+        "Preparei um rascunho de reclamacao administrativa para voce enviar ao Itau.",
       messages: [{ role: "user", content: "Sim, pode preparar." }],
       caseContext: {
         type: "itau_refund",

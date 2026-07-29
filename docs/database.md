@@ -34,12 +34,19 @@ O schema inicial cria:
 
 - `audita_tenants`: organizacoes/clientes.
 - `audita_users`: usuarios vinculados a um tenant.
+- `audita_user_profiles`: perfil cadastral criptografado, isolado por usuario e tenant.
 - `audita_sessions`: sessoes autenticadas.
 - `audita_sources`: fontes por tenant.
 - `audita_audit_events`: eventos/sinais por tenant.
 - `audita_reports`: relatorios por tenant.
 
 Toda consulta operacional deve filtrar por `tenant_id`. Dados reais de clientes diferentes nao devem compartilhar consultas sem filtro de tenant.
+
+O perfil cadastral reutilizado em formularios guarda um unico payload AES-256-GCM
+por usuario. A chave fica exclusivamente no secret
+`AUDITA_PROFILE_ENCRYPTION_KEY`; nome e e-mail basicos continuam em
+`audita_users`. Valores de pedidos, analises e respostas do chat nao fazem parte
+do perfil.
 
 ## Usuarios
 
@@ -56,6 +63,8 @@ Criar usuarios separados por finalidade:
 - Nunca commitar dumps.
 - Nunca usar dados reais em desenvolvimento sem anonimizacao.
 - Nunca compartilhar credenciais em conversa, issue ou README.
+- Nunca salvar CPF, RG, telefone ou endereco em texto aberto.
+- Nunca registrar o payload descriptografado do perfil em logs ou eventos.
 - Toda mudanca de schema deve ser versionada por migracao.
 - Backups devem ser criptografados e testados periodicamente.
 
