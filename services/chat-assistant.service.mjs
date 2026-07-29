@@ -1,3 +1,5 @@
+import crypto from "node:crypto";
+
 import { extractOpenAIUsage } from "./api-usage.service.mjs";
 import { suggestJecClaimValues } from "./jec-petition.service.mjs";
 
@@ -63,6 +65,16 @@ export const AUDITA_CHAT_CAPABILITIES = [
     statusLabel: "Disponivel quando a integracao Direct Data estiver configurada",
     route: "/chat?tool=itau-refund",
   },
+  {
+    id: "court_certificates_api",
+    name: "Certidões estaduais por API",
+    description:
+      "Emissão de certidões cíveis, criminais, fiscais e correlatas via Direct Data.",
+    status: "provider_configured",
+    statusLabel:
+      "Disponível quando a integração Direct Data estiver configurada",
+    route: "/chat",
+  },
 ];
 
 const MODULE_ACTIONS = {
@@ -115,6 +127,62 @@ export function buildJecIntakeAction({ uf, caseId, suggestion = null } = {}) {
     description:
       "Revise os dados, gere o PDF e siga o guia do portal oficial. O protocolo será feito por você.",
     ...(suggestion ? { suggestion } : {}),
+  };
+}
+
+export function buildCourtCertificateIntakeAction({
+  uf = "",
+  certificateType = "Civel",
+  subjectType = "cpf",
+  configuration = {},
+} = {}) {
+  return {
+    kind: "court_certificate_intake",
+    moduleId: "court_certificates_api",
+    actionId: crypto.randomUUID(),
+    label: "Informar dados com segurança",
+    title: "Certidão estadual por API",
+    description:
+      "Informe os dados no formulário protegido. Eles não entram no histórico do chat.",
+    uf: String(uf || "").trim().toUpperCase(),
+    certificateType: String(certificateType || "Civel").trim(),
+    subjectType: subjectType === "cnpj" ? "cnpj" : "cpf",
+    configuration: {
+      allowedUfs: Array.isArray(configuration.allowedUfs)
+        ? configuration.allowedUfs
+        : [],
+      confirmedUfs: Array.isArray(configuration.confirmedUfs)
+        ? configuration.confirmedUfs
+        : [],
+      experimentalUfs: Array.isArray(configuration.experimentalUfs)
+        ? configuration.experimentalUfs
+        : [],
+      certificateTypes: Array.isArray(configuration.certificateTypes)
+        ? configuration.certificateTypes
+        : [],
+      queryCostBrl: Number(configuration.queryCostBrl || 0.36),
+      pdfSurchargeBrl: Number(configuration.pdfSurchargeBrl || 0.18),
+      pdfTotalCostBrl: Number(
+        configuration.pdfTotalCostBrl ||
+          configuration.pdfQueryCostBrl ||
+          0.54,
+      ),
+      pricingNote: String(configuration.pricingNote || ""),
+      creditCost: Number(configuration.creditCost || 1),
+    },
+  };
+}
+
+export function buildCourtCertificateResultAction(result = {}) {
+  if (result?.status !== "success") return null;
+  return {
+    kind: "court_certificate_result",
+    moduleId: "court_certificates_api",
+    actionId: crypto.randomUUID(),
+    label: "Ver certidão",
+    title: "Resultado da certidão estadual",
+    description: result.analysis?.summary || "Consulta concluída.",
+    result,
   };
 }
 
@@ -218,6 +286,12 @@ export function buildAuditaChatInstructions(customPrompt = "") {
     "Depois do PDF revisado, apresente o link oficial e o passo a passo manual da UF. Login, anexos, escolhas juridicas e protocolo final sao feitos pelo usuario.",
     "Continue disponivel no chat para responder duvidas sobre cada etapa, mas nao afirme que uma acao externa foi concluida sem evidencia.",
     "Quando o usuario ja tiver o numero do processo, ofereca a consulta opcional de acompanhamento no TJ via Direct Data. Explique que e uma consulta somente leitura, com cobertura limitada por UF, e que ela nao protocola nem substitui o portal oficial.",
+    "Acompanhamento processual e certidao estadual sao produtos diferentes. Nunca apresente uma busca de processo como se fosse emissao de certidao.",
+    "Quando o usuario pedir uma certidao civel, criminal, fiscal, eleitoral, de falencia/recuperacao, familia ou militar, inclusive quando perguntar custo ou requisitos, use sempre consultar_certidao_estadual_direct_data. Nao use preparar_fluxo_audita para esse pedido.",
+    "Antes da consulta paga, chame a ferramenta com as confirmacoes ainda falsas para obter e informar o custo exato da configuracao. queryCostBrl e o total sem PDF; pdfSurchargeBrl e apenas o acrescimo; pdfTotalCostBrl e o total final com PDF. Nunca some queryCostBrl com pdfTotalCostBrl. Depois obtenha duas confirmacoes expressas: autorizacao/base legal para consultar o documento e concordancia com o custo. Nao presuma nenhuma delas.",
+    "Nao solicite CPF ou CNPJ no texto da conversa. Se o perfil seguro nao tiver um CPF valido ou o usuario quiser consultar CNPJ, a ferramenta abrira um formulario protegido.",
+    "Uma UF marcada como experimental existe no contrato tecnico, mas nao esta confirmada no catalogo comercial do provedor. Explique essa diferenca sem prometer retorno.",
+    "No resultado da certidao, diferencie ocorrencia encontrada, nenhuma ocorrencia informada e resultado inconclusivo. Nunca transforme retorno inconclusivo em nada consta.",
     "Se o usuario pedir ajuda profissional, ofereca o suporte opcional de um advogado da Audita. Nao diga que houve contratacao, encaminhamento ou contato sem confirmacao expressa e um fluxo seguro.",
     "Nao escreva rotulos como Fonte: nem repita URLs no corpo da resposta; a interface apresenta as fontes separadamente quando forem necessarias.",
     "Use consultar_regras_reembolso_itau apenas quando o usuario pedir regras, acordo, prazos ou canais oficiais; nao use essa ferramenta para a saudacao ou triagem inicial.",
@@ -930,7 +1004,17 @@ function buildModuleRoute(moduleId, uf) {
 }
 
 function addUniqueAction(actions, action) {
-  if (!action || actions.some((item) => item.moduleId === action.moduleId && item.route === action.route)) return;
+  if (
+    !action ||
+    actions.some(
+      (item) =>
+        item.kind === action.kind &&
+        item.moduleId === action.moduleId &&
+        item.route === action.route,
+    )
+  ) {
+    return;
+  }
   actions.push(action);
 }
 
@@ -1036,6 +1120,8 @@ function buildChatTools({
   sources,
   getItauCase,
   onItauCaseUpdate,
+  onCourtCertificateQuery,
+  courtCertificateStatus,
 }) {
   const chatTools = [
     tool({
@@ -1046,7 +1132,7 @@ function buildChatTools({
     }),
     tool({
       name: "preparar_fluxo_audita",
-      description: "Prepara a proxima acao no Audita para certidoes estaduais, busca de imoveis, indisponibilidade, inicio da analise Itau ou historico. Nao use esta ferramenta para iniciar o Juizado Especial.",
+      description: "Prepara a proxima acao para busca de imoveis, indisponibilidade, inicio da analise Itau, historico ou o fluxo legado de portal estadual. Para emitir certidao por API, consultar cobertura ou informar custo, use exclusivamente consultar_certidao_estadual_direct_data. Nao use esta ferramenta para iniciar o Juizado Especial.",
       parameters: z.object({
         module: z.enum([
           "state_courts",
@@ -1059,6 +1145,15 @@ function buildChatTools({
         reason: z.string().optional(),
       }),
       execute: async ({ module, uf, reason }) => {
+        if (module === "state_courts") {
+          return {
+            status: "use_certificate_api_tool",
+            reason:
+              "A emissão conversacional de certidão deve usar consultar_certidao_estadual_direct_data.",
+            note:
+              "Não abra o módulo legado. Use a ferramenta de certidão por API neste turno.",
+          };
+        }
         const action = buildModuleRoute(module, uf);
         addUniqueAction(actions, action);
         return {
@@ -1125,6 +1220,96 @@ function buildChatTools({
       },
     }),
   ];
+
+  if (typeof onCourtCertificateQuery === "function") {
+    chatTools.splice(
+      2,
+      0,
+      tool({
+        name: "consultar_certidao_estadual_direct_data",
+        description:
+          "Orca ou consulta uma certidao estadual real via Direct Data. Chame tambem antes das confirmacoes para obter a cobertura e o custo exato; nesse caso, envie os booleanos como false e nenhuma consulta paga sera feita. Para executar, ambos devem ser true. Nao recebe CPF/CNPJ no chat: usa o perfil seguro ou abre um formulario protegido.",
+        parameters: z.object({
+          uf: z
+            .string()
+            .min(2)
+            .max(2)
+            .describe("UF solicitada expressamente pelo usuario."),
+          certificateType: z
+            .enum([
+              "Civel",
+              "Criminal",
+              "Fiscal",
+              "FinsEleitorais",
+              "FalenciaRecuperacao",
+              "Familia",
+              "Militar",
+            ])
+            .describe("Tipo de certidao pedido pelo usuario."),
+          subjectType: z
+            .enum(["cpf", "cnpj"])
+            .describe(
+              "Use cnpj somente quando o usuario disser que a consulta e de empresa.",
+            )
+            .optional(),
+          generatePdf: z
+            .boolean()
+            .describe("Se o usuario quer o comprovante/certidao em PDF."),
+          authorizationConfirmed: z
+            .boolean()
+            .describe(
+              "True somente apos o usuario confirmar autorizacao ou base legal.",
+            ),
+          paidQueryConfirmed: z
+            .boolean()
+            .describe(
+              "True somente apos o usuario aceitar expressamente o custo informado.",
+            ),
+        }),
+        execute: async (input) => {
+          const response = await onCourtCertificateQuery(input);
+          const configuration =
+            response?.configuration || courtCertificateStatus || {};
+          const source = {
+            name: "Direct Data - TJ Certidão Cível, Criminal e Fiscal",
+            url:
+              configuration.docsUrl ||
+              "https://apiv3.directd.com.br/swagger/index.html",
+          };
+          addUniqueSource(sources, source);
+
+          if (response?.requiresSecureIntake) {
+            const action = buildCourtCertificateIntakeAction({
+              ...input,
+              configuration,
+            });
+            addUniqueAction(actions, action);
+            return {
+              status: "secure_intake_required",
+              reason: response.reason,
+              action,
+              configuration,
+              note:
+                "O formulario protegido foi aberto. Nao solicite o documento no texto do chat.",
+            };
+          }
+
+          if (response?.result?.status === "success") {
+            const action = buildCourtCertificateResultAction(response.result);
+            addUniqueAction(actions, action);
+            return {
+              status: "success",
+              result: response.result,
+              action,
+              configuration,
+            };
+          }
+
+          return response;
+        },
+      }),
+    );
+  }
 
   if (typeof onItauCaseUpdate === "function" && getItauCase?.()?.id) {
     chatTools.splice(
@@ -1300,6 +1485,8 @@ export async function runAuditaChat({
   browserContext = null,
   getItauCase = null,
   onItauCaseUpdate = null,
+  onCourtCertificateQuery = null,
+  courtCertificateStatus = null,
   env = process.env,
 } = {}) {
   const normalizedMessages = normalizeChatMessages(messages);
@@ -1345,6 +1532,8 @@ export async function runAuditaChat({
       sources,
       getItauCase,
       onItauCaseUpdate,
+      onCourtCertificateQuery,
+      courtCertificateStatus,
     }),
   });
   const controller = new AbortController();

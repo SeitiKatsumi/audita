@@ -2103,12 +2103,196 @@ function formatChatText(value) {
     .replace(/\n/g, "<br />");
 }
 
+function formatCourtCertificateDocument(value, subjectType = "cpf") {
+  const maxLength = subjectType === "cnpj" ? 14 : 11;
+  const digits = String(value || "").replace(/\D/g, "").slice(0, maxLength);
+  if (subjectType === "cnpj") {
+    return digits
+      .replace(/^(\d{2})(\d)/, "$1.$2")
+      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1/$2")
+      .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+  }
+  return formatJecCpf(digits);
+}
+
+function renderCourtCertificateIntake(action) {
+  const configuration = action.configuration || {};
+  const allowedUfs = Array.isArray(configuration.allowedUfs)
+    ? configuration.allowedUfs
+    : [];
+  const certificateTypes = Array.isArray(configuration.certificateTypes)
+    ? configuration.certificateTypes
+    : [];
+  const subjectType = action.subjectType === "cnpj" ? "cnpj" : "cpf";
+  const profileDocument =
+    subjectType === "cpf" ? currentUserProfile?.document || "" : "";
+  const profileName =
+    subjectType === "cpf" ? currentUserProfile?.fullName || "" : "";
+  const queryCost = Number(configuration.queryCostBrl || 0.36);
+  const pdfCost = Number(
+    configuration.pdfTotalCostBrl ||
+      configuration.pdfQueryCostBrl ||
+      0.54,
+  );
+  const actionId = action.actionId || "";
+
+  return `
+    <article class="court-certificate-card court-certificate-intake">
+      <div class="court-certificate-heading">
+        <div>
+          <strong>${escapeHtml(action.title || "Certidão estadual por API")}</strong>
+          <small>${escapeHtml(action.description || "Informe os dados no formulário protegido.")}</small>
+        </div>
+        <span>Direct Data</span>
+      </div>
+      ${action.error ? `<p class="court-certificate-error" role="alert">${escapeHtml(action.error)}</p>` : ""}
+      <form data-court-certificate-form="${escapeHtml(actionId)}">
+        <div class="court-certificate-grid">
+          <label>
+            <span>Pessoa consultada</span>
+            <select name="documentType" data-court-certificate-subject>
+              <option value="cpf" ${subjectType === "cpf" ? "selected" : ""}>Pessoa física (CPF)</option>
+              <option value="cnpj" ${subjectType === "cnpj" ? "selected" : ""}>Pessoa jurídica (CNPJ)</option>
+            </select>
+          </label>
+          <label>
+            <span>CPF ou CNPJ</span>
+            <input name="document" required inputmode="numeric" autocomplete="off" data-court-certificate-document value="${escapeHtml(formatCourtCertificateDocument(profileDocument, subjectType))}" placeholder="${subjectType === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00"}" />
+          </label>
+          <label>
+            <span>UF</span>
+            <select name="uf" required>
+              <option value="">Selecione</option>
+              ${allowedUfs
+                .map(
+                  (uf) =>
+                    `<option value="${escapeHtml(uf)}" ${String(action.uf || "").toUpperCase() === uf ? "selected" : ""}>${escapeHtml(uf)}${configuration.experimentalUfs?.includes(uf) ? " - experimental" : ""}</option>`,
+                )
+                .join("")}
+            </select>
+          </label>
+          <label>
+            <span>Tipo de certidão</span>
+            <select name="certificateType" required>
+              ${certificateTypes
+                .map(
+                  (type) =>
+                    `<option value="${escapeHtml(type)}" ${String(action.certificateType || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() === String(type).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() ? "selected" : ""}>${escapeHtml(type)}</option>`,
+                )
+                .join("")}
+            </select>
+          </label>
+          <label class="court-certificate-wide">
+            <span>Nome completo ou razão social <small>opcional</small></span>
+            <input name="fullName" maxlength="180" autocomplete="name" value="${escapeHtml(profileName)}" />
+          </label>
+        </div>
+        <details class="court-certificate-optional">
+          <summary>Dados complementares</summary>
+          <div class="court-certificate-grid">
+            <label>
+              <span>Data de nascimento</span>
+              <input name="birthDate" type="date" />
+            </label>
+            <label>
+              <span>RG</span>
+              <input name="rg" maxlength="30" autocomplete="off" value="${escapeHtml(subjectType === "cpf" ? currentUserProfile?.rg || "" : "")}" />
+            </label>
+            <label>
+              <span>Gênero</span>
+              <select name="gender">
+                <option value="">Não informar</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+              </select>
+            </label>
+            <label>
+              <span>Nome da mãe</span>
+              <input name="motherName" maxlength="180" autocomplete="off" />
+            </label>
+            <label>
+              <span>Nome do pai</span>
+              <input name="fatherName" maxlength="180" autocomplete="off" />
+            </label>
+          </div>
+        </details>
+        <div class="court-certificate-consents">
+          <label>
+            <input name="generatePdf" type="checkbox" />
+            <span>Gerar comprovante em PDF (${escapeHtml(formatChatCurrency(pdfCost))} no total).</span>
+          </label>
+          <label>
+            <input name="authorizationConfirmed" type="checkbox" required />
+            <span>Confirmo autorização ou base legal para consultar este CPF/CNPJ.</span>
+          </label>
+          <label>
+            <input name="paidQueryConfirmed" type="checkbox" required />
+            <span>Concordo com a consulta paga: ${escapeHtml(formatChatCurrency(queryCost))} sem PDF ou ${escapeHtml(formatChatCurrency(pdfCost))} com PDF.</span>
+          </label>
+        </div>
+        <div class="court-certificate-actions">
+          <button type="submit">Consultar certidão</button>
+          <small>${escapeHtml(String(configuration.creditCost || 1))} crédito Audita por consulta concluída.</small>
+        </div>
+      </form>
+    </article>
+  `;
+}
+
+function renderCourtCertificateResult(action) {
+  const result = action.result || {};
+  const certificate = result.certificate || {};
+  const analysis = result.analysis || {};
+  const statusLabels = {
+    occurrence_found: "Ocorrência encontrada",
+    no_occurrence_reported: "Nenhuma ocorrência informada",
+    inconclusive: "Revisão necessária",
+  };
+  const statusLabel =
+    statusLabels[analysis.outcome] || "Consulta concluída";
+  const evidenceUrl =
+    typeof certificate.evidenceUrl === "string" &&
+    certificate.evidenceUrl.startsWith("https://")
+      ? certificate.evidenceUrl
+      : "";
+
+  return `
+    <article class="court-certificate-card court-certificate-result ${escapeHtml(analysis.risk || "review")}">
+      <div class="court-certificate-heading">
+        <div>
+          <strong>${escapeHtml(statusLabel)}</strong>
+          <small>${escapeHtml(result.uf || "")} · ${escapeHtml(result.certificateType || "Certidão estadual")} · ${escapeHtml(result.subjectMasked || "")}</small>
+        </div>
+        <span>${result.coverage === "experimental" ? "Cobertura experimental" : "Cobertura confirmada"}</span>
+      </div>
+      <p>${escapeHtml(analysis.summary || "A certidão precisa ser revisada.")}</p>
+      <dl class="court-certificate-details">
+        ${certificate.entityName ? `<div><dt>Emissor</dt><dd>${escapeHtml(certificate.entityName)}</dd></div>` : ""}
+        ${certificate.issueDate ? `<div><dt>Emissão</dt><dd>${escapeHtml(certificate.issueDate)}</dd></div>` : ""}
+        ${certificate.expiryDate ? `<div><dt>Validade</dt><dd>${escapeHtml(certificate.expiryDate)}</dd></div>` : ""}
+        ${certificate.number ? `<div><dt>Número</dt><dd>${escapeHtml(certificate.number)}</dd></div>` : ""}
+        ${certificate.validationCode ? `<div><dt>Validação</dt><dd>${escapeHtml(certificate.validationCode)}</dd></div>` : ""}
+        ${certificate.status ? `<div><dt>Status do provedor</dt><dd>${escapeHtml(certificate.status)}</dd></div>` : ""}
+      </dl>
+      ${certificate.observation ? `<p class="court-certificate-observation">${escapeHtml(certificate.observation)}</p>` : ""}
+      ${result.coverage === "experimental" ? `<p class="court-certificate-notice">Esta UF aparece no contrato técnico, mas não está confirmada no catálogo comercial do provedor. Confira o documento emitido.</p>` : ""}
+      <div class="court-certificate-actions">
+        ${evidenceUrl ? `<a href="${escapeHtml(evidenceUrl)}" target="_blank" rel="noreferrer">Abrir comprovante</a>` : ""}
+        <small>${escapeHtml(result.disclaimer || "")}</small>
+      </div>
+    </article>
+  `;
+}
+
 function renderChatActions(actions) {
   const availableActions = Array.isArray(actions)
     ? actions.filter(
         (action) =>
           (action?.route && String(action.route).startsWith("/")) ||
-          (action?.kind === "jec_intake" && action?.caseId),
+          (action?.kind === "jec_intake" && action?.caseId) ||
+          action?.kind === "court_certificate_intake" ||
+          action?.kind === "court_certificate_result",
       )
     : [];
   if (!availableActions.length) return "";
@@ -2116,8 +2300,14 @@ function renderChatActions(actions) {
   return `
     <div class="chat-message-actions">
       ${availableActions
-        .map(
-          (action) => `
+        .map((action) => {
+          if (action.kind === "court_certificate_intake") {
+            return renderCourtCertificateIntake(action);
+          }
+          if (action.kind === "court_certificate_result") {
+            return renderCourtCertificateResult(action);
+          }
+          return `
             <article>
               <div>
                 <strong>${escapeHtml(action.title || "Continuar no Audita")}</strong>
@@ -2129,8 +2319,8 @@ function renderChatActions(actions) {
                   : `<button type="button" data-chat-route="${escapeHtml(action.route)}">${escapeHtml(action.label || "Abrir")}</button>`
               }
             </article>
-          `,
-        )
+          `;
+        })
         .join("")}
     </div>
   `;
@@ -3831,6 +4021,128 @@ function localItauAnalysisMessage(caseData) {
   return `Encontrei ${caseData.candidates.length} possível cobrança. Você reconhece essa contratação?`;
 }
 
+function findChatAction(actionId) {
+  const normalizedId = String(actionId || "");
+  if (!normalizedId) return null;
+  for (const thread of chatState.threads) {
+    for (const message of thread.messages || []) {
+      const index = Array.isArray(message.actions)
+        ? message.actions.findIndex(
+            (action) => String(action?.actionId || "") === normalizedId,
+          )
+        : -1;
+      if (index >= 0) return { thread, message, index, action: message.actions[index] };
+    }
+  }
+  return null;
+}
+
+function formatProviderBirthDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
+
+function courtCertificateErrorMessage(code, billingVerificationRequired = false) {
+  if (billingVerificationRequired) {
+    return "A Direct Data recebeu a solicitação, mas não concluiu a emissão. Não repita agora: confira o histórico e o saldo do provedor antes de tentar novamente.";
+  }
+  const messages = {
+    authorization_required: "Confirme a autorização ou base legal da consulta.",
+    paid_query_confirmation_required: "Confirme que concorda com o custo da consulta.",
+    invalid_document: "Informe um CPF ou CNPJ válido.",
+    invalid_birth_date: "Confira a data de nascimento.",
+    invalid_certificate_type: "Selecione um tipo de certidão válido.",
+    unsupported_uf: "Esta UF não está habilitada nesta integração.",
+    insufficient_credits: "Não há créditos Audita suficientes para esta consulta.",
+    direct_data_certificates_disabled: "A integração de certidões ainda não está habilitada.",
+    direct_data_token_missing: "A credencial da Direct Data ainda não está configurada.",
+    provider_authentication_failed: "A Direct Data recusou a credencial configurada.",
+    provider_permission_or_balance_required:
+      "A Direct Data recusou a consulta por permissão ou saldo.",
+    provider_rate_limited:
+      "A Direct Data limitou temporariamente novas consultas.",
+    provider_temporarily_unavailable:
+      "A Direct Data está temporariamente indisponível.",
+    provider_timeout: "A emissão demorou mais que o limite esperado.",
+    provider_async_timeout: "A certidão continua em processamento no provedor.",
+    provider_empty_response: "O provedor não devolveu uma certidão válida.",
+  };
+  return messages[code] || "Não foi possível emitir esta certidão agora.";
+}
+
+async function submitCourtCertificateForm(form) {
+  const actionId = form.dataset.courtCertificateForm;
+  const found = findChatAction(actionId);
+  if (!found) return;
+  const submitButton = form.querySelector('button[type="submit"]');
+  const data = new FormData(form);
+  const requestBody = {
+    requestId: actionId,
+    documentType: String(data.get("documentType") || "cpf"),
+    document: String(data.get("document") || ""),
+    uf: String(data.get("uf") || ""),
+    certificateType: String(data.get("certificateType") || ""),
+    fullName: String(data.get("fullName") || ""),
+    birthDate: formatProviderBirthDate(data.get("birthDate")),
+    rg: String(data.get("rg") || ""),
+    gender: String(data.get("gender") || ""),
+    motherName: String(data.get("motherName") || ""),
+    fatherName: String(data.get("fatherName") || ""),
+    generatePdf: data.get("generatePdf") === "on",
+    authorizationConfirmed: data.get("authorizationConfirmed") === "on",
+    paidQueryConfirmed: data.get("paidQueryConfirmed") === "on",
+  };
+
+  found.action.error = "";
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Consultando...";
+  }
+
+  try {
+    const response = await fetch(
+      "/api/integrations/direct-data/tj/certificates",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showLogin("Entre para consultar a certidão estadual.");
+      return;
+    }
+    if (!response.ok || !payload.result) {
+      found.action.error = courtCertificateErrorMessage(
+        payload.error,
+        payload.billingVerificationRequired === true,
+      );
+      return;
+    }
+
+    found.message.actions[found.index] = {
+      kind: "court_certificate_result",
+      moduleId: "court_certificates_api",
+      actionId,
+      title: "Resultado da certidão estadual",
+      description:
+        payload.result.analysis?.summary || "Consulta concluída.",
+      result: payload.result,
+    };
+    found.thread.updatedAt = new Date().toISOString();
+  } catch {
+    found.action.error =
+      "A conexão com a consulta foi interrompida. Tente novamente.";
+  } finally {
+    saveChatState();
+    renderChatWorkspace();
+  }
+}
+
 async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment) {
   const content =
     String(rawMessage || "").trim() ||
@@ -3879,6 +4191,7 @@ async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment)
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
+        requestId: thread.messages.at(-1)?.id || createChatId(),
         messages: thread.messages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
         caseContext: activeCase ? { type: "itau_refund", case: activeCase } : null,
         browserSessionId: activeChatBrowserSession?.id || null,
@@ -4374,6 +4687,14 @@ chatMessages?.addEventListener("click", async (event) => {
 });
 
 chatMessages?.addEventListener("submit", (event) => {
+  const courtCertificateForm = event.target.closest(
+    "[data-court-certificate-form]",
+  );
+  if (courtCertificateForm) {
+    event.preventDefault();
+    submitCourtCertificateForm(courtCertificateForm);
+    return;
+  }
   const monitoringForm = event.target.closest("[data-jec-monitoring-form]");
   if (monitoringForm) {
     event.preventDefault();
@@ -4394,6 +4715,19 @@ chatMessages?.addEventListener("submit", (event) => {
 });
 
 chatMessages?.addEventListener("input", (event) => {
+  const courtDocument = event.target.closest(
+    "[data-court-certificate-document]",
+  );
+  if (courtDocument) {
+    const subjectType =
+      courtDocument.form?.querySelector("[data-court-certificate-subject]")
+        ?.value || "cpf";
+    courtDocument.value = formatCourtCertificateDocument(
+      courtDocument.value,
+      subjectType,
+    );
+    return;
+  }
   const input = event.target.closest("[data-jec-mask]");
   if (!input) return;
   const formatters = {
@@ -4403,6 +4737,22 @@ chatMessages?.addEventListener("input", (event) => {
   };
   const formatter = formatters[input.dataset.jecMask];
   if (formatter) input.value = formatter(input.value);
+});
+
+chatMessages?.addEventListener("change", (event) => {
+  const subjectSelect = event.target.closest(
+    "[data-court-certificate-subject]",
+  );
+  if (!subjectSelect) return;
+  const documentInput = subjectSelect.form?.querySelector(
+    "[data-court-certificate-document]",
+  );
+  if (!documentInput) return;
+  documentInput.value = "";
+  documentInput.placeholder =
+    subjectSelect.value === "cnpj"
+      ? "00.000.000/0000-00"
+      : "000.000.000-00";
 });
 
 renderChatWorkspace();

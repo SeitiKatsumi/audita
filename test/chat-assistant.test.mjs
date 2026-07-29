@@ -4,6 +4,8 @@ import test from "node:test";
 import {
   AUDITA_CHAT_CAPABILITIES,
   buildAuditaChatInstructions,
+  buildCourtCertificateIntakeAction,
+  buildCourtCertificateResultAction,
   buildJecIntakeAction,
   buildItauToolUpdatePayload,
   cleanAuditaChatAnswer,
@@ -26,6 +28,56 @@ test("chat masks CPF, CNPJ and email before model input", () => {
     masked,
     "CPF [CPF informado], CNPJ [CNPJ informado] e contato [e-mail informado]",
   );
+});
+
+test("chat exposes the Direct Data certificate capability and safe intake action", () => {
+  const capability = AUDITA_CHAT_CAPABILITIES.find(
+    (item) => item.id === "court_certificates_api",
+  );
+  const action = buildCourtCertificateIntakeAction({
+    uf: "SP",
+    certificateType: "Civel",
+    subjectType: "cnpj",
+    configuration: {
+      allowedUfs: ["BA", "SP"],
+      confirmedUfs: ["BA"],
+      experimentalUfs: ["SP"],
+      certificateTypes: ["C\u00edvel"],
+      queryCostBrl: 0.36,
+      pdfTotalCostBrl: 0.54,
+      creditCost: 1,
+    },
+  });
+
+  assert.equal(capability.status, "provider_configured");
+  assert.equal(action.kind, "court_certificate_intake");
+  assert.equal(action.subjectType, "cnpj");
+  assert.equal(action.configuration.experimentalUfs[0], "SP");
+  assert.doesNotMatch(JSON.stringify(action), /\d{11}|\d{14}/);
+});
+
+test("chat certificate result action keeps the normalized provider result", () => {
+  const action = buildCourtCertificateResultAction({
+    status: "success",
+    uf: "BA",
+    subjectMasked: "529********25",
+    analysis: {
+      outcome: "no_occurrence_reported",
+      summary: "Sem ocorrencia informada.",
+    },
+  });
+
+  assert.equal(action.kind, "court_certificate_result");
+  assert.equal(action.result.subjectMasked, "529********25");
+});
+
+test("chat certificate instructions require authorization, cost and secure document intake", () => {
+  const instructions = buildAuditaChatInstructions();
+
+  assert.match(instructions, /consultar_certidao_estadual_direct_data/);
+  assert.match(instructions, /duas confirmacoes expressas/i);
+  assert.match(instructions, /formulario protegido/i);
+  assert.match(instructions, /resultado inconclusivo/i);
 });
 
 test("chat removes duplicated source labels from the conversational answer", () => {

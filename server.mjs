@@ -14,6 +14,7 @@ import {
 } from "./services/chat-browser.service.mjs";
 import { createCreditsService } from "./services/credits.service.mjs";
 import { createDirectDataCourtService } from "./services/direct-data-court.service.mjs";
+import { createDirectDataCertificatesService } from "./services/direct-data-certificates.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
 import {
   runAuditaChat,
@@ -1405,6 +1406,11 @@ const directDataCourtService = createDirectDataCourtService({
   recordApiUsage: (usageContext, event) =>
     apiUsageService.record(usageContext, event),
 });
+const directDataCertificatesService = createDirectDataCertificatesService({
+  creditsService,
+  recordApiUsage: (usageContext, event) =>
+    apiUsageService.record(usageContext, event),
+});
 const propertyAssetsService = createPropertyAssetsService({
   getDb: () => ({ pool, dbReady }),
   getAuthContext: getTenantIdForRequest,
@@ -2733,6 +2739,78 @@ async function runChatConversation(request) {
     tenantId: authContext.tenantId,
     userId: authContext.user?.id || null,
   };
+  const certificateStatus = directDataCertificatesService.getStatus();
+  const certificateRequestId =
+    String(body.requestId || "").trim() || crypto.randomUUID();
+  const queryCourtCertificate = async (input = {}) => {
+    if (!certificateStatus.configured) {
+      return {
+        unavailable: true,
+        reason: certificateStatus.enabled
+          ? "direct_data_token_missing"
+          : "direct_data_certificates_disabled",
+        configuration: certificateStatus,
+      };
+    }
+    if (input.authorizationConfirmed !== true) {
+      return {
+        invalid: true,
+        reason: "authorization_required",
+        configuration: certificateStatus,
+      };
+    }
+    if (input.paidQueryConfirmed !== true) {
+      return {
+        invalid: true,
+        reason: "paid_query_confirmation_required",
+        configuration: certificateStatus,
+      };
+    }
+
+    const requestedSubjectType =
+      String(input.subjectType || "cpf").toLowerCase() === "cnpj"
+        ? "cnpj"
+        : "cpf";
+    const profileState = authContext.user
+      ? await loadUserProfile(authContext.user)
+      : { profile: {} };
+    const profile = profileState.profile || {};
+    if (requestedSubjectType === "cnpj" || !profile.document) {
+      return {
+        requiresSecureIntake: true,
+        reason:
+          requestedSubjectType === "cnpj"
+            ? "cnpj_secure_intake_required"
+            : "profile_document_required",
+        configuration: certificateStatus,
+      };
+    }
+
+    const idempotencyKey = crypto
+      .createHash("sha256")
+      .update(
+        `${certificateRequestId}:${JSON.stringify({
+          uf: input.uf,
+          certificateType: input.certificateType,
+          generatePdf: input.generatePdf === true,
+          subjectType: requestedSubjectType,
+        })}`,
+      )
+      .digest("hex")
+      .slice(0, 48);
+
+    return directDataCertificatesService.query(
+      {
+        ...input,
+        requestId: idempotencyKey,
+        document: profile.document,
+        documentType: "cpf",
+        fullName: profile.fullName || authContext.user?.name || "",
+        rg: profile.rg || "",
+      },
+      authContext,
+    );
+  };
   let browserContext = null;
   const browserSessionId = String(body.browserSessionId || "").trim();
   const jecBrowserEnabled =
@@ -2817,6 +2895,8 @@ async function runChatConversation(request) {
       browserContext,
       getItauCase: () => synchronizedCase || effectiveCaseContext?.case || null,
       onItauCaseUpdate: applyItauCaseUpdate,
+      onCourtCertificateQuery: queryCourtCertificate,
+      courtCertificateStatus: certificateStatus,
     });
   } catch (error) {
     try {
@@ -3100,6 +3180,90 @@ async function handleApi(request, response, pathname) {
       sendJson(response, 500, {
         error: "property_search_query_failed",
         message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (
+    pathname === "/api/integrations/direct-data/tj/certificates/status" &&
+    request.method === "GET"
+  ) {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    sendJson(response, 200, {
+      configuration: directDataCertificatesService.getStatus(),
+    });
+    return true;
+  }
+
+  if (
+    pathname === "/api/integrations/direct-data/tj/certificates" &&
+    request.method === "POST"
+  ) {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const result = await directDataCertificatesService.query(
+        await readJsonBody(request),
+        authContext,
+      );
+      if (result.unavailable) {
+        sendJson(response, 503, {
+          error: result.reason || "direct_data_certificates_unavailable",
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, {
+          error: result.reason || "invalid_direct_data_certificate_query",
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.unsupported) {
+        sendJson(response, 422, {
+          error: result.reason || "direct_data_certificate_uf_unsupported",
+          allowedUfs: result.allowedUfs,
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.insufficientCredits) {
+        sendJson(response, 402, {
+          error: "insufficient_credits",
+          creditCost: result.creditCost,
+          wallet: result.wallet,
+          providerCompleted: result.providerCompleted === true,
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      if (result.failed) {
+        sendJson(response, 502, {
+          error: result.reason || "direct_data_certificate_query_failed",
+          providerStatus: result.providerStatus,
+          providerReference: result.providerReference,
+          providerRequestSubmitted:
+            result.providerRequestSubmitted === true,
+          billingVerificationRequired:
+            result.billingVerificationRequired === true,
+          configuration: result.configuration,
+        });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch {
+      sendJson(response, 500, {
+        error: "direct_data_certificate_query_failed",
+        message: "Não foi possível emitir a certidão estadual agora.",
       });
     }
     return true;
