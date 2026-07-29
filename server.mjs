@@ -59,7 +59,9 @@ const databaseUrl = process.env.DATABASE_URL;
 const autoMigrate = process.env.AUDITA_AUTO_MIGRATE !== "false";
 const authRequired = process.env.AUDITA_AUTH_REQUIRED !== "false";
 const sessionCookieName = "audita_session";
-const appVersion = process.env.APP_VERSION || resolveGitVersion() || "local";
+const appVersion = String(
+  process.env.APP_VERSION || resolveGitVersion() || "local",
+).trim();
 const appEnv = process.env.APP_ENV || "local";
 const appUrl = process.env.APP_URL || "";
 let profileEncryptionKey = resolveProfileEncryptionKey(
