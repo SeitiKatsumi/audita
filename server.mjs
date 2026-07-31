@@ -6,6 +6,10 @@ import { dirname, extname, join, resolve } from "node:path";
 import WebSocket, { WebSocketServer } from "ws";
 import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
+import {
+  buildDfSellerAuditRequest,
+  normalizeDfSellerInput,
+} from "./services/seller-analysis.service.mjs";
 import { createApiUsageService } from "./services/api-usage.service.mjs";
 import { createOpenAIOfficialUsageService } from "./services/openai-official-usage.service.mjs";
 import {
@@ -13,8 +17,17 @@ import {
   normalizeWebSocketCloseCode,
 } from "./services/chat-browser.service.mjs";
 import { createCreditsService } from "./services/credits.service.mjs";
+import {
+  createStripeBillingService,
+  StripeBillingError,
+} from "./services/stripe-billing.service.mjs";
+import { createBillingAdminService } from "./services/billing-admin.service.mjs";
 import { createDirectDataCourtService } from "./services/direct-data-court.service.mjs";
 import { createDirectDataCertificatesService } from "./services/direct-data-certificates.service.mjs";
+import {
+  createDirectDataPersonService,
+  personNamesMatch,
+} from "./services/direct-data-person.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
 import {
   runAuditaChat,
@@ -51,6 +64,10 @@ import {
   resolveProfileEncryptionKey,
   UserProfileValidationError,
 } from "./services/user-profile.service.mjs";
+import {
+  buildSelfServeTenantIdentity,
+  createSelfServeAccount,
+} from "./services/tenant-onboarding.service.mjs";
 
 const root = resolve(".");
 loadLocalEnvFiles();
@@ -545,16 +562,22 @@ async function saveFallbackAuth() {
   await writeFile(fallbackAuthPath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
-function createFallbackUser({ email, name, password, role = "member" }) {
+function createFallbackUser({ email, name, password, role = "owner" }) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (fallbackUsersByEmail.has(normalizedEmail)) {
     return null;
   }
+  const userId = fallbackUserId++;
+  const tenant = buildSelfServeTenantIdentity({
+    name,
+    email: normalizedEmail,
+    nonce: `local-${userId}`,
+  });
   const user = {
-    id: fallbackUserId++,
-    tenant_id: "local",
-    tenant_name: "Local",
-    tenant_slug: "local",
+    id: userId,
+    tenant_id: `local-${userId}`,
+    tenant_name: tenant.name,
+    tenant_slug: tenant.slug,
     email: normalizedEmail,
     name,
     role,
@@ -1401,12 +1424,24 @@ const auditService = createAuditService({
   recordApiUsage: (usageContext, event) => apiUsageService.record(usageContext, event),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
+const stripeBillingService = createStripeBillingService({
+  getDb: () => ({ pool, dbReady }),
+  creditsService,
+});
+const billingAdminService = createBillingAdminService({
+  getDb: () => ({ pool, dbReady }),
+});
 const directDataCourtService = createDirectDataCourtService({
   creditsService,
   recordApiUsage: (usageContext, event) =>
     apiUsageService.record(usageContext, event),
 });
 const directDataCertificatesService = createDirectDataCertificatesService({
+  creditsService,
+  recordApiUsage: (usageContext, event) =>
+    apiUsageService.record(usageContext, event),
+});
+const directDataPersonService = createDirectDataPersonService({
   creditsService,
   recordApiUsage: (usageContext, event) =>
     apiUsageService.record(usageContext, event),
@@ -2959,6 +2994,165 @@ async function runChatConversation(request) {
 }
 
 async function handleApi(request, response, pathname) {
+  if (pathname === "/api/billing/plans" && request.method === "GET") {
+    sendJson(response, 200, stripeBillingService.catalog());
+    return true;
+  }
+
+  if (pathname === "/api/billing/webhook" && request.method === "POST") {
+    try {
+      const rawBody = await readBufferBody(request, 2 * 1024 * 1024);
+      const result = await stripeBillingService.handleWebhook(
+        rawBody,
+        request.headers["stripe-signature"],
+      );
+      sendJson(response, 200, result);
+    } catch (error) {
+      const statusCode =
+        error instanceof StripeBillingError ? error.statusCode : 500;
+      sendJson(response, statusCode, {
+        error:
+          error instanceof StripeBillingError
+            ? error.code
+            : "billing_webhook_failed",
+        message:
+          error instanceof StripeBillingError
+            ? error.message
+            : "Nao foi possivel processar o evento de cobranca.",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/billing/subscription" && request.method === "GET") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      sendJson(response, 200, await stripeBillingService.billingState(authContext));
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "billing_state_failed",
+        message: "Nao foi possivel carregar a assinatura.",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/billing/checkout" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const result = await stripeBillingService.createCheckoutSession(
+        authContext,
+        await readJsonBody(request),
+      );
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "billing_manager_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, {
+          error: result.reason || "invalid_billing_selection",
+        });
+        return true;
+      }
+      if (result.unavailable) {
+        sendJson(response, 503, {
+          error: result.reason || "billing_not_configured",
+          missing: result.missing || [],
+        });
+        return true;
+      }
+      sendJson(response, 201, result);
+    } catch (error) {
+      const statusCode =
+        error instanceof StripeBillingError ? error.statusCode : 500;
+      sendJson(response, statusCode, {
+        error:
+          error instanceof StripeBillingError
+            ? error.code
+            : "billing_checkout_failed",
+        message:
+          error instanceof StripeBillingError
+            ? error.message
+            : "Nao foi possivel iniciar o checkout.",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/billing/portal" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const result = await stripeBillingService.createPortalSession(authContext);
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "billing_manager_required" });
+        return true;
+      }
+      if (result.notFound) {
+        sendJson(response, 404, {
+          error: result.reason || "billing_customer_not_found",
+        });
+        return true;
+      }
+      if (result.unavailable) {
+        sendJson(response, 503, {
+          error: result.reason || "billing_portal_unavailable",
+        });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch (error) {
+      const statusCode =
+        error instanceof StripeBillingError ? error.statusCode : 500;
+      sendJson(response, statusCode, {
+        error:
+          error instanceof StripeBillingError
+            ? error.code
+            : "billing_portal_failed",
+        message:
+          error instanceof StripeBillingError
+            ? error.message
+            : "Nao foi possivel abrir o portal da assinatura.",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/admin/billing" && request.method === "GET") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (authRequired && !canManageIntegrations(authContext.user)) {
+        sendJson(response, 403, { error: "insufficient_role" });
+        return true;
+      }
+      sendJson(response, 200, await billingAdminService.getDashboard());
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "billing_admin_query_failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Nao foi possivel carregar a gestao comercial.",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/audit" && request.method === "GET") {
     try {
       const history = await auditService.listAuditHistory(request);
@@ -2992,6 +3186,110 @@ async function handleApi(request, response, pathname) {
     } catch (error) {
       sendJson(response, 500, {
         error: "audit_start_failed",
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/seller-analysis/df" && request.method === "POST") {
+    try {
+      const body = await readJsonBody(request);
+      const sellerInput = normalizeDfSellerInput(body);
+      if (sellerInput.invalid) {
+        sendJson(response, 400, {
+          error: "invalid_seller_analysis_request",
+          missingFields: sellerInput.missingFields,
+        });
+        return true;
+      }
+
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+
+      let resolvedFullName = sellerInput.fullName;
+      let resolvedMotherName = sellerInput.motherName;
+      let identityEnriched = false;
+
+      if (!resolvedMotherName) {
+        const enrichment = await directDataPersonService.lookup(
+          {
+            cpf: sellerInput.cpf,
+            authorizationConfirmed: true,
+            requestId: crypto.randomUUID(),
+          },
+          authContext,
+        );
+
+        if (enrichment.insufficientCredits) {
+          sendJson(response, 402, {
+            error: "insufficient_credits",
+            motherNameRequired: true,
+            creditCost: enrichment.creditCost,
+            wallet: enrichment.wallet,
+          });
+          return true;
+        }
+        if (enrichment.unavailable || enrichment.failed || !enrichment.result) {
+          sendJson(response, enrichment.unavailable ? 503 : 502, {
+            error: "seller_identity_enrichment_failed",
+            reason: enrichment.reason || "provider_request_failed",
+            motherNameRequired: true,
+            billingVerificationRequired: enrichment.billingVerificationRequired === true,
+          });
+          return true;
+        }
+        if (!personNamesMatch(sellerInput.fullName, enrichment.result.fullName)) {
+          sendJson(response, 409, {
+            error: "seller_name_mismatch",
+            message: "O nome informado não corresponde ao cadastro retornado para o CPF.",
+          });
+          return true;
+        }
+        if (!enrichment.result.motherName) {
+          sendJson(response, 422, {
+            error: "seller_mother_name_not_found",
+            motherNameRequired: true,
+          });
+          return true;
+        }
+
+        resolvedFullName = enrichment.result.fullName;
+        resolvedMotherName = enrichment.result.motherName;
+        identityEnriched = true;
+      }
+
+      const prepared = buildDfSellerAuditRequest({
+        cpf: sellerInput.cpf,
+        fullName: resolvedFullName,
+        motherName: resolvedMotherName,
+        authorizationConfirmed: true,
+      });
+      if (prepared.invalid) {
+        sendJson(response, 400, {
+          error: "invalid_seller_analysis_request",
+          missingFields: prepared.missingFields,
+        });
+        return true;
+      }
+
+      request.body = prepared.requestBody;
+      const result = await auditService.startAudit(request);
+      if (result.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: "invalid_seller_analysis_request" });
+        return true;
+      }
+      sendJson(response, 202, { ...result, identityEnriched });
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "seller_analysis_start_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -4080,22 +4378,13 @@ async function handleApi(request, response, pathname) {
         return true;
       }
 
-      if (!defaultTenantId) {
-        await cacheDefaultTenant();
-      }
-      if (!defaultTenantId) {
-        sendJson(response, 503, { error: "tenant_unavailable" });
-        return true;
-      }
-
-      const result = await pool.query(
-        `INSERT INTO audita_users (tenant_id, email, name, role, password_hash, status)
-         VALUES ($1, $2, $3, 'member', $4, 'active')
-         RETURNING id`,
-        [defaultTenantId, email, name, hashPassword(password)],
-      );
-
-      await createSession(response, request, result.rows[0].id);
+      const account = await createSelfServeAccount(pool, {
+        name,
+        email,
+        passwordHash: hashPassword(password),
+        nonce: crypto.randomBytes(6).toString("hex"),
+      });
+      await createSession(response, request, account.userId);
       sendJson(response, 201, { ok: true });
     } catch (error) {
       if (error?.code === "23505") {

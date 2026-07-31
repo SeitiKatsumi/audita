@@ -3,7 +3,7 @@ EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUIZADO ESPECIAL C�
 
 {{FULL_NAME}}, {{NATIONALITY}}, {{MARITAL_STATUS}}, {{PROFESSION}}, portador(a) do RG nº {{RG}} e inscrito(a) no CPF sob o nº {{DOCUMENT}}, residente e domiciliado(a) na {{ADDRESS}}, e-mail: {{EMAIL}}, telefone: {{PHONE}}, com base na capacidade postulatória própria conferida pelo art. 9º da Lei nº 9.099/95 (sem necessidade de advogado), vem, respeitosamente, à presença de Vossa Excelência, propor a presente:
 
-AÇÃO DECLARATÓRIA DE INEXISTÊNCIA DE DÉBITO C/C REPETIÇÃO DE INDÉBITO EM DOBRO, LUCROS CESSANTES E INDENIZAÇÃO POR DANOS MORAIS
+{{ACTION_TITLE}}
 
 em face de ITAÚ UNIBANCO S.A., pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 60.701.190/0001-04, com sede na Praça Alfredo Egydio de Souza Aranha, nº 100, Jabaquara, São Paulo/SP, CEP 04344-902, pelas razões de fato e de direito a seguir expostas:
 
@@ -55,9 +55,7 @@ Valores cobrados indevidamente por produtos ou serviços não autorizados/solici
 
 Valores que, embora autorizados ou solicitados originalmente, não foram cancelados após o devido requerimento do consumidor.
 
-4. Dos Lucros Cessantes e Perdas e Danos (Privação de Capital)
-
-Nos termos dos Arts. 389 e 402 do Código Civil, a Ré deve indenizar o(a) Autor(a) pelo que ele(a) razoavelmente deixou de lucrar ao ter seu dinheiro privado indevidamente. O valor subtraído deve ser recomposto considerando a rentabilidade que o capital teria auferido no período.
+{{LOST_PROFITS_GROUNDS}}
 
 III. DA TUTELA DE URGÊNCIA (ART. 300 DO CPC)
 
@@ -79,9 +77,9 @@ a) Declarar a inexistência de relação contratual quanto aos seguros/serviços
 
 b) Condenar a Ré à Repetição do Indébito em Dobro de todos os valores indevidamente descontados nos últimos 5 anos, no montante apurado pela auditoria no valor de R$ {{DOUBLE_REFUND}}, com juros e correção desde o desembolso;
 
-c) Condenar a Ré ao pagamento de Lucros Cessantes / Perdas e Danos pela privação do capital, no valor estimado de R$ {{LOST_PROFITS}};
+{{LOST_PROFITS_REQUEST}}
 
-d) Condenar a Ré ao pagamento de Danos Morais no valor de R$ {{MORAL_DAMAGES}}, pela conduta abusiva e desvio produtivo do consumidor.
+{{MORAL_DAMAGES_REQUEST}}
 
 Dá-se à causa o valor de R$ {{CASE_VALUE}}.
 
@@ -103,6 +101,8 @@ EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUIZADO ESPECIAL C�
 
 {{FULL_NAME}}, {{NATIONALITY}}, {{MARITAL_STATUS}}, {{PROFESSION}}, portador(a) do RG nº {{RG}} e inscrito(a) no CPF sob o nº {{DOCUMENT}}, residente e domiciliado(a) na {{ADDRESS}}, e-mail: {{EMAIL}}, telefone: {{PHONE}}, com base na capacidade postulatória própria conferida pelo art. 9º da Lei nº 9.099/95 (sem necessidade de advogado), vem, respeitosamente, à presença de Vossa Excelência, propor a presente:
 
+{{ACTION_TITLE}}
+
 em face de ITAÚ UNIBANCO S.A., pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 60.701.190/0001-04, com sede na Praça Alfredo Egydio de Souza Aranha, nº 100, Jabaquara, São Paulo/SP, CEP 04344-902, pelas razões de fato e de direito a seguir expostas:
 
 DA LIMITAÇÃO TEMPORAL IMPOSTA PELO ACORDO
@@ -117,17 +117,15 @@ Assim, o acordo não pode ser interpretado como quitação geral das cobranças 
 
 I. DOS FATOS
 
-1 O(A) Autor(a) é titular de conta/cartão de crédito junto à instituição financeira Ré. Ao realizar a auditoria analítica de seus extratos e faturas por meio do sistema IA AUDITA, constatou a incidência continuada e não autorizada de cobranças referentes a seguros e serviços adicionais jamais solicitados ou contratados.
+1 O(A) Autor(a) é titular de conta e/ou cartão de crédito junto à instituição financeira Ré. Ao analisar o documento recente fornecido pelo(a) consumidor(a), a plataforma IA AUDITA identificou {{EVIDENCE_SUMMARY}}, que o(a) Autor(a) declarou não reconhecer.
 
-2 As referidas tarifas vêm sendo debitadas mensalmente sem o prévio, expresso e inequívoco consentimento do(a) Autor(a), configurando clara venda casada e prática abusiva.
+2 Nesta etapa, a quantificação está limitada aos lançamentos efetivamente apresentados. O(A) Autor(a) não dispõe dos extratos históricos completos nem do instrumento contratual que permita verificar a origem, a duração e a regularidade da cobrança contestada.
 
-3 Cumpre ressaltar que a conduta da Ré não se trata de fato isolado. Trata-se de prática sistêmica e reiterada, objeto de Ação Civil Pública promovida pelo Procon-MPMG e IDEC (Processo nº 5085307-63.2016.8.13.0024 - TJMG), na qual a própria instituição financeira celebrou acordo para estorno e reparação por cobranças indevidas de seguros não consentidos.
+3 {{HISTORICAL_CONTEXT}}
 
-4 Destaca-se que no referido acordo restou formalmente pactuado o dever da instituição financeira Ré de conferir transparência às contratações, obrigando-se a enviar a cópia do contrato e a confirmação dos termos diretamente ao consumidor via WhatsApp, SMS ou e-mail.
+4 A discussão sobre cobranças de seguros e serviços não consentidos também foi objeto da Ação Civil Pública nº 5085307-63.2016.8.13.0024, em trâmite no TJMG, invocada neste rascunho como referência a ser conferida na revisão jurídica e documental do caso concreto.
 
-5 Ocorre que, no caso do(a) Autor(a), a Ré NUNCA enviou qualquer via do contrato ou mensagem via WhatsApp/SMS confirmando a adesão aos referidos seguros/serviços. A omissão do banco em cumprir o dever de envio da via contratual demonstra de forma inequívoca que nunca houve aceite ou manifestação de vontade do consumidor, tratando-se de cobrança puramente arbitrária e unilateral.
-
-6 A privação indevida desse capital do patrimônio do(a) Autor(a) ao longo do tempo gerou indisponibilidade financeira, impedindo a rentabilização do dinheiro ou impondo-lhe prejuízos financeiros diretos, o que fundamenta os pedidos de devolução em dobro e reparação por lucros cessantes.
+5 O(A) Autor(a) afirma não reconhecer a contratação e não ter localizado confirmação de adesão ou cópia do contrato. Por isso, requer que a Ré apresente os documentos e registros capazes de demonstrar eventual consentimento, sem que a ausência desses documentos em poder do consumidor seja tratada, por si só, como prova definitiva do fato.
 
 II. DO DIREITO E DA JURISPRUDÊNCIA
 
@@ -139,7 +137,7 @@ Requer-se desde já a inversão do ônus da prova (Art. 6º, VIII, do CDC), cabe
 
 2. Da Violação do Dever de Informação e Ausência de Envio via WhatsApp/SMS
 
-Conforme prevê o Art. 6º, inciso III, do CDC, é direito básico do consumidor a informação adequada e clara sobre os diferentes produtos e serviços. Ademais, ao descumprir a obrigação de disponibilizar e enviar a cópia do contrato assinado via WhatsApp ou SMS no momento da suposta contratação, a Ré violou o princípio da transparência e da boa-fé objetiva (Art. 422 do Código Civil e Art. 4º, III, do CDC). Sem a comprovação do envio da via do contrato ao WhatsApp do cliente, reputa-se inexistente a contratação e nulas as cobranças efetuadas.
+Conforme prevê o Art. 6º, inciso III, do CDC, é direito básico do consumidor a informação adequada e clara sobre os diferentes produtos e serviços. Diante da negativa de contratação, cabe à Ré apresentar o instrumento de adesão e os registros de consentimento que sustentem a cobrança, observados o princípio da transparência e a distribuição do ônus da prova no caso concreto.
 
 3. DA REPETIÇÃO DO INDÉBITO EM DOBRO (ART. 42, PARÁGRAFO ÚNICO, DO CDC)
 
@@ -153,37 +151,35 @@ Valores cobrados indevidamente por produtos ou serviços não autorizados/solici
 
 Valores que, embora autorizados ou solicitados originalmente, não foram cancelados após o devido requerimento do consumidor.
 
-4. Dos Lucros Cessantes e Perdas e Danos (Privação do Capital)
+{{LOST_PROFITS_GROUNDS}}
 
-Ao subtrair mensalmente valores da conta do(a) Autor(a), a Ré retirou-lhe a disponibilidade do capital de giro e a oportunidade de rendimento financeiro (Custo de Oportunidade). Nos termos dos Arts. 389 e 402 do Código Civil, os lucros cessantes abrangem o que o credor razoavelmente deixou de lucrar. O capital indevidamente retido pelo Réu deve ser recomposto considerando os rendimentos que teria auferido durante o período de privação.
+4. Do Precedente da Ação Civil Pública
 
-5. Do Precedente da Ação Civil Pública (Prova Emprestada)
-
-A ilicitude da conduta da Ré encontra respaldo no acordo homologado no Processo nº 5085307-63.2016.8.13.0024 (TJMG), no qual o Itaú comprometeu-se a reparar consumidores vítimas de seguros cobrados sem autorização. Tal precedente serve como suporte fático e jurisprudencial para demonstrar o modus operandi abusivo da instituição financeira.
+O Processo nº 5085307-63.2016.8.13.0024 (TJMG) deve ser examinado como referência coletiva, sem substituir a prova individual da cobrança, da ausência de consentimento e dos danos alegados neste caso.
 
 III. DA TUTELA DE URGÊNCIA (ART. 300 DO CPC)
 
-Presentes a probabilidade do direito (demonstrada pelos extratos com descontos indevidos) e o perigo da demora (continuidade dos saques ilegais na conta), requer-se a concessão de medida liminar para determinar que a Ré suspenda imediatamente qualquer cobrança relativa aos seguros e serviços não contratados, sob pena de multa diária (astreintes) a ser fixada por este Juízo.
+Diante da cobrança recente documentada e do risco de novos débitos enquanto a contratação é contestada, requer-se, caso a cobrança permaneça ativa, a suspensão de novos lançamentos até a apreciação do mérito, sujeita à análise dos requisitos do Art. 300 do CPC pelo Juízo.
 
 IV. DOS PEDIDOS
 
 Diante do exposto, requer a Vossa Excelência:
 
-1 A concessão da Tutela de Urgência, inaudita altera parte, ordenando que a Ré cancele e se abstenha de efetuar novos descontos de seguros/serviços não contratados, sob pena de multa diária a ser arbitrada;
+1 A concessão da Tutela de Urgência, ordenando que a Ré suspenda a cobrança contestada, caso ainda esteja ativa, e se abstenha de efetuar novos lançamentos da mesma origem até decisão judicial, sob pena de multa a ser arbitrada;
 
 2 A citação da Ré no endereço declinado para, querendo, apresentar contestação e comparecer à audiência de conciliação;
 
-3 A Inversão do Ônus da Prova, nos termos do Art. 6º, VIII, do CDC;
+3 A Inversão do Ônus da Prova, nos termos do Art. 6º, VIII, do CDC, determinando que a Ré exiba em juízo o instrumento de contratação, os registros de consentimento e os extratos ou faturas do período controvertido, observado o limite temporal juridicamente aplicável;
 
 4 No mérito, julgar TOTALMENTE PROCEDENTES os pedidos para:
 
-a) Declarar a inexistência de relação jurídica contratual quanto aos seguros/serviços cobrados, ante a ausência de consentimento e a inequívoca comprovação de que o Réu jamais enviou qualquer via contratual ou confirmação por WhatsApp/SMS ao Autor(a);
+a) Declarar a inexistência de relação jurídica contratual quanto à cobrança contestada, caso a Ré não comprove consentimento válido;
 
-b) Condenar a Ré à Repetição do Indébito em Dobro de todos os valores indevidamente descontados nos últimos 5 (cinco) anos, totalizando o valor atualizado de R$ {{DOUBLE_REFUND}}, acrescido de juros moratórios e correção monetária desde cada desembolso;
+b) Condenar a Ré à Repetição do Indébito em Dobro dos valores comprovados nesta etapa, no total inicial de R$ {{DOUBLE_REFUND}}, acrescido de juros e correção na forma definida pelo Juízo, ficando eventual valor histórico adicional condicionado à exibição dos documentos e à respectiva comprovação;
 
-c) Condenar a Ré ao pagamento de Lucros Cessantes / Indenização por Perdas e Danos pela privação indevida do capital do(a) Autor(a), no valor estimado de R$ {{LOST_PROFITS}};
+{{LOST_PROFITS_REQUEST}}
 
-d) Condenar a Ré ao pagamento de indenização por Danos Morais no valor de R$ {{MORAL_DAMAGES}}, pelo desvio produtivo do consumidor e abusividade da conduta.
+{{MORAL_DAMAGES_REQUEST}}
 
 Dá-se à causa o valor de R$ {{CASE_VALUE}}.
 
@@ -217,9 +213,10 @@ export const JEC_PETITION_TEMPLATES = Object.freeze({
     text: MODEL_2,
     sourceModel: 2,
     reviewNotes: [
-      "O modelo fornecido menciona auditoria de extratos apesar de a jornada indicar ausência dos documentos históricos.",
-      "O modelo fornecido não contém um título de ação entre a qualificação e a identificação da parte ré.",
-      "A coerência dos fatos e dos pedidos deve ser revisada juridicamente antes do protocolo.",
+      "A recorrência relatada não é tratada como fato comprovado sem os extratos históricos.",
+      "A quantificação inicial fica limitada às cobranças efetivamente evidenciadas.",
+      "Pedidos facultativos sem valor positivo informado são omitidos do rascunho.",
+      "Fatos, competência, fundamentos e pedidos ainda exigem revisão jurídica antes do protocolo.",
     ],
   }),
 });

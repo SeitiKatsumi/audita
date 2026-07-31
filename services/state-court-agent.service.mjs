@@ -450,6 +450,8 @@ function buildStateCourtAgentInstructions(session) {
       "Use handoff_human para pedir a intervencao da pessoa e explique uma unica acao objetiva.",
       "Prefira observar, preencher por rotulo, selecionar por rotulo e clicar por texto.",
       "Nao use clique por coordenadas neste fluxo.",
+      "Depois de observar a tela, se o roteiro do portal disser para parar antes do primeiro campo, formulario, escolha territorial, login, CAPTCHA, anexo ou envio, chame handoff_human imediatamente com o checkpoint exato. Nao repita observe_browser sem executar uma acao segura ou registrar o handoff.",
+      "Nunca peca ao usuario apenas para confirmar que uma pagina carregou. Se a pagina carregou, avance pela proxima acao reversivel permitida; se houver checkpoint, informe a decisao ou dado concreto que o humano precisa fornecer.",
       String(session.profile?.agentInstructions || ""),
     ]
       .filter(Boolean)

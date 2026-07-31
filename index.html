@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260728-browser-status-1" />
+    <link rel="stylesheet" href="styles.css?v=20260731-charge-documents-2" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -43,35 +43,99 @@
     </section>
 
     <div class="shell">
-      <button class="mobile-menu-button" id="mobileMenuButton" type="button" aria-controls="sidebar" aria-expanded="false">Menu</button>
-      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher menu" title="Recolher menu">&lsaquo;</button>
+      <button class="mobile-menu-button" id="mobileMenuButton" type="button" aria-controls="sidebar" aria-expanded="false">
+        <img src="assets/nav-icons/menu-2.svg" alt="" aria-hidden="true" />
+        <span>Menu</span>
+      </button>
       <aside class="sidebar" id="sidebar" aria-label="Navega&ccedil;&atilde;o principal">
-        <div class="brand">
-          <img class="brand-logo" src="assets/audita-logo-white.svg" alt="Audita" />
-          <div>
-            <strong>Audita</strong>
-            <small>Elevenmind</small>
-            <small class="deploy-version" id="deployVersion">vers&atilde;o local</small>
+        <header class="sidebar-header">
+          <div class="brand">
+            <img class="brand-logo" src="assets/audita-logo-white.svg" alt="Audita" />
+            <div class="brand-copy">
+              <strong>Audita</strong>
+              <small>Elevenmind</small>
+              <small class="deploy-version" id="deployVersion">vers&atilde;o local</small>
+            </div>
           </div>
-        </div>
+          <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Recolher menu" title="Recolher menu">
+            <img id="sidebarToggleIcon" src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />
+          </button>
+        </header>
 
         <nav class="nav-list">
-          <a class="active" href="#home">Home</a>
-          <a class="nav-ai" href="/chat" data-app-route="chat">
-            <span class="nav-ai-mark" aria-hidden="true">A</span>
-            Audita IA
+          <a class="active" href="#home">
+            <img class="nav-icon" src="assets/nav-icons/home.svg" alt="" aria-hidden="true" />
+            <span class="nav-label">Home</span>
           </a>
-          <details class="nav-group" open>
-            <summary>Assistente de Consultas</summary>
-            <a class="nav-child" href="#consulta-tjdft-pf" data-nav-pages="consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj">
-              Certid&otilde;es estaduais
-            </a>
-            <a class="nav-child" href="#consulta-imoveis">Busca de im&oacute;veis</a>
-            <a class="nav-child" href="#consulta-cnib">Indisponibilidade de bens</a>
+          <a class="nav-ai" href="/chat" data-app-route="chat">
+            <img class="nav-icon" src="assets/nav-icons/square-rounded-letter-a.svg" alt="" aria-hidden="true" />
+            <span class="nav-label">Audita IA</span>
+            <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+          </a>
+          <a href="#analise-cobrancas">
+            <img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" aria-hidden="true" />
+            <span class="nav-label">An&aacute;lise de cobran&ccedil;as indevidas</span>
+            <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+          </a>
+          <details class="nav-group">
+            <summary>
+              <img class="nav-icon" src="assets/nav-icons/building.svg" alt="" aria-hidden="true" />
+              <span class="nav-label">An&aacute;lise Compra e Venda de Im&oacute;veis</span>
+              <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+            </summary>
+            <div class="nav-children">
+              <a class="nav-child" href="#analise-vendedor">
+                <span class="nav-label">An&aacute;lise de Vendedor</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+            </div>
           </details>
-          <a href="#historico">Hist&oacute;rico de consultas</a>
-          <a href="#meu-painel">Meu painel</a>
-          <a class="hidden" href="#admin-consumo" id="adminUsageNav">Consumo de APIs</a>
+          <details class="nav-group" open>
+            <summary>
+              <img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" aria-hidden="true" />
+              <span class="nav-label">Configura&ccedil;&otilde;es</span>
+              <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+            </summary>
+            <div class="nav-children">
+              <a class="nav-child" href="#historico">
+                <span class="nav-label">Hist&oacute;rico de consultas</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="nav-child" href="#meu-painel">
+                <span class="nav-label">Meu painel</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="nav-child hidden" href="#admin-planos" id="adminBillingNav">
+                <span class="nav-label">Planos e assinaturas</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="nav-child hidden" href="#admin-consumo" id="adminUsageNav">
+                <span class="nav-label">Consumo de APIs</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+            </div>
+          </details>
+          <details class="nav-group">
+            <summary>
+              <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
+              <span class="nav-label">Ferramentas de Consulta (Dev)</span>
+              <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+            </summary>
+            <div class="nav-children">
+              <a class="nav-child" href="#consulta-tjdft-pf" data-nav-pages="consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj">
+                <span class="nav-label">Certid&otilde;es estaduais</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="nav-child" href="#consulta-imoveis">
+                <span class="nav-label">Busca de im&oacute;veis</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="nav-child" href="#consulta-cnib">
+                <span class="nav-label">Indisponibilidade de bens</span>
+                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+            </div>
+          </details>
         </nav>
 
         <div class="sidebar-footer">
@@ -87,6 +151,7 @@
           </button>
         </div>
       </aside>
+      <button class="sidebar-scrim" id="sidebarScrim" type="button" aria-label="Fechar menu"></button>
 
       <main class="workspace">
         <header class="topbar">
@@ -123,6 +188,7 @@
                 </div>
               </a>
               <div class="chat-header-actions">
+                <a class="chat-tools-button chat-plans-link" href="/planos">Planos</a>
                 <button class="chat-browser-mobile-open hidden" id="chatBrowserMobileOpen" type="button">
                   Navegador <span aria-hidden="true"></span>
                 </button>
@@ -316,6 +382,126 @@
             <strong>4.8s</strong>
             <span>An&aacute;lise preliminar</span>
           </article>
+        </section>
+
+        <section class="seller-analysis-page" id="analise-vendedor" data-page="analise-vendedor">
+          <article class="module seller-analysis-module">
+            <div class="module-header seller-analysis-header">
+              <div>
+                <p class="eyebrow">Compra e venda de im&oacute;veis</p>
+                <h2>An&aacute;lise de Vendedor</h2>
+              </div>
+              <span class="live">Dispon&iacute;vel no DF</span>
+            </div>
+            <p class="seller-analysis-intro">
+              Est&aacute; comprando um im&oacute;vel? Use a Audita para reunir as certid&otilde;es do vendedor antes de avan&ccedil;ar. Nesta primeira etapa, consultamos automaticamente as certid&otilde;es dispon&iacute;veis para pessoa f&iacute;sica no TJDFT e organizamos os PDFs oficiais em um s&oacute; lugar. O cruzamento com outras fontes e a an&aacute;lise de risco ser&atilde;o adicionados nas pr&oacute;ximas etapas.
+            </p>
+
+            <div class="seller-analysis-scope">
+              <div>
+                <small>Escopo desta primeira etapa</small>
+                <strong>Vendedor pessoa f&iacute;sica &middot; Distrito Federal</strong>
+                <span>A an&aacute;lise de risco por IA ser&aacute; adicionada em uma etapa futura.</span>
+              </div>
+              <ul aria-label="Certid&otilde;es inclu&iacute;das">
+                <li>Criminal</li>
+                <li>C&iacute;vel</li>
+                <li>Fal&ecirc;ncia e Recupera&ccedil;&atilde;o Judicial</li>
+                <li>Especial &mdash; C&iacute;vel e Criminal</li>
+              </ul>
+            </div>
+
+            <div class="seller-analysis-workspace">
+              <form class="seller-analysis-form" id="sellerAnalysisForm">
+                <div class="seller-analysis-form-heading">
+                  <span>1</span>
+                  <div>
+                    <strong>Dados do vendedor</strong>
+                    <small>Informe apenas o CPF e o nome completo. A filia&ccedil;&atilde;o ser&aacute; localizada automaticamente.</small>
+                  </div>
+                </div>
+                <label>
+                  CPF do vendedor
+                  <input id="sellerAnalysisCpf" type="text" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000.000.000-00" required />
+                </label>
+                <label>
+                  Nome completo
+                  <input id="sellerAnalysisFullName" type="text" maxlength="180" autocomplete="name" placeholder="Nome completo do vendedor" required />
+                </label>
+                <label class="hidden" id="sellerAnalysisMotherField">
+                  Nome completo da m&atilde;e
+                  <input id="sellerAnalysisMotherName" type="text" maxlength="180" autocomplete="off" placeholder="Informe somente se a busca autom&aacute;tica n&atilde;o localizar" />
+                </label>
+                <label class="seller-analysis-consent">
+                  <input id="sellerAnalysisAuthorization" type="checkbox" required />
+                  <span>Confirmo que possuo autoriza&ccedil;&atilde;o ou base legal para consultar os dados deste vendedor.</span>
+                </label>
+                <p class="seller-analysis-privacy">
+                  O CPF &eacute; consultado no cadastro da Direct Data para obter o nome da m&atilde;e e depois enviado ao portal oficial do TJDFT para a emiss&atilde;o. A Audita usa apenas os dados necess&aacute;rios e registra o identificador mascarado e seu hash para rastreabilidade.
+                </p>
+                <button class="primary-action" id="sellerAnalysisSubmit" type="submit">Extrair todas as certid&otilde;es</button>
+                <small class="login-error" id="sellerAnalysisError" role="alert"></small>
+              </form>
+
+              <section class="seller-analysis-result" id="sellerAnalysisResult" aria-live="polite">
+                <div class="seller-analysis-empty">
+                  <strong>Nenhuma extra&ccedil;&atilde;o iniciada</strong>
+                  <p>Preencha os dados do vendedor para solicitar as quatro certid&otilde;es oficiais do TJDFT.</p>
+                </div>
+              </section>
+            </div>
+          </article>
+        </section>
+
+        <section class="charge-analysis-page" id="analise-cobrancas" data-page="analise-cobrancas">
+          <div class="charge-analysis-shell">
+            <header class="charge-analysis-header">
+              <div class="charge-analysis-identity">
+                <span class="charge-analysis-mark" aria-hidden="true">
+                  <img src="assets/audita-logo-white.svg" alt="" />
+                </span>
+                <p><strong>Audita</strong> est&aacute; analisando com voc&ecirc;</p>
+              </div>
+              <ol class="charge-analysis-progress" id="chargeAnalysisProgress" aria-label="Progresso da an&aacute;lise">
+                <li class="active" data-charge-progress="triage">
+                  <span aria-hidden="true"></span>
+                  <div><strong>Triagem</strong><small>V&iacute;nculo com o cart&atilde;o</small></div>
+                </li>
+                <li data-charge-progress="document">
+                  <span aria-hidden="true"></span>
+                  <div><strong>Documento</strong><small>Leitura da fatura</small></div>
+                </li>
+                <li class="locked" data-charge-progress="plans">
+                  <span aria-hidden="true"></span>
+                  <div><strong>Libera&ccedil;&atilde;o</strong><small>Aguardando defini&ccedil;&atilde;o</small></div>
+                </li>
+              </ol>
+              <span class="charge-analysis-status" id="chargeAnalysisStatus">Etapa 1 de 3</span>
+              <div class="charge-analysis-visually-hidden">
+                <h2>An&aacute;lise de cobran&ccedil;as indevidas</h2>
+                <p>Fluxo guiado, sem conversa aberta com IA.</p>
+              </div>
+            </header>
+
+            <main
+              class="charge-analysis-stage"
+              id="chargeAnalysisStage"
+              aria-label="Conversa guiada para an&aacute;lise de cobran&ccedil;as"
+              aria-live="polite"
+            >
+              <div class="charge-analysis-message assistant">
+                <span class="charge-analysis-avatar" aria-hidden="true">
+                  <img src="assets/audita-logo-white.svg" alt="" />
+                </span>
+                <div class="charge-analysis-bubble">
+                  <small>Audita &middot; Triagem guiada</small>
+                  <p>Carregando a primeira etapa&hellip;</p>
+                </div>
+              </div>
+            </main>
+
+            <p class="charge-analysis-error hidden" id="chargeAnalysisError" role="alert"></p>
+          </div>
         </section>
 
         <section class="assistant-workbench" id="assistente" data-page="assistente">
@@ -1213,6 +1399,194 @@
           </article>
         </section>
 
+        <section class="billing-admin" id="admin-planos" data-page="admin-planos">
+          <div class="billing-admin-title-row">
+            <div>
+              <p class="eyebrow">Administra&ccedil;&atilde;o comercial</p>
+              <h2>Planos e assinaturas</h2>
+              <p>Gerencie a oferta recorrente, o consumo por consulta e a sa&uacute;de das assinaturas.</p>
+            </div>
+            <div class="billing-admin-actions">
+              <a class="secondary-action" href="/planos" target="_blank" rel="noopener">Ver p&aacute;gina de planos</a>
+              <button class="primary-action" id="billingAdminRefresh" type="button">Atualizar</button>
+            </div>
+          </div>
+
+          <p class="billing-admin-error hidden" id="billingAdminError" role="alert"></p>
+
+          <nav class="billing-admin-tabs" aria-label="Gest&atilde;o comercial">
+            <button class="active" data-billing-tab="overview" type="button">Vis&atilde;o geral</button>
+            <button data-billing-tab="plans" type="button">Planos</button>
+            <button data-billing-tab="queries" type="button">Por consulta</button>
+            <button data-billing-tab="subscriptions" type="button">Assinaturas</button>
+          </nav>
+
+          <div class="billing-admin-panel active" data-billing-panel="overview">
+            <div class="billing-admin-metrics" aria-label="Resumo comercial">
+              <article>
+                <small>Receita recorrente mensal</small>
+                <strong id="billingAdminMrr">R$ 0,00</strong>
+                <span>Equivalente mensal das assinaturas ativas</span>
+              </article>
+              <article>
+                <small>Assinaturas ativas</small>
+                <strong id="billingAdminActiveSubscriptions">0</strong>
+                <span id="billingAdminPastDue">Nenhuma pend&ecirc;ncia</span>
+              </article>
+              <article>
+                <small>Cr&eacute;ditos em carteira</small>
+                <strong id="billingAdminOutstandingCredits">0</strong>
+                <span>Saldo total ainda n&atilde;o consumido</span>
+              </article>
+              <article>
+                <small>Eventos processados</small>
+                <strong id="billingAdminEvents">0</strong>
+                <span>&Uacute;ltimos 30 dias</span>
+              </article>
+            </div>
+
+            <div class="billing-admin-overview-grid">
+              <article class="module billing-admin-readiness">
+                <div class="module-header">
+                  <div>
+                    <p class="eyebrow">Cobran&ccedil;a</p>
+                    <h2>Prontid&atilde;o da opera&ccedil;&atilde;o</h2>
+                  </div>
+                  <span class="billing-admin-status" id="billingAdminStatus">Verificando</span>
+                </div>
+                <div class="billing-readiness-list" id="billingReadinessList"></div>
+                <p class="billing-admin-note" id="billingAdminConfigurationNote"></p>
+              </article>
+
+              <article class="module billing-commercial-model">
+                <div class="module-header">
+                  <div>
+                    <p class="eyebrow">Modelo recomendado</p>
+                    <h2>Assinatura + cr&eacute;ditos</h2>
+                  </div>
+                </div>
+                <div class="billing-model-flow">
+                  <div>
+                    <strong>1. Assinatura</strong>
+                    <span>Receita previs&iacute;vel e acesso ao chat.</span>
+                  </div>
+                  <div>
+                    <strong>2. Cr&eacute;ditos</strong>
+                    <span>Consultas pagas consomem saldo conhecido.</span>
+                  </div>
+                  <div>
+                    <strong>3. Excedente</strong>
+                    <span>Pacotes adicionais evitam plano ilimitado.</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <article class="module billing-events-module">
+              <div class="module-header">
+                <div>
+                  <p class="eyebrow">Stripe</p>
+                  <h2>Atividade recente de cobran&ccedil;a</h2>
+                </div>
+              </div>
+              <div class="api-usage-table-wrap">
+                <table class="api-usage-table">
+                  <thead>
+                    <tr>
+                      <th>Evento</th>
+                      <th>Organiza&ccedil;&atilde;o</th>
+                      <th>Status</th>
+                      <th>Data</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billingAdminEventRows"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div class="billing-admin-panel" data-billing-panel="plans">
+            <div class="billing-panel-heading">
+              <div>
+                <p class="eyebrow">Oferta sugerida</p>
+                <h2>Planos recorrentes</h2>
+              </div>
+              <p>Valores iniciais para valida&ccedil;&atilde;o comercial. O checkout usa os Price IDs configurados na Stripe.</p>
+            </div>
+            <div class="billing-plan-admin-grid" id="billingAdminPlanGrid"></div>
+
+            <div class="billing-panel-heading billing-pack-heading">
+              <div>
+                <p class="eyebrow">Excedente</p>
+                <h2>Pacotes de cr&eacute;ditos</h2>
+              </div>
+              <p>Venda avulsa para clientes que ultrapassarem a franquia mensal.</p>
+            </div>
+            <div class="billing-pack-admin-grid" id="billingAdminPackGrid"></div>
+          </div>
+
+          <div class="billing-admin-panel" data-billing-panel="queries">
+            <div class="billing-panel-heading">
+              <div>
+                <p class="eyebrow">Consumo vari&aacute;vel</p>
+                <h2>Pre&ccedil;o por consulta</h2>
+              </div>
+              <p>A cobran&ccedil;a &eacute; em cr&eacute;ditos; o custo real do provedor continua no painel de Consumo de APIs.</p>
+            </div>
+            <article class="module billing-query-module">
+              <div class="api-usage-table-wrap">
+                <table class="api-usage-table billing-query-table">
+                  <thead>
+                    <tr>
+                      <th>Consulta</th>
+                      <th>Fornecedor</th>
+                      <th>Cr&eacute;ditos</th>
+                      <th>Valor de refer&ecirc;ncia</th>
+                      <th>Disponibilidade</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billingAdminOperationRows"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div class="billing-admin-panel" data-billing-panel="subscriptions">
+            <div class="billing-panel-heading">
+              <div>
+                <p class="eyebrow">Clientes</p>
+                <h2>Assinaturas</h2>
+              </div>
+              <label class="billing-subscription-filter">
+                Status
+                <select id="billingSubscriptionStatus">
+                  <option value="">Todos</option>
+                  <option value="active">Ativas</option>
+                  <option value="trialing">Em teste</option>
+                  <option value="past_due">Pagamento pendente</option>
+                  <option value="canceled">Canceladas</option>
+                </select>
+              </label>
+            </div>
+            <article class="module billing-subscription-module">
+              <div class="api-usage-table-wrap">
+                <table class="api-usage-table billing-subscription-table">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Plano</th>
+                      <th>Status</th>
+                      <th>Renova&ccedil;&atilde;o</th>
+                      <th>Saldo</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billingAdminSubscriptionRows"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
+
         <section class="integrations-admin" id="integracoes-admin" data-page="integracoes-admin">
           <article class="module integration-form-card">
             <div class="module-header">
@@ -1400,6 +1774,8 @@
       </main>
     </div>
 
-    <script type="module" src="app.js?v=20260728-browser-status-1"></script>
+    <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
+    <script type="module" src="charge-analysis.js?v=20260731-charge-documents-2"></script>
+    <script type="module" src="app.js?v=20260731-seller-analysis-1"></script>
   </body>
 </html>

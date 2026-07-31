@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Planos da Audita para consultas, analises juridicas e equipes."
+    />
+    <title>Planos | Audita</title>
+    <link rel="icon" href="/assets/audita-logo-white.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/plans.css?v=20260730-commercial-1" />
+    <script type="module" src="/plans.js?v=20260730-commercial-1"></script>
+  </head>
+  <body>
+    <header class="plans-header">
+      <a class="plans-brand" href="/chat" aria-label="Voltar para a Audita">
+        <span class="plans-logo"><img src="/assets/audita-logo-white.svg" alt="" /></span>
+        <span>
+          <strong>Audita</strong>
+          <small>Consultas e an&aacute;lises jur&iacute;dicas</small>
+        </span>
+      </a>
+      <nav class="plans-header-actions" aria-label="A&ccedil;&otilde;es da conta">
+        <a class="text-action" href="/chat">Abrir a Audita</a>
+        <button class="secondary-action hidden" id="manageSubscriptionButton" type="button">
+          Gerenciar assinatura
+        </button>
+        <button class="secondary-action" id="accountButton" type="button">Entrar</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="plans-intro" aria-labelledby="plansTitle">
+        <p class="eyebrow">Planos e cr&eacute;ditos</p>
+        <h1 id="plansTitle">Escolha a capacidade certa para sua rotina</h1>
+        <p class="plans-lead">
+          A conversa com a Audita continua simples. Os cr&eacute;ditos s&atilde;o usados
+          apenas em consultas, certid&otilde;es e processamentos que geram custo.
+        </p>
+
+        <div class="billing-cycle" role="group" aria-label="Per&iacute;odo de cobran&ccedil;a">
+          <button class="active" id="monthlyButton" type="button" aria-pressed="true">
+            Mensal
+          </button>
+          <button id="annualButton" type="button" aria-pressed="false">
+            Anual
+            <span>2 meses de economia</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="page-status hidden" id="pageStatus" role="status" aria-live="polite"></div>
+
+      <section class="account-summary hidden" id="accountSummary" aria-labelledby="accountSummaryTitle">
+        <div>
+          <p class="eyebrow">Sua conta</p>
+          <h2 id="accountSummaryTitle">Assinatura e saldo</h2>
+        </div>
+        <dl>
+          <div>
+            <dt>Plano</dt>
+            <dd id="currentPlanValue">Explorar</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd id="subscriptionStatusValue">Sem assinatura</dd>
+          </div>
+          <div>
+            <dt>Cr&eacute;ditos dispon&iacute;veis</dt>
+            <dd id="creditBalanceValue">0</dd>
+          </div>
+          <div>
+            <dt>Pr&oacute;xima renova&ccedil;&atilde;o</dt>
+            <dd id="renewalValue">N&atilde;o se aplica</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="plans-section" aria-labelledby="subscriptionsTitle">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Assinaturas</p>
+            <h2 id="subscriptionsTitle">Planos que crescem com o uso</h2>
+          </div>
+          <p>Sem promessa de consulta ilimitada. O consumo aparece antes de cada opera&ccedil;&atilde;o paga.</p>
+        </div>
+        <div class="plan-grid" id="planGrid" aria-live="polite"></div>
+      </section>
+
+      <section class="credit-section" aria-labelledby="creditPacksTitle">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Uso adicional</p>
+            <h2 id="creditPacksTitle">Pacotes de cr&eacute;ditos</h2>
+          </div>
+          <p>Para demandas pontuais sem trocar de plano. O saldo adicional aparece na carteira da organiza&ccedil;&atilde;o.</p>
+        </div>
+        <div class="credit-pack-list" id="creditPackList"></div>
+      </section>
+
+      <section class="comparison-section" aria-labelledby="comparisonTitle">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Compara&ccedil;&atilde;o</p>
+            <h2 id="comparisonTitle">O que muda entre os planos</h2>
+          </div>
+        </div>
+        <div class="comparison-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Recurso</th>
+                <th scope="col">Explorar</th>
+                <th scope="col">Essencial</th>
+                <th scope="col">Profissional</th>
+                <th scope="col">Equipe</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Cr&eacute;ditos inclu&iacute;dos</th>
+                <td>0</td>
+                <td>30/m&ecirc;s</td>
+                <td>150/m&ecirc;s</td>
+                <td>500/m&ecirc;s</td>
+              </tr>
+              <tr>
+                <th scope="row">Usu&aacute;rios</th>
+                <td>1</td>
+                <td>1</td>
+                <td>3</td>
+                <td>10</td>
+              </tr>
+              <tr>
+                <th scope="row">Chat e orienta&ccedil;&atilde;o inicial</th>
+                <td>Inclu&iacute;do</td>
+                <td>Inclu&iacute;do</td>
+                <td>Inclu&iacute;do</td>
+                <td>Inclu&iacute;do</td>
+              </tr>
+              <tr>
+                <th scope="row">Consultas e certid&otilde;es pagas</th>
+                <td>Com cr&eacute;ditos avulsos</td>
+                <td>Inclu&iacute;do</td>
+                <td>Inclu&iacute;do</td>
+                <td>Inclu&iacute;do</td>
+              </tr>
+              <tr>
+                <th scope="row">Gest&atilde;o de consumo por usu&aacute;rio</th>
+                <td>N&atilde;o</td>
+                <td>N&atilde;o</td>
+                <td>Inclu&iacute;do</td>
+                <td>Inclu&iacute;do</td>
+              </tr>
+              <tr>
+                <th scope="row">SLA e integra&ccedil;&otilde;es dedicadas</th>
+                <td>N&atilde;o</td>
+                <td>N&atilde;o</td>
+                <td>N&atilde;o</td>
+                <td>Enterprise</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="commercial-rules" aria-labelledby="rulesTitle">
+        <div>
+          <p class="eyebrow">Regras claras</p>
+          <h2 id="rulesTitle">Cobran&ccedil;a previs&iacute;vel desde o in&iacute;cio</h2>
+        </div>
+        <ul>
+          <li>Cr&eacute;ditos mensais renovam a cada ciclo e n&atilde;o acumulam.</li>
+          <li>Planos anuais recebem a franquia anual no pagamento.</li>
+          <li>Opera&ccedil;&otilde;es pagas sempre pedem confirma&ccedil;&atilde;o antes da consulta.</li>
+          <li>Servi&ccedil;os de advocacia n&atilde;o fazem parte da assinatura.</li>
+          <li>Cancelamento e dados de pagamento ficam no portal seguro da Stripe.</li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      <span>Audita</span>
+      <p>Decis&otilde;es melhores com dados, contexto e rastreabilidade.</p>
+      <a href="/chat">Voltar para a plataforma</a>
+    </footer>
+
+    <dialog class="auth-dialog" id="authDialog" aria-labelledby="authTitle">
+      <form method="dialog" class="dialog-close-row">
+        <button type="submit" aria-label="Fechar">Fechar</button>
+      </form>
+      <div class="auth-dialog-content">
+        <p class="eyebrow">Conta Audita</p>
+        <h2 id="authTitle">Entre para continuar</h2>
+        <p id="authDescription">Sua assinatura fica vinculada &agrave; sua organiza&ccedil;&atilde;o.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Modo de acesso">
+          <button class="active" id="loginTab" type="button" role="tab" aria-selected="true">Entrar</button>
+          <button id="registerTab" type="button" role="tab" aria-selected="false">Criar conta</button>
+        </div>
+        <form id="authForm">
+          <label class="hidden" id="nameField">
+            Nome
+            <input id="authName" name="name" autocomplete="name" />
+          </label>
+          <label>
+            E-mail
+            <input id="authEmail" name="email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            Senha
+            <input
+              id="authPassword"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              minlength="8"
+              required
+            />
+          </label>
+          <p class="form-error hidden" id="authError" role="alert"></p>
+          <button class="primary-action" id="authSubmitButton" type="submit">Entrar</button>
+        </form>
+      </div>
+    </dialog>
+  </body>
+</html>

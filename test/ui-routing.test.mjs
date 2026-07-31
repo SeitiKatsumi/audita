@@ -19,6 +19,17 @@ test("serves the shared application document only from the chat route", () => {
   });
 });
 
+test("serves the commercial plans page from a stable route", () => {
+  assert.deepEqual(resolveUiRoute("/planos/"), {
+    type: "redirect",
+    location: "/planos",
+  });
+  assert.deepEqual(resolveUiRoute("/planos"), {
+    type: "file",
+    path: "/plans.html",
+  });
+});
+
 test("preserves API-independent static asset routes", () => {
   assert.deepEqual(resolveUiRoute("/app.js"), {
     type: "file",

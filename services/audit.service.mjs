@@ -306,6 +306,7 @@ export function createAuditService({
       existing.resultados = existing.resultados.map((result) => (result.fonte === nextResult.fonte ? nextResult : result));
       existing.status = aggregateStatus(existing.resultados);
       existing.scoreRisco = calculateRiskScore(existing.resultados);
+      existing.updatedAt = new Date().toISOString();
     }
 
     const { pool, dbReady } = getDb ? getDb() : {};
@@ -388,6 +389,30 @@ export function createAuditService({
     const startedAt = new Date().toISOString();
     await updateResult(query.consultaId, { ...query.resultados.find((result) => result.fonte === fonte), status: "running", startedAt });
     try {
+      const reportProgress = async (progress = {}) => {
+        const currentQuery = memoryQueries.get(query.consultaId) || query;
+        const currentResult = currentQuery.resultados.find((result) => result.fonte === fonte) || {};
+        await updateResult(query.consultaId, {
+          ...currentResult,
+          fonte,
+          status: "running",
+          resultado: "indisponivel",
+          dados: {
+            ...(currentResult.dados || {}),
+            certidoes: Array.isArray(progress.certidoes) ? progress.certidoes : currentResult.dados?.certidoes || [],
+            progress: {
+              stage: String(progress.stage || "collector_running"),
+              completed: Number(progress.completed || 0),
+              total: Number(progress.total || 0),
+              currentCertificate: String(progress.currentCertificate || ""),
+              currentCertificateId: String(progress.currentCertificateId || ""),
+              updatedAt: new Date().toISOString(),
+            },
+          },
+          startedAt: currentResult.startedAt || startedAt,
+          finishedAt: "",
+        });
+      };
       const result = await runCollectorWithCache({
         collector,
         fonte,
@@ -397,8 +422,9 @@ export function createAuditService({
           consultaId: query.consultaId,
           extraFields: query.extraFields || {},
           timeoutMs: envNumber("AUDIT_COLLECTOR_TIMEOUT_MS", 12000),
-          retries: envNumber("AUDIT_COLLECTOR_RETRIES", 1),
-          usageContext: {
+           retries: envNumber("AUDIT_COLLECTOR_RETRIES", 1),
+           onProgress: reportProgress,
+           usageContext: {
             tenantId: query.tenantId,
             userId: query.userId,
             user: query.usageUser || null,
@@ -628,6 +654,8 @@ export function createAuditService({
         status: aggregateStatus(memory.resultados),
         resultados: memory.resultados.map(toApiResult),
         scoreRisco: calculateRiskScore(memory.resultados),
+        createdAt: memory.createdAt || "",
+        updatedAt: memory.updatedAt || "",
       };
     }
 
@@ -647,7 +675,7 @@ export function createAuditService({
     }
 
     const auditResult = await pool.query(
-      `SELECT public_id, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos
+      `SELECT public_id, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos, created_at, updated_at
        FROM audita_audits
        WHERE public_id = $1
          ${tenantFilter}
@@ -686,6 +714,8 @@ export function createAuditService({
       tipoDocumento: audit.tipo_documento || audit.document_type,
       status: aggregateStatus(resultados),
       resultados,
+      createdAt: audit.created_at,
+      updatedAt: audit.updated_at,
       scoreRisco: {
         nivel: audit.score_nivel || "indefinido",
         motivos: Array.isArray(audit.score_motivos) ? audit.score_motivos : JSON.parse(audit.score_motivos || "[]"),

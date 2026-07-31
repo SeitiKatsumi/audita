@@ -47,14 +47,26 @@ const completeClaimant = {
   caseValue: "5079,80",
 };
 
-test("catalog exposes verified entry points for SP, RJ, MG and PR", () => {
+test("catalog exposes verified entry points for configured JEC routes", () => {
   assert.deepEqual(
     listJecPortals().map((portal) => portal.uf),
-    ["SP", "RJ", "MG", "PR"],
+    ["SP", "RJ", "MG", "PR", "MT", "DF", "GO", "AC", "AM", "CE", "MA", "PA", "PB", "ES", "SC", "BA", "RO", "RR", "PI", "SE", "PE", "TO", "RN", "AL", "AP", "MS", "RS"],
   );
   assert.match(getJecPortal("SP").startUrl, /tjsp\.jus\.br/);
   assert.match(getJecPortal("RJ").startUrl, /tjrj\.jus\.br/);
   assert.match(getJecPortal("PR").startUrl, /ejud\.tjpr\.jus\.br/);
+  assert.match(getJecPortal("MT").startUrl, /atermacao\.tjmt\.jus\.br/);
+  assert.match(getJecPortal("DF").startUrl, /tjdft\.jus\.br/);
+  assert.match(getJecPortal("GO").startUrl, /orquestrador\.tjgo\.jus\.br/);
+  assert.match(getJecPortal("AC").startUrl, /tjac\.jus\.br/);
+  assert.match(getJecPortal("AM").startUrl, /tjam\.jus\.br/);
+  assert.match(getJecPortal("CE").startUrl, /sisatermacao\.tjce\.jus\.br/);
+  assert.match(getJecPortal("MA").startUrl, /tjma\.jus\.br/);
+  assert.match(getJecPortal("PA").startUrl, /tjpa\.jus\.br/);
+  assert.match(getJecPortal("PB").startUrl, /app\.tjpb\.jus\.br/);
+  assert.match(getJecPortal("AP").startUrl, /pje\.tjap\.jus\.br/);
+  assert.match(getJecPortal("MS").startUrl, /eproc1g\.tjms\.jus\.br/);
+  assert.match(getJecPortal("RS").startUrl, /tjrs\.jus\.br/);
   for (const uf of ["SP", "RJ", "MG", "PR"]) {
     const guide = getJecPortal(uf).guide;
     assert.equal(guide.verifiedAt, "2026-07-27");
@@ -114,8 +126,8 @@ test("AI claim suggestion uses only evidenced disputed amounts", () => {
 
   assert.deepEqual(suggestion.values, {
     doubleRefundAmount: "79,80",
-    lostProfitsAmount: "0,00",
-    moralDamagesAmount: "0,00",
+    lostProfitsAmount: "",
+    moralDamagesAmount: "",
     caseValue: "79,80",
   });
   assert.equal(suggestion.evidencedPrincipal, 39.9);
@@ -139,8 +151,8 @@ test("AI claim suggestion does not capitalize unsupported historical recurrence"
 
   assert.equal(suggestion.values.doubleRefundAmount, "");
   assert.equal(suggestion.values.caseValue, "");
-  assert.equal(suggestion.values.lostProfitsAmount, "0,00");
-  assert.equal(suggestion.values.moralDamagesAmount, "0,00");
+  assert.equal(suggestion.values.lostProfitsAmount, "");
+  assert.equal(suggestion.values.moralDamagesAmount, "");
   assert.match(suggestion.notes.join("\n"), /não entrou no cálculo/i);
 });
 
@@ -151,7 +163,7 @@ test("AI claim suggestion preserves amounts already supplied for human review", 
   });
 
   assert.equal(suggestion.values.doubleRefundAmount, "79,80");
-  assert.equal(suggestion.values.lostProfitsAmount, "0,00");
+  assert.equal(suggestion.values.lostProfitsAmount, "");
   assert.equal(suggestion.values.moralDamagesAmount, "5.000,00");
   assert.equal(suggestion.values.caseValue, "5.079,80");
 });
@@ -189,11 +201,11 @@ test("petition preparation reports every field needed before PDF generation", ()
   assert.ok(incomplete.missingFields.includes("doubleRefundAmount"));
   assert.match(incomplete.draft, /\[PENDENTE: FULL_NAME\]/);
 
-  const unsupported = prepareJecPetition({ caseData: sampleCase, uf: "BA", claimant: {} });
+  const unsupported = prepareJecPetition({ caseData: sampleCase, uf: "XX", claimant: {} });
   assert.equal(unsupported.unsupported, true);
 });
 
-test("petition replaces optional monetary placeholders with reviewable legal wording", () => {
+test("petition omits optional claims that do not have a positive reviewed value", () => {
   const prepared = prepareJecPetition({
     caseData: {
       ...sampleCase,
@@ -215,9 +227,10 @@ test("petition replaces optional monetary placeholders with reviewable legal wor
 
   assert.equal(prepared.ready, true);
   assert.doesNotMatch(prepared.draft, /\[PENDENTE: (?:LOST_PROFITS|MORAL_DAMAGES)\]/);
-  assert.match(prepared.draft, /valor a ser apurado mediante prova documental/i);
-  assert.match(prepared.draft, /valor a ser arbitrado pelo Juízo/i);
-  assert.match(prepared.warnings.join("\n"), /Sem valor informado para danos morais/i);
+  assert.doesNotMatch(prepared.draft, /Lucros Cessantes/i);
+  assert.doesNotMatch(prepared.draft, /Danos Morais/i);
+  assert.doesNotMatch(prepared.draft, /R\$\s+0,00/);
+  assert.match(prepared.warnings.join("\n"), /Danos morais não foram incluídos/i);
 });
 
 test("petition validates CPF and composes a structured address", () => {
@@ -290,10 +303,51 @@ test("journey without historical statements selects the supplied exhibition mode
   assert.equal(prepared.template.sourceModel, 2);
   assert.ok(
     prepared.template.reviewNotes.some((note) =>
-      /ausência dos documentos históricos/i.test(note),
+      /recorrência relatada/i.test(note),
     ),
   );
   assert.doesNotMatch(prepared.draft, /23\.?156/);
+  assert.match(
+    prepared.draft,
+    /AÇÃO DECLARATÓRIA DE INEXISTÊNCIA DE RELAÇÃO JURÍDICA C\/C EXIBIÇÃO INCIDENTAL DE DOCUMENTOS/i,
+  );
+  assert.match(prepared.draft, /documento recente fornecido/i);
+  assert.match(prepared.draft, /Proteção Horizonte/i);
+  assert.match(prepared.draft, /22\/07\/2026/i);
+  assert.match(prepared.draft, /extensão temporal permanece não comprovada/i);
+  assert.match(prepared.draft, /exiba em juízo/i);
+  assert.doesNotMatch(prepared.draft, /auditoria analítica de seus extratos e faturas/i);
+  assert.doesNotMatch(prepared.draft, /totalizando o valor atualizado/i);
+  assert.doesNotMatch(prepared.draft, /R\$\s+0,00/);
+  assert.doesNotMatch(prepared.draft, /Lucros Cessantes/i);
+});
+
+test("document-exhibition model includes optional claims only when a positive value is supplied", () => {
+  const prepared = prepareJecPetition({
+    caseData: {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        historicalDocumentsAvailable: "no",
+      },
+    },
+    uf: "SP",
+    city: "São Paulo",
+    claimant: {
+      ...completeClaimant,
+      historicalDocumentsAvailable: "no",
+      lostProfitsAmount: "350,00",
+      moralDamagesAmount: "2000,00",
+      caseValue: "2429,80",
+    },
+  });
+
+  assert.equal(prepared.ready, true);
+  assert.match(prepared.draft, /Lucros Cessantes/i);
+  assert.match(prepared.draft, /R\$\s+350,00/);
+  assert.match(prepared.draft, /Danos Morais/i);
+  assert.match(prepared.draft, /R\$\s+2\.000,00/);
+  assert.doesNotMatch(prepared.draft, /R\$\s+0,00/);
 });
 
 test("journey with historical statements selects the supplied audited model", () => {

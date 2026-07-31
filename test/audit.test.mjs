@@ -12,6 +12,7 @@ import {
   collect as collectTjdft,
   esajModelValue,
   getCertificateTypesForInput,
+  getTjdftPfMissingFields,
   isAssistedSessionPdfContentValid,
 } from "../collectors/tjdft.collector.mjs";
 
@@ -47,6 +48,21 @@ test("calcula score alto quando alguma fonte consta", () => {
     { fonte: "receita_federal", status: "success", resultado: "nada_consta" },
   ]);
   assert.equal(score.nivel, "alto");
+});
+
+test("TJDFT exige mae apenas para certidoes criminal e especial, e nunca exige pai", () => {
+  assert.deepEqual(
+    getTjdftPfMissingFields({ firstName: "Maria", motherName: "", certificateTypes: ["civil", "falencia"] }),
+    [],
+  );
+  assert.deepEqual(
+    getTjdftPfMissingFields({ firstName: "Maria", motherName: "", certificateTypes: ["criminal"] }),
+    ["motherName"],
+  );
+  assert.deepEqual(
+    getTjdftPfMissingFields({ firstName: "", motherName: "Ana", certificateTypes: ["especial"] }),
+    ["firstName"],
+  );
 });
 
 test("CNIB seleciona dataset BigDataCorp por tipo de documento", () => {
@@ -207,6 +223,53 @@ test("cria consulta e executa collector mock", async () => {
   const audit = await service.findAudit(started.consultaId);
   assert.equal(audit.resultados[0].status, "success");
   assert.equal(audit.scoreRisco.nivel, "baixo");
+});
+
+test("collector publica progresso incremental durante uma auditoria", async () => {
+  let releaseCollector;
+  const collectorGate = new Promise((resolve) => {
+    releaseCollector = resolve;
+  });
+  const service = createAuditService({
+    getDb: () => ({ pool: null, dbReady: false }),
+    getAuthContext: async () => ({ tenantId: 1, user: { id: 7 }, unauthorized: false }),
+    customCollectors: {
+      progressive: {
+        collect: async (input) => {
+          await input.onProgress({
+            stage: "certificate_started",
+            completed: 1,
+            total: 4,
+            currentCertificate: "Cível",
+            currentCertificateId: "civil",
+            certidoes: [{ tipo: "Criminal", status: "success", pdfDownloaded: true }],
+          });
+          await collectorGate;
+          return {
+            fonte: "progressive",
+            status: "success",
+            resultado: "nada_consta",
+            dados: { certidoes: [] },
+          };
+        },
+      },
+    },
+  });
+
+  const started = await service.startAudit({
+    body: { documento: "52998224725", tipoDocumento: "cpf", fontes: ["progressive"] },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const running = await service.findAudit(started.consultaId);
+  assert.equal(running.resultados[0].status, "running");
+  assert.equal(running.resultados[0].dados.progress.completed, 1);
+  assert.equal(running.resultados[0].dados.progress.currentCertificate, "Cível");
+  assert.equal(running.resultados[0].dados.certidoes[0].pdfDownloaded, true);
+
+  releaseCollector();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const completed = await service.findAudit(started.consultaId);
+  assert.equal(completed.status, "success");
 });
 
 test("collector falhando nao derruba consulta", async () => {

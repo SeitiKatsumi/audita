@@ -19,7 +19,9 @@ const loginTitle = document.querySelector("#loginTitle");
 const logoutButton = document.querySelector("#logoutButton");
 const loginButton = document.querySelector("#loginButton");
 const sidebarToggle = document.querySelector("#sidebarToggle");
+const sidebarToggleIcon = document.querySelector("#sidebarToggleIcon");
 const mobileMenuButton = document.querySelector("#mobileMenuButton");
+const sidebarScrim = document.querySelector("#sidebarScrim");
 const newQueryButton = document.querySelector("#newQueryButton");
 const environmentName = document.querySelector("#environmentName");
 const environmentDetail = document.querySelector("#environmentDetail");
@@ -30,6 +32,7 @@ const profileName = document.querySelector("#profileName");
 const profileEmail = document.querySelector("#profileEmail");
 const profilePlan = document.querySelector("#profilePlan");
 const profileRole = document.querySelector("#profileRole");
+const adminBillingNav = document.querySelector("#adminBillingNav");
 const adminUsageNav = document.querySelector("#adminUsageNav");
 const apiUsageDays = document.querySelector("#apiUsageDays");
 const apiUsageProvider = document.querySelector("#apiUsageProvider");
@@ -200,6 +203,15 @@ const auditStepPanels = document.querySelectorAll("[data-audit-step-panel]");
 const auditBackButton = document.querySelector("#auditBackButton");
 const auditNextButton = document.querySelector("#auditNextButton");
 const auditSubmitButton = document.querySelector("#auditSubmitButton");
+const sellerAnalysisForm = document.querySelector("#sellerAnalysisForm");
+const sellerAnalysisCpf = document.querySelector("#sellerAnalysisCpf");
+const sellerAnalysisFullName = document.querySelector("#sellerAnalysisFullName");
+const sellerAnalysisMotherField = document.querySelector("#sellerAnalysisMotherField");
+const sellerAnalysisMotherName = document.querySelector("#sellerAnalysisMotherName");
+const sellerAnalysisAuthorization = document.querySelector("#sellerAnalysisAuthorization");
+const sellerAnalysisSubmit = document.querySelector("#sellerAnalysisSubmit");
+const sellerAnalysisError = document.querySelector("#sellerAnalysisError");
+const sellerAnalysisResult = document.querySelector("#sellerAnalysisResult");
 const cnibForm = document.querySelector("#cnibForm");
 const cnibDocumentType = document.querySelector("#cnibDocumentType");
 const cnibDocument = document.querySelector("#cnibDocument");
@@ -902,6 +914,14 @@ const pageMeta = {
     title: "Busca de im\u00f3veis",
     eyebrow: "Assistente de Consultas",
   },
+  "analise-cobrancas": {
+    title: "An\u00e1lise de cobran\u00e7as indevidas",
+    eyebrow: "Triagem guiada sem IA",
+  },
+  "analise-vendedor": {
+    title: "An\u00e1lise de Vendedor",
+    eyebrow: "Compra e venda de im\u00f3veis",
+  },
   "consulta-receita": {
     title: "Receita/CNPJ",
     eyebrow: "Assistente de Consultas",
@@ -934,6 +954,10 @@ const pageMeta = {
     title: "Consumo de APIs",
     eyebrow: "Administra\u00e7\u00e3o e custos",
   },
+  "admin-planos": {
+    title: "Planos e assinaturas",
+    eyebrow: "Administra\u00e7\u00e3o comercial",
+  },
 };
 
 function getActivePage() {
@@ -964,15 +988,26 @@ function setActivePage(page) {
     operationsPages.classList.add("page-hidden");
   }
 
+  document.querySelectorAll("details.nav-group").forEach((group) => {
+    group.classList.remove("has-active-child");
+  });
+
   navLinks.forEach((link) => {
     const linkedPage = link.dataset.appRoute || (link.getAttribute("href") || "").replace("#", "");
     const groupedPages = (link.dataset.navPages || "").split(/\s+/).filter(Boolean);
-    link.classList.toggle("active", linkedPage === activePage || groupedPages.includes(activePage));
+    const isActive = linkedPage === activePage || groupedPages.includes(activePage);
+    link.classList.toggle("active", isActive);
+    if (isActive) {
+      const parentGroup = link.closest("details.nav-group");
+      if (parentGroup) {
+        parentGroup.open = true;
+        parentGroup.classList.add("has-active-child");
+      }
+    }
   });
 
   applyAuditRouteDefaults(activePage);
-  document.body.classList.remove("menu-open");
-  mobileMenuButton?.setAttribute("aria-expanded", "false");
+  setMobileMenu(false);
   if (activePage === "chat") {
     renderChatWorkspace();
     requestAnimationFrame(() => chatInput?.focus());
@@ -2841,13 +2876,18 @@ function renderJecAssistedBrowser(state = {}) {
   const agentSessionId = state.agent?.id || "";
   if (cachedSession.live) {
     return `
-      <section class="jec-live-browser-summary">
+      <section class="jec-live-browser-summary" data-assisted-session="${escapeHtml(sessionId)}">
         <div>
           <span><i aria-hidden="true"></i>Navegador ao vivo</span>
           <strong>${escapeHtml(state.portal?.tribunal || cachedSession.courtName || "Portal oficial")}</strong>
           <small>A IA e você compartilham a mesma sessão. O envio final continua exclusivamente humano.</small>
         </div>
         <button type="button" data-chat-browser-open="${escapeHtml(sessionId)}">Ver navegador</button>
+        ${renderStateCourtAgentPanel(agentSessionId, {
+          agentStatus: state.agent?.status,
+          agentMessages: state.agent?.messages,
+          agentNextAction: state.agent?.nextAction,
+        })}
       </section>
     `;
   }
@@ -3097,7 +3137,7 @@ function renderJecPetitionPanel(caseData = {}) {
             <span>Estado</span>
             <select name="uf" required>
               <option value="">Selecione</option>
-              ${["SP", "RJ", "MG", "PR"]
+              ${["SP", "RJ", "MG", "PR", "MT", "DF", "GO", "AC", "AM", "CE", "MA", "PA", "PB", "ES", "SC", "BA", "RO", "RR", "PI", "SE", "PE", "TO", "RN", "AL", "AP", "MS", "RS"]
                 .map(
                   (uf) =>
                     `<option value="${uf}" ${String(claimant.uf || "") === uf ? "selected" : ""}>${uf}</option>`,
@@ -3272,6 +3312,10 @@ function renderJecPetitionPanel(caseData = {}) {
                 <input name="reviewConfirmed" type="checkbox" />
                 <span>Revisei o rascunho e os dados acima.</span>
               </label>
+              <label class="jec-confirmation">
+                <input name="transmissionAuthorized" type="checkbox" />
+                <span>Autorizo somente a abertura assistida do portal oficial. O protocolo final continua sob meu controle.</span>
+              </label>
               ${
                 Array.isArray(prepared.warnings) && prepared.warnings.length
                   ? `<ul class="jec-template-warnings">${prepared.warnings
@@ -3288,11 +3332,13 @@ function renderJecPetitionPanel(caseData = {}) {
             prepared?.ready
               ? `
                 <button class="secondary-action" type="submit" data-jec-action="pdf">Baixar PDF para revisão</button>
+                <button class="secondary-action" type="submit" data-jec-action="browser">Abrir navegador assistido</button>
               `
               : ""
           }
         </div>
       </form>
+      ${renderJecAssistedBrowser(state)}
       ${renderJecManualFiling(caseData, state)}
     </details>
   `;
@@ -3782,7 +3828,11 @@ async function submitJecPetitionForm(form, action) {
   if (submitButton) {
     submitButton.disabled = true;
     submitButton.textContent =
-      action === "pdf" ? "Gerando PDF..." : "Preparando...";
+      action === "pdf"
+        ? "Gerando PDF..."
+        : action === "browser"
+          ? "Abrindo navegador..."
+          : "Preparando...";
   }
   jecCaseStates.set(caseId, { ...previous, claimant, error: "" });
 
@@ -3803,6 +3853,46 @@ async function submitJecPetitionForm(form, action) {
       uf: claimant.uf,
       city: claimant.city,
     };
+    if (action === "browser") {
+      const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
+      const transmissionAuthorized = Boolean(
+        form.elements.transmissionAuthorized?.checked,
+      );
+      if (!reviewConfirmed || !transmissionAuthorized) {
+        throw new Error("Confirme a revisão e autorize somente a abertura assistida do portal.");
+      }
+      const response = await fetch("/api/jec/sessions", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          ...payload,
+          reviewConfirmed,
+          transmissionAuthorized,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        showLogin("Entre para abrir o navegador assistido.");
+        return;
+      }
+      if (!response.ok || !data.session?.id) {
+        throw new Error(data.message || "Não foi possível abrir o navegador assistido agora.");
+      }
+      assistedRemoteSessions.set(data.session.id, data.session);
+      jecCaseStates.set(caseId, {
+        ...previous,
+        claimant,
+        profileStored,
+        prepared: previous.prepared,
+        portal: data.portal || previous.portal,
+        session: data.session,
+        agent: data.agent || null,
+        error: "",
+      });
+      if (data.session.live) openChatBrowserPane(data.session);
+      renderChatWorkspace();
+      return;
+    }
     if (action === "pdf") {
       const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
       if (!reviewConfirmed) {
@@ -3885,7 +3975,11 @@ async function submitJecPetitionForm(form, action) {
     if (submitButton?.isConnected) {
       submitButton.disabled = false;
       submitButton.textContent =
-        action === "pdf" ? "Baixar PDF para revisão" : "Preparar rascunho";
+        action === "pdf"
+          ? "Baixar PDF para revisão"
+          : action === "browser"
+            ? "Abrir navegador assistido"
+            : "Preparar rascunho";
     }
   }
 }
@@ -6246,6 +6340,224 @@ async function loadAuditResult(consultaId, attempts = 180) {
   }
 }
 
+const sellerAnalysisCertificateTypes = [
+  "Criminal",
+  "Cível",
+  "Falência e Recuperação Judicial",
+  "Especial — Cível e Criminal",
+];
+
+function isValidSellerAnalysisCpf(value) {
+  const cpf = String(value || "").replace(/\D/g, "");
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  const calculateDigit = (base) => {
+    const sum = base
+      .split("")
+      .map(Number)
+      .reduce((total, number, index) => total + number * (base.length + 1 - index), 0);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  return calculateDigit(cpf.slice(0, 9)) === Number(cpf[9]) && calculateDigit(cpf.slice(0, 10)) === Number(cpf[10]);
+}
+
+function getSellerCertificateStatus(certificate = {}, auditStatus = "pending", isCurrent = false) {
+  if (certificate.pdfPath || certificate.pdfDownloaded) {
+    return { label: "PDF disponível", className: "success" };
+  }
+  if (certificate.status === "success") {
+    return { label: "Resultado disponível", className: "success" };
+  }
+  if (certificate.status === "failed" || certificate.resultado === "erro") {
+    return { label: "Falha na emissão", className: "failed" };
+  }
+  if (certificate.status === "waiting_user_action") {
+    return { label: "Ação necessária", className: "waiting" };
+  }
+  if (isCurrent && ["preparing", "pending", "running", "partial"].includes(auditStatus)) {
+    return { label: "Emitindo agora", className: "processing" };
+  }
+  if (["failed", "partial"].includes(auditStatus)) {
+    return { label: "Não extraída", className: "failed" };
+  }
+  return { label: "Na fila", className: "processing" };
+}
+
+function formatSellerAnalysisElapsed(milliseconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(milliseconds || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes ? `${minutes}min ${String(seconds).padStart(2, "0")}s` : `${seconds}s`;
+}
+
+function getSellerAnalysisStage(audit, execution, progress, completed) {
+  if (audit?.status === "preparing") {
+    return "1 de 3 · Consultando dados cadastrais na Direct Data";
+  }
+  if (["failed", "success"].includes(audit?.status)) {
+    return audit.status === "success"
+      ? "3 de 3 · Extração concluída"
+      : "Processamento interrompido";
+  }
+  if (progress?.currentCertificate) {
+    return `2 de 3 · Emitindo ${progress.currentCertificate}`;
+  }
+  if (completed) {
+    return "2 de 3 · Consolidando documentos do TJDFT";
+  }
+  return execution?.status === "running"
+    ? "2 de 3 · Conectando ao portal do TJDFT"
+    : "2 de 3 · Preparando as quatro certidões";
+}
+
+function renderSellerAnalysisFailure({ documento = "em preparação", message, detail = "" } = {}) {
+  renderSellerAnalysisResult({
+    status: "failed",
+    documento,
+    resultados: [],
+    errorMessage: message || "Não foi possível iniciar a extração.",
+    errorDetail: detail,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function getSellerAnalysisStartError(data = {}, responseStatus = 0) {
+  if (data.error === "seller_name_mismatch") {
+    return "O nome informado não corresponde ao cadastro do CPF. Confira os dados.";
+  }
+  if (data.reason === "provider_permission_or_balance_required") {
+    return "A Direct Data recusou a consulta por permissão ou saldo insuficiente.";
+  }
+  if (["direct_data_person_disabled", "direct_data_token_missing"].includes(data.reason)) {
+    return "A consulta cadastral da Direct Data ainda não está configurada neste ambiente.";
+  }
+  if (data.reason === "provider_timeout") {
+    return "A Direct Data não respondeu dentro de 30 segundos.";
+  }
+  if (data.reason === "provider_temporarily_unavailable") {
+    return "A Direct Data está temporariamente indisponível.";
+  }
+  if (data.motherNameRequired) {
+    return "Não foi possível localizar automaticamente o nome da mãe. Informe-o para continuar.";
+  }
+  if (responseStatus === 400) {
+    return "Confira o CPF e o nome completo do vendedor.";
+  }
+  return "Não foi possível iniciar a extração agora.";
+}
+
+function renderSellerAnalysisResult(audit) {
+  if (!sellerAnalysisResult) return;
+  const execution = (audit?.resultados || []).find((item) => item.fonte === "tjdft");
+  const certificates = Array.isArray(execution?.dados?.certidoes) ? execution.dados.certidoes : [];
+  const progress = execution?.dados?.progress || {};
+  const downloaded = certificates.filter((item) => item.pdfPath || item.pdfDownloaded).length;
+  const completed = Math.max(certificates.length, Number(progress.completed || 0));
+  const total = Number(progress.total || sellerAnalysisCertificateTypes.length);
+  const processing = !audit || ["preparing", "pending", "running", "partial"].includes(audit.status);
+  const overallLabel = processing
+    ? audit?.status === "preparing" ? "Validando vendedor" : "Extraindo"
+    : downloaded === sellerAnalysisCertificateTypes.length
+      ? "Concluído"
+      : downloaded
+        ? "Concluído parcialmente"
+        : audit?.errorMessage ? "Falha antes de iniciar" : "Falha na extração";
+  const progressPercent = audit?.status === "success"
+    ? 100
+    : audit?.status === "preparing"
+      ? 8
+      : audit?.status === "failed"
+        ? 0
+        : Math.min(95, Math.round(15 + (completed / Math.max(1, total)) * 80));
+  const startedAt = Date.parse(audit?.createdAt || execution?.startedAt || "");
+  const lastActivityAt = Date.parse(progress.updatedAt || audit?.updatedAt || execution?.startedAt || "");
+  const elapsedMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
+  const inactivityMs = Number.isFinite(lastActivityAt) ? Date.now() - lastActivityAt : 0;
+  const activityState = processing && inactivityMs >= 90000
+    ? { className: "stalled", label: `Sem avanço há ${formatSellerAnalysisElapsed(inactivityMs)}. Pode haver lentidão no portal.` }
+    : processing && inactivityMs >= 45000
+      ? { className: "slow", label: `Aguardando o portal há ${formatSellerAnalysisElapsed(inactivityMs)}.` }
+      : processing
+        ? { className: "active", label: "Processamento ativo; a tela é atualizada automaticamente." }
+        : { className: audit?.status === "success" ? "active" : "stalled", label: audit?.errorDetail || audit?.errorMessage || "Processamento encerrado." };
+  const stageLabel = getSellerAnalysisStage(audit, execution, progress, completed);
+  const certificateRows = sellerAnalysisCertificateTypes.map((expectedType, index) => {
+    const certificate = certificates[index] || {};
+    const isCurrent = processing && Number(progress.completed || 0) === index && Boolean(progress.currentCertificate);
+    const status = getSellerCertificateStatus(certificate, audit?.status, isCurrent);
+    const pdfUrl = toPdfPublicUrl(certificate.pdfPath);
+    const resultLabel = certificate.resultado === "consta"
+      ? "Documento requer revisão"
+      : certificate.resultado === "nada_consta"
+        ? "Nada consta"
+        : "";
+    return `
+      <article class="seller-certificate-item">
+        <div>
+          <strong>${escapeHtml(certificate.tipo || expectedType)}</strong>
+          <small>${escapeHtml(resultLabel || certificate.errorMessage || "Certidão oficial do TJDFT")}</small>
+        </div>
+        <span class="property-status ${escapeHtml(status.className)}">${escapeHtml(status.label)}</span>
+        ${pdfUrl ? `<a class="secondary-action" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noreferrer">Abrir PDF</a>` : ""}
+      </article>
+    `;
+  }).join("");
+
+  sellerAnalysisResult.innerHTML = `
+    <div class="seller-analysis-result-head">
+      <div>
+        <small>Consulta ${escapeHtml(audit?.documento || "em preparação")}</small>
+        <strong>${escapeHtml(overallLabel)}</strong>
+      </div>
+      <span>${downloaded}/${sellerAnalysisCertificateTypes.length} PDFs</span>
+    </div>
+    <section class="seller-analysis-progress" aria-label="Progresso da extração">
+      <div class="seller-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progressPercent}">
+        <span style="width: ${progressPercent}%"></span>
+      </div>
+      <div class="seller-progress-summary">
+        <strong>${escapeHtml(stageLabel)}</strong>
+        <span>${escapeHtml(processing ? `Tempo decorrido: ${formatSellerAnalysisElapsed(elapsedMs)}` : `${progressPercent}%`)}</span>
+      </div>
+      <small class="seller-progress-activity ${escapeHtml(activityState.className)}">${escapeHtml(activityState.label)}</small>
+      <small class="seller-progress-expectation">Tempo normal: cerca de 30 segundos a 2 minutos. O limite técnico desta etapa é aproximadamente 3 minutos.</small>
+    </section>
+    <div class="seller-certificate-list">${certificateRows}</div>
+    <p class="seller-analysis-result-note">Esta etapa apresenta somente os documentos oficiais extraídos. A análise de risco por IA ainda não está ativa.</p>
+  `;
+}
+
+async function loadSellerAnalysisResult(consultaId, attempts = 180) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(`/audit/${encodeURIComponent(consultaId)}`, { headers: { accept: "application/json" } });
+      if (response.status === 401) {
+        showLogin("Entre para acompanhar a análise do vendedor.");
+        renderSellerAnalysisFailure({ message: "É necessário entrar para acompanhar esta extração." });
+        return;
+      }
+      if (!response.ok) {
+        if (sellerAnalysisError) sellerAnalysisError.textContent = "Não foi possível acompanhar esta extração.";
+        renderSellerAnalysisFailure({ message: "Não foi possível acompanhar esta extração." });
+        return;
+      }
+      const audit = await response.json();
+      renderSellerAnalysisResult(audit);
+      if (!["pending", "running", "partial"].includes(audit.status)) return;
+    } catch {
+      if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
+      renderSellerAnalysisFailure({ message: "Falha de comunicação durante o acompanhamento." });
+      return;
+    }
+    if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  renderSellerAnalysisFailure({
+    message: "A extração excedeu o tempo esperado.",
+    detail: "O portal não concluiu dentro da janela de acompanhamento. Tente novamente mais tarde.",
+  });
+}
+
 function validateCnibDocument(tipoDocumento, value) {
   const digits = String(value || "").replace(/\D/g, "");
   if (tipoDocumento === "cpf") {
@@ -6656,10 +6968,19 @@ function canAccessApiUsageAdmin(authState = currentAuthState) {
 function configureApiUsageAdmin(authState) {
   currentAuthState = authState || { authRequired: false, user: null };
   const allowed = canAccessApiUsageAdmin(currentAuthState);
+  adminBillingNav?.classList.toggle("hidden", !allowed);
   adminUsageNav?.classList.toggle("hidden", !allowed);
-  if (!allowed && getActivePage() === "admin-consumo") {
+  if (
+    !allowed &&
+    ["admin-consumo", "admin-planos"].includes(getActivePage())
+  ) {
     window.location.hash = "home";
   }
+  window.dispatchEvent(
+    new CustomEvent("audita:auth-changed", {
+      detail: currentAuthState,
+    }),
+  );
 }
 
 function formatUsageNumber(value) {
@@ -7201,16 +7522,38 @@ promptSuggestions.forEach((button) => {
   });
 });
 
+function setMobileMenu(open) {
+  document.body.classList.toggle("menu-open", open);
+  mobileMenuButton?.setAttribute("aria-expanded", String(open));
+}
+
 sidebarToggle?.addEventListener("click", () => {
+  if (window.matchMedia("(max-width: 1120px)").matches) {
+    setMobileMenu(false);
+    return;
+  }
+
   const collapsed = document.body.classList.toggle("sidebar-collapsed");
-  sidebarToggle.textContent = collapsed ? "\u203a" : "\u2039";
   sidebarToggle.setAttribute("aria-label", collapsed ? "Expandir menu" : "Recolher menu");
   sidebarToggle.title = collapsed ? "Expandir menu" : "Recolher menu";
+  if (sidebarToggleIcon) {
+    sidebarToggleIcon.src = collapsed
+      ? "assets/nav-icons/chevron-right.svg"
+      : "assets/nav-icons/chevron-left.svg";
+  }
 });
 
 mobileMenuButton?.addEventListener("click", () => {
-  const open = document.body.classList.toggle("menu-open");
-  mobileMenuButton.setAttribute("aria-expanded", String(open));
+  setMobileMenu(!document.body.classList.contains("menu-open"));
+});
+
+sidebarScrim?.addEventListener("click", () => setMobileMenu(false));
+
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("menu-open")) {
+    setMobileMenu(false);
+    mobileMenuButton?.focus();
+  }
 });
 
 agentForm.addEventListener("submit", async (event) => {
@@ -7954,6 +8297,103 @@ cnibForm?.addEventListener("submit", async (event) => {
   }
 });
 
+sellerAnalysisCpf?.addEventListener("input", () => {
+  sellerAnalysisCpf.value = formatJecCpf(sellerAnalysisCpf.value);
+});
+
+sellerAnalysisForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (sellerAnalysisError) sellerAnalysisError.textContent = "";
+
+  const cpf = String(sellerAnalysisCpf?.value || "").replace(/\D/g, "");
+  const fullName = sellerAnalysisFullName?.value.trim() || "";
+  const motherName = sellerAnalysisMotherName?.value.trim() || "";
+  if (!isValidSellerAnalysisCpf(cpf)) {
+    if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe um CPF válido.";
+    sellerAnalysisCpf?.focus();
+    return;
+  }
+  if (!fullName) {
+    if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe o nome completo do vendedor.";
+    sellerAnalysisFullName?.focus();
+    return;
+  }
+  if (!sellerAnalysisAuthorization?.checked) {
+    if (sellerAnalysisError) sellerAnalysisError.textContent = "Confirme a autorização ou base legal para realizar a consulta.";
+    sellerAnalysisAuthorization?.focus();
+    return;
+  }
+
+  if (sellerAnalysisSubmit) {
+    sellerAnalysisSubmit.disabled = true;
+    sellerAnalysisSubmit.textContent = motherName ? "Iniciando extração..." : "Consultando cadastro...";
+  }
+  const startedAt = new Date().toISOString();
+  renderSellerAnalysisResult({
+    status: "preparing",
+    documento: formatJecCpf(cpf),
+    resultados: [],
+    createdAt: startedAt,
+    updatedAt: startedAt,
+  });
+
+  try {
+    const response = await fetch("/api/seller-analysis/df", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        cpf,
+        fullName,
+        motherName,
+        authorizationConfirmed: true,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (response.status === 401) {
+      showLogin("Entre para extrair as certidões do vendedor.");
+      renderSellerAnalysisFailure({
+        documento: formatJecCpf(cpf),
+        message: "É necessário entrar para iniciar a extração.",
+      });
+      return;
+    }
+    if (!response.ok || !data.consultaId) {
+      const startError = getSellerAnalysisStartError(data, response.status);
+      if (sellerAnalysisError) {
+        sellerAnalysisError.textContent = startError;
+        if (data.motherNameRequired) {
+          sellerAnalysisMotherField?.classList.remove("hidden");
+          if (sellerAnalysisMotherName) sellerAnalysisMotherName.required = true;
+          sellerAnalysisMotherName?.focus();
+        }
+      }
+      renderSellerAnalysisFailure({
+        documento: formatJecCpf(cpf),
+        message: startError,
+        detail: data.billingVerificationRequired
+          ? "A consulta pode ter sido recebida pelo provedor; não houve repetição automática."
+          : "Revise a mensagem e tente novamente após corrigir a causa.",
+      });
+      return;
+    }
+
+    sessionStorage.setItem("audita:lastSellerAnalysisDfAuditId", data.consultaId);
+    await loadSellerAnalysisResult(data.consultaId);
+  } catch {
+    if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
+    renderSellerAnalysisFailure({
+      documento: formatJecCpf(cpf),
+      message: "Falha de comunicação com a API da Audita.",
+      detail: "A extração não permaneceu em execução silenciosamente.",
+    });
+  } finally {
+    if (sellerAnalysisSubmit) {
+      sellerAnalysisSubmit.disabled = false;
+      sellerAnalysisSubmit.textContent = "Extrair todas as certidões";
+    }
+  }
+});
+
 auditForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!validateAuditStep(2)) {
@@ -8444,6 +8884,10 @@ apiPricingList?.addEventListener("click", (event) => {
 
 window.addEventListener("hashchange", () => {
   setActivePage(getActivePage());
+  if (getActivePage() === "analise-vendedor") {
+    const sellerAuditId = sessionStorage.getItem("audita:lastSellerAnalysisDfAuditId");
+    if (sellerAuditId) loadSellerAnalysisResult(sellerAuditId, 1);
+  }
   if (getActivePage() === "consulta-imoveis") {
     loadPropertyModule();
   }
@@ -8494,6 +8938,10 @@ if (authState.authRequired && !authState.user) {
   if (resumeAuditId) {
     setAuditWizardStep(3);
     await loadAuditResult(resumeAuditId, 1);
+  }
+  if (getActivePage() === "analise-vendedor") {
+    const sellerAuditId = sessionStorage.getItem("audita:lastSellerAnalysisDfAuditId");
+    if (sellerAuditId) await loadSellerAnalysisResult(sellerAuditId, 1);
   }
   await loadAuditHistory();
   await loadPropertyModule();

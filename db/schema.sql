@@ -222,6 +222,48 @@ CREATE TABLE IF NOT EXISTS audita_credit_ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS audita_billing_customers (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL UNIQUE REFERENCES audita_tenants(id) ON DELETE RESTRICT,
+  stripe_customer_id TEXT NOT NULL UNIQUE,
+  customer_email TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_subscriptions (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE RESTRICT,
+  provider TEXT NOT NULL DEFAULT 'stripe',
+  provider_subscription_id TEXT NOT NULL UNIQUE,
+  plan_id TEXT NOT NULL,
+  billing_interval TEXT NOT NULL CHECK (billing_interval IN ('monthly', 'annual')),
+  status TEXT NOT NULL CHECK (
+    status IN ('incomplete', 'incomplete_expired', 'trialing', 'active', 'past_due', 'canceled', 'unpaid', 'paused', 'inactive')
+  ),
+  monthly_credits INTEGER NOT NULL DEFAULT 0 CHECK (monthly_credits >= 0),
+  member_limit INTEGER NOT NULL DEFAULT 1 CHECK (member_limit >= 0),
+  current_period_start TIMESTAMPTZ,
+  current_period_end TIMESTAMPTZ,
+  cancel_at_period_end BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS audita_billing_events (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT REFERENCES audita_tenants(id) ON DELETE SET NULL,
+  provider TEXT NOT NULL DEFAULT 'stripe',
+  provider_event_id TEXT NOT NULL UNIQUE,
+  event_type TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('processing', 'processed', 'ignored', 'failed')),
+  event_created_at TIMESTAMPTZ,
+  processed_at TIMESTAMPTZ,
+  error_message TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS audita_api_pricing (
   id BIGSERIAL PRIMARY KEY,
   tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE RESTRICT,
@@ -505,6 +547,10 @@ CREATE INDEX IF NOT EXISTS audita_audit_evidence_audit_idx ON audita_audit_evide
 CREATE INDEX IF NOT EXISTS audita_job_logs_audit_idx ON audita_job_logs(audit_query_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_credit_ledger_tenant_idx ON audita_credit_ledger(tenant_id, created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS audita_credit_ledger_reference_idx ON audita_credit_ledger(tenant_id, reference_id, entry_type);
+CREATE INDEX IF NOT EXISTS audita_billing_customers_tenant_idx ON audita_billing_customers(tenant_id);
+CREATE INDEX IF NOT EXISTS audita_subscriptions_tenant_idx ON audita_subscriptions(tenant_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS audita_subscriptions_status_idx ON audita_subscriptions(tenant_id, status, current_period_end);
+CREATE INDEX IF NOT EXISTS audita_billing_events_tenant_idx ON audita_billing_events(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_api_pricing_tenant_idx ON audita_api_pricing(tenant_id, provider, active);
 CREATE INDEX IF NOT EXISTS audita_api_usage_tenant_idx ON audita_api_usage(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_api_usage_user_idx ON audita_api_usage(tenant_id, user_id, created_at DESC);

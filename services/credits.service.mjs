@@ -152,5 +152,121 @@ export function createCreditsService({ getDb } = {}) {
     }
   }
 
-  return { getWallet, consume };
+  async function grant(authContext, { amount, referenceId, operation, metadata = {} }) {
+    const value = Number(amount);
+    if (!creditsEnabled() || !Number.isInteger(value) || value <= 0) {
+      return {
+        ok: true,
+        state: "not_granted",
+        wallet: await getWallet(authContext),
+        amount: Math.max(0, value || 0),
+      };
+    }
+
+    const reference = String(referenceId || "").trim();
+    if (!reference) {
+      return {
+        ok: false,
+        state: "invalid_reference",
+        wallet: await getWallet(authContext),
+        amount: value,
+      };
+    }
+
+    const { pool, dbReady } = getDb ? getDb() : {};
+    if (!pool || !dbReady || !authContext?.tenantId) {
+      const key = walletKey(authContext);
+      const ledgerKey = `${key}:${reference}:grant`;
+      if (memoryLedger.has(ledgerKey)) {
+        return {
+          ok: true,
+          state: "granted",
+          wallet: await getWallet(authContext),
+          amount: value,
+          duplicate: true,
+        };
+      }
+      const wallet = await getWallet(authContext);
+      const next = {
+        balance: wallet.balance + value,
+        consumed: wallet.consumed,
+        reserved: wallet.reserved,
+      };
+      memoryWallets.set(key, next);
+      memoryLedger.set(ledgerKey, {
+        amount: value,
+        operation,
+        metadata,
+        createdAt: new Date().toISOString(),
+      });
+      return {
+        ok: true,
+        state: "granted",
+        wallet: publicWallet(next, true),
+        amount: value,
+      };
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const duplicate = await client.query(
+        `SELECT id
+         FROM audita_credit_ledger
+         WHERE tenant_id = $1 AND reference_id = $2 AND entry_type = 'grant'
+         LIMIT 1`,
+        [authContext.tenantId, reference],
+      );
+      if (duplicate.rows[0]) {
+        await client.query("COMMIT");
+        return {
+          ok: true,
+          state: "granted",
+          wallet: await getWallet(authContext),
+          amount: value,
+          duplicate: true,
+        };
+      }
+
+      await client.query(
+        `INSERT INTO audita_credit_wallets (tenant_id, balance)
+         VALUES ($1, $2)
+         ON CONFLICT (tenant_id) DO NOTHING`,
+        [authContext.tenantId, integerEnv("AUDITA_INITIAL_CREDITS", 0)],
+      );
+      await client.query(
+        `UPDATE audita_credit_wallets
+         SET balance = balance + $2, updated_at = NOW()
+         WHERE tenant_id = $1`,
+        [authContext.tenantId, value],
+      );
+      await client.query(
+        `INSERT INTO audita_credit_ledger (
+           tenant_id, user_id, entry_type, amount, operation, reference_id, metadata
+         ) VALUES ($1, $2, 'grant', $3, $4, $5, $6)`,
+        [
+          authContext.tenantId,
+          authContext.user?.id || null,
+          value,
+          String(operation || "billing_grant"),
+          reference,
+          JSON.stringify(metadata || {}),
+        ],
+      );
+      await client.query("COMMIT");
+      return {
+        ok: true,
+        state: "granted",
+        wallet: await getWallet(authContext),
+        amount: value,
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  return { getWallet, consume, grant };
 }

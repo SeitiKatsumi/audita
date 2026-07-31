@@ -22,6 +22,47 @@ quiser conhece-la. A IA nao contrata, encaminha ou promete atendimento sem
 confirmacao expressa. A peticao e apoio para revisao: a IA nao assina nem
 protocola, e o envio final permanece com o usuario.
 
+## Triagem guiada no painel
+
+O painel principal tambem oferece o modulo `#analise-cobrancas`, separado do
+chat aberto. A navegacao dessa tela e deterministica:
+
+1. o usuario informa por botoes se possuiu cartao Itau/Itaucard, se precisa
+   consultar referencias de marcas, se atua como advogado ou se nunca teve o
+   produto;
+2. titular ou advogado autorizado informa se possui todo o historico, apenas
+   alguns documentos/um print recente ou nenhum extrato;
+3. no caminho completo, o usuario pode selecionar varias faturas ou extratos;
+   no parcial, envia uma evidencia recente; sem documentos, informa descricao,
+   valor mensal e duracao aproximada;
+4. o modulo reutiliza `POST /api/itau-refund/analyze` para cada documento e pede confirmacao para
+   cada lancamento candidato;
+5. a interface apresenta uma auditoria preliminar sem inventar juros, dano moral
+   ou valor da causa;
+6. no caminho parcial ou sem documentos, a simulacao declaratoria fica separada
+   dos valores comprovados e calcula somente `valor mensal x meses informados`;
+7. planos, liberacao e peticao permanecem bloqueados ate a definicao da proxima
+   fase comercial.
+
+A apresentacao usa uma conversa progressiva: as mensagens da Audita sao
+reveladas em sequencia, com um estado curto de digitacao, e a resposta escolhida
+aparece como balao do usuario antes da proxima etapa. Em dispositivos com
+`prefers-reduced-motion: reduce`, os intervalos sao eliminados sem alterar o
+conteudo ou a ordem do fluxo.
+
+A lista de 113 nomes fornecida para busca e uma referencia ampliada de triagem,
+nao uma afirmacao de cobertura oficial. A presenca de uma marca nessa lista nao
+substitui a verificacao do emissor/administrador na fatura e no periodo concreto.
+As publicacoes oficiais citam apenas parte dessas marcas, e a peticao coletiva
+historica menciona 133 tipos de cartao administrados a epoca, sem validar a lista
+ampliada atual como um cadastro oficial completo.
+
+O relatorio visual pode exibir o dobro do total marcado como nao reconhecido
+somente como cenario matematico. A aplicacao do art. 42 do CDC, a correcao, os
+juros, perdas e danos e o valor da causa dependem do caso concreto e de revisao
+juridica. O acordo coletivo divulgado em 2026 preve restituicao simples dentro
+de seus criterios proprios.
+
 ## Jornada conversacional
 
 - `suspeita`: uma pergunta curta identifica nome, valor ou recorrencia que chamou a atencao.
@@ -48,7 +89,9 @@ A resposta conversacional deve mostrar apenas o proximo passo. Regras completas,
 ### Com extratos historicos
 
 - a evidencia recente inicia a triagem;
-- novos extratos podem ser anexados quando houver sinal concreto;
+- o painel permite selecionar varias faturas ou extratos para a analise;
+- cada arquivo e enviado individualmente ao analisador e os resultados sao
+  consolidados na interface, preservando a origem de cada lancamento;
 - as cobrancas devem ser organizadas por periodo, sem duplicar lancamentos;
 - o laudo e o rascunho usam somente datas e valores comprovados;
 - devolucao em dobro, juros, correcao e dano moral dependem de revisao juridica e nao sao presumidos.
@@ -57,6 +100,13 @@ A resposta conversacional deve mostrar apenas o proximo passo. Regras completas,
 
 - a falta dos documentos antigos nao encerra a conversa nem apaga o relato de recorrencia;
 - a Audita prepara um rascunho preliminar com a evidencia recente disponivel;
+- se existir apenas uma evidencia recente, a interface analisa o documento e
+  depois solicita o valor mensal e a duracao aproximada para uma simulacao
+  separada;
+- se nao existir documento, o usuario informa diretamente a descricao da
+  cobranca, o valor mensal, a duracao e confirma que os dados sao aproximados;
+- o total estimado e o cenario matematico em dobro nunca sao somados aos valores
+  documentais como se fossem comprovados;
 - o rascunho pode incluir pedido de exibicao de extratos, contratos e autorizacoes, se juridicamente cabivel;
 - periodo, total pago e valor da causa permanecem como pontos a confirmar;
 - valores de simulacoes comerciais nao sao copiados automaticamente para o caso.

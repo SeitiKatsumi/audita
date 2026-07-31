@@ -241,16 +241,16 @@ export async function collect(input) {
   const firstName = String(extra.firstName || extra.primeiroNome || fullNameFallback.split(/\s+/)[0] || "").trim();
   const motherName = String(extra.motherName || extra.nomeMae || stateCourtFields.motherName || "").trim();
   const fatherName = String(extra.fatherName || extra.nomePai || stateCourtFields.fatherName || "").trim();
-  const missingFields = [];
-
-  if (documentType === "cpf") {
-    if (!firstName) missingFields.push("firstName");
-    if (!motherName) missingFields.push("motherName");
-    if (!fatherName) missingFields.push("fatherName");
-  }
+  const missingFields = documentType === "cpf"
+    ? getTjdftPfMissingFields({
+        firstName,
+        motherName,
+        certificateTypes: getCertificateTypesForInput(input),
+      })
+    : [];
 
   if (missingFields.length) {
-    return unavailableResult(fonte, "Informe primeiro nome, nome da mãe e nome do pai para automatizar o TJDFT PF.", {
+    return unavailableResult(fonte, "Informe o primeiro nome e, para certidões Criminais ou Especiais, o nome da mãe.", {
       officialUrl: OFFICIAL_URL,
       missingFields,
       integrationStrategy: discoverIntegrationStrategy(),
@@ -6780,10 +6780,57 @@ async function findVisiblePdfLink(page) {
 
 async function collectAllCertificates({ context, input, firstName, motherName, fatherName }) {
   const results = [];
-  for (const certificateType of getCertificateTypesForInput(input)) {
-    results.push(await collectCertificate({ context, input, firstName, motherName, fatherName, certificateType }));
+  const certificateTypes = getCertificateTypesForInput(input);
+  await notifyTjdftProgress(input, {
+    stage: "portal_started",
+    completed: 0,
+    total: certificateTypes.length,
+    currentCertificate: certificateTypes[0]?.label || "",
+    currentCertificateId: certificateTypes[0]?.id || "",
+    certidoes: [],
+  });
+  for (const certificateType of certificateTypes) {
+    await notifyTjdftProgress(input, {
+      stage: "certificate_started",
+      completed: results.length,
+      total: certificateTypes.length,
+      currentCertificate: certificateType.label,
+      currentCertificateId: certificateType.id,
+      certidoes: results.map(toTjdftProgressCertificate),
+    });
+    const result = await collectCertificate({ context, input, firstName, motherName, fatherName, certificateType });
+    results.push(result);
+    const nextCertificate = certificateTypes[results.length];
+    await notifyTjdftProgress(input, {
+      stage: nextCertificate ? "certificate_completed" : "portal_completed",
+      completed: results.length,
+      total: certificateTypes.length,
+      currentCertificate: nextCertificate?.label || "",
+      currentCertificateId: nextCertificate?.id || "",
+      certidoes: results.map(toTjdftProgressCertificate),
+    });
   }
   return results;
+}
+
+function toTjdftProgressCertificate(certificate = {}) {
+  return {
+    tipo: certificate.tipo || "",
+    status: certificate.status || "",
+    resultado: certificate.resultado || "",
+    pdfPath: certificate.pdfPath || "",
+    pdfDownloaded: Boolean(certificate.pdfDownloaded || certificate.pdfPath),
+    errorMessage: certificate.errorMessage || "",
+  };
+}
+
+async function notifyTjdftProgress(input, progress) {
+  if (typeof input?.onProgress !== "function") return;
+  try {
+    await input.onProgress(progress);
+  } catch {
+    // Progress telemetry must never interrupt certificate issuance.
+  }
 }
 
 export function getCertificateTypesForInput(input) {
@@ -6797,6 +6844,16 @@ export function getCertificateTypesForInput(input) {
   const selectedSet = new Set(selected);
   const filtered = CERTIFICATE_TYPES.filter((certificateType) => selectedSet.has(certificateType.id));
   return filtered.length ? filtered : CERTIFICATE_TYPES;
+}
+
+export function getTjdftPfMissingFields({ firstName, motherName, certificateTypes = CERTIFICATE_TYPES } = {}) {
+  const missingFields = [];
+  if (!String(firstName || "").trim()) missingFields.push("firstName");
+  const needsMotherName = certificateTypes.some((certificateType) =>
+    ["criminal", "especial"].includes(String(certificateType?.id || certificateType)),
+  );
+  if (needsMotherName && !String(motherName || "").trim()) missingFields.push("motherName");
+  return missingFields;
 }
 
 async function collectCertificate({ context, input, firstName, motherName, fatherName, certificateType }) {

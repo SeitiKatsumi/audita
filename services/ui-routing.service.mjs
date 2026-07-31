@@ -1,4 +1,5 @@
 const CHAT_PATH = "/chat";
+const PLANS_PATH = "/planos";
 
 export function resolveUiRoute(pathname) {
   const path = String(pathname || "/");
@@ -14,6 +15,20 @@ export function resolveUiRoute(pathname) {
     return {
       type: "file",
       path: "/index.html",
+    };
+  }
+
+  if (path === `${PLANS_PATH}/`) {
+    return {
+      type: "redirect",
+      location: PLANS_PATH,
+    };
+  }
+
+  if (path === PLANS_PATH) {
+    return {
+      type: "file",
+      path: "/plans.html",
     };
   }
 

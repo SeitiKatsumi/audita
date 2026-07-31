@@ -194,6 +194,242 @@ const JEC_PORTALS = Object.freeze({
       ],
     },
   },
+  MT: {
+    uf: "MT",
+    tribunal: "TJMT",
+    name: "Atermação Eletrônica dos Juizados Especiais de Mato Grosso",
+    officialUrl: "https://atermacao.tjmt.jus.br/",
+    startUrl: "https://atermacao.tjmt.jus.br/",
+    mode: "atermacao_eletronica",
+    allowedHosts: ["atermacao.tjmt.jus.br", "tjmt.jus.br"],
+    checkpoint: "Primeiro campo de identificação, documento, contato, anexo ou envio.",
+    requirements: [
+      "Causa dentro do limite aplicável ao Juizado sem advogado.",
+      "Documentos e provas revisados pelo usuário antes da atermação.",
+    ],
+    instructions: [
+      "Abra somente a página inicial da atermação e confirme que ela carregou.",
+      "Não preencha CPF/CNPJ, nome, contato, anexos ou qualquer formulário.",
+      "Pare antes de qualquer campo ou avanço que inicie a solicitação.",
+    ],
+    guide: {
+      verifiedAt: "2026-07-30",
+      sources: ["https://atermacao.tjmt.jus.br/"],
+      steps: ["Abra a página de atermação e confirme que o serviço está disponível."],
+      humanOnly: ["Dados pessoais, documentos, triagem do servidor e envio."],
+      caseNotes: ["O pedido é submetido à triagem do tribunal antes da distribuição."],
+    },
+  },
+  DF: {
+    uf: "DF",
+    tribunal: "TJDFT",
+    name: "Atendimento NUREVI dos Juizados Especiais do Distrito Federal",
+    officialUrl: "https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais",
+    startUrl: "https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais",
+    mode: "triagem_remota",
+    allowedHosts: ["tjdft.jus.br", "atalho.tjdft.jus.br"],
+    checkpoint: "Agendamento NUREVI, identificação, documentos ou entrada na videochamada.",
+    requirements: ["Atendimento remoto conduzido por servidor para redução a termo."],
+    instructions: [
+      "Abra a orientação oficial e apenas identifique a Agenda Virtual do NUREVI.",
+      "Não selecione dia, horário, identificação ou entre em videoconferência.",
+    ],
+    guide: {
+      verifiedAt: "2026-07-30",
+      sources: ["https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais"],
+      steps: ["Localize a opção de agenda remota sem iniciar o agendamento."],
+      humanOnly: ["Agendamento, atendimento com servidor, documentos e distribuição."],
+      caseNotes: ["A petição é reduzida a termo e distribuída pelo atendimento humano."],
+    },
+  },
+  GO: {
+    uf: "GO",
+    tribunal: "TJGO",
+    name: "CEAJE do Tribunal de Justiça de Goiás",
+    officialUrl: "https://orquestrador.tjgo.jus.br/",
+    startUrl: "https://orquestrador.tjgo.jus.br/",
+    mode: "triagem_autenticada",
+    allowedHosts: ["orquestrador.tjgo.jus.br", "tjgo.jus.br"],
+    checkpoint: "Tela inicial de autenticação da CEAJE.",
+    requirements: ["Triagem humana e atendimento pela Central Estadual de Atermação."],
+    instructions: [
+      "Abra a página e confirme a existência da CEAJE.",
+      "Pare na tela de e-mail e senha; não preencha nem crie cadastro.",
+    ],
+    guide: {
+      verifiedAt: "2026-07-30",
+      sources: ["https://orquestrador.tjgo.jus.br/"],
+      steps: ["Confirme visualmente a entrada da CEAJE e interrompa antes da autenticação."],
+      humanOnly: ["Login, cadastro, triagem, documentos e protocolo."],
+      caseNotes: ["Goiânia pode utilizar canal próprio de atermação; não inferir comarca."],
+    },
+  },
+  AC: {
+    uf: "AC", tribunal: "TJAC", name: "Petição Cidadão do Acre",
+    officialUrl: "https://www.tjac.jus.br/consultas/peticao-cidadao/",
+    startUrl: "https://www.tjac.jus.br/consultas/peticao-cidadao/", mode: "peticao_cidada",
+    allowedHosts: ["www.tjac.jus.br"],
+    checkpoint: "Cadastro do cidadão, CPF, documentos, termo ou envio.",
+    requirements: ["Triagem e documentos revisados pelo usuário."],
+    instructions: ["Confirme o título e as instruções da Petição Cidadão.", "Pare antes de qualquer campo, termo, anexo ou envio."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjac.jus.br/consultas/peticao-cidadao/"], steps: ["Confirme a página de primeiro atendimento."], humanOnly: ["Cadastro, documentos, termo e envio."], caseNotes: ["A atermação passa por análise antes da distribuição."] },
+  },
+  AM: {
+    uf: "AM", tribunal: "TJAM", name: "Atermação Online dos Juizados de Manaus",
+    officialUrl: "https://www.tjam.jus.br/index.php/juizados/atermacao",
+    startUrl: "https://www.tjam.jus.br/index.php/juizados/atermacao", mode: "atermacao_online",
+    allowedHosts: ["www.tjam.jus.br", "forms.gle", "docs.google.com", "accounts.google.com"],
+    checkpoint: "Primeiro campo do formulário, login Google, anexo ou envio.",
+    requirements: ["Pessoa física; fluxo oficial limitado à Comarca de Manaus e causas até 20 salários mínimos sem advogado."],
+    instructions: ["Confirme a página e, se houver link oficial, abra apenas a primeira tela do formulário.", "Pare antes de inserir dados, autenticar no Google, anexar ou enviar."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjam.jus.br/index.php/juizados/atermacao"], steps: ["Confirme a entrada oficial de atermação."], humanOnly: ["Dados, login, anexos, concordância e envio."], caseNotes: ["O tribunal revisa a solicitação antes do ajuizamento."] },
+  },
+  CE: {
+    uf: "CE", tribunal: "TJCE", name: "SISAtermação do Ceará",
+    officialUrl: "https://sisatermacao.tjce.jus.br/", startUrl: "https://sisatermacao.tjce.jus.br/", mode: "atermacao_online",
+    allowedHosts: ["sisatermacao.tjce.jus.br", "sbje.tjce.jus.br"],
+    checkpoint: "Dados do reclamante ou reclamado, anexos, termo ou envio.",
+    requirements: ["Unidade competente, documentos e prova escolhidos pelo usuário."],
+    instructions: ["Abra a tela inicial e confirme as instruções do SISAtermação.", "Não preencha campos, aceite termos, anexe ou envie."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://sisatermacao.tjce.jus.br/"], steps: ["Confirme o serviço sem iniciar a solicitação."], humanOnly: ["Dados, anexos, termo e envio."], caseNotes: ["A Central de Atermação analisa antes do protocolo no PJe."] },
+  },
+  MA: {
+    uf: "MA", tribunal: "TJMA", name: "Atermação Online do Maranhão",
+    officialUrl: "https://www.tjma.jus.br/links/portal/cidadao", startUrl: "https://sistemas.tjma.jus.br/atermacao/", mode: "atermacao_online",
+    allowedHosts: ["www.tjma.jus.br", "sistemas.tjma.jus.br"],
+    checkpoint: "Primeiro dado do formulário, anexo ou envio.",
+    requirements: ["Causa dentro do limite aplicável e documentos revisados pelo usuário."],
+    instructions: ["Permita o carregamento da aplicação e abra apenas a entrada que leve ao formulário, se a ação for reversível e não iniciar envio.", "Pare no primeiro campo, escolha territorial, login, anexo ou envio; não preencha nem envie."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjma.jus.br/links/portal/cidadao", "https://sistemas.tjma.jus.br/atermacao/"], steps: ["Confirme a aplicação oficial e, se houver uma entrada segura, abra somente a tela inicial do formulário."], humanOnly: ["Escolha territorial, dados, anexos e envio."], caseNotes: ["O pedido é analisado pelo tribunal antes da distribuição."] },
+  },
+  PA: {
+    uf: "PA", tribunal: "TJPA", name: "Atermação Online do Pará",
+    officialUrl: "https://www.tjpa.jus.br/PortalExterno/institucional/Atermacao-Online/1590300-atermacao-online.xhtml", startUrl: "https://www.tjpa.jus.br/PortalExterno/institucional/Atermacao-Online/1590300-atermacao-online.xhtml", mode: "atermacao_online",
+    allowedHosts: ["www.tjpa.jus.br"], checkpoint: "Primeiro campo, login, CAPTCHA, anexo ou envio.",
+    requirements: ["Cobertura territorial e unidade devem ser confirmadas pelo usuário."],
+    instructions: ["Aguarde a landing page com JavaScript e identifique a entrada do serviço.", "Pare antes de iniciar formulário, dados, login, CAPTCHA, anexos ou envio."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjpa.jus.br/PortalExterno/institucional/Atermacao-Online/1590300-atermacao-online.xhtml"], steps: ["Confirme visualmente a landing page oficial."], humanOnly: ["Dados, login, CAPTCHA, anexos e envio."], caseNotes: ["Cobertura atual deve ser confirmada antes de orientar a comarca."] },
+  },
+  PB: {
+    uf: "PB", tribunal: "TJPB", name: "Peça Você – Juizados da Paraíba",
+    officialUrl: "https://app.tjpb.jus.br/peca-voce-juizados/", startUrl: "https://app.tjpb.jus.br/peca-voce-juizados/", mode: "atermacao_online",
+    allowedHosts: ["app.tjpb.jus.br", "www.tjpb.jus.br"], checkpoint: "Novo protocolo, dados da reclamação, anexo, autenticação ou envio.",
+    requirements: ["Fluxo sem advogado no limite aplicável e triagem posterior pelo Juizado."],
+    instructions: ["Abra a página inicial e confirme o serviço Peça Você.", "Não escolha novo protocolo nem preencha dados, anexos ou envio."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://app.tjpb.jus.br/peca-voce-juizados/"], steps: ["Confirme a página inicial do serviço."], humanOnly: ["Protocolo, dados, anexos, autenticação e envio."], caseNotes: ["A triagem posterior no Juizado é obrigatória."] },
+  },
+  ES: {
+    uf: "ES", tribunal: "TJES", name: "Balcão Virtual do Espírito Santo",
+    officialUrl: "https://www.tjes.jus.br/balcao-virtual/", startUrl: "https://www.tjes.jus.br/balcao-virtual/", mode: "triagem_remota",
+    allowedHosts: ["www.tjes.jus.br"], checkpoint: "Escolha da unidade, entrada na fila de videoatendimento ou identificação.",
+    requirements: ["A unidade competente e a possibilidade de atermação devem ser confirmadas pelo usuário com o tribunal."],
+    instructions: ["Abra somente a página oficial do Balcão Virtual.", "Pare antes de escolher unidade, entrar em fila, fornecer identificação ou iniciar atendimento."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjes.jus.br/balcao-virtual/"], steps: ["Confirme que o Balcão Virtual oficial carregou."], humanOnly: ["Escolha de unidade, fila, identificação e qualquer orientação para protocolo."], caseNotes: ["É um canal de atendimento; não há protocolo autônomo presumido."] },
+  },
+  SC: {
+    uf: "SC", tribunal: "TJSC", name: "Balcão Virtual de Santa Catarina",
+    officialUrl: "https://www.tjsc.jus.br/balcao-virtual/balcao-virtual-comarcas", startUrl: "https://www.tjsc.jus.br/balcao-virtual/balcao-virtual-comarcas", mode: "triagem_remota",
+    allowedHosts: ["www.tjsc.jus.br"], checkpoint: "Escolha da comarca ou unidade, entrada no atendimento ou identificação.",
+    requirements: ["A comarca e a unidade de atermação precisam ser confirmadas pelo usuário."],
+    instructions: ["Abra somente a lista oficial do Balcão Virtual.", "Pare antes de selecionar comarca, unidade, sala, fornecer identificação ou iniciar atendimento."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjsc.jus.br/balcao-virtual/balcao-virtual-comarcas"], steps: ["Confirme que a lista oficial de comarcas carregou."], humanOnly: ["Comarca, unidade, sala de atendimento, identificação e protocolo."], caseNotes: ["É canal de atendimento e localiza unidades de atermação; não representa protocolo autônomo."] },
+  },
+  BA: {
+    uf: "BA", tribunal: "TJBA", name: "PROJUDI dos Juizados da Bahia",
+    officialUrl: "https://projudi.tjba.jus.br/projudi/", startUrl: "https://projudi.tjba.jus.br/projudi/", mode: "peticionamento_cidadao",
+    allowedHosts: ["projudi.tjba.jus.br"], checkpoint: "Cadastro ou login da pessoa física no PROJUDI.",
+    requirements: ["A unidade competente e o cadastro da pessoa física devem ser confirmados pelo usuário."],
+    instructions: ["Abra somente a página inicial oficial do PROJUDI.", "Pare antes de cadastro, login, seleção de ação, preenchimento, anexos ou envio."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://projudi.tjba.jus.br/projudi/"], steps: ["Confirme a página oficial do PROJUDI."], humanOnly: ["Cadastro, login, escolha processual, dados, anexos e envio."], caseNotes: ["O portal informa serviços para pessoa física apta a propor ação perante o Juizado." ] },
+  },
+  RO: {
+    uf: "RO", tribunal: "TJRO", name: "AtermaJus de Rondônia",
+    officialUrl: "https://atermajus.tjro.jus.br/", startUrl: "https://atermajus.tjro.jus.br/", mode: "atermacao_online",
+    allowedHosts: ["atermajus.tjro.jus.br", "www.tjro.jus.br"], checkpoint: "Início da solicitação, dados do formulário ou autenticação.",
+    requirements: ["Causa dentro do limite aplicável e triagem da Central de Atendimento."],
+    instructions: ["Abra somente o AtermaJus oficial.", "Pare antes de iniciar solicitação, preencher dados, anexar, autenticar ou finalizar."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://atermajus.tjro.jus.br/", "https://www.tjro.jus.br/noticias-cgj/mais-noticias-cgj/atermajus-tjro-lanca-plataforma-que-amplia-acesso-da-populacao-a-justica-2"], steps: ["Confirme a entrada oficial do AtermaJus."], humanOnly: ["Início da solicitação, dados, anexos, autenticação e finalização."], caseNotes: ["O pedido é recebido pelo canal oficial e passa por tratamento do tribunal."] },
+  },
+  RR: {
+    uf: "RR", tribunal: "TJRR", name: "Balcão Virtual de Roraima",
+    officialUrl: "https://balcaovirtual.tjrr.jus.br/inicio", startUrl: "https://balcaovirtual.tjrr.jus.br/inicio", mode: "triagem_remota",
+    allowedHosts: ["balcaovirtual.tjrr.jus.br"], checkpoint: "Escolha de Juizados Especiais, entrada em videoconferência ou identificação.",
+    requirements: ["A unidade e o meio de atermação devem ser confirmados pelo usuário com o tribunal."],
+    instructions: ["Abra somente a página oficial do Balcão Virtual.", "Pare antes de selecionar o atendimento, abrir videoconferência, fornecer identificação ou relatar o caso."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://balcaovirtual.tjrr.jus.br/inicio", "https://www.tjrr.jus.br/index.php/como-ingressar-com-acao-nos-juizados-civeis"], steps: ["Confirme que o Balcão Virtual oficial carregou."], humanOnly: ["Unidade, videoconferência, identificação, relato, documentos e protocolo."], caseNotes: ["É triagem e atendimento, não protocolo autônomo presumido."] },
+  },
+  PI: {
+    uf: "PI", tribunal: "TJPI", name: "Balcão Virtual do Piauí",
+    officialUrl: "https://www.tjpi.jus.br/portaltjpi/balcaovirtual/", startUrl: "https://www.tjpi.jus.br/portaltjpi/balcaovirtual/", mode: "triagem_remota",
+    allowedHosts: ["www.tjpi.jus.br"], checkpoint: "Escolha da unidade, entrada no atendimento remoto ou identificação.",
+    requirements: ["A unidade competente e a forma de atermação devem ser confirmadas pelo usuário com o tribunal."],
+    instructions: ["Abra somente o Balcão Virtual oficial.", "Pare antes de escolher unidade, abrir atendimento, fornecer identificação ou relatar o caso."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjpi.jus.br/portaltjpi/balcaovirtual/"], steps: ["Confirme que o Balcão Virtual oficial carregou."], humanOnly: ["Unidade, atendimento, identificação, relato, documentos e protocolo."], caseNotes: ["É canal de atendimento/triagem; não representa protocolo autônomo."] },
+  },
+  SE: {
+    uf: "SE", tribunal: "TJSE", name: "Pré-Autuação dos Juizados de Sergipe",
+    officialUrl: "https://www.tjse.jus.br/portal/servicos/judiciais/juizados-especiais-preatuacao", startUrl: "https://www.tjse.jus.br/portal/servicos/judiciais/juizados-especiais-preatuacao", mode: "pre_atermacao_online",
+    allowedHosts: ["www.tjse.jus.br"], checkpoint: "Primeiro campo do formulário de pré-autuação, documento ou envio.",
+    requirements: ["Causa no limite aplicável e confirmação posterior pelo tribunal."],
+    instructions: ["Abra somente o formulário oficial de Pré-Autuação.", "Pare antes de preencher qualquer campo, enviar documentos ou encaminhar a reclamação."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjse.jus.br/portal/servicos/judiciais/juizados-especiais-preatuacao"], steps: ["Confirme que o formulário oficial carregou."], humanOnly: ["Dados, documentos, confirmação da unidade e envio."], caseNotes: ["O TJSE informa pré-atermação para causas no limite do Juizado sem advogado."] },
+  },
+  PE: {
+    uf: "PE", tribunal: "TJPE", name: "Juizado Digital de Pernambuco",
+    officialUrl: "https://portal.tjpe.jus.br/web/juizados-especiais/juizado-digital", startUrl: "https://portal.tjpe.jus.br/web/juizados-especiais/juizado-digital", mode: "atermacao_online",
+    allowedHosts: ["portal.tjpe.jus.br", "www.tjpe.jus.br"], checkpoint: "Iniciar nova queixa, primeiro campo do formulário ou dados da solicitação.",
+    requirements: ["A competência e o tipo de queixa devem ser confirmados pelo usuário."],
+    instructions: ["Abra somente o Juizado Digital oficial.", "Pare antes de iniciar nova queixa, preencher campos, anexar documentos ou enviar."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://portal.tjpe.jus.br/web/juizados-especiais/juizado-digital"], steps: ["Confirme a entrada oficial do Juizado Digital."], humanOnly: ["Início de queixa, dados, documentos e envio."], caseNotes: ["O TJPE informa que a queixa virtual é continuada posteriormente pela equipe do Juizado."] },
+  },
+  TO: {
+    uf: "TO", tribunal: "TJTO", name: "Balcão Virtual do Tocantins",
+    officialUrl: "https://tjto.jus.br/balcao-virtual", startUrl: "https://tjto.jus.br/balcao-virtual", mode: "triagem_remota",
+    allowedHosts: ["tjto.jus.br", "www.tjto.jus.br"], checkpoint: "Escolha da unidade/sala virtual ou identificação para atendimento.",
+    requirements: ["A unidade competente e a forma de atermação devem ser confirmadas com o tribunal."],
+    instructions: ["Abra somente o Balcão Virtual oficial.", "Pare antes de selecionar unidade ou sala, informar identificação ou iniciar atendimento."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://tjto.jus.br/balcao-virtual"], steps: ["Confirme que o Balcão Virtual oficial carregou."], humanOnly: ["Unidade, sala, identificação, relato, documentos e protocolo."], caseNotes: ["É canal de atendimento/triagem, não protocolo autônomo presumido."] },
+  },
+  RN: {
+    uf: "RN", tribunal: "TJRN", name: "Balcão Virtual dos Juizados do Rio Grande do Norte",
+    officialUrl: "https://www.tjrn.jus.br/balcao-virtual/", startUrl: "https://www.tjrn.jus.br/balcao-virtual/", mode: "triagem_remota",
+    allowedHosts: ["www.tjrn.jus.br", "tjrn.jus.br"], checkpoint: "Escolha da secretaria/unidade, sala de videoconferência ou identificação.",
+    requirements: ["Comarca e unidade competente devem ser confirmadas pelo usuário."],
+    instructions: ["Abra somente a lista oficial do Balcão Virtual.", "Pare antes de escolher secretaria, abrir sala, informar identificação ou relatar o caso."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjrn.jus.br/balcao-virtual/"], steps: ["Confirme a lista oficial de unidades e Juizados."], humanOnly: ["Unidade, sala, identificação, relato, documentos e protocolo."], caseNotes: ["É atendimento/triagem; não representa protocolo autônomo."] },
+  },
+  AL: {
+    uf: "AL", tribunal: "TJAL", name: "Juizados Especiais de Alagoas",
+    officialUrl: "https://www.tjal.jus.br/juizado/juizados-capital", startUrl: "https://www.tjal.jus.br/juizado/juizados-capital", mode: "triagem_remota",
+    allowedHosts: ["www.tjal.jus.br", "tjal.jus.br"], checkpoint: "Escolha de comarca/juizado e abertura de canal de atendimento.",
+    requirements: ["A competência territorial e o canal de atermação devem ser confirmados pelo usuário."],
+    instructions: ["Abra somente a lista oficial dos Juizados.", "Pare antes de escolher unidade, abrir Balcão Virtual, informar identificação ou iniciar contato."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjal.jus.br/juizado/juizados-capital"], steps: ["Confirme que a lista oficial de Juizados carregou."], humanOnly: ["Unidade, atendimento, identificação, relato, documentos e protocolo."], caseNotes: ["A página expõe unidades e canais; não foi presumido protocolo autônomo."] },
+  },
+  AP: {
+    uf: "AP", tribunal: "TJAP", name: "PJe do Amapá – entrada autenticada",
+    officialUrl: "https://pje.tjap.jus.br/1gconsulta/loginOld.seam?loginComCertificado=false", startUrl: "https://pje.tjap.jus.br/1gconsulta/loginOld.seam?loginComCertificado=false", mode: "peticionamento_autenticado",
+    allowedHosts: ["pje.tjap.jus.br"], checkpoint: "Login por CPF/senha ou certificado digital no PJe.",
+    requirements: ["O roteiro público antigo aponta atermação no SuperFácil; a entrada online atual observada é o PJe autenticado."],
+    instructions: ["Abra somente a tela de entrada do PJe de 1º grau.", "Pare antes de informar CPF/CNPJ, senha, certificado, dados, anexos ou envio."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://pje.tjap.jus.br/1gconsulta/loginOld.seam?loginComCertificado=false", "https://old.tjap.jus.br/portal/images/SGPE/ouvidoria/CARTA_DE_SERVIOS_AO_CIDADO_TJAP_compressed_1.pdf"], steps: ["Confirme a tela de autenticação do PJe e interrompa antes do login."], humanOnly: ["CPF/senha ou certificado digital, definição da unidade, dados, documentos e protocolo."], caseNotes: ["Não foi localizada uma URL pública atual de Solicitar Atermação para iniciar autonomamente pelo cidadão."] },
+  },
+  MS: {
+    uf: "MS", tribunal: "TJMS", name: "eproc de Mato Grosso do Sul",
+    officialUrl: "https://www.tjms.jus.br/eproc", startUrl: "https://eproc1g.tjms.jus.br/", mode: "peticionamento_autenticado",
+    allowedHosts: ["www.tjms.jus.br", "eproc1g.tjms.jus.br"], checkpoint: "Login, cadastro ou certificado digital no eproc.",
+    requirements: ["A competência do Juizado e o perfil de acesso devem ser confirmados pelo usuário."],
+    instructions: ["Abra somente a entrada oficial de 1º grau do eproc.", "Pare na tela de usuário, senha e certificado; não crie cadastro, não preencha nem envie."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjms.jus.br/eproc", "https://eproc1g.tjms.jus.br/"], steps: ["Confirme a página institucional e a tela de login do eproc."], humanOnly: ["Login, cadastro, certificado, escolha processual, dados, anexos e protocolo."], caseNotes: ["A página institucional confirma peticionamento eletrônico, mas o primeiro passo prático exige autenticação."] },
+  },
+  RS: {
+    uf: "RS", tribunal: "TJRS", name: "Balcão Virtual do Rio Grande do Sul",
+    officialUrl: "https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/balcao-virtual/", startUrl: "https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/balcao-virtual/", mode: "triagem_remota",
+    allowedHosts: ["www.tjrs.jus.br"], checkpoint: "Escolha de Capital ou Interior, unidade e entrada no atendimento virtual.",
+    requirements: ["A comarca, a unidade e a possibilidade de atermação precisam ser confirmadas no atendimento."],
+    instructions: ["Abra somente a lista oficial do Balcão Virtual.", "Pare antes de escolher unidade, entrar em sala, fornecer identificação ou relatar o caso."],
+    guide: { verifiedAt: "2026-07-30", sources: ["https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/balcao-virtual/"], steps: ["Confirme que a página expõe os acessos de 1º grau para Capital e Interior."], humanOnly: ["Comarca, unidade, atendimento, identificação, documentos e protocolo."], caseNotes: ["O Balcão Virtual é canal de triagem; não foi presumido protocolo autônomo."] },
+  },
 });
 
 const SUPPORTED_UFS = Object.freeze(Object.keys(JEC_PORTALS));
@@ -355,11 +591,23 @@ export function suggestJecClaimValues({ caseData = {}, claimant = {} } = {}) {
   const doubleRefundAmount =
     suppliedDoubleRefund ??
     (hasEvidencedAmount ? Number((evidencedPrincipal * 2).toFixed(2)) : null);
-  const lostProfitsAmount = suppliedLostProfits ?? 0;
-  const moralDamagesAmount = suppliedMoralDamages ?? 0;
+  const lostProfitsAmount =
+    Number.isFinite(suppliedLostProfits) && suppliedLostProfits > 0
+      ? suppliedLostProfits
+      : null;
+  const moralDamagesAmount =
+    Number.isFinite(suppliedMoralDamages) && suppliedMoralDamages > 0
+      ? suppliedMoralDamages
+      : null;
   const calculatedCaseValue =
     Number.isFinite(doubleRefundAmount)
-      ? Number((doubleRefundAmount + lostProfitsAmount + moralDamagesAmount).toFixed(2))
+      ? Number(
+          (
+            doubleRefundAmount +
+            (lostProfitsAmount || 0) +
+            (moralDamagesAmount || 0)
+          ).toFixed(2),
+        )
       : null;
   const caseValue = suppliedCaseValue ?? calculatedCaseValue;
 
@@ -379,14 +627,14 @@ export function suggestJecClaimValues({ caseData = {}, claimant = {} } = {}) {
     );
   }
   notes.push(
-    suppliedLostProfits !== null
+    Number.isFinite(lostProfitsAmount)
       ? "Lucros cessantes mantidos conforme o valor informado para revisão."
-      : "Lucros cessantes sugeridos como R$ 0,00 porque não há perda de renda quantificada no caso.",
+      : "Lucros cessantes não foram incluídos porque não há perda de renda quantificada no caso.",
   );
   notes.push(
-    suppliedMoralDamages !== null
+    Number.isFinite(moralDamagesAmount)
       ? "Danos morais mantidos conforme o valor informado para revisão."
-      : "Danos morais sugeridos como R$ 0,00 porque dependem dos fatos e de revisão jurídica individual.",
+      : "Danos morais não foram incluídos porque dependem dos fatos e de revisão jurídica individual.",
   );
   if (historicalEvidence === "yes" && historicalDocuments !== "yes") {
     notes.push(
@@ -423,8 +671,85 @@ function formatPetitionDate(value = new Date()) {
   }).format(date);
 }
 
-function buildDraft({ claimant, templateId, generatedAt }) {
+function formatEvidenceDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || "").trim());
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "";
+}
+
+function buildEvidenceSummary(caseData = {}) {
+  const disputed = (
+    Array.isArray(caseData?.candidates) ? caseData.candidates : []
+  ).filter((candidate) => candidate?.answer === "not_recognized");
+  const items = disputed.slice(0, 5).map((candidate) => {
+    const label = cleanText(candidate?.label || candidate?.description, 120);
+    const date = formatEvidenceDate(candidate?.date);
+    const amount = normalizeMoney(candidate?.amount);
+    return [
+      label ? `“${label}”` : "um lançamento contestado",
+      date ? `em ${date}` : "",
+      Number.isFinite(amount) && amount > 0
+        ? `no valor de R$ ${formatPetitionMoney(amount)}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+  });
+  if (!items.length) return "";
+  return items.length === 1
+    ? `a cobrança ${items[0]}`
+    : `as cobranças ${items.join("; ")}`;
+}
+
+function buildHistoricalContext(caseData = {}) {
+  const historicalEvidence = String(
+    caseData?.answers?.historicalEvidence || "pending",
+  );
+  if (historicalEvidence === "yes") {
+    return "O(A) Autor(a) relata que a cobrança também ocorreu em período anterior. Como os extratos históricos ainda não foram apresentados, a extensão temporal permanece não comprovada e não integra o cálculo inicial; sua apuração depende da exibição dos documentos pela Ré.";
+  }
+  return "Não há, nesta etapa, documentação histórica suficiente para afirmar recorrência ou duração da cobrança. Por isso, a quantificação inicial foi limitada aos lançamentos efetivamente apresentados.";
+}
+
+function buildActionTitle(templateId, claimant) {
+  const base =
+    templateId === "document_exhibition"
+      ? "AÇÃO DECLARATÓRIA DE INEXISTÊNCIA DE RELAÇÃO JURÍDICA C/C EXIBIÇÃO INCIDENTAL DE DOCUMENTOS, OBRIGAÇÃO DE NÃO FAZER E REPETIÇÃO DE INDÉBITO EM DOBRO"
+      : "AÇÃO DECLARATÓRIA DE INEXISTÊNCIA DE DÉBITO C/C REPETIÇÃO DE INDÉBITO EM DOBRO";
+  const additions = [];
+  if (claimant.lostProfitsAmount > 0) additions.push("LUCROS CESSANTES");
+  if (claimant.moralDamagesAmount > 0) {
+    additions.push("INDENIZAÇÃO POR DANOS MORAIS");
+  }
+  return additions.length ? `${base} C/C ${additions.join(" E ")}` : base;
+}
+
+function buildOptionalClaimText(claimant) {
+  const omitted = "__AUDITA_OMIT_SECTION__";
+  let requestLetterCode = "c".charCodeAt(0);
+  const lostProfitsGrounds =
+    claimant.lostProfitsAmount > 0
+      ? "4. Dos Lucros Cessantes e Perdas e Danos (Privação de Capital)\n\nNos termos dos Arts. 389 e 402 do Código Civil, eventual lucro cessante exige demonstração concreta do prejuízo e do nexo causal, conforme os documentos submetidos à revisão."
+      : omitted;
+  const lostProfitsRequest =
+    claimant.lostProfitsAmount > 0
+      ? `${String.fromCharCode(requestLetterCode++)}) Condenar a Ré ao pagamento de Lucros Cessantes / Perdas e Danos no valor de R$ ${formatPetitionMoney(claimant.lostProfitsAmount)}, condicionado à prova do prejuízo e do nexo causal;`
+      : omitted;
+  const moralDamagesRequest =
+    claimant.moralDamagesAmount > 0
+      ? `${String.fromCharCode(requestLetterCode)}) Condenar a Ré ao pagamento de Danos Morais no valor de R$ ${formatPetitionMoney(claimant.moralDamagesAmount)}, sujeito à apreciação do Juízo diante das circunstâncias comprovadas;`
+      : omitted;
+  return {
+    omitted,
+    lostProfitsGrounds,
+    lostProfitsRequest,
+    moralDamagesRequest,
+  };
+}
+
+function buildDraft({ caseData, claimant, templateId, generatedAt }) {
+  const optionalClaims = buildOptionalClaimText(claimant);
   return renderJecPetitionTemplate(templateId, {
+    ACTION_TITLE: buildActionTitle(templateId, claimant),
     CITY_UF:
       claimant.city && claimant.uf ? `${claimant.city}/${claimant.uf}` : "",
     FULL_NAME: claimant.fullName,
@@ -436,20 +761,19 @@ function buildDraft({ claimant, templateId, generatedAt }) {
     ADDRESS: claimant.address,
     EMAIL: claimant.email,
     PHONE: formatProfilePhone(claimant.phone),
+    EVIDENCE_SUMMARY: buildEvidenceSummary(caseData),
+    HISTORICAL_CONTEXT: buildHistoricalContext(caseData),
     DOUBLE_REFUND: formatPetitionMoney(claimant.doubleRefundAmount),
     LOST_PROFITS: formatPetitionMoney(claimant.lostProfitsAmount),
     MORAL_DAMAGES: formatPetitionMoney(claimant.moralDamagesAmount),
+    LOST_PROFITS_GROUNDS: optionalClaims.lostProfitsGrounds,
+    LOST_PROFITS_REQUEST: optionalClaims.lostProfitsRequest,
+    MORAL_DAMAGES_REQUEST: optionalClaims.moralDamagesRequest,
     CASE_VALUE: formatPetitionMoney(claimant.caseValue),
     DATE: formatPetitionDate(generatedAt),
   })
-    .replace(
-      /no valor estimado de R\$ \[PENDENTE: LOST_PROFITS\]/g,
-      "em valor a ser apurado mediante prova documental",
-    )
-    .replace(
-      /no valor de R\$ \[PENDENTE: MORAL_DAMAGES\]/g,
-      "em valor a ser arbitrado pelo Juízo",
-    );
+    .replaceAll(optionalClaims.omitted, "")
+    .replace(/\n{3,}/g, "\n\n");
 }
 
 export function prepareJecPetition({
@@ -507,8 +831,6 @@ export function prepareJecPetition({
   const moralDamagesAmount = normalizeMoney(claimant.moralDamagesAmount);
   const caseValue = normalizeMoney(claimant.caseValue);
   if (!(doubleRefundAmount > 0)) missingFields.push("doubleRefundAmount");
-  if (!(lostProfitsAmount >= 0)) missingFields.push("lostProfitsAmount");
-  if (!(moralDamagesAmount >= 0)) missingFields.push("moralDamagesAmount");
   if (!(caseValue > 0)) missingFields.push("caseValue");
 
   const normalizedClaimant = {
@@ -549,6 +871,7 @@ export function prepareJecPetition({
     }),
     claimant: normalizedClaimant,
     draft: buildDraft({
+      caseData,
       claimant: normalizedClaimant,
       templateId,
       generatedAt,
@@ -567,15 +890,11 @@ export function prepareJecPetition({
     warnings: [
       "Rascunho baseado no modelo fornecido: revise fatos, competência territorial, pedidos e valor da causa.",
       "Os valores jurídicos não são calculados nem presumidos pelo Audita; devem ser informados e revisados.",
-      ...(!Number.isFinite(lostProfitsAmount)
-        ? [
-            "Sem valor informado para lucros cessantes, o rascunho usa pedido a apurar mediante prova documental.",
-          ]
+      ...(!(lostProfitsAmount > 0)
+        ? ["Lucros cessantes não foram incluídos porque nenhum valor positivo foi informado."]
         : []),
-      ...(!Number.isFinite(moralDamagesAmount)
-        ? [
-            "Sem valor informado para danos morais, o rascunho usa pedido a ser arbitrado pelo Juízo.",
-          ]
+      ...(!(moralDamagesAmount > 0)
+        ? ["Danos morais não foram incluídos porque nenhum valor positivo foi informado."]
         : []),
       ...template.reviewNotes,
       "A IA não assina nem protocola; a ação final exige revisão e confirmação humana.",
