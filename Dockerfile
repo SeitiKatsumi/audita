@@ -10,7 +10,8 @@ ENV APP_VERSION=${CAPROVER_GIT_COMMIT_SHA}
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY index.html styles.css app.js server.mjs ./
+COPY index.html styles.css app.js billing-admin.js charge-analysis.js server.mjs ./
+COPY plans.html plans.css plans.js ./
 COPY assets ./assets
 COPY data ./data
 COPY db ./db

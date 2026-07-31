@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { resolveUiRoute } from "../services/ui-routing.service.mjs";
+
+const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
 
 test("redirects legacy UI entry points to chat", () => {
   for (const pathname of ["/", "/index.html", "/chat/"]) {
@@ -35,4 +38,19 @@ test("preserves API-independent static asset routes", () => {
     type: "file",
     path: "/app.js",
   });
+});
+
+test("production image includes every root-level UI asset", () => {
+  for (const file of [
+    "index.html",
+    "styles.css",
+    "app.js",
+    "billing-admin.js",
+    "charge-analysis.js",
+    "plans.html",
+    "plans.css",
+    "plans.js",
+  ]) {
+    assert.match(dockerfile, new RegExp(`\\b${file.replace(".", "\\.")}\\b`));
+  }
 });
