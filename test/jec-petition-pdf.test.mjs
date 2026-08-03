@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildJecPetitionHtml,
   createJecPetitionPdf,
+  resolveJecPdfBrowserExecutable,
 } from "../services/jec-petition-pdf.service.mjs";
 
 const prepared = {
@@ -11,7 +12,7 @@ const prepared = {
   generatedAt: "2026-07-27T15:00:00.000Z",
   template: {
     id: "audited_values",
-    label: "Modelo 1 - Auditoria concluída e valores apurados",
+    label: "Relatório Técnico de Auditoria - Modelo 1 (valores apurados)",
   },
   claimant: {
     fullName: "Cliente Teste",
@@ -47,7 +48,51 @@ test("petition HTML uses A4 legal-document typography and escapes content", () =
   assert.match(html, /Times New Roman/);
   assert.match(html, /class="court-address"/);
   assert.match(html, /class="action-title"/);
+  assert.match(html, /class="signature-block"/);
   assert.match(html, /analista &lt;teste&gt;/);
+});
+
+test("PDF renderer accepts both petition models and returns PDF bytes", async () => {
+  for (const template of [
+    { id: "audited_values", label: "Modelo 1", sourceModel: 1 },
+    { id: "document_exhibition", label: "Modelo 2", sourceModel: 2 },
+  ]) {
+    let renderedHtml = "";
+    let browserClosed = false;
+    const bytes = Buffer.from(
+      await createJecPetitionPdf(
+        { ...prepared, template },
+        {
+          launch: async () => ({
+            newPage: async () => ({
+              setContent: async (html) => {
+                renderedHtml = html;
+              },
+              emulateMedia: async () => {},
+              pdf: async () => Buffer.from("%PDF-model-test"),
+            }),
+            close: async () => {
+              browserClosed = true;
+            },
+          }),
+        },
+      ),
+    );
+
+    assert.match(renderedHtml, new RegExp(template.label));
+    assert.equal(bytes.subarray(0, 5).toString("ascii"), "%PDF-");
+    assert.equal(browserClosed, true);
+  }
+});
+
+test("PDF browser resolution falls back to an installed system browser", () => {
+  const executable = resolveJecPdfBrowserExecutable({
+    env: { JEC_PDF_BROWSER_EXECUTABLE_PATH: "C:\\Browsers\\chrome.exe" },
+    bundledExecutable: "C:\\missing\\playwright.exe",
+    fileExists: (candidate) => candidate === "C:\\Browsers\\chrome.exe",
+  });
+
+  assert.equal(executable, "C:\\Browsers\\chrome.exe");
 });
 
 test("PDF generation refuses an incomplete petition before opening a browser", async () => {

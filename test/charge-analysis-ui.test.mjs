@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   buildChargeAuditSnapshot,
   buildChargeEstimate,
+  buildChargeJecHandoff,
   CHARGE_ANALYSIS_BRANDS,
 } from "../charge-analysis.js";
 
@@ -57,6 +58,17 @@ test("sidebar keeps charge analysis at the main level and uses the selected adap
   assert.match(stylesCss, /body\.sidebar-collapsed \.nav-label\s*\{[\s\S]*?position:\s*absolute/);
 });
 
+test("sidebar keeps expanded groups scrollable and collapsed icons centered", () => {
+  assert.match(stylesCss, /\.nav-list\s*\{[\s\S]*?grid-auto-rows:\s*max-content/);
+  assert.match(
+    stylesCss,
+    /body\.sidebar-collapsed \.nav-list (?:a|summary),[\s\S]*?width:\s*100%[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/,
+  );
+  assert.match(appJs, /function keepNavGroupVisible\(group\)/);
+  assert.match(appJs, /group\.addEventListener\("toggle", \(\) => keepNavGroupVisible\(group\)\)/);
+  assert.match(appJs, /navList\.scrollBy\(\{/);
+});
+
 test("charge analysis exposes a guided flow without an open chat input", () => {
   const moduleMarkup = indexHtml.match(
     /<section class="charge-analysis-page"[\s\S]*?<\/section>/,
@@ -70,11 +82,60 @@ test("charge analysis exposes a guided flow without an open chat input", () => {
   assert.doesNotMatch(moduleMarkup, /textarea|contenteditable|chatInput/);
 });
 
+test("charge analysis uses one module-wide progress rail from authorization to tribunal", () => {
+  const progressMarkup = indexHtml.match(
+    /<ol class="charge-analysis-progress charge-module-progress"[\s\S]*?<\/ol>/,
+  )?.[0];
+
+  assert.ok(progressMarkup);
+  assert.match(progressMarkup, /data-charge-progress="authorization"/);
+  assert.match(progressMarkup, /data-charge-progress="statements"/);
+  assert.match(progressMarkup, /data-charge-progress="analysis"/);
+  assert.match(progressMarkup, /data-charge-progress="result"/);
+  assert.match(progressMarkup, /data-charge-progress="recovery"/);
+  assert.match(progressMarkup, /data-charge-progress="report"/);
+  assert.match(progressMarkup, /data-charge-progress="tribunal"/);
+  assert.match(indexHtml, /Etapa 1 de 7/);
+  assert.match(chargeAnalysisJs, /state\.recovery\.phase === "guide"[\s\S]*?"tribunal"/);
+  assert.doesNotMatch(chargeAnalysisJs, /charge-recovery-progress/);
+  assert.match(stylesCss, /\.charge-module-progress\s*\{/);
+});
+
 test("charge analysis reveals agent messages before moving to the selected path", () => {
   assert.match(chargeAnalysisJs, /revealTriageMessages/);
   assert.match(chargeAnalysisJs, /Audita est&aacute; digitando/);
   assert.match(chargeAnalysisJs, /continueFromTriage/);
   assert.match(chargeAnalysisJs, /prefers-reduced-motion: reduce/);
+  assert.match(chargeAnalysisJs, /function typingDelayFor\(message\)/);
+  assert.match(chargeAnalysisJs, /Math\.min\(1700, Math\.max\(900, visibleLength \* 4\)\)/);
+});
+
+test("charge analysis starts by asking about express authorization", () => {
+  assert.match(
+    chargeAnalysisJs,
+    /Voc&ecirc; contratou ou autorizou expressamente a cobran&ccedil;a de algum seguro ou servi&ccedil;o/,
+  );
+  assert.match(chargeAnalysisJs, /data-charge-action="not-authorized"/);
+  assert.match(chargeAnalysisJs, /data-charge-action="authorized"/);
+  assert.match(chargeAnalysisJs, /data-charge-action="verify-statement"/);
+  assert.match(chargeAnalysisJs, /N&atilde;o tenho certeza \/ Quero verificar o extrato/);
+  assert.match(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
+  assert.match(chargeAnalysisJs, /Seguro Prestamista/);
+});
+
+test("charge analysis context exposes the explanatory memorandum and video", () => {
+  assert.match(chargeAnalysisJs, /Memorando explicativo e v&iacute;deo/);
+  assert.match(chargeAnalysisJs, /17\/12\/2025/);
+  assert.match(chargeAnalysisJs, /5085307-63\.2016\.8\.13\.0024/);
+  assert.match(chargeAnalysisJs, /youtube-nocookie\.com\/embed\/rzxDS0cbdlc/);
+  assert.match(chargeAnalysisJs, /youtube\.com\/shorts\/rzxDS0cbdlc/);
+});
+
+test("charge analysis keeps optional context collapsed by default", () => {
+  assert.match(chargeAnalysisJs, /<details class="charge-analysis-disclosure charge-analysis-transaction">/);
+  assert.match(chargeAnalysisJs, /<details class="charge-analysis-disclosure charge-analysis-context">/);
+  assert.match(chargeAnalysisJs, /<details class="charge-analysis-disclosure charge-analysis-insurance-details">/);
+  assert.doesNotMatch(chargeAnalysisJs, /<details class="[^"]*charge-analysis-(?:transaction|context|insurance-details)[^"]*" open>/);
 });
 
 test("charge analysis separates complete, partial and no-statement journeys", () => {
@@ -134,4 +195,83 @@ test("declaratory simulation keeps estimated values separate from documentary to
   assert.match(chargeAnalysisJs, /valores como declarados e estimados/);
   assert.match(chargeAnalysisJs, /não comprovados por extratos/);
   assert.match(chargeAnalysisJs, /A definir na revisão/);
+});
+
+test("guided documentary journey hands evidenced charges to JEC model 1", () => {
+  const handoff = buildChargeJecHandoff({
+    handoffId: "documented-case",
+    documentAvailability: "complete",
+    authorizationAnswer: "confirmed",
+    caseData: {
+      candidates: [
+        {
+          id: "charge-1",
+          label: "Seguro Fatura Protegida",
+          amount: 19,
+          answer: "not_recognized",
+        },
+      ],
+    },
+  });
+
+  assert.equal(handoff.ready, true);
+  assert.equal(handoff.journey, "with_historical_documents");
+  assert.equal(handoff.caseData.id, "guided-jec-documented-case");
+  assert.equal(handoff.caseData.answers.historicalDocumentsAvailable, "yes");
+  assert.equal(handoff.caseData.answers.authorizationAnswer, "confirmed");
+  assert.equal(handoff.suggestion.values.doubleRefundAmount, "38,00");
+  assert.equal(handoff.caseData.candidates[0].amount, 19);
+});
+
+test("guided no-statement journey hands a declared estimate to JEC model 2", () => {
+  const estimate = {
+    description: "Proteção do cartão",
+    ...buildChargeEstimate({
+      monthlyAmount: 19,
+      durationValue: 15,
+      durationUnit: "years",
+    }),
+  };
+  const handoff = buildChargeJecHandoff({
+    handoffId: "declared-case",
+    documentAvailability: "none",
+    authorizationAnswer: "confirmed",
+    estimate,
+  });
+
+  assert.equal(handoff.ready, true);
+  assert.equal(handoff.journey, "without_historical_documents");
+  assert.equal(handoff.caseData.answers.historicalDocumentsAvailable, "no");
+  assert.equal(handoff.caseData.answers.authorizationAnswer, "confirmed");
+  assert.equal(handoff.caseData.answers.declaredEstimate.estimatedPaid, 3420);
+  assert.equal(handoff.caseData.candidates[0].answer, "not_recognized");
+  assert.equal(handoff.caseData.candidates[0].amount, null);
+  assert.equal(handoff.suggestion.values.doubleRefundAmount, "6.840,00");
+});
+
+test("guided results continue through recovery without redirecting to chat", () => {
+  assert.match(chargeAnalysisJs, /data-charge-action="start-recovery"/);
+  assert.match(chargeAnalysisJs, /Prosseguir para recupera&ccedil;&atilde;o/);
+  assert.match(chargeAnalysisJs, /Agora você pode preparar a documentação para avaliar o Juizado Especial Cível/);
+  assert.doesNotMatch(chargeAnalysisJs, /Comece pelos canais administrativos/);
+  assert.doesNotMatch(chargeAnalysisJs, /Consumidor\.gov\.br ou no Procon/);
+  assert.match(chargeAnalysisJs, /function renderRecoveryIntro\(\)/);
+  assert.match(chargeAnalysisJs, /function renderRecoveryReport\(\)/);
+  assert.match(chargeAnalysisJs, /function renderRecoveryGuide\(\)/);
+  assert.match(chargeAnalysisJs, /\/api\/jec\/petitions\/prepare/);
+  assert.match(chargeAnalysisJs, /\/api\/jec\/petitions\/pdf/);
+  assert.match(chargeAnalysisJs, /id="chargeRecoveryGuideUf"/);
+  assert.doesNotMatch(chargeAnalysisJs, /audita:open-jec/);
+  assert.doesNotMatch(appJs, /function openGuidedChargeJec\(event\)/);
+  assert.doesNotMatch(appJs, /window\.history\.pushState\(\{\}, "", "\/chat"\)/);
+});
+
+test("recovery report reuses calculated values without asking for another review", () => {
+  assert.doesNotMatch(chargeAnalysisJs, /Valores para revisão/);
+  assert.doesNotMatch(chargeAnalysisJs, /Restituição em dobro \(R\$\)<\/span><input/);
+  assert.doesNotMatch(chargeAnalysisJs, /Valor da causa \(R\$\)<\/span><input/);
+  assert.match(chargeAnalysisJs, /const calculatedValues = state\.recovery\.handoff\?\.suggestion\?\.values \|\| \{\}/);
+  assert.match(chargeAnalysisJs, /type="hidden" name="doubleRefundAmount"/);
+  assert.match(chargeAnalysisJs, /type="hidden" name="caseValue"/);
+  assert.match(chargeAnalysisJs, /Os valores calculados na análise serão incluídos automaticamente/);
 });

@@ -23,7 +23,7 @@ I. DOS FATOS
 
 2 Ocorre que, apesar da conduta da Ré em omitir e não disponibilizar os extratos consolidados, o(a) Autor(a) obteve o histórico de suas movimentações bancárias e realizou uma auditoria técnica profunda por meio da plataforma IA AUDITA.
 
-3 O levantamento auditado revelou a incidência continuada e sistemática de descontos e cobranças relativas a seguros e serviços adicionais jamais solicitados ou autorizados, lançados de forma oculta nos lançamentos mensais.
+3 O levantamento auditado revelou {{EVIDENCE_SUMMARY}}, entre os lançamentos que o(a) Autor(a) declarou não reconhecer como produtos ou serviços por ele(a) solicitados ou autorizados.
 
 4 A prática configura nítida venda casada e prestação de serviço não solicitado, conduta amplamente combatida e que foi inclusive objeto de Ação Civil Pública promovida pelo Procon-MPMG e IDEC (Processo nº 5085307-63.2016.8.13.0024 - TJMG), em que o Itaú celebrou acordo reconhecendo a abusividade de cobranças de seguros sem a expressa anuência do cliente.
 
@@ -117,9 +117,9 @@ Assim, o acordo não pode ser interpretado como quitação geral das cobranças 
 
 I. DOS FATOS
 
-1 O(A) Autor(a) é titular de conta e/ou cartão de crédito junto à instituição financeira Ré. Ao analisar o documento recente fornecido pelo(a) consumidor(a), a plataforma IA AUDITA identificou {{EVIDENCE_SUMMARY}}, que o(a) Autor(a) declarou não reconhecer.
+1 {{EVIDENCE_CONTEXT}}
 
-2 Nesta etapa, a quantificação está limitada aos lançamentos efetivamente apresentados. O(A) Autor(a) não dispõe dos extratos históricos completos nem do instrumento contratual que permita verificar a origem, a duração e a regularidade da cobrança contestada.
+2 {{QUANTIFICATION_CONTEXT}}
 
 3 {{HISTORICAL_CONTEXT}}
 
@@ -175,7 +175,7 @@ Diante do exposto, requer a Vossa Excelência:
 
 a) Declarar a inexistência de relação jurídica contratual quanto à cobrança contestada, caso a Ré não comprove consentimento válido;
 
-b) Condenar a Ré à Repetição do Indébito em Dobro dos valores comprovados nesta etapa, no total inicial de R$ {{DOUBLE_REFUND}}, acrescido de juros e correção na forma definida pelo Juízo, ficando eventual valor histórico adicional condicionado à exibição dos documentos e à respectiva comprovação;
+b) Condenar a Ré à Repetição do Indébito em Dobro {{REFUND_SCOPE}}, no total inicial de R$ {{DOUBLE_REFUND}}, acrescido de juros e correção na forma definida pelo Juízo, ficando eventual valor histórico adicional condicionado à exibição dos documentos e à respectiva comprovação;
 
 {{LOST_PROFITS_REQUEST}}
 
@@ -199,7 +199,7 @@ CPF nº {{DOCUMENT}}
 export const JEC_PETITION_TEMPLATES = Object.freeze({
   audited_values: Object.freeze({
     id: "audited_values",
-    label: "Modelo 1 - Auditoria concluída e valores apurados",
+    label: "Relatório Técnico de Auditoria - Modelo 1 (valores apurados)",
     text: MODEL_1,
     sourceModel: 1,
     reviewNotes: [
@@ -209,7 +209,7 @@ export const JEC_PETITION_TEMPLATES = Object.freeze({
   }),
   document_exhibition: Object.freeze({
     id: "document_exhibition",
-    label: "Modelo 2 - Exibição incidental de documentos",
+    label: "Relatório Técnico de Auditoria - Modelo 2 (documentos a apresentar)",
     text: MODEL_2,
     sourceModel: 2,
     reviewNotes: [

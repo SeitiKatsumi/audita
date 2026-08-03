@@ -368,12 +368,14 @@ a {
 
 .nav-list {
   display: grid;
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 6px;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   padding: 18px 10px;
+  scroll-padding-block: 10px;
   scrollbar-color: rgba(91, 172, 240, 0.44) transparent;
   scrollbar-width: thin;
 }
@@ -647,10 +649,10 @@ body.sidebar-collapsed .nav-list {
 
 body.sidebar-collapsed .nav-list a,
 body.sidebar-collapsed .nav-list summary {
-  width: 56px;
+  width: 100%;
   height: 52px;
   min-height: 52px;
-  grid-template-columns: 24px;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   gap: 0;
   padding: 0;
@@ -8440,6 +8442,503 @@ body[data-active-page="chat"] .workspace {
   }
 }
 
+.charge-recovery-progress {
+  display: grid;
+  width: min(760px, calc(100% - 72px));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0;
+  margin: 18px 72px 8px 0;
+  list-style: none;
+}
+
+.charge-recovery-progress li {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: #7896aa;
+  font-size: 0.72rem;
+}
+
+.charge-recovery-progress li:not(:last-child)::after {
+  position: absolute;
+  z-index: -1;
+  top: 12px;
+  left: 26px;
+  width: calc(100% - 26px);
+  height: 1px;
+  background: rgba(106, 163, 201, 0.26);
+  content: "";
+}
+
+.charge-recovery-progress li > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid rgba(106, 163, 201, 0.34);
+  border-radius: 50%;
+  background: #071a2b;
+  font-weight: 800;
+}
+
+.charge-recovery-progress li.active,
+.charge-recovery-progress li.complete {
+  color: #e8f8f0;
+}
+
+.charge-recovery-progress li.active > span,
+.charge-recovery-progress li.complete > span {
+  border-color: rgba(49, 247, 143, 0.58);
+  color: #062018;
+  background: var(--lime);
+}
+
+.charge-recovery-progress li.complete:not(:last-child)::after {
+  background: rgba(49, 247, 143, 0.5);
+}
+
+.charge-recovery-conversation,
+.charge-recovery-conversation.compact {
+  padding-bottom: 22px;
+}
+
+.charge-recovery-actions,
+.charge-recovery-form-actions,
+.charge-recovery-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.charge-recovery-actions {
+  width: min(760px, calc(100% - 72px));
+  padding: 0 0 42px;
+  margin-right: 72px;
+}
+
+.charge-recovery-form,
+.charge-recovery-tribunal-picker,
+.charge-recovery-guide,
+.charge-recovery-guide-empty {
+  width: min(940px, calc(100% - 72px));
+  margin: 0 72px 28px 0;
+  border: 1px solid rgba(89, 154, 203, 0.28);
+  border-radius: 8px;
+  background: rgba(5, 27, 45, 0.78);
+}
+
+.charge-recovery-form {
+  padding: 24px;
+}
+
+.charge-recovery-form-heading,
+.charge-recovery-guide > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.charge-recovery-form-heading h3,
+.charge-recovery-form-heading p,
+.charge-recovery-guide h3,
+.charge-recovery-guide p {
+  margin: 0;
+}
+
+.charge-recovery-form-heading h3,
+.charge-recovery-guide h3 {
+  margin-top: 3px;
+  color: #f2f8fc;
+  font-size: 1.04rem;
+}
+
+.charge-recovery-form-heading > span,
+.charge-recovery-guide > header > span {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border: 1px solid rgba(49, 247, 143, 0.32);
+  border-radius: 4px;
+  color: #92eeb9;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.charge-recovery-form-intro {
+  max-width: 760px;
+  margin: 14px 0 22px;
+  color: #a9c0cf;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.charge-recovery-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.charge-recovery-form-grid label,
+.charge-recovery-tribunal-picker label {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: #bcd0dd;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.charge-recovery-form-grid label.wide {
+  grid-column: 1 / -1;
+}
+
+.charge-recovery-form-grid label small {
+  color: #7e9bad;
+  font-weight: 500;
+}
+
+.charge-recovery-form-grid input,
+.charge-recovery-form-grid select,
+.charge-recovery-tribunal-picker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(105, 165, 204, 0.3);
+  border-radius: 5px;
+  outline: 0;
+  color: #edf7fc;
+  background: #071b2c;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.charge-recovery-form-grid input:focus,
+.charge-recovery-form-grid select:focus,
+.charge-recovery-tribunal-picker select:focus {
+  border-color: rgba(49, 247, 143, 0.65);
+  box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
+}
+
+.charge-recovery-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 22px;
+  margin: 24px 0 14px;
+  border-top: 1px solid rgba(105, 165, 204, 0.17);
+}
+
+.charge-recovery-section-title strong {
+  color: #eef8fc;
+  font-size: 0.86rem;
+}
+
+.charge-recovery-section-title span {
+  color: #829dad;
+  font-size: 0.7rem;
+}
+
+.charge-recovery-values,
+.charge-recovery-preview,
+.charge-recovery-guide details {
+  margin-top: 22px;
+  border-top: 1px solid rgba(105, 165, 204, 0.18);
+}
+
+.charge-recovery-values > summary,
+.charge-recovery-preview summary,
+.charge-recovery-guide summary {
+  padding: 16px 0;
+  color: #7bcdf8;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.charge-recovery-values > p {
+  margin: -4px 0 14px;
+  color: #9cb3c2;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.charge-recovery-suggestion {
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-left: 3px solid #69c9fa;
+  background: rgba(27, 88, 126, 0.18);
+}
+
+.charge-recovery-suggestion strong,
+.charge-recovery-suggestion p,
+.charge-recovery-suggestion small {
+  display: block;
+  margin: 0;
+}
+
+.charge-recovery-suggestion p {
+  margin-top: 5px;
+  color: #c4d7e2;
+  font-size: 0.75rem;
+}
+
+.charge-recovery-suggestion small {
+  margin-top: 7px;
+  color: #8da9b9;
+  line-height: 1.45;
+}
+
+.charge-recovery-preview {
+  padding-top: 18px;
+}
+
+.charge-recovery-preview > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.charge-recovery-preview > div:first-child strong {
+  color: #9af0bd;
+}
+
+.charge-recovery-preview > div:first-child span {
+  color: #93adbd;
+  font-size: 0.72rem;
+}
+
+.charge-recovery-preview pre {
+  max-height: 420px;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid rgba(105, 165, 204, 0.18);
+  border-radius: 5px;
+  color: #d8e8f1;
+  background: #04131f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.charge-recovery-preview ul,
+.charge-recovery-guide ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+  color: #a9bfcd;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.charge-recovery-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 15px;
+  color: #c6d9e4;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.charge-recovery-confirmation input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.charge-recovery-form-actions {
+  padding-top: 22px;
+  margin-top: 22px;
+  border-top: 1px solid rgba(105, 165, 204, 0.18);
+}
+
+.charge-recovery-form-error {
+  padding: 11px 13px;
+  margin: 0 0 16px;
+  border-left: 3px solid #ffbf69;
+  color: #ffe5bd;
+  background: rgba(177, 111, 31, 0.13);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.charge-recovery-tribunal-picker {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 22px;
+  padding: 20px 22px;
+}
+
+.charge-recovery-tribunal-picker p {
+  margin: 0 0 4px;
+  color: #91aaba;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.charge-recovery-guide {
+  padding: 22px;
+}
+
+.charge-recovery-guide > ol {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  margin: 22px 0 0;
+  list-style: none;
+  counter-reset: recovery-step;
+}
+
+.charge-recovery-guide > ol li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px 0;
+  border-top: 1px solid rgba(105, 165, 204, 0.15);
+  color: #cfdee7;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  counter-increment: recovery-step;
+}
+
+.charge-recovery-guide > ol li::before {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(49, 247, 143, 0.35);
+  border-radius: 50%;
+  color: #91edb7;
+  content: counter(recovery-step);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.charge-recovery-guide-note {
+  padding: 12px 14px;
+  margin-top: 18px !important;
+  border-left: 3px solid #ffbf69;
+  color: #d9c5a8;
+  background: rgba(177, 111, 31, 0.1);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.charge-recovery-guide-actions {
+  justify-content: flex-start;
+  padding-top: 20px;
+}
+
+.charge-recovery-guide-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.charge-recovery-guide > small {
+  display: block;
+  margin-top: 18px;
+  color: #809dac;
+  line-height: 1.5;
+}
+
+.charge-recovery-guide-empty {
+  padding: 28px 22px;
+  color: #9ab1bf;
+  text-align: center;
+}
+
+.charge-recovery-guide-empty strong {
+  color: #dcebf3;
+}
+
+.charge-recovery-guide-empty p {
+  margin: 5px 0 0;
+}
+
+@media (max-width: 760px) {
+  .charge-recovery-progress,
+  .charge-recovery-actions,
+  .charge-recovery-form,
+  .charge-recovery-tribunal-picker,
+  .charge-recovery-guide,
+  .charge-recovery-guide-empty {
+    width: calc(100% - 48px);
+    margin-right: 24px;
+    margin-left: 24px;
+  }
+
+  .charge-recovery-progress li {
+    grid-template-columns: 26px;
+  }
+
+  .charge-recovery-progress li strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .charge-recovery-progress li:not(:last-child)::after {
+    width: calc(100% - 10px);
+  }
+
+  .charge-recovery-form-grid,
+  .charge-recovery-tribunal-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .charge-recovery-form-grid label.wide {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .charge-recovery-progress,
+  .charge-recovery-actions,
+  .charge-recovery-form,
+  .charge-recovery-tribunal-picker,
+  .charge-recovery-guide,
+  .charge-recovery-guide-empty {
+    width: calc(100% - 28px);
+    margin-right: 14px;
+    margin-left: 14px;
+  }
+
+  .charge-recovery-form,
+  .charge-recovery-guide,
+  .charge-recovery-tribunal-picker {
+    padding: 18px 14px;
+  }
+
+  .charge-recovery-form-heading,
+  .charge-recovery-guide > header,
+  .charge-recovery-section-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .charge-recovery-actions,
+  .charge-recovery-form-actions,
+  .charge-recovery-guide-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .charge-recovery-actions > *,
+  .charge-recovery-form-actions > *,
+  .charge-recovery-guide-actions > * {
+    width: 100%;
+  }
+}
+
 .billing-admin {
   display: grid;
   gap: 18px;
@@ -9091,17 +9590,134 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   font-size: 0.76rem;
 }
 
-.charge-analysis-context {
+.charge-analysis-disclosure {
+  margin-top: 10px;
+  overflow: visible;
   padding-top: 10px;
+  border: 0;
   border-top: 1px solid rgba(142, 193, 226, 0.14);
+  border-radius: 0;
+  background: transparent;
 }
 
-.charge-analysis-context summary {
+.charge-analysis-disclosure > summary {
+  display: grid;
+  min-height: 24px;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
   color: #69c9fa;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  list-style: none;
+}
+
+.charge-analysis-context summary::-webkit-details-marker,
+.charge-analysis-transaction summary::-webkit-details-marker,
+.charge-analysis-insurance-details summary::-webkit-details-marker {
+  display: none;
 }
 
 .charge-analysis-context p {
   color: #aec3d1;
+}
+
+.charge-analysis-transaction ul {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0 0;
+  margin: 0;
+  border-top: 1px solid rgba(89, 154, 203, 0.18);
+  color: #c5d7e3;
+  font-size: 0.76rem;
+  list-style: none;
+}
+
+.charge-analysis-transaction li {
+  overflow-wrap: anywhere;
+}
+
+.charge-analysis-transaction li strong {
+  color: #78c9f5;
+}
+
+.charge-analysis-transaction li small {
+  color: #9eb5c5;
+}
+
+.charge-analysis-context-body {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+.charge-analysis-context-body p,
+.charge-analysis-context-body p + p {
+  margin: 0;
+}
+
+.charge-analysis-video {
+  width: min(230px, 100%);
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border: 1px solid rgba(89, 154, 203, 0.3);
+  border-radius: 6px;
+  background: #020b12;
+}
+
+.charge-analysis-video iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.charge-analysis-context-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.charge-analysis-context-links a {
+  margin-top: 0;
+}
+
+.charge-analysis-dropdown-chevron {
+  width: 16px;
+  height: 16px;
+  justify-self: end;
+  object-fit: contain;
+  filter: brightness(0) saturate(100%) invert(73%) sepia(35%) saturate(713%) hue-rotate(162deg) brightness(101%) contrast(92%);
+  transition: transform 180ms ease;
+}
+
+.charge-analysis-transaction[open] > summary .charge-analysis-dropdown-chevron,
+.charge-analysis-context[open] > summary .charge-analysis-dropdown-chevron,
+.charge-analysis-insurance-details[open] > summary .charge-analysis-dropdown-chevron {
+  transform: rotate(90deg);
+}
+
+.charge-analysis-insurance-list {
+  display: grid;
+  gap: 7px;
+  padding: 10px 0 0;
+  margin: 0;
+  border-top: 1px solid rgba(89, 154, 203, 0.18);
+  background: transparent;
+}
+
+.charge-analysis-insurance-list p,
+.charge-analysis-insurance-list p + p {
+  margin: 0;
+  color: #bdcfdb;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.charge-analysis-insurance-list strong {
+  color: #78c9f5;
 }
 
 .charge-analysis-actions {
@@ -9359,5 +9975,181 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   .charge-analysis-message,
   .charge-analysis-typing {
     animation: none;
+  }
+}
+
+/* One continuous progress rail for the complete charge-recovery journey. */
+.charge-analysis-header {
+  padding-right: 0;
+  padding-bottom: 12px;
+}
+
+.charge-module-progress {
+  position: relative;
+  z-index: 1;
+  top: auto;
+  right: auto;
+  left: auto;
+  display: grid;
+  width: min(980px, calc(100% - 72px));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0;
+  padding: 0;
+  margin: 8px 72px 16px 0;
+  border: 0;
+  background: transparent;
+  transform: none;
+}
+
+.charge-module-progress li,
+.charge-module-progress li + li {
+  position: relative;
+  display: grid;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 0;
+  border: 0;
+  border-radius: 0;
+  color: #7896aa;
+  background: transparent;
+  box-shadow: none;
+}
+
+.charge-module-progress li:not(:last-child)::after,
+.charge-module-progress li.active:not(:last-child)::after {
+  position: absolute;
+  z-index: -1;
+  top: 13px;
+  left: 26px;
+  width: calc(100% - 18px);
+  height: 1px;
+  background: rgba(106, 163, 201, 0.24);
+  content: "";
+}
+
+.charge-module-progress li.complete:not(:last-child)::after {
+  background: rgba(49, 247, 143, 0.5);
+}
+
+.charge-module-progress li > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid rgba(106, 163, 201, 0.34);
+  border-radius: 50%;
+  color: #88a7ba;
+  background: #071a2b;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.charge-module-progress li div {
+  position: static !important;
+  display: grid;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0;
+  gap: 1px;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+  border: 0 !important;
+}
+
+.charge-module-progress li strong {
+  overflow-wrap: anywhere;
+  color: #9bb4c5;
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.charge-module-progress li small {
+  display: none;
+}
+
+.charge-module-progress li.active,
+.charge-module-progress li.complete {
+  background: transparent;
+  box-shadow: none;
+}
+
+.charge-module-progress li.active > span,
+.charge-module-progress li.complete > span {
+  border-color: rgba(49, 247, 143, 0.58);
+  color: #062018;
+  background: var(--lime);
+  box-shadow: 0 0 12px rgba(49, 247, 143, 0.22);
+}
+
+.charge-module-progress li.active strong {
+  color: #eefaf4;
+}
+
+.charge-module-progress li.complete strong {
+  color: #b7d1c4;
+}
+
+.charge-module-progress li.locked {
+  opacity: 0.62;
+}
+
+@media (max-width: 760px) {
+  .charge-module-progress {
+    width: calc(100% - 24px);
+    margin: 4px 12px 7px;
+  }
+
+  .charge-module-progress li,
+  .charge-module-progress li + li {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0;
+    padding: 0;
+  }
+
+  .charge-module-progress li div {
+    display: none;
+  }
+
+  .charge-module-progress li:not(:last-child)::after,
+  .charge-module-progress li.active:not(:last-child)::after {
+    top: 12px;
+    left: calc(50% + 12px);
+    width: calc(100% - 24px);
+  }
+
+  .charge-module-progress li > span {
+    width: 24px;
+    height: 24px;
+  }
+
+  .charge-analysis-status {
+    position: static !important;
+    display: block;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 12px 13px !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: normal !important;
+    border: 0 !important;
+    color: #8fa9bb;
+    background: transparent;
+    font-size: 0.7rem;
+    text-align: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .charge-analysis-header {
+    padding: 11px 18px 11px 84px;
   }
 }

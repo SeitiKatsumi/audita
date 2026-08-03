@@ -93,6 +93,16 @@ test("manual filing guide exposes official links and keeps final submission huma
   assert.match(guide.steps.at(-1), /pessoalmente/i);
 });
 
+test("every supported state exposes a complete manual recovery guide", () => {
+  for (const portal of listJecPortals()) {
+    const guide = getJecManualFilingGuide(portal.uf);
+    assert.equal(guide.uf, portal.uf);
+    assert.ok(guide.steps.length >= 5);
+    assert.equal(guide.finalActionHumanOnly, true);
+    assert.match(guide.note, /Relatório Técnico/i);
+  }
+});
+
 test("petition draft uses the supplied audited-values model", () => {
   const prepared = prepareJecPetition({
     caseData: sampleCase,
@@ -322,6 +332,54 @@ test("journey without historical statements selects the supplied exhibition mode
   assert.doesNotMatch(prepared.draft, /Lucros Cessantes/i);
 });
 
+test("document-exhibition model keeps a no-statement estimate explicitly declaratory", () => {
+  const prepared = prepareJecPetition({
+    caseData: {
+      candidates: [
+        {
+          id: "declared-charge",
+          label: "Proteção do cartão",
+          amount: null,
+          answer: "not_recognized",
+          source: "consumer_declaration",
+        },
+      ],
+      answers: {
+        historicalEvidence: "yes",
+        historicalDocumentsAvailable: "no",
+        declaredEstimate: {
+          description: "Proteção do cartão",
+          monthlyAmount: 19,
+          months: 180,
+          estimatedPaid: 3420,
+          hypotheticalDouble: 6840,
+          source: "consumer_declaration",
+        },
+      },
+    },
+    uf: "SP",
+    city: "São Paulo",
+    claimant: {
+      ...completeClaimant,
+      historicalDocumentsAvailable: "no",
+      doubleRefundAmount: "6840,00",
+      moralDamagesAmount: "0",
+      caseValue: "6840,00",
+    },
+  });
+
+  assert.equal(prepared.ready, true);
+  assert.equal(prepared.template.id, "document_exhibition");
+  assert.equal(prepared.template.sourceModel, 2);
+  assert.equal(prepared.knownAmountCount, 0);
+  assert.match(prepared.draft, /memória e na declaração do\(a\) consumidor/i);
+  assert.match(prepared.draft, /Nenhum extrato histórico foi apresentado/i);
+  assert.match(prepared.draft, /R\$\s+3\.420,00/);
+  assert.match(prepared.draft, /estimativa inicial sujeita à apuração/i);
+  assert.doesNotMatch(prepared.draft, /documento recente fornecido/i);
+  assert.doesNotMatch(prepared.draft, /valores comprovados nesta etapa/i);
+});
+
 test("document-exhibition model includes optional claims only when a positive value is supplied", () => {
   const prepared = prepareJecPetition({
     caseData: {
@@ -376,7 +434,7 @@ test("chat UI focuses the JEC secure intake returned by the AI tool", async () =
   assert.match(source, /panel\.scrollIntoView/);
   assert.match(source, /state\.open \|\| state\.prepared/);
   assert.match(source, /\/api\/jec\/petitions\/pdf/);
-  assert.match(source, /Baixar PDF para revisão/);
+  assert.match(source, /Gerar Relatório Técnico em PDF/);
   assert.match(source, /data-jec-monitoring-form/);
   assert.match(source, /\/api\/integrations\/direct-data\/tj\/processes/);
   assert.match(source, /Acessar portal oficial/);

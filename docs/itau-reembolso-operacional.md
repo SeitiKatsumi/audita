@@ -12,14 +12,14 @@ O modulo ajuda o consumidor a:
 6. registrar sinais adicionais, como cobranca posterior ao cancelamento;
 7. usar o acordo coletivo divulgado pelo MPMG apenas como contexto juridico historico;
 8. escolher a jornada judicial com ou sem extratos historicos;
-9. preparar a peticao no Modelo 1 ou Modelo 2 e gerar o PDF;
+9. preparar o Relatorio Tecnico de Auditoria no Modelo 1 ou Modelo 2 e gerar o PDF;
 10. informar a UF, abrir o link oficial e seguir o protocolo manual orientado;
 11. depois do protocolo, consultar opcionalmente o andamento processual.
 
 O modulo nao decide que uma cobranca e ilegal. O suporte profissional de um
 advogado da Audita e uma opcao separada, apresentada somente quando o consumidor
 quiser conhece-la. A IA nao contrata, encaminha ou promete atendimento sem
-confirmacao expressa. A peticao e apoio para revisao: a IA nao assina nem
+confirmacao expressa. O relatorio organiza a analise e uma minuta para revisao: a IA nao assina nem
 protocola, e o envio final permanece com o usuario.
 
 ## Triagem guiada no painel
@@ -27,9 +27,8 @@ protocola, e o envio final permanece com o usuario.
 O painel principal tambem oferece o modulo `#analise-cobrancas`, separado do
 chat aberto. A navegacao dessa tela e deterministica:
 
-1. o usuario informa por botoes se possuiu cartao Itau/Itaucard, se precisa
-   consultar referencias de marcas, se atua como advogado ou se nunca teve o
-   produto;
+1. o usuario informa por botoes se autorizou expressamente a cobranca, se nao a
+   reconhece, se deseja verificar o extrato ou se atua como advogado;
 2. titular ou advogado autorizado informa se possui todo o historico, apenas
    alguns documentos/um print recente ou nenhum extrato;
 3. no caminho completo, o usuario pode selecionar varias faturas ou extratos;
@@ -41,8 +40,14 @@ chat aberto. A navegacao dessa tela e deterministica:
    ou valor da causa;
 6. no caminho parcial ou sem documentos, a simulacao declaratoria fica separada
    dos valores comprovados e calcula somente `valor mensal x meses informados`;
-7. planos, liberacao e peticao permanecem bloqueados ate a definicao da proxima
-   fase comercial.
+7. ao concluir a auditoria ou a simulacao, o proprio modulo abre a jornada de
+   recuperacao, explica os limites do processo, coleta os dados para o Relatorio
+   Tecnico de Auditoria e seleciona o Modelo 1 (com historico documental) ou o
+   Modelo 2 (sem historico documental), sem redirecionar para o chat;
+8. os valores declarados sem extrato permanecem identificados como estimativas
+   e nao sao convertidos em evidencia documental;
+9. depois do PDF, o usuario escolhe a UF e recebe o passo a passo do tribunal,
+   com links oficiais e destaque para as etapas que dependem de acao humana.
 
 A apresentacao usa uma conversa progressiva: as mensagens da Audita sao
 reveladas em sequencia, com um estado curto de digitacao, e a resposta escolhida

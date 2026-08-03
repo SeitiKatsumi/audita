@@ -1,4 +1,46 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import { chromium } from "playwright";
+
+export function resolveJecPdfBrowserExecutable({
+  env = process.env,
+  fileExists = existsSync,
+  bundledExecutable = "",
+} = {}) {
+  let playwrightExecutable = bundledExecutable;
+  if (!playwrightExecutable) {
+    try {
+      playwrightExecutable = chromium.executablePath();
+    } catch {
+      playwrightExecutable = "";
+    }
+  }
+  const candidates = [
+    env.JEC_PDF_BROWSER_EXECUTABLE_PATH,
+    playwrightExecutable,
+    env.LOCALAPPDATA && join(env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe"),
+    env.ProgramFiles && join(env.ProgramFiles, "Google", "Chrome", "Application", "chrome.exe"),
+    env["ProgramFiles(x86)"] && join(env["ProgramFiles(x86)"], "Google", "Chrome", "Application", "chrome.exe"),
+    env.ProgramFiles && join(env.ProgramFiles, "Microsoft", "Edge", "Application", "msedge.exe"),
+    env["ProgramFiles(x86)"] && join(env["ProgramFiles(x86)"], "Microsoft", "Edge", "Application", "msedge.exe"),
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  ].filter(Boolean);
+  return candidates.find((candidate) => fileExists(candidate)) || "";
+}
+
+function launchJecPdfBrowser(options = {}) {
+  const executablePath = resolveJecPdfBrowserExecutable();
+  return chromium.launch({
+    ...options,
+    ...(executablePath ? { executablePath } : {}),
+  });
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -38,18 +80,33 @@ export function buildJecPetitionHtml(prepared) {
     .map((item) => item.trim())
     .filter(Boolean);
   const claimantName = String(prepared.claimant?.fullName || "").trim();
-  const content = paragraphs
-    .map((paragraph, index) => {
-      const className = paragraphClass(
-        paragraph,
-        index,
-        paragraphs,
-        claimantName,
-      );
-      return `<p class="${className}">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`;
-    })
-    .join("\n");
-  const modelLabel = escapeHtml(prepared.template?.label || "Petição JEC");
+  const renderedParagraphs = paragraphs.map((paragraph, index) => {
+    const className = paragraphClass(
+      paragraph,
+      index,
+      paragraphs,
+      claimantName,
+    );
+    return {
+      className,
+      html: `<p class="${className}">${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`,
+    };
+  });
+  const signatureStart = renderedParagraphs.findIndex(
+    ({ className }) => className === "signature",
+  );
+  const content = signatureStart < 0
+    ? renderedParagraphs.map(({ html }) => html).join("\n")
+    : [
+        ...renderedParagraphs.slice(0, signatureStart).map(({ html }) => html),
+        `<section class="signature-block">${renderedParagraphs
+          .slice(signatureStart)
+          .map(({ html }) => html)
+          .join("\n")}</section>`,
+      ].join("\n");
+  const modelLabel = escapeHtml(
+    prepared.template?.label || "Relatório Técnico de Auditoria",
+  );
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -97,6 +154,10 @@ export function buildJecPetitionHtml(prepared) {
         margin: 4pt 0;
         text-align: center;
       }
+      .signature-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
     </style>
   </head>
   <body>
@@ -107,7 +168,7 @@ export function buildJecPetitionHtml(prepared) {
 
 export async function createJecPetitionPdf(
   prepared,
-  { launch = (options) => chromium.launch(options) } = {},
+  { launch = launchJecPdfBrowser } = {},
 ) {
   if (!prepared?.ready) {
     const error = new Error("jec_petition_incomplete");
@@ -133,7 +194,7 @@ export async function createJecPetitionPdf(
       headerTemplate: "<span></span>",
       footerTemplate: `
         <div style="width:100%;padding:0 22mm 6mm 30mm;font:8px Arial,sans-serif;color:#667085;display:flex;justify-content:space-between;">
-          <span>Documento gerado pela Audita - revisar antes do protocolo</span>
+          <span>Relatório Técnico gerado pela Audita - revisar antes do protocolo</span>
           <span><span class="pageNumber"></span>/<span class="totalPages"></span></span>
         </div>
       `,

@@ -6,16 +6,23 @@ import { resolveUiRoute } from "../services/ui-routing.service.mjs";
 
 const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
 
-test("redirects legacy UI entry points to chat", () => {
-  for (const pathname of ["/", "/index.html", "/chat/"]) {
+test("serves the home entry point without redirecting to chat", () => {
+  for (const pathname of ["/", "/index.html"]) {
     assert.deepEqual(resolveUiRoute(pathname), {
-      type: "redirect",
-      location: "/chat",
+      type: "file",
+      path: "/index.html",
     });
   }
 });
 
-test("serves the shared application document only from the chat route", () => {
+test("normalizes the chat trailing slash route", () => {
+  assert.deepEqual(resolveUiRoute("/chat/"), {
+    type: "redirect",
+    location: "/chat",
+  });
+});
+
+test("serves the shared application document from the chat route", () => {
   assert.deepEqual(resolveUiRoute("/chat"), {
     type: "file",
     path: "/index.html",

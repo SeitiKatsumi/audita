@@ -465,6 +465,17 @@ const MANUAL_FILING_STEPS = Object.freeze({
   ]),
 });
 
+function genericManualFilingSteps(portal) {
+  return [
+    `Acesse o canal oficial do ${portal.tribunal} pelo link indicado pela Audita.`,
+    "Confirme a comarca, a unidade e se o pedido deve seguir pelo Juizado Especial Cível.",
+    "Faça o login, cadastro, agendamento ou atendimento somente no ambiente oficial quando solicitado.",
+    "Apresente os dados do consumidor, do Itaú e o relato conforme o Relatório Técnico revisado.",
+    "Anexe o Relatório Técnico de Auditoria, documento pessoal, comprovante de residência e as provas disponíveis, se o canal permitir anexos.",
+    "Confira todas as informações e conclua pessoalmente o protocolo, a atermação ou o atendimento.",
+  ];
+}
+
 function cleanText(value, maxLength = 400) {
   return String(value || "")
     .replace(/[\u0000-\u001f\u007f]/g, " ")
@@ -515,18 +526,19 @@ export function getJecPortal(uf, { city = "" } = {}) {
 export function getJecManualFilingGuide(uf, { city = "" } = {}) {
   const portal = getJecPortal(uf, { city });
   if (!portal) return null;
+  const stateSteps = MANUAL_FILING_STEPS[portal.uf];
   return {
     uf: portal.uf,
     tribunal: portal.tribunal,
     title: `Protocolo manual no ${portal.tribunal}`,
     portalUrl: portal.startUrl,
     informationUrl: portal.officialUrl,
-    steps: [...(MANUAL_FILING_STEPS[portal.uf] || [])],
+    steps: [...(stateSteps || genericManualFilingSteps(portal))],
     requirements: [...(portal.requirements || [])],
     verifiedAt: portal.guide?.verifiedAt || "",
     finalActionHumanOnly: true,
     note:
-      "A Audita prepara o PDF e orienta o caminho. Login, anexos, escolhas jurídicas e protocolo final são feitos pelo usuário.",
+      "A Audita prepara o Relatório Técnico em PDF e orienta o caminho. Login, anexos, escolhas jurídicas e protocolo final são feitos pelo usuário.",
   };
 }
 
@@ -700,7 +712,49 @@ function buildEvidenceSummary(caseData = {}) {
     : `as cobranças ${items.join("; ")}`;
 }
 
+function getDeclaredEstimate(caseData = {}) {
+  const estimate = caseData?.answers?.declaredEstimate;
+  if (!estimate || estimate.source !== "consumer_declaration") return null;
+  const monthlyAmount = normalizeMoney(estimate.monthlyAmount);
+  const estimatedPaid = normalizeMoney(estimate.estimatedPaid);
+  const months = Math.max(0, Math.floor(Number(estimate.months) || 0));
+  if (!(monthlyAmount > 0) || months < 1) return null;
+  return {
+    description: cleanText(estimate.description, 120) || "cobrança contestada",
+    monthlyAmount,
+    estimatedPaid,
+    months,
+  };
+}
+
+function buildEvidenceContext(caseData = {}) {
+  const estimate = getDeclaredEstimate(caseData);
+  if (estimate) {
+    const total = Number.isFinite(estimate.estimatedPaid) && estimate.estimatedPaid > 0
+      ? `, totalizando aproximadamente R$ ${formatPetitionMoney(estimate.estimatedPaid)}`
+      : "";
+    return `O(A) Autor(a) é titular de conta e/ou cartão de crédito junto à instituição financeira Ré e relata não reconhecer a cobrança “${estimate.description}”, no valor mensal aproximado de R$ ${formatPetitionMoney(estimate.monthlyAmount)}, durante cerca de ${estimate.months} mês(es)${total}. Nenhum extrato histórico foi apresentado nesta etapa.`;
+  }
+  return `O(A) Autor(a) é titular de conta e/ou cartão de crédito junto à instituição financeira Ré. Ao analisar o documento recente fornecido pelo(a) consumidor(a), a plataforma IA AUDITA identificou ${buildEvidenceSummary(caseData)}, que o(a) Autor(a) declarou não reconhecer.`;
+}
+
+function buildQuantificationContext(caseData = {}) {
+  if (getDeclaredEstimate(caseData)) {
+    return "A quantificação indicada nesta etapa é uma simulação aritmética baseada na memória e na declaração do(a) consumidor(a), não um valor comprovado por extratos. A origem, a duração e o total da cobrança permanecem sujeitos à exibição dos documentos pela Ré e à revisão do caso concreto.";
+  }
+  return "Nesta etapa, a quantificação está limitada aos lançamentos efetivamente apresentados. O(A) Autor(a) não dispõe dos extratos históricos completos nem do instrumento contratual que permita verificar a origem, a duração e a regularidade da cobrança contestada.";
+}
+
+function buildRefundScope(caseData = {}) {
+  return getDeclaredEstimate(caseData)
+    ? "dos valores que vierem a ser comprovados, tomando-se o montante informado apenas como estimativa inicial sujeita à apuração"
+    : "dos valores comprovados nesta etapa";
+}
+
 function buildHistoricalContext(caseData = {}) {
+  if (getDeclaredEstimate(caseData)) {
+    return "O(A) Autor(a) relata que a cobrança ocorreu durante o período aproximado informado. Essa recorrência fundamenta apenas a estimativa declaratória inicial e permanece não comprovada até a apresentação dos extratos e demais documentos pertinentes.";
+  }
   const historicalEvidence = String(
     caseData?.answers?.historicalEvidence || "pending",
   );
@@ -762,6 +816,9 @@ function buildDraft({ caseData, claimant, templateId, generatedAt }) {
     EMAIL: claimant.email,
     PHONE: formatProfilePhone(claimant.phone),
     EVIDENCE_SUMMARY: buildEvidenceSummary(caseData),
+    EVIDENCE_CONTEXT: buildEvidenceContext(caseData),
+    QUANTIFICATION_CONTEXT: buildQuantificationContext(caseData),
+    REFUND_SCOPE: buildRefundScope(caseData),
     HISTORICAL_CONTEXT: buildHistoricalContext(caseData),
     DOUBLE_REFUND: formatPetitionMoney(claimant.doubleRefundAmount),
     LOST_PROFITS: formatPetitionMoney(claimant.lostProfitsAmount),

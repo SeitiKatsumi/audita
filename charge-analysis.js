@@ -140,6 +140,37 @@ export const CHARGE_ANALYSIS_BRANDS = Object.freeze(
 
 const OFFICIAL_CONTEXT_URL =
   "https://www.mpmg.mp.br/portal/menu/comunicacao/noticias/acordo-do-procon-mpmg-com-o-itau-beneficia-consumidores-de-cartoes-de-diversas-redes-varejistas-parceiras-do-banco.shtml";
+const EXPLANATORY_VIDEO_URL =
+  "https://youtube.com/shorts/rzxDS0cbdlc?is=G23u_WrPjxUIQTug";
+const EXPLANATORY_VIDEO_EMBED_URL =
+  "https://www.youtube-nocookie.com/embed/rzxDS0cbdlc";
+
+const RECOVERY_UFS = Object.freeze([
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+]);
+
+const RECOVERY_FIELD_LABELS = Object.freeze({
+  fullName: "nome completo",
+  document: "CPF válido",
+  rg: "RG",
+  nationality: "nacionalidade",
+  maritalStatus: "estado civil",
+  profession: "profissão",
+  email: "e-mail válido",
+  phone: "telefone",
+  postalCode: "CEP",
+  street: "logradouro",
+  addressNumber: "número",
+  district: "bairro",
+  city: "cidade",
+  uf: "UF do endereço",
+  address: "endereço completo",
+  doubleRefundAmount: "valor estimado para restituição",
+  caseValue: "valor da causa",
+  disputedCharge: "cobrança não reconhecida",
+  historicalDocumentsAvailable: "disponibilidade dos extratos",
+});
 
 function normalizeSearch(value) {
   return String(value || "")
@@ -236,6 +267,132 @@ export function buildChargeEstimate(input = {}) {
   };
 }
 
+function formatChargeAmountInput(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "";
+  return amount.toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+export function buildChargeJecHandoff({
+  caseData = {},
+  documentAvailability = "",
+  estimate = null,
+  authorizationAnswer = "",
+  selectedBrand = "",
+  handoffId = "",
+} = {}) {
+  const historicalDocumentsAvailable = documentAvailability === "complete" ? "yes" : "no";
+  const sourceCandidates = Array.isArray(caseData?.candidates)
+    ? caseData.candidates.map((candidate) => ({ ...candidate }))
+    : [];
+  const audit = buildChargeAuditSnapshot({ candidates: sourceCandidates });
+  const declaredEstimate =
+    Number(estimate?.monthlyAmount) > 0 && Number(estimate?.months) > 0
+      ? {
+          description: String(estimate.description || "Cobrança informada pelo cliente").trim(),
+          monthlyAmount: Number(Number(estimate.monthlyAmount).toFixed(2)),
+          months: Math.floor(Number(estimate.months)),
+          estimatedPaid: Number(Number(estimate.estimatedPaid || 0).toFixed(2)),
+          hypotheticalDouble: Number(Number(estimate.hypotheticalDouble || 0).toFixed(2)),
+          source: "consumer_declaration",
+        }
+      : null;
+  const mayUseDeclaration =
+    Boolean(declaredEstimate) && sourceCandidates.length === 0 && documentAvailability !== "complete";
+  const candidates = mayUseDeclaration
+    ? [
+        {
+          id: `declared-charge-${handoffId || "estimate"}`,
+          label: declaredEstimate.description,
+          description: declaredEstimate.description,
+          category: "declaracao",
+          date: "",
+          amount: null,
+          answer: "not_recognized",
+          reason: "Cobrança declarada pelo cliente sem extrato histórico disponível.",
+          confidence: "declared",
+          source: "consumer_declaration",
+        },
+      ]
+    : sourceCandidates;
+  const disputedCount = candidates.filter(
+    (candidate) => candidate.answer === "not_recognized",
+  ).length;
+  const pendingCount = candidates.filter(
+    (candidate) => !candidate.answer || candidate.answer === "pending",
+  ).length;
+  const ready = disputedCount > 0 && pendingCount === 0;
+  const suggestedDouble =
+    audit.totalDisputed > 0
+      ? audit.hypotheticalDouble
+      : mayUseDeclaration
+        ? declaredEstimate.hypotheticalDouble
+        : 0;
+  const normalizedId = String(handoffId || caseData?.id || "estimate")
+    .replace(/[^a-zA-Z0-9_-]/g, "-")
+    .slice(0, 120);
+  const historicalEvidence =
+    historicalDocumentsAvailable === "yes" || Number(declaredEstimate?.months) > 1
+      ? "yes"
+      : String(caseData?.answers?.historicalEvidence || "unknown");
+  const suggestionSource = mayUseDeclaration
+    ? "charge_analysis_declared_estimate"
+    : "charge_analysis_documentary_evidence";
+
+  return {
+    ready,
+    reason:
+      disputedCount === 0
+        ? "Confirme ao menos uma cobrança não reconhecida antes de preparar a documentação."
+        : pendingCount > 0
+          ? "Revise todos os lançamentos encontrados antes de preparar a documentação."
+          : "",
+    caseData: {
+      ...caseData,
+      id: `guided-jec-${normalizedId}`,
+      status: ready ? "evaluated" : caseData?.status || "review_required",
+      candidates,
+      answers: {
+        ...(caseData?.answers || {}),
+        historicalDocumentsAvailable,
+        historicalEvidence,
+        wantsJec: "yes",
+        authorizationAnswer,
+        selectedBrand,
+        documentAvailability,
+        ...(declaredEstimate ? { declaredEstimate } : {}),
+      },
+    },
+    suggestion: {
+      source: suggestionSource,
+      reviewRequired: true,
+      evidencedPrincipal: audit.totalDisputed,
+      disputedCount,
+      knownAmountCount: audit.totalDisputed > 0 ? audit.disputedCount : 0,
+      values: {
+        doubleRefundAmount: formatChargeAmountInput(suggestedDouble),
+        lostProfitsAmount: "",
+        moralDamagesAmount: "",
+        caseValue: formatChargeAmountInput(suggestedDouble),
+      },
+      notes: [
+        mayUseDeclaration
+          ? "Os valores foram informados pelo cliente e permanecem estimados até a apresentação dos documentos."
+          : "A estimativa inicial usa somente cobranças documentadas e marcadas como não reconhecidas.",
+      ],
+      disclaimer:
+        "A repetição em dobro, os danos e o valor da causa dependem de revisão jurídica e decisão judicial.",
+    },
+    journey:
+      historicalDocumentsAvailable === "yes"
+        ? "with_historical_documents"
+        : "without_historical_documents",
+  };
+}
+
 const stage =
   typeof document === "undefined"
     ? null
@@ -252,6 +409,7 @@ if (stage) {
   const state = {
     screen: "triage",
     route: "consumer",
+    authorizationAnswer: "",
     selectedBrand: "",
     brandSearch: "",
     documentAvailability: "",
@@ -268,6 +426,18 @@ if (stage) {
       durationUnit: "months",
       confirmed: false,
     },
+    recovery: {
+      phase: "intro",
+      handoff: null,
+      claimant: {},
+      prepared: null,
+      portals: [],
+      guideUf: "",
+      loading: false,
+      busy: false,
+      pdfGeneratedAt: "",
+      error: "",
+    },
     busy: false,
     error: "",
   };
@@ -279,6 +449,21 @@ if (stage) {
       durationValue: "",
       durationUnit: "months",
       confirmed: false,
+    };
+  }
+
+  function resetRecovery() {
+    state.recovery = {
+      phase: "intro",
+      handoff: null,
+      claimant: {},
+      prepared: null,
+      portals: [],
+      guideUf: "",
+      loading: false,
+      busy: false,
+      pdfGeneratedAt: "",
+      error: "",
     };
   }
 
@@ -324,6 +509,14 @@ if (stage) {
     return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
   }
 
+  function typingDelayFor(message) {
+    const visibleLength = String(message || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim().length;
+    return Math.min(1700, Math.max(900, visibleLength * 4));
+  }
+
   function scrollLatestMessage(container) {
     if (!window.matchMedia?.("(max-width: 820px)")?.matches) return;
     container?.lastElementChild?.scrollIntoView?.({
@@ -337,11 +530,11 @@ if (stage) {
     conversation.insertAdjacentHTML("beforeend", messages[0]);
 
     for (const message of messages.slice(1)) {
-      await messageDelay(340);
+      await messageDelay(520);
       if (sequenceId !== messageSequenceId) return;
       conversation.insertAdjacentHTML("beforeend", typingMessage());
       scrollLatestMessage(conversation);
-      await messageDelay(520);
+      await messageDelay(typingDelayFor(message));
       if (sequenceId !== messageSequenceId) return;
       conversation.lastElementChild?.remove();
       conversation.insertAdjacentHTML("beforeend", message);
@@ -358,11 +551,11 @@ if (stage) {
     conversation?.querySelector(".charge-analysis-message.question")?.remove();
     conversation?.insertAdjacentHTML("beforeend", userMessage(reply));
     scrollLatestMessage(conversation);
-    await messageDelay(280);
+    await messageDelay(420);
     if (sequenceId !== messageSequenceId) return;
     conversation?.insertAdjacentHTML("beforeend", typingMessage());
     scrollLatestMessage(conversation);
-    await messageDelay(620);
+    await messageDelay(900);
     if (sequenceId !== messageSequenceId) return;
     updateState();
     render();
@@ -374,30 +567,133 @@ if (stage) {
     errorBox.classList.toggle("hidden", !message);
   }
 
+  function currentJecHandoff() {
+    return buildChargeJecHandoff({
+      caseData: state.caseData || {},
+      documentAvailability: state.documentAvailability,
+      estimate: state.estimate,
+      authorizationAnswer: state.authorizationAnswer,
+      selectedBrand: state.selectedBrand,
+    });
+  }
+
+  function documentationActionMarkup() {
+    const handoff = currentJecHandoff();
+    return `
+      <button
+        type="button"
+        class="primary-action"
+        data-charge-action="start-recovery"
+        ${handoff.ready ? "" : "disabled"}
+        ${handoff.reason ? `title="${escapeChargeHtml(handoff.reason)}"` : ""}
+      >Prosseguir para recupera&ccedil;&atilde;o</button>
+    `;
+  }
+
+  async function loadRecoveryDependencies() {
+    if (state.recovery.loading) return;
+    state.recovery.loading = true;
+    render();
+
+    try {
+      const [profileResponse, portalsResponse] = await Promise.all([
+        fetch("/api/user/profile", { headers: { accept: "application/json" } }),
+        fetch("/api/jec/portals", { headers: { accept: "application/json" } }),
+      ]);
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json().catch(() => ({}));
+        state.recovery.claimant = {
+          ...(profileData.profile || {}),
+          ...state.recovery.claimant,
+        };
+      }
+      if (portalsResponse.ok) {
+        const portalsData = await portalsResponse.json().catch(() => ({}));
+        state.recovery.portals = Array.isArray(portalsData.portals)
+          ? portalsData.portals
+          : [];
+      }
+    } catch {
+      // O preenchimento manual continua disponivel se perfil ou catalogo falharem.
+    } finally {
+      state.recovery.loading = false;
+      render();
+    }
+  }
+
+  function startRecoveryFlow() {
+    const handoff = buildChargeJecHandoff({
+      caseData: state.caseData || {},
+      documentAvailability: state.documentAvailability,
+      estimate: state.estimate,
+      authorizationAnswer: state.authorizationAnswer,
+      selectedBrand: state.selectedBrand,
+      handoffId:
+        globalThis.crypto?.randomUUID?.() ||
+        `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    });
+    if (!handoff.ready) {
+      setError(handoff.reason);
+      return;
+    }
+    resetRecovery();
+    state.recovery.handoff = handoff;
+    state.recovery.claimant = {
+      historicalDocumentsAvailable:
+        handoff.caseData.answers?.historicalDocumentsAvailable || "",
+      ...(handoff.suggestion?.values || {}),
+    };
+    state.recovery.phase = "intro";
+    state.screen = "recovery";
+    void loadRecoveryDependencies();
+  }
+
   function syncProgress() {
-    const progressState =
-      state.screen === "triage" || state.screen === "brands" || state.screen === "documents" || state.screen === "ended"
-        ? "triage"
-        : state.screen === "upload" || state.screen === "analyzing" || state.screen === "result" || state.screen === "estimate" || state.screen === "estimate-result"
-          ? "document"
-          : "plans";
-    const order = ["triage", "document", "plans"];
+    const order = [
+      "authorization",
+      "statements",
+      "analysis",
+      "result",
+      "recovery",
+      "report",
+      "tribunal",
+    ];
+    const labels = {
+      authorization: "Autorização",
+      statements: "Extratos",
+      analysis: "Análise",
+      result: "Resultado",
+      recovery: "Recuperação",
+      report: "Relatório",
+      tribunal: "Tribunal",
+    };
+    let progressState = "authorization";
+    if (state.screen === "documents") {
+      progressState = "statements";
+    } else if (["upload", "analyzing", "estimate"].includes(state.screen)) {
+      progressState = "analysis";
+    } else if (["result", "estimate-result"].includes(state.screen)) {
+      progressState = "result";
+    } else if (state.screen === "recovery") {
+      progressState = state.recovery.phase === "guide"
+        ? "tribunal"
+        : state.recovery.phase === "report"
+          ? "report"
+          : "recovery";
+    }
     const currentIndex = order.indexOf(progressState);
 
     progressItems.forEach((item) => {
       const index = order.indexOf(item.dataset.chargeProgress);
       item.classList.toggle("active", index === currentIndex);
-      item.classList.toggle("complete", index < currentIndex || (state.screen === "result" && index === 1));
-      item.classList.toggle("locked", item.dataset.chargeProgress === "plans");
+      item.classList.toggle("complete", index < currentIndex);
+      item.classList.toggle("locked", index > currentIndex);
+      if (index === currentIndex) item.setAttribute("aria-current", "step");
+      else item.removeAttribute("aria-current");
     });
 
     if (status) {
-      status.textContent =
-        progressState === "triage"
-          ? "Etapa 1 de 3"
-          : state.screen === "result" || state.screen === "estimate-result"
-            ? state.documentAvailability === "complete" ? "Auditoria documental" : "Simulação preliminar"
-            : "Etapa 2 de 3";
+      status.textContent = `Etapa ${currentIndex + 1} de ${order.length} · ${labels[progressState]}`;
     }
     if (shell) shell.dataset.flowStage = progressState;
   }
@@ -406,17 +702,17 @@ if (stage) {
     const sequenceId = ++messageSequenceId;
     const responseButtons = `
       <div class="charge-analysis-actions" aria-label="Respostas da primeira etapa">
-        <button type="button" data-charge-action="has-card" aria-label="Sim, possuo ou possu&iacute;a cart&atilde;o entre 2011 e hoje">
-          <strong>Sim</strong>
+        <button type="button" data-charge-action="not-authorized">
+          <strong>N&atilde;o autorizei / Desconhe&ccedil;o a contrata&ccedil;&atilde;o destes seguros</strong>
         </button>
-        <button type="button" data-charge-action="show-brands" aria-label="N&atilde;o tenho certeza, consultar a lista ampliada de marcas">
-          <strong>N&atilde;o tenho certeza</strong>
+        <button type="button" data-charge-action="authorized">
+          <strong>Sim, eu autorizei e assinei contrato com o Ita&uacute;</strong>
         </button>
-        <button type="button" data-charge-action="lawyer" aria-label="Sou advogado ou advogada e quero auditar o documento de um cliente">
+        <button type="button" data-charge-action="verify-statement">
+          <strong>N&atilde;o tenho certeza / Quero verificar o extrato</strong>
+        </button>
+        <button type="button" class="secondary" data-charge-action="lawyer" aria-label="Sou advogado ou advogada e quero auditar o documento de um cliente">
           <strong>Sou advogado(a)</strong>
-        </button>
-        <button type="button" class="secondary" data-charge-action="no-card" aria-label="N&atilde;o tenho e nunca tive, encerrar esta triagem">
-          <strong>N&atilde;o tenho e nunca tive</strong>
         </button>
       </div>
     `;
@@ -427,15 +723,60 @@ if (stage) {
       `),
       assistantMessage(`
         <p>Em 2026, o MPMG e o Idec divulgaram um acordo com o Ita&uacute; relacionado a cobran&ccedil;as de seguros ou servi&ccedil;os sem consentimento entre 2011 e 2025.</p>
-        <details class="charge-analysis-context">
-          <summary>Entenda o contexto antes de come&ccedil;ar</summary>
-          <p>O acordo coletivo possui crit&eacute;rios de documentos e reclama&ccedil;&atilde;o pr&eacute;via e prev&ecirc; restitui&ccedil;&atilde;o simples. Eventuais pedidos de devolu&ccedil;&atilde;o em dobro, perdas e danos ou indeniza&ccedil;&atilde;o dependem das provas e de revis&atilde;o jur&iacute;dica individual.</p>
-          <a href="${OFFICIAL_CONTEXT_URL}" target="_blank" rel="noreferrer">Consultar publica&ccedil;&atilde;o oficial do MPMG</a>
+        <details class="charge-analysis-disclosure charge-analysis-transaction">
+          <summary>
+            <span>Instrumento de Transa&ccedil;&atilde;o</span>
+            <img class="charge-analysis-dropdown-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+          </summary>
+          <ul>
+            <li><strong>Data de celebra&ccedil;&atilde;o:</strong> 17/12/2025</li>
+            <li><strong>A&ccedil;&atilde;o Civil Coletiva n&ordm;:</strong> 5085307-63.2016.8.13.0024 <small>(5&ordf; Vara C&iacute;vel de Belo Horizonte/MG)</small></li>
+            <li><strong>Apela&ccedil;&atilde;o C&iacute;vel n&ordm;:</strong> 1.0000.17.021376-3/010 <small>(9&ordf; C&acirc;mara C&iacute;vel do TJMG)</small></li>
+          </ul>
+        </details>
+        <details class="charge-analysis-disclosure charge-analysis-context">
+          <summary>
+            <span>Memorando explicativo e v&iacute;deo</span>
+            <img class="charge-analysis-dropdown-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+          </summary>
+          <div class="charge-analysis-context-body">
+            <p><strong>Como interpretar este instrumento</strong></p>
+            <p>O acordo coletivo possui crit&eacute;rios de documentos e reclama&ccedil;&atilde;o pr&eacute;via e prev&ecirc; restitui&ccedil;&atilde;o simples. Ele n&atilde;o torna automaticamente indevida toda cobran&ccedil;a vinculada ao Ita&uacute;.</p>
+            <p>Eventuais pedidos de devolu&ccedil;&atilde;o em dobro, perdas e danos ou indeniza&ccedil;&atilde;o dependem das provas do caso e de revis&atilde;o jur&iacute;dica individual.</p>
+            <div class="charge-analysis-video">
+              <iframe
+                src="${EXPLANATORY_VIDEO_EMBED_URL}"
+                title="V&iacute;deo explicativo sobre o Instrumento de Transa&ccedil;&atilde;o"
+                loading="lazy"
+                referrerpolicy="strict-origin-when-cross-origin"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen
+              ></iframe>
+            </div>
+            <div class="charge-analysis-context-links">
+              <a href="${EXPLANATORY_VIDEO_URL}" target="_blank" rel="noreferrer">Abrir v&iacute;deo no YouTube</a>
+              <a href="${OFFICIAL_CONTEXT_URL}" target="_blank" rel="noreferrer">Consultar fonte oficial do MPMG</a>
+            </div>
+          </div>
         </details>
       `, "Contexto verificado"),
       assistantMessage(`<p>Para entender melhor o seu caso, vou fazer algumas perguntas r&aacute;pidas.</p>`),
       assistantMessage(`
-        <p><strong>Voc&ecirc; possui ou j&aacute; possuiu cart&atilde;o Ita&uacute;, Itaucard ou de alguma marca parceira desde 2011?</strong></p>
+        <p><strong>Voc&ecirc; contratou ou autorizou expressamente a cobran&ccedil;a de algum seguro ou servi&ccedil;o no seu cart&atilde;o/conta Ita&uacute; desde 2011?</strong></p>
+        <p class="charge-analysis-choice-hint">Se tiver d&uacute;vida, consulte os tipos de seguro considerados nesta verifica&ccedil;&atilde;o.</p>
+        <details class="charge-analysis-disclosure charge-analysis-insurance-details">
+          <summary>
+            <span>Seguros e servi&ccedil;os considerados</span>
+            <img class="charge-analysis-dropdown-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+          </summary>
+          <div class="charge-analysis-insurance-list">
+            <p><strong>Seguro Perda e Roubo / Cart&atilde;o Protegido / Prote&ccedil;&atilde;o Premiada:</strong> cobertura para transa&ccedil;&otilde;es sob coa&ccedil;&atilde;o ou furto do cart&atilde;o.</p>
+            <p><strong>Seguro Bolsa Protegida:</strong> cobertura de pertences levados junto com o cart&atilde;o.</p>
+            <p><strong>Seguro Prote&ccedil;&atilde;o Financeira / Perda de Renda:</strong> quita&ccedil;&atilde;o tempor&aacute;ria de faturas em caso de demiss&atilde;o ou incapacidade.</p>
+            <p><strong>Seguro Acidentes Pessoais / Vida Associado:</strong> ap&oacute;lices vinculadas diretamente ao lan&ccedil;amento autom&aacute;tico na fatura/conta.</p>
+            <p><strong>Seguro Prestamista:</strong> vinculado a contratos de empr&eacute;stimo pessoal, consignado ou financiamento de ve&iacute;culo.</p>
+          </div>
+        </details>
         <p class="charge-analysis-choice-hint">Escolha uma op&ccedil;&atilde;o para continuar.</p>
         ${responseButtons}
       `, "Primeira pergunta", "question"),
@@ -527,6 +868,15 @@ if (stage) {
   function routeIdentityMessage() {
     if (state.route === "lawyer") {
       return "Sou advogado(a) e quero auditar para um cliente.";
+    }
+    if (state.authorizationAnswer === "denied") {
+      return "Não autorizei e desconheço a contratação destes seguros.";
+    }
+    if (state.authorizationAnswer === "confirmed") {
+      return "Autorizei e assinei um contrato com o Itaú.";
+    }
+    if (state.authorizationAnswer === "uncertain") {
+      return "Não tenho certeza e quero verificar o extrato.";
     }
     if (state.selectedBrand) return `Meu cartão pode ser ${state.selectedBrand}.`;
     return "Possuo ou já possuí cartão Itaú ou de marca parceira.";
@@ -629,7 +979,7 @@ if (stage) {
           <span>Confirmo que esses dados são aproximados e foram informados com base no que consigo recordar.</span>
         </label>
 
-        <p class="charge-upload-privacy">A simulação não substitui a análise dos extratos. O relatório e a minuta devem identificar esses valores como declarados e estimados.</p>
+        <p class="charge-upload-privacy">A simulação não substitui a análise dos extratos. O Relatório Técnico deve identificar esses valores como declarados e estimados.</p>
 
         <div class="charge-upload-actions">
           <button type="button" class="secondary-action" data-charge-action="${inline ? "new-document" : "back-documents"}">${inline ? "Revisar documento" : "Voltar"}</button>
@@ -691,7 +1041,7 @@ if (stage) {
           </table>
         </div>
         <footer>
-          <p>Este cálculo usa informações aproximadas fornecidas pelo cliente. A minuta deverá registrar a ausência de extratos históricos e poderá indicar a necessidade de apresentação dos documentos pelo banco, quando juridicamente cabível.</p>
+          <p>Este cálculo usa informações aproximadas fornecidas pelo cliente. O Relatório Técnico deverá registrar a ausência de extratos históricos e poderá indicar a necessidade de apresentação dos documentos pelo banco, quando juridicamente cabível.</p>
         </footer>
       </section>
     `;
@@ -715,19 +1065,19 @@ if (stage) {
       <div class="charge-result-heading">
         <div>
           <p class="eyebrow">Simulação concluída</p>
-          <h3>Base estimada para relatório e minuta</h3>
+          <h3>Base estimada para o Relatório Técnico</h3>
           <p>Sem extratos históricos · valores declarados pelo cliente</p>
         </div>
         <span>Estimativa</span>
       </div>
       ${estimateReportMarkup()}
-      <section class="charge-petition-note" aria-label="Próxima etapa da petição">
+      <section class="charge-petition-note" aria-label="Próxima etapa da recuperação">
         <strong>Como esta informação será utilizada</strong>
-        <p>A simulação poderá compor o relatório e a minuta da petição, sempre identificada como estimativa. A geração do PDF continua condicionada aos dados pessoais, à revisão do texto e à etapa de liberação.</p>
+        <p>A simulação poderá compor o Relatório Técnico de Auditoria, sempre identificada como estimativa. Na próxima etapa, você revisará os dados, gerará o PDF e receberá o passo a passo do tribunal.</p>
       </section>
       <div class="charge-result-actions">
         <button type="button" class="secondary-action" data-charge-action="edit-estimate">Editar informações</button>
-        <button type="button" class="primary-action" disabled>Relatório e petição · próxima etapa</button>
+        ${documentationActionMarkup()}
       </div>
     `;
   }
@@ -768,7 +1118,7 @@ if (stage) {
           <p><strong>${documentPrompt}</strong></p>
           <p>${documentDetail}</p>
           <p>${routeCopy}</p>
-        `, "Etapa 2 · Documento", "question")}
+        `, "Audita · Análise", "question")}
       </div>
 
       <form class="charge-upload-panel" id="chargeAnalysisUploadForm">
@@ -999,18 +1349,373 @@ if (stage) {
 
       ${
         state.estimate
-          ? `<section class="charge-petition-note" aria-label="Próxima etapa da petição">
+          ? `<section class="charge-petition-note" aria-label="Próxima etapa da recuperação">
               <strong>Base documental e estimativa separadas</strong>
-              <p>O relatório e a minuta poderão usar a evidência recente e a simulação declaratória em seções distintas, sem apresentar o período estimado como comprovado.</p>
+              <p>O Relatório Técnico poderá usar a evidência recente e a simulação declaratória em seções distintas, sem apresentar o período estimado como comprovado.</p>
             </section>`
           : ""
       }
 
       <div class="charge-result-actions">
         <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
-        <button type="button" class="primary-action" disabled>Relatório e petição · próxima etapa</button>
+        ${documentationActionMarkup()}
       </div>
     `;
+  }
+
+  function formatRecoveryCpf(value) {
+    const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+    return digits
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+  }
+
+  function formatRecoveryPhone(value) {
+    const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+    if (digits.length <= 2) return digits ? `(${digits}` : "";
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) {
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+
+  function formatRecoveryPostalCode(value) {
+    const digits = String(value || "").replace(/\D/g, "").slice(0, 8);
+    return digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+  }
+
+  function normalizeRecoveryText(value) {
+    return String(value || "").normalize("NFC").replace(/\s+/g, " ").trim();
+  }
+
+  function renderRecoveryIntro() {
+    const loadingCopy = state.recovery.loading
+      ? "Carregando seus dados seguros..."
+      : "Preparar Relatório Técnico";
+    stage.innerHTML = `
+      <div class="charge-analysis-conversation charge-recovery-conversation">
+        ${assistantMessage(`
+          <p><strong>A análise terminou. Agora vamos organizar o caminho para buscar a restituição.</strong></p>
+          <p>A Audita não libera o dinheiro automaticamente. Ela ajuda você a reunir a prova, documentar o caso e chegar ao canal adequado com as informações organizadas.</p>
+        `, "Audita · Recuperação")}
+        ${assistantMessage(`
+          <p><strong>Agora você pode preparar a documentação para avaliar o Juizado Especial Cível.</strong></p>
+          <p>O Relatório Técnico de Auditoria reúne os dados da análise e organiza uma minuta para revisão. Depois do PDF, você escolhe o estado e recebe o passo a passo do tribunal. O protocolo final continua sendo feito por você.</p>
+        `, "Audita · Próxima etapa")}
+      </div>
+      <div class="charge-recovery-actions">
+        <button type="button" class="secondary-action" data-charge-action="back-to-result">Voltar à análise</button>
+        <button type="button" class="primary-action" data-charge-action="open-recovery-report" ${state.recovery.loading ? "disabled" : ""}>${loadingCopy}</button>
+      </div>
+    `;
+  }
+
+  function recoveryUfOptions(selectedUf = "") {
+    return RECOVERY_UFS.map(
+      (uf) => `<option value="${uf}" ${selectedUf === uf ? "selected" : ""}>${uf}</option>`,
+    ).join("");
+  }
+
+  function recoveryMissingFieldsMarkup(prepared) {
+    const missingFields = Array.isArray(prepared?.missingFields)
+      ? prepared.missingFields
+      : [];
+    if (!missingFields.length) return "";
+    return `
+      <p class="charge-recovery-form-error" role="alert">
+        Revise: ${missingFields
+          .map((field) => RECOVERY_FIELD_LABELS[field] || field)
+          .map(escapeChargeHtml)
+          .join(", ")}.
+      </p>
+    `;
+  }
+
+  function recoveryReportFormMarkup() {
+    const claimant = state.recovery.claimant || {};
+    const prepared = state.recovery.prepared;
+    const calculatedValues = state.recovery.handoff?.suggestion?.values || {};
+    const historicalDocumentsAvailable =
+      claimant.historicalDocumentsAvailable ||
+      state.recovery.handoff?.caseData?.answers?.historicalDocumentsAvailable ||
+      "";
+    const reportButtonLabel = prepared ? "Atualizar relatório" : "Preparar relatório";
+    return `
+      <form class="charge-recovery-form" id="chargeRecoveryForm" aria-busy="${state.recovery.busy}">
+        ${state.recovery.error ? `<p class="charge-recovery-form-error" role="alert">${escapeChargeHtml(state.recovery.error)}</p>` : ""}
+        <div class="charge-recovery-form-heading">
+          <div>
+            <p class="eyebrow">Relatório Técnico de Auditoria</p>
+            <h3>Confira os dados que entrarão no PDF</h3>
+          </div>
+          <span>${state.recovery.handoff?.journey === "with_historical_documents" ? "Modelo 1" : "Modelo 2"}</span>
+        </div>
+        <p class="charge-recovery-form-intro">Esses dados são usados somente para montar o documento. A UF e a cidade abaixo correspondem ao seu endereço e ajudam a preparar a minuta; o tribunal será confirmado na etapa seguinte.</p>
+
+        <div class="charge-recovery-form-grid">
+          <label class="wide"><span>Nome completo</span><input name="fullName" required maxlength="160" autocomplete="name" value="${escapeChargeHtml(claimant.fullName || "")}" /></label>
+          <label><span>CPF</span><input name="document" required inputmode="numeric" maxlength="14" autocomplete="off" data-recovery-mask="cpf" placeholder="000.000.000-00" value="${escapeChargeHtml(formatRecoveryCpf(claimant.document || ""))}" /></label>
+          <label><span>RG</span><input name="rg" required maxlength="40" autocomplete="off" value="${escapeChargeHtml(claimant.rg || "")}" /></label>
+          <label><span>Nacionalidade</span><select name="nationality" required><option value="">Selecione</option><option value="Brasileiro(a)" ${String(claimant.nationality || "").toLowerCase().startsWith("brasileir") ? "selected" : ""}>Brasileiro(a)</option><option value="Estrangeiro(a)" ${String(claimant.nationality || "").toLowerCase().startsWith("estrangeir") ? "selected" : ""}>Estrangeiro(a)</option></select></label>
+          <label><span>Estado civil</span><select name="maritalStatus" required><option value="">Selecione</option>${["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "Separado(a)", "União estável"].map((value) => `<option value="${value}" ${String(claimant.maritalStatus || "").toLowerCase().startsWith(value.replace("(a)", "").slice(0, 5).toLowerCase()) ? "selected" : ""}>${value}</option>`).join("")}</select></label>
+          <label><span>Profissão</span><input name="profession" required maxlength="120" autocomplete="organization-title" value="${escapeChargeHtml(claimant.profession || "")}" /></label>
+          <label><span>E-mail</span><input name="email" required type="email" maxlength="160" autocomplete="email" value="${escapeChargeHtml(claimant.email || "")}" /></label>
+          <label><span>Telefone</span><input name="phone" required inputmode="tel" maxlength="15" autocomplete="tel" data-recovery-mask="phone" placeholder="(00) 00000-0000" value="${escapeChargeHtml(formatRecoveryPhone(claimant.phone || ""))}" /></label>
+        </div>
+
+        <div class="charge-recovery-section-title"><strong>Endereço</strong><span>Usado para identificar o consumidor e a competência territorial.</span></div>
+        <div class="charge-recovery-form-grid">
+          <label><span>CEP</span><input name="postalCode" required inputmode="numeric" maxlength="9" autocomplete="postal-code" data-recovery-mask="postalCode" placeholder="00000-000" value="${escapeChargeHtml(formatRecoveryPostalCode(claimant.postalCode || ""))}" /></label>
+          <label><span>Bairro</span><input name="district" required maxlength="80" autocomplete="address-level3" value="${escapeChargeHtml(claimant.district || "")}" /></label>
+          <label class="wide"><span>Logradouro</span><input name="street" required maxlength="160" autocomplete="address-line1" value="${escapeChargeHtml(claimant.street || "")}" /></label>
+          <label><span>Número</span><input name="addressNumber" required maxlength="20" autocomplete="address-line2" value="${escapeChargeHtml(claimant.addressNumber || "")}" /></label>
+          <label><span>Complemento <small>opcional</small></span><input name="addressComplement" maxlength="80" autocomplete="address-line3" value="${escapeChargeHtml(claimant.addressComplement || "")}" /></label>
+          <label><span>UF do seu endereço</span><select name="uf" required><option value="">Selecione</option>${recoveryUfOptions(String(claimant.uf || "").toUpperCase())}</select></label>
+          <label><span>Cidade</span><input name="city" required maxlength="100" autocomplete="address-level2" value="${escapeChargeHtml(claimant.city || "")}" /></label>
+        </div>
+
+        <input type="hidden" name="historicalDocumentsAvailable" value="${escapeChargeHtml(historicalDocumentsAvailable)}" />
+        <input type="hidden" name="doubleRefundAmount" value="${escapeChargeHtml(calculatedValues.doubleRefundAmount ?? claimant.doubleRefundAmount ?? "")}" />
+        <input type="hidden" name="caseValue" value="${escapeChargeHtml(calculatedValues.caseValue ?? claimant.caseValue ?? "")}" />
+        <input type="hidden" name="lostProfitsAmount" value="${escapeChargeHtml(calculatedValues.lostProfitsAmount ?? claimant.lostProfitsAmount ?? "")}" />
+        <input type="hidden" name="moralDamagesAmount" value="${escapeChargeHtml(calculatedValues.moralDamagesAmount ?? claimant.moralDamagesAmount ?? "")}" />
+
+        ${recoveryMissingFieldsMarkup(prepared)}
+        ${prepared ? `
+          <section class="charge-recovery-preview" aria-label="Prévia do Relatório Técnico">
+            <div><strong>${prepared.ready ? "Relatório pronto para revisão" : "Relatório incompleto"}</strong><span>${escapeChargeHtml(prepared.template?.label || "")}</span></div>
+            <details><summary>Revisar conteúdo do PDF</summary><pre>${escapeChargeHtml(prepared.draft || "")}</pre></details>
+            ${Array.isArray(prepared.warnings) && prepared.warnings.length ? `<details><summary>Avisos importantes</summary><ul>${prepared.warnings.map((warning) => `<li>${escapeChargeHtml(warning)}</li>`).join("")}</ul></details>` : ""}
+            <label class="charge-recovery-confirmation"><input name="reviewConfirmed" type="checkbox" /><span>Revisei os dados e o conteúdo do relatório antes de gerar o PDF.</span></label>
+          </section>
+        ` : ""}
+
+        <div class="charge-recovery-form-actions">
+          <button type="button" class="secondary-action" data-charge-action="back-to-recovery-intro">Voltar</button>
+          <button type="submit" class="secondary-action" data-recovery-submit="prepare" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Processando..." : reportButtonLabel}</button>
+          ${prepared?.ready ? `<button type="submit" class="primary-action" data-recovery-submit="pdf" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Gerando..." : "Gerar Relatório Técnico em PDF"}</button>` : ""}
+        </div>
+      </form>
+    `;
+  }
+
+  function renderRecoveryReport() {
+    stage.innerHTML = `
+      <div class="charge-analysis-conversation charge-recovery-conversation compact">
+        ${assistantMessage(`
+          <p><strong>Agora vou montar o seu Relatório Técnico de Auditoria.</strong></p>
+          <p>Confira seus dados pessoais e o endereço. Os valores calculados na análise serão incluídos automaticamente. O documento organiza a análise e a minuta, mas ainda deve ser revisado por você ou por um profissional antes do protocolo.</p>
+        `, "Audita · Relatório")}
+      </div>
+      ${recoveryReportFormMarkup()}
+    `;
+  }
+
+  function selectedRecoveryPortal() {
+    const selectedUf = state.recovery.guideUf || state.recovery.claimant?.uf || "";
+    const portals = state.recovery.portals || [];
+    const selected = portals.find((portal) => portal.uf === selectedUf);
+    if (selected) return selected;
+    const preparedPortal = state.recovery.prepared?.portal;
+    return preparedPortal?.uf === selectedUf ? preparedPortal : null;
+  }
+
+  function recoveryGuideSteps(portal) {
+    const manualSteps = portal?.manualFiling?.steps;
+    if (Array.isArray(manualSteps) && manualSteps.length) return manualSteps;
+    return [
+      `Acesse o canal oficial do ${portal?.tribunal || "tribunal"}.`,
+      "Confirme a comarca, a unidade e se o caso deve seguir pelo Juizado Especial Cível.",
+      "Faça o login, cadastro ou atendimento somente no ambiente oficial quando solicitado.",
+      "Apresente os dados do consumidor, do banco e o relato conforme o relatório revisado.",
+      "Anexe o Relatório Técnico, documento pessoal, comprovante de residência e as provas disponíveis.",
+      "Revise todas as informações e conclua pessoalmente o protocolo ou atendimento.",
+    ];
+  }
+
+  function recoveryGuideMarkup() {
+    const portal = selectedRecoveryPortal();
+    if (!state.recovery.guideUf) {
+      return `<div class="charge-recovery-guide-empty"><strong>Selecione o estado</strong><p>O roteiro correspondente aparecerá aqui.</p></div>`;
+    }
+    if (!portal) {
+      return `<div class="charge-recovery-guide-empty"><strong>Guia indisponível</strong><p>Não foi possível carregar o tribunal desta UF agora.</p></div>`;
+    }
+    const steps = recoveryGuideSteps(portal);
+    const requirements = Array.isArray(portal.requirements) ? portal.requirements : [];
+    const humanOnly = Array.isArray(portal.guide?.humanOnly) ? portal.guide.humanOnly : [];
+    const notes = Array.isArray(portal.guide?.caseNotes) ? portal.guide.caseNotes : [];
+    return `
+      <section class="charge-recovery-guide" aria-label="Passo a passo do ${escapeChargeHtml(portal.tribunal || "tribunal")}">
+        <header><div><p class="eyebrow">${escapeChargeHtml(portal.uf)}</p><h3>${escapeChargeHtml(portal.name || portal.tribunal)}</h3></div><span>${escapeChargeHtml(portal.tribunal || "")}</span></header>
+        <ol>${steps.map((step) => `<li><span>${escapeChargeHtml(step)}</span></li>`).join("")}</ol>
+        ${requirements.length ? `<details><summary>O que separar antes de começar</summary><ul>${requirements.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
+        ${humanOnly.length ? `<details><summary>Etapas que dependem de você</summary><ul>${humanOnly.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
+        ${notes.length ? `<p class="charge-recovery-guide-note">${escapeChargeHtml(notes.join(" "))}</p>` : ""}
+        <div class="charge-recovery-guide-actions">
+          <a class="primary-action" href="${escapeChargeHtml(portal.startUrl || portal.officialUrl || "#")}" target="_blank" rel="noreferrer">Abrir portal oficial</a>
+          ${portal.officialUrl && portal.officialUrl !== portal.startUrl ? `<a class="secondary-action" href="${escapeChargeHtml(portal.officialUrl)}" target="_blank" rel="noreferrer">Ver orientações do tribunal</a>` : ""}
+        </div>
+        <small>O login, a escolha da unidade, os anexos e o protocolo final são realizados pelo usuário. A Audita não envia o processo automaticamente.</small>
+      </section>
+    `;
+  }
+
+  function renderRecoveryGuide() {
+    const selectedUf = state.recovery.guideUf || "";
+    stage.innerHTML = `
+      <div class="charge-analysis-conversation charge-recovery-conversation compact">
+        ${assistantMessage(`
+          <p><strong>Seu Relatório Técnico foi gerado.</strong></p>
+          <p>Agora selecione o estado onde pretende iniciar o pedido. A Audita mostrará o caminho oficial conhecido para o tribunal, mas você ainda deve confirmar a comarca e a competência territorial.</p>
+        `, "Audita · Tribunal")}
+      </div>
+      <section class="charge-recovery-tribunal-picker">
+        <label><span>Estado do tribunal</span><select id="chargeRecoveryGuideUf"><option value="">Selecione</option>${recoveryUfOptions(selectedUf)}</select></label>
+        <p>Normalmente o consumidor inicia o pedido no local do seu domicílio. Confirme essa informação antes de protocolar.</p>
+      </section>
+      ${recoveryGuideMarkup()}
+      <div class="charge-recovery-actions">
+        <button type="button" class="secondary-action" data-charge-action="back-to-recovery-report">Revisar relatório</button>
+        <button type="button" class="secondary-action" data-charge-action="download-report-again" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Gerando..." : "Baixar relatório novamente"}</button>
+        <button type="button" class="primary-action" data-charge-action="restart">Iniciar nova análise</button>
+      </div>
+    `;
+  }
+
+  function renderRecovery() {
+    if (state.recovery.phase === "guide") renderRecoveryGuide();
+    else if (state.recovery.phase === "report") renderRecoveryReport();
+    else renderRecoveryIntro();
+  }
+
+  function readRecoveryClaimant(form) {
+    const data = new FormData(form);
+    return {
+      uf: String(data.get("uf") || "").trim().toUpperCase(),
+      city: normalizeRecoveryText(data.get("city")),
+      fullName: normalizeRecoveryText(data.get("fullName")),
+      document: String(data.get("document") || "").replace(/\D/g, "").slice(0, 11),
+      rg: normalizeRecoveryText(data.get("rg")).toLocaleUpperCase("pt-BR"),
+      nationality: normalizeRecoveryText(data.get("nationality")),
+      maritalStatus: normalizeRecoveryText(data.get("maritalStatus")),
+      profession: normalizeRecoveryText(data.get("profession")),
+      email: normalizeRecoveryText(data.get("email")).toLocaleLowerCase("pt-BR"),
+      phone: String(data.get("phone") || "").replace(/\D/g, "").slice(0, 11),
+      postalCode: String(data.get("postalCode") || "").replace(/\D/g, "").slice(0, 8),
+      street: normalizeRecoveryText(data.get("street")),
+      addressNumber: normalizeRecoveryText(data.get("addressNumber")),
+      addressComplement: normalizeRecoveryText(data.get("addressComplement")),
+      district: normalizeRecoveryText(data.get("district")),
+      historicalDocumentsAvailable: String(data.get("historicalDocumentsAvailable") || "").trim(),
+      doubleRefundAmount: String(data.get("doubleRefundAmount") || "").trim(),
+      lostProfitsAmount: String(data.get("lostProfitsAmount") || "").trim(),
+      moralDamagesAmount: String(data.get("moralDamagesAmount") || "").trim(),
+      caseValue: String(data.get("caseValue") || "").trim(),
+    };
+  }
+
+  function recoveryPayload(claimant = state.recovery.claimant) {
+    return {
+      caseData: state.recovery.handoff?.caseData || {},
+      claimant,
+      uf: claimant?.uf || "",
+      city: claimant?.city || "",
+    };
+  }
+
+  function recoveryApiError(data = {}, fallback = "Não foi possível concluir esta etapa.") {
+    if (Array.isArray(data.missingFields) && data.missingFields.length) {
+      return `Revise: ${data.missingFields
+        .map((field) => RECOVERY_FIELD_LABELS[field] || field)
+        .join(", ")}.`;
+    }
+    return data.message || fallback;
+  }
+
+  async function prepareRecoveryReport(form) {
+    if (state.recovery.busy) return;
+    const claimant = readRecoveryClaimant(form);
+    state.recovery.claimant = claimant;
+    state.recovery.busy = true;
+    state.recovery.error = "";
+    render();
+
+    try {
+      const response = await fetch("/api/jec/petitions/prepare", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify(recoveryPayload(claimant)),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        document.querySelector("#loginButton")?.click();
+        throw new Error("Entre na Audita para preparar o Relatório Técnico.");
+      }
+      if (!response.ok || !data.prepared) {
+        throw new Error(recoveryApiError(data, "Não foi possível preparar o relatório agora."));
+      }
+      state.recovery.prepared = data.prepared;
+      state.recovery.error = data.prepared.ready
+        ? ""
+        : recoveryApiError(data.prepared, "Revise os campos indicados.");
+    } catch (error) {
+      state.recovery.error = error?.message || "Falha ao preparar o Relatório Técnico.";
+    } finally {
+      state.recovery.busy = false;
+      state.recovery.phase = "report";
+      render();
+    }
+  }
+
+  async function downloadRecoveryReport(claimant = state.recovery.claimant) {
+    if (state.recovery.busy || !state.recovery.prepared?.ready) return;
+    state.recovery.busy = true;
+    state.recovery.error = "";
+    render();
+
+    try {
+      const response = await fetch("/api/jec/petitions/pdf", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/pdf" },
+        body: JSON.stringify({
+          ...recoveryPayload(claimant),
+          reviewConfirmed: true,
+        }),
+      });
+      if (response.status === 401) {
+        document.querySelector("#loginButton")?.click();
+        throw new Error("Entre na Audita para gerar o Relatório Técnico.");
+      }
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(recoveryApiError(data, "Não foi possível gerar o PDF agora."));
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition") || "";
+      const fileName =
+        disposition.match(/filename="([^"]+)"/i)?.[1] ||
+        "relatorio-tecnico-auditoria-itau.pdf";
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      state.recovery.pdfGeneratedAt = new Date().toISOString();
+      state.recovery.guideUf = claimant.uf || state.recovery.guideUf || "";
+      state.recovery.phase = "guide";
+    } catch (error) {
+      state.recovery.error = error?.message || "Falha ao gerar o Relatório Técnico.";
+      state.recovery.phase = "report";
+    } finally {
+      state.recovery.busy = false;
+      render();
+    }
   }
 
   function renderEnded() {
@@ -1037,6 +1742,7 @@ if (stage) {
     else if (state.screen === "result") renderResult();
     else if (state.screen === "estimate") renderEstimate();
     else if (state.screen === "estimate-result") renderEstimateResult();
+    else if (state.screen === "recovery") renderRecovery();
     else if (state.screen === "ended") renderEnded();
     else renderTriage();
     setError(state.error);
@@ -1162,32 +1868,38 @@ if (stage) {
     const action = button.dataset.chargeAction;
     state.error = "";
 
-    if (action === "has-card") {
-      continueFromTriage("Possuo ou já possuí um desses cartões.", () => {
+    if (action === "not-authorized") {
+      continueFromTriage("Não autorizei / Desconheço a contratação destes seguros.", () => {
         state.route = "consumer";
+        state.authorizationAnswer = "denied";
         state.screen = "documents";
       });
       return;
-    } else if (action === "show-brands") {
-      continueFromTriage("Não tenho certeza.", () => {
+    } else if (action === "authorized") {
+      continueFromTriage("Sim, eu autorizei e assinei contrato com o Itaú.", () => {
         state.route = "consumer";
-        state.screen = "brands";
+        state.authorizationAnswer = "confirmed";
+        state.screen = "documents";
+      });
+      return;
+    } else if (action === "verify-statement") {
+      continueFromTriage("Não tenho certeza / Quero verificar o extrato.", () => {
+        state.route = "consumer";
+        state.authorizationAnswer = "uncertain";
+        state.screen = "documents";
       });
       return;
     } else if (action === "lawyer") {
       continueFromTriage("Sou advogado(a).", () => {
         state.route = "lawyer";
+        state.authorizationAnswer = "professional";
         state.screen = "documents";
-      });
-      return;
-    } else if (action === "no-card") {
-      continueFromTriage("Não tenho e nunca tive.", () => {
-        state.screen = "ended";
       });
       return;
     } else if (action === "back-triage" || action === "restart") {
       state.screen = "triage";
       state.route = "consumer";
+      state.authorizationAnswer = "";
       state.selectedBrand = "";
       state.documentAvailability = "";
       state.selectedFile = null;
@@ -1203,6 +1915,7 @@ if (stage) {
         durationUnit: "months",
         confirmed: false,
       };
+      resetRecovery();
     } else if (action === "select-brand") {
       state.selectedBrand = button.dataset.chargeBrand || "";
       render();
@@ -1238,6 +1951,7 @@ if (stage) {
       state.caseBatches = [];
       state.estimate = null;
       resetEstimateDraft();
+      resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
     } else if (action === "new-document") {
@@ -1248,11 +1962,26 @@ if (stage) {
       state.caseBatches = [];
       state.estimate = null;
       resetEstimateDraft();
+      resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
     } else if (action === "edit-estimate") {
       state.estimate = null;
       state.screen = "estimate";
+    } else if (action === "start-recovery") {
+      startRecoveryFlow();
+      return;
+    } else if (action === "back-to-result") {
+      state.screen = state.documentAvailability === "none" ? "estimate-result" : "result";
+    } else if (action === "open-recovery-report") {
+      state.recovery.phase = "report";
+    } else if (action === "back-to-recovery-intro") {
+      state.recovery.phase = "intro";
+    } else if (action === "back-to-recovery-report") {
+      state.recovery.phase = "report";
+    } else if (action === "download-report-again") {
+      void downloadRecoveryReport();
+      return;
     } else if (action === "answer-candidate") {
       updateCandidate(button);
       return;
@@ -1275,6 +2004,15 @@ if (stage) {
     if (event.target.id === "chargeEstimateDurationValue") {
       state.estimateDraft.durationValue = event.target.value;
     }
+    if (event.target.matches("[data-recovery-mask]")) {
+      const formatters = {
+        cpf: formatRecoveryCpf,
+        phone: formatRecoveryPhone,
+        postalCode: formatRecoveryPostalCode,
+      };
+      const formatter = formatters[event.target.dataset.recoveryMask];
+      if (formatter) event.target.value = formatter(event.target.value);
+    }
   });
 
   stage.addEventListener("change", (event) => {
@@ -1294,9 +2032,31 @@ if (stage) {
     if (event.target.id === "chargeEstimateConfirmed") {
       state.estimateDraft.confirmed = event.target.checked;
     }
+    if (event.target.id === "chargeRecoveryGuideUf") {
+      state.recovery.guideUf = event.target.value;
+      renderRecoveryGuide();
+    }
   });
 
   stage.addEventListener("submit", (event) => {
+    if (event.target.id === "chargeRecoveryForm") {
+      event.preventDefault();
+      const action = event.submitter?.dataset.recoverySubmit || "prepare";
+      if (action === "pdf") {
+        const claimant = readRecoveryClaimant(event.target);
+        state.recovery.claimant = claimant;
+        if (!event.target.elements.reviewConfirmed?.checked) {
+          state.recovery.error = "Confirme a revisão do relatório antes de gerar o PDF.";
+          renderRecoveryReport();
+          return;
+        }
+        void downloadRecoveryReport(claimant);
+      } else {
+        void prepareRecoveryReport(event.target);
+      }
+      return;
+    }
+
     if (event.target.id === "chargeEstimateForm") {
       event.preventDefault();
       const formData = new FormData(event.target);

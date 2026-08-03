@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-white.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260731-charge-documents-2" />
+    <link rel="stylesheet" href="styles.css?v=20260803-module-progress-1" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -462,26 +462,43 @@
                 </span>
                 <p><strong>Audita</strong> est&aacute; analisando com voc&ecirc;</p>
               </div>
-              <ol class="charge-analysis-progress" id="chargeAnalysisProgress" aria-label="Progresso da an&aacute;lise">
-                <li class="active" data-charge-progress="triage">
-                  <span aria-hidden="true"></span>
-                  <div><strong>Triagem</strong><small>V&iacute;nculo com o cart&atilde;o</small></div>
-                </li>
-                <li data-charge-progress="document">
-                  <span aria-hidden="true"></span>
-                  <div><strong>Documento</strong><small>Leitura da fatura</small></div>
-                </li>
-                <li class="locked" data-charge-progress="plans">
-                  <span aria-hidden="true"></span>
-                  <div><strong>Libera&ccedil;&atilde;o</strong><small>Aguardando defini&ccedil;&atilde;o</small></div>
-                </li>
-              </ol>
-              <span class="charge-analysis-status" id="chargeAnalysisStatus">Etapa 1 de 3</span>
               <div class="charge-analysis-visually-hidden">
                 <h2>An&aacute;lise de cobran&ccedil;as indevidas</h2>
                 <p>Fluxo guiado, sem conversa aberta com IA.</p>
               </div>
             </header>
+
+            <ol class="charge-analysis-progress charge-module-progress" id="chargeAnalysisProgress" aria-label="Progresso completo do m&oacute;dulo">
+              <li class="active" data-charge-progress="authorization" aria-current="step">
+                <span aria-hidden="true">1</span>
+                <div><strong>Autoriza&ccedil;&atilde;o</strong><small>Confirma&ccedil;&atilde;o inicial</small></div>
+              </li>
+              <li class="locked" data-charge-progress="statements">
+                <span aria-hidden="true">2</span>
+                <div><strong>Extratos</strong><small>Disponibilidade</small></div>
+              </li>
+              <li class="locked" data-charge-progress="analysis">
+                <span aria-hidden="true">3</span>
+                <div><strong>An&aacute;lise</strong><small>Documento ou c&aacute;lculo</small></div>
+              </li>
+              <li class="locked" data-charge-progress="result">
+                <span aria-hidden="true">4</span>
+                <div><strong>Resultado</strong><small>Apura&ccedil;&atilde;o</small></div>
+              </li>
+              <li class="locked" data-charge-progress="recovery">
+                <span aria-hidden="true">5</span>
+                <div><strong>Recupera&ccedil;&atilde;o</strong><small>Pr&oacute;ximo passo</small></div>
+              </li>
+              <li class="locked" data-charge-progress="report">
+                <span aria-hidden="true">6</span>
+                <div><strong>Relat&oacute;rio</strong><small>Gerar PDF</small></div>
+              </li>
+              <li class="locked" data-charge-progress="tribunal">
+                <span aria-hidden="true">7</span>
+                <div><strong>Tribunal</strong><small>Guia do Estado</small></div>
+              </li>
+            </ol>
+            <span class="charge-analysis-status" id="chargeAnalysisStatus">Etapa 1 de 7 &middot; Autoriza&ccedil;&atilde;o</span>
 
             <main
               class="charge-analysis-stage"
@@ -1775,7 +1792,7 @@
     </div>
 
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
-    <script type="module" src="charge-analysis.js?v=20260731-charge-documents-2"></script>
-    <script type="module" src="app.js?v=20260731-seller-analysis-1"></script>
+    <script type="module" src="charge-analysis.js?v=20260803-automatic-values-1"></script>
+    <script type="module" src="app.js?v=20260803-recovery-flow-1"></script>
   </body>
 </html>

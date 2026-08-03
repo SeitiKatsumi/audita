@@ -77,6 +77,8 @@ const apiPricingUnitCost = document.querySelector("#apiPricingUnitCost");
 const apiPricingSource = document.querySelector("#apiPricingSource");
 const apiPricingActive = document.querySelector("#apiPricingActive");
 const apiPricingClear = document.querySelector("#apiPricingClear");
+const navList = document.querySelector(".nav-list");
+const navGroups = document.querySelectorAll("details.nav-group");
 const navLinks = document.querySelectorAll(".nav-list a[href^='#'], .nav-list a[data-app-route]");
 const pageBlocks = document.querySelectorAll("[data-page]");
 const chatThreadList = document.querySelector("#chatThreadList");
@@ -988,7 +990,7 @@ function setActivePage(page) {
     operationsPages.classList.add("page-hidden");
   }
 
-  document.querySelectorAll("details.nav-group").forEach((group) => {
+  navGroups.forEach((group) => {
     group.classList.remove("has-active-child");
   });
 
@@ -3124,8 +3126,8 @@ function renderJecPetitionPanel(caseData = {}) {
     "";
   return `
     <details class="jec-petition-panel" ${state.open || state.prepared ? "open" : ""}>
-      <summary>Juizado Especial · petição e protocolo manual</summary>
-      <p>Use este formulário seguro para preparar a petição em PDF. Os dados não entram no histórico do chat.</p>
+      <summary>Relatório Técnico de Auditoria · protocolo manual</summary>
+      <p>Use este formulário seguro para preparar o relatório em PDF. Os dados não entram no histórico do chat.</p>
       ${
         state.error
           ? `<div class="jec-form-error" role="alert">${escapeHtml(state.error)}</div>`
@@ -3331,7 +3333,7 @@ function renderJecPetitionPanel(caseData = {}) {
           ${
             prepared?.ready
               ? `
-                <button class="secondary-action" type="submit" data-jec-action="pdf">Baixar PDF para revisão</button>
+                <button class="secondary-action" type="submit" data-jec-action="pdf">Gerar Relatório Técnico em PDF</button>
                 <button class="secondary-action" type="submit" data-jec-action="browser">Abrir navegador assistido</button>
               `
               : ""
@@ -3393,6 +3395,10 @@ function renderItauCaseCard(caseData) {
   const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
   const evaluation = caseData.evaluation || {};
   const answers = caseData.answers || {};
+  const declaredEstimate =
+    answers.declaredEstimate?.source === "consumer_declaration"
+      ? answers.declaredEstimate
+      : null;
   const riskClass = ["alto", "medio", "baixo"].includes(evaluation.risk) ? evaluation.risk : "indefinido";
   const candidateHtml = candidates.length
     ? candidates
@@ -3404,18 +3410,28 @@ function renderItauCaseCard(caseData) {
                   <span>${escapeHtml(candidate.category || "lançamento")}</span>
                   <strong>${escapeHtml(candidate.label || candidate.description || "Cobrança a revisar")}</strong>
                 </div>
-                <b>${candidate.amount === null ? "Valor não identificado" : escapeHtml(formatChatCurrency(candidate.amount))}</b>
+                <b>${
+                  declaredEstimate && candidate.source === "consumer_declaration"
+                    ? `${escapeHtml(formatChatCurrency(declaredEstimate.monthlyAmount))} / mês`
+                    : candidate.amount === null
+                      ? "Valor não identificado"
+                      : escapeHtml(formatChatCurrency(candidate.amount))
+                }</b>
               </header>
               <p>
                 ${candidate.date ? `<time>${escapeHtml(candidate.date)}</time>` : ""}
                 ${escapeHtml(candidate.reason || "Confirme se você autorizou este produto ou serviço.")}
               </p>
-              <div class="itau-recognition" role="group" aria-label="Você reconhece esta cobrança?">
-                <small>Você reconhece esta contratação?</small>
-                <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="recognized" class="${candidate.answer === "recognized" ? "active" : ""}">Reconheço</button>
-                <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="not_recognized" class="${candidate.answer === "not_recognized" ? "active danger" : ""}">Não reconheço</button>
-                <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="unknown" class="${candidate.answer === "unknown" ? "active" : ""}">Não sei</button>
-              </div>
+              ${
+                declaredEstimate && candidate.source === "consumer_declaration"
+                  ? `<small>Estimativa declarada para ${escapeHtml(String(declaredEstimate.months || ""))} mês(es), sujeita à comprovação documental.</small>`
+                  : `<div class="itau-recognition" role="group" aria-label="Você reconhece esta cobrança?">
+                      <small>Você reconhece esta contratação?</small>
+                      <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="recognized" class="${candidate.answer === "recognized" ? "active" : ""}">Reconheço</button>
+                      <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="not_recognized" class="${candidate.answer === "not_recognized" ? "active danger" : ""}">Não reconheço</button>
+                      <button type="button" data-itau-case="${escapeHtml(caseData.id)}" data-itau-candidate="${escapeHtml(candidate.id)}" data-itau-answer="unknown" class="${candidate.answer === "unknown" ? "active" : ""}">Não sei</button>
+                    </div>`
+              }
             </article>
           `,
         )
@@ -3431,15 +3447,19 @@ function renderItauCaseCard(caseData) {
     <section class="itau-analysis-card" data-itau-card="${escapeHtml(caseData.id)}">
       <header class="itau-analysis-header">
         <div>
-          <span class="itau-module-label">ANÁLISE DE FATURA ITAÚ</span>
+          <span class="itau-module-label">${declaredEstimate ? "SIMULAÇÃO DECLARATÓRIA ITAÚ" : "ANÁLISE DE FATURA ITAÚ"}</span>
           <h3>${escapeHtml(itauClassificationLabel(evaluation))}</h3>
-          <p>${escapeHtml(caseData.document?.fileName || "Documento analisado")} · ${
-            caseData.document?.processedBy === "openai_and_rules"
-              ? "IA + regras verificáveis"
-              : "regras locais"
+          <p>${
+            declaredEstimate
+              ? "Sem extrato histórico · valores informados pelo cliente"
+              : `${escapeHtml(caseData.document?.fileName || "Documento analisado")} · ${
+                  caseData.document?.processedBy === "openai_and_rules"
+                    ? "IA + regras verificáveis"
+                    : "regras locais"
+                }`
           }</p>
         </div>
-        <span class="itau-risk ${riskClass}">Risco ${escapeHtml(evaluation.risk || "indefinido")}</span>
+        <span class="itau-risk ${riskClass}">${declaredEstimate ? "Base estimada" : `Risco ${escapeHtml(evaluation.risk || "indefinido")}`}</span>
       </header>
 
       <div class="itau-next-step">
@@ -3450,7 +3470,7 @@ function renderItauCaseCard(caseData) {
       <div class="itau-charge-list">${candidateHtml}</div>
 
       ${
-        candidates.length
+        candidates.length && !declaredEstimate
           ? `
             <details class="itau-review-details">
               <summary>Informar contexto adicional</summary>
@@ -3544,7 +3564,7 @@ function renderActiveJecFlow(thread) {
       <span class="chat-message-avatar"><img src="assets/audita-logo-white.svg" alt="" /></span>
       <div class="chat-message-content">
         <strong>Audita IA</strong>
-        <div class="chat-message-body">Complete os dados seguros abaixo para gerar a petição em PDF. Depois você receberá o link e o passo a passo do tribunal.</div>
+        <div class="chat-message-body">Complete os dados seguros abaixo para gerar o Relatório Técnico em PDF. Depois você receberá o link e o passo a passo do tribunal.</div>
         ${renderJecPetitionPanel(active.caseData)}
       </div>
     </article>
@@ -3907,7 +3927,7 @@ async function submitJecPetitionForm(form, action) {
         }),
       });
       if (response.status === 401) {
-        showLogin("Entre para gerar o PDF da petição.");
+        showLogin("Entre para gerar o Relatório Técnico em PDF.");
         return;
       }
       if (!response.ok) {
@@ -3920,7 +3940,7 @@ async function submitJecPetitionForm(form, action) {
       const blob = await response.blob();
       const disposition = response.headers.get("content-disposition") || "";
       const fileName =
-        disposition.match(/filename="([^"]+)"/i)?.[1] || "peticao-jec-itau.pdf";
+        disposition.match(/filename="([^"]+)"/i)?.[1] || "relatorio-tecnico-auditoria-itau.pdf";
       const downloadUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = downloadUrl;
@@ -3976,7 +3996,7 @@ async function submitJecPetitionForm(form, action) {
       submitButton.disabled = false;
       submitButton.textContent =
         action === "pdf"
-          ? "Baixar PDF para revisão"
+          ? "Gerar Relatório Técnico em PDF"
           : action === "browser"
             ? "Abrir navegador assistido"
             : "Preparar rascunho";
@@ -4761,8 +4781,14 @@ chatMessages?.addEventListener("click", async (event) => {
 
   const jecActionButton = event.target.closest("[data-chat-jec]");
   if (jecActionButton) {
+    const caseId = jecActionButton.dataset.chatJec;
+    const found = findItauCaseMessage(caseId);
+    const storedAction = (found?.message?.actions || []).find(
+      (action) => action?.kind === "jec_intake" && action?.caseId === caseId,
+    );
     const activated = activateJecIntake({
-      caseId: jecActionButton.dataset.chatJec,
+      ...(storedAction || {}),
+      caseId,
       uf: jecActionButton.dataset.chatJecUf,
     });
     if (activated) {
@@ -7526,6 +7552,49 @@ function setMobileMenu(open) {
   document.body.classList.toggle("menu-open", open);
   mobileMenuButton?.setAttribute("aria-expanded", String(open));
 }
+
+function keepNavGroupVisible(group) {
+  if (!group.open || !navList) {
+    return;
+  }
+
+  const collapsedDesktop =
+    document.body.classList.contains("sidebar-collapsed") &&
+    !window.matchMedia("(max-width: 1120px)").matches;
+  if (collapsedDesktop) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    const navBounds = navList.getBoundingClientRect();
+    const groupBounds = group.getBoundingClientRect();
+    const edgeSpacing = 10;
+    const availableHeight = navBounds.height - edgeSpacing * 2;
+    let scrollDelta = 0;
+
+    if (groupBounds.height > availableHeight) {
+      scrollDelta = groupBounds.top - navBounds.top - edgeSpacing;
+    } else if (groupBounds.bottom > navBounds.bottom - edgeSpacing) {
+      scrollDelta = groupBounds.bottom - navBounds.bottom + edgeSpacing;
+    } else if (groupBounds.top < navBounds.top + edgeSpacing) {
+      scrollDelta = groupBounds.top - navBounds.top - edgeSpacing;
+    }
+
+    if (Math.abs(scrollDelta) < 1) {
+      return;
+    }
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    navList.scrollBy({
+      top: scrollDelta,
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  });
+}
+
+navGroups.forEach((group) => {
+  group.addEventListener("toggle", () => keepNavGroupVisible(group));
+});
 
 sidebarToggle?.addEventListener("click", () => {
   if (window.matchMedia("(max-width: 1120px)").matches) {

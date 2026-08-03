@@ -51,6 +51,7 @@ import {
 } from "./services/state-court-agent.service.mjs";
 import {
   buildJecAgentProfile,
+  getJecManualFilingGuide,
   getJecPortal,
   listJecPortals,
   prepareJecPetition,
@@ -3650,7 +3651,12 @@ async function handleApi(request, response, pathname) {
       sendJson(response, 401, { error: "authentication_required" });
       return true;
     }
-    sendJson(response, 200, { portals: listJecPortals() });
+    sendJson(response, 200, {
+      portals: listJecPortals().map((portal) => ({
+        ...portal,
+        manualFiling: getJecManualFilingGuide(portal.uf),
+      })),
+    });
     return true;
   }
 
@@ -3743,7 +3749,7 @@ async function handleApi(request, response, pathname) {
       }
       const pdf = Buffer.from(await createJecPetitionPdf(prepared));
       const modelNumber = Number(prepared.template?.sourceModel || 0) || 1;
-      const fileName = `peticao-jec-itau-modelo-${modelNumber}.pdf`;
+      const fileName = `relatorio-tecnico-auditoria-itau-modelo-${modelNumber}.pdf`;
       response.writeHead(200, {
         "content-type": "application/pdf",
         "content-disposition": `attachment; filename="${fileName}"`,
