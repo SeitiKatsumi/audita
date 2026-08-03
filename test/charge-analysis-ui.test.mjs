@@ -10,6 +10,7 @@ import {
 } from "../charge-analysis.js";
 
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const plansHtml = readFileSync(new URL("../plans.html", import.meta.url), "utf8");
 const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const stylesCss = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const chargeAnalysisJs = readFileSync(
@@ -56,6 +57,17 @@ test("sidebar keeps charge analysis at the main level and uses the selected adap
   assert.match(appJs, /classList\.add\("has-active-child"\)/);
   assert.match(stylesCss, /body\.sidebar-collapsed \.nav-group\.has-active-child > summary/);
   assert.match(stylesCss, /body\.sidebar-collapsed \.nav-label\s*\{[\s\S]*?position:\s*absolute/);
+});
+
+test("every Audita surface uses the official logo asset", () => {
+  const surfaces = [indexHtml, plansHtml, appJs, chargeAnalysisJs];
+  for (const surface of surfaces) {
+    assert.doesNotMatch(surface, /audita-logo-white\.svg/);
+  }
+  assert.match(indexHtml, /assets\/audita-logo-original\.png/);
+  assert.match(plansHtml, /assets\/audita-logo-original\.png/);
+  assert.match(appJs, /assets\/audita-logo-original\.png/);
+  assert.match(chargeAnalysisJs, /assets\/audita-logo-original\.png/);
 });
 
 test("sidebar keeps expanded groups scrollable and collapsed icons centered", () => {

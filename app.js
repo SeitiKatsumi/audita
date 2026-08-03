@@ -3561,7 +3561,7 @@ function renderActiveJecFlow(thread) {
   if (!active) return "";
   return `
     <article class="chat-message-row assistant chat-jec-flow-row" data-jec-flow-case="${escapeHtml(active.caseData.id)}">
-      <span class="chat-message-avatar"><img src="assets/audita-logo-white.svg" alt="" /></span>
+      <span class="chat-message-avatar"><img src="assets/audita-logo-original.png" alt="" /></span>
       <div class="chat-message-content">
         <strong>Audita IA</strong>
         <div class="chat-message-body">Complete os dados seguros abaixo para gerar o Relatório Técnico em PDF. Depois você receberá o link e o passo a passo do tribunal.</div>
@@ -3665,7 +3665,7 @@ function renderChatMessages() {
         <article class="chat-message-row ${message.role === "user" ? "user" : "assistant"}">
           ${
             message.role === "assistant"
-              ? `<span class="chat-message-avatar"><img src="assets/audita-logo-white.svg" alt="" /></span>`
+              ? `<span class="chat-message-avatar"><img src="assets/audita-logo-original.png" alt="" /></span>`
               : ""
           }
           <div class="chat-message-content">
@@ -3695,7 +3695,7 @@ function renderChatMessages() {
       "beforeend",
       `
         <article class="chat-message-row assistant chat-message-loading">
-          <span class="chat-message-avatar"><img src="assets/audita-logo-white.svg" alt="" /></span>
+          <span class="chat-message-avatar"><img src="assets/audita-logo-original.png" alt="" /></span>
           <div class="chat-message-content">
             <strong>Audita IA</strong>
             <div class="chat-thinking" aria-label="Analisando"><i></i><i></i><i></i></div>

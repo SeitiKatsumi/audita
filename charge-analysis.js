@@ -470,7 +470,7 @@ if (stage) {
   function assistantAvatar() {
     return `
       <span class="charge-analysis-avatar" aria-hidden="true">
-        <img src="assets/audita-logo-white.svg" alt="" />
+        <img src="assets/audita-logo-original.png" alt="" />
       </span>
     `;
   }
@@ -1131,7 +1131,7 @@ if (stage) {
         />
         <label class="charge-upload-dropzone ${fileName ? "has-file" : ""}" for="chargeAnalysisFile" data-charge-upload-drop>
           <span class="charge-upload-icon" aria-hidden="true">
-            <img src="assets/audita-logo-white.svg" alt="" />
+            <img src="assets/audita-logo-original.png" alt="" />
           </span>
           <strong>${fileName ? escapeChargeHtml(fileName) : isCompleteHistory ? "Anexar faturas ou extratos" : "Anexar documento ou print"}</strong>
           <small>${fileName ? "Clique para trocar a seleção" : `PDF, imagem, CSV ou TXT · até 12 MB por arquivo${isCompleteHistory ? " · seleção múltipla" : ""}`}</small>
@@ -1167,7 +1167,7 @@ if (stage) {
     stage.innerHTML = `
       <div class="charge-analysis-processing" role="status">
         <span class="charge-analysis-mark" aria-hidden="true">
-          <img src="assets/audita-logo-white.svg" alt="" />
+          <img src="assets/audita-logo-original.png" alt="" />
         </span>
         <p class="eyebrow">Leitura em andamento</p>
         <h3>${files.length > 1 ? `Analisando ${files.length} documentos` : `Analisando ${escapeChargeHtml(files[0]?.name || "o documento")}`}</h3>
@@ -1722,7 +1722,7 @@ if (stage) {
     stage.innerHTML = `
       <div class="charge-analysis-finish">
         <span class="charge-analysis-mark" aria-hidden="true">
-          <img src="assets/audita-logo-white.svg" alt="" />
+          <img src="assets/audita-logo-original.png" alt="" />
         </span>
         <p class="eyebrow">Triagem encerrada</p>
         <h3>Este fluxo é específico para cartões Itaú, Itaucard e possíveis marcas parceiras.</h3>
