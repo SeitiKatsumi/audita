@@ -7,6 +7,7 @@ import {
   buildChargeEstimate,
   buildChargeJecHandoff,
   CHARGE_ANALYSIS_BRANDS,
+  mergeChargeAnalysisFiles,
 } from "../charge-analysis.js";
 
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
@@ -159,6 +160,18 @@ test("charge analysis separates complete, partial and no-statement journeys", ()
   assert.match(chargeAnalysisJs, /Não tenho nenhum extrato/);
   assert.match(chargeAnalysisJs, /multiple/);
   assert.match(chargeAnalysisJs, /aggregateChargeCases/);
+});
+
+test("charge analysis accepts and manages multiple documents in every upload journey", () => {
+  assert.match(chargeAnalysisJs, /id="chargeAnalysisFile"[\s\S]*?multiple/);
+  assert.doesNotMatch(chargeAnalysisJs, /files\.slice\(0, 1\)/);
+  assert.match(chargeAnalysisJs, /data-charge-action="remove-upload-file"/);
+  assert.match(chargeAnalysisJs, /Clique para adicionar mais documentos/);
+
+  const first = { name: "janeiro.pdf", size: 120, lastModified: 1, type: "application/pdf" };
+  const duplicate = { ...first };
+  const second = { name: "fevereiro.pdf", size: 160, lastModified: 2, type: "application/pdf" };
+  assert.deepEqual(mergeChargeAnalysisFiles([first], [duplicate, second]), [first, second]);
 });
 
 test("charge analysis keeps the 113 supplied brand references as triage data", () => {

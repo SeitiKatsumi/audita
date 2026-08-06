@@ -7773,9 +7773,9 @@ body[data-active-page="chat"] .workspace {
 }
 
 .charge-upload-file-list li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 14px;
   padding: 9px 11px;
   border: 1px solid rgba(73, 169, 255, 0.16);
@@ -7785,9 +7785,32 @@ body[data-active-page="chat"] .workspace {
   font-size: 0.75rem;
 }
 
+.charge-upload-file-list li > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .charge-upload-file-list small {
   flex: 0 0 auto;
   color: var(--muted);
+}
+
+.charge-upload-file-list button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 121, 121, 0.34);
+  border-radius: 6px;
+  color: #ffb0b0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.charge-upload-file-list button:hover,
+.charge-upload-file-list button:focus-visible {
+  border-color: rgba(255, 121, 121, 0.68);
+  color: #ffe1e1;
+  background: rgba(255, 121, 121, 0.08);
 }
 
 .charge-estimate-panel,

@@ -138,6 +138,16 @@ export const CHARGE_ANALYSIS_BRANDS = Object.freeze(
   CHARGE_ANALYSIS_BRAND_GROUPS.flatMap((group) => group.brands),
 );
 
+export function mergeChargeAnalysisFiles(currentFiles = [], incomingFiles = []) {
+  const uniqueFiles = new Map();
+  [...currentFiles, ...incomingFiles].forEach((file) => {
+    if (!file) return;
+    const identity = [file.name, file.size, file.lastModified, file.type].join(":");
+    if (!uniqueFiles.has(identity)) uniqueFiles.set(identity, file);
+  });
+  return [...uniqueFiles.values()];
+}
+
 const OFFICIAL_CONTEXT_URL =
   "https://www.mpmg.mp.br/portal/menu/comunicacao/noticias/acordo-do-procon-mpmg-com-o-itau-beneficia-consumidores-de-cartoes-de-diversas-redes-varejistas-parceiras-do-banco.shtml";
 const EXPLANATORY_VIDEO_URL =
@@ -1102,7 +1112,7 @@ if (stage) {
     const isCompleteHistory = state.documentAvailability === "complete";
     const documentPrompt = isCompleteHistory
       ? "Anexe todas as faturas ou extratos disponíveis para uma análise documental mais completa."
-      : "Envie uma fatura, um extrato ou um print recente para localizar a possível cobrança.";
+      : "Envie uma ou mais faturas, extratos ou prints recentes para localizar a possível cobrança.";
     const documentDetail = isCompleteHistory
       ? "Os documentos serão analisados individualmente e reunidos em uma única visão, preservando a origem de cada lançamento."
       : "Depois da leitura, você poderá informar há quanto tempo lembra de receber a cobrança para gerar a simulação.";
@@ -1126,21 +1136,32 @@ if (stage) {
           class="hidden"
           id="chargeAnalysisFile"
           type="file"
-          ${isCompleteHistory ? "multiple" : ""}
+          multiple
           accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,application/pdf,image/png,image/jpeg,text/csv,text/plain"
         />
         <label class="charge-upload-dropzone ${fileName ? "has-file" : ""}" for="chargeAnalysisFile" data-charge-upload-drop>
           <span class="charge-upload-icon" aria-hidden="true">
             <img src="assets/audita-logo-original.png" alt="" />
           </span>
-          <strong>${fileName ? escapeChargeHtml(fileName) : isCompleteHistory ? "Anexar faturas ou extratos" : "Anexar documento ou print"}</strong>
-          <small>${fileName ? "Clique para trocar a seleção" : `PDF, imagem, CSV ou TXT · até 12 MB por arquivo${isCompleteHistory ? " · seleção múltipla" : ""}`}</small>
+          <strong>${fileName ? escapeChargeHtml(fileName) : isCompleteHistory ? "Anexar faturas ou extratos" : "Anexar documentos ou prints"}</strong>
+          <small>${fileName ? "Clique para adicionar mais documentos" : "PDF, imagem, CSV ou TXT · até 12 MB por arquivo · seleção múltipla"}</small>
         </label>
 
         ${
-          files.length > 1
+          files.length
             ? `<ul class="charge-upload-file-list">${files
-                .map((file) => `<li><span>${escapeChargeHtml(file.name)}</span><small>${Math.max(1, Math.round(file.size / 1024))} KB</small></li>`)
+                .map((file, index) => `
+                  <li>
+                    <span>${escapeChargeHtml(file.name)}</span>
+                    <small>${Math.max(1, Math.round(file.size / 1024))} KB</small>
+                    <button
+                      type="button"
+                      data-charge-action="remove-upload-file"
+                      data-charge-file-index="${index}"
+                      aria-label="Remover ${escapeChargeHtml(file.name)}"
+                    >Remover</button>
+                  </li>
+                `)
                 .join("")}</ul>`
             : ""
         }
@@ -1150,7 +1171,7 @@ if (stage) {
           <span>Confirmo que sou titular do documento ou possuo autorização para realizar esta análise.</span>
         </label>
 
-        <p class="charge-upload-privacy">O arquivo é processado para esta análise e não fica armazenado por este módulo. Dados sensíveis são mascarados antes da leitura automatizada quando aplicável.</p>
+        <p class="charge-upload-privacy">Os arquivos são processados para esta análise e não ficam armazenados por este módulo. Dados sensíveis são mascarados antes da leitura automatizada quando aplicável.</p>
 
         <div class="charge-upload-actions">
           <button type="button" class="secondary-action" data-charge-action="back-documents">Voltar</button>
@@ -1954,6 +1975,14 @@ if (stage) {
       resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
+    } else if (action === "remove-upload-file") {
+      const fileIndex = Number(button.dataset.chargeFileIndex);
+      if (Number.isInteger(fileIndex) && fileIndex >= 0) {
+        state.selectedFiles.splice(fileIndex, 1);
+        state.selectedFile = state.selectedFiles[0] || null;
+      }
+      renderUpload();
+      return;
     } else if (action === "new-document") {
       state.selectedFile = null;
       state.selectedFiles = [];
@@ -2018,7 +2047,7 @@ if (stage) {
   stage.addEventListener("change", (event) => {
     if (event.target.id === "chargeAnalysisFile") {
       const files = Array.from(event.target.files || []);
-      state.selectedFiles = state.documentAvailability === "complete" ? files : files.slice(0, 1);
+      state.selectedFiles = mergeChargeAnalysisFiles(state.selectedFiles, files);
       state.selectedFile = state.selectedFiles[0] || null;
       renderUpload();
     }
@@ -2131,7 +2160,7 @@ if (stage) {
     if (!dropzone) return;
     event.preventDefault();
     const files = Array.from(event.dataTransfer?.files || []);
-    state.selectedFiles = state.documentAvailability === "complete" ? files : files.slice(0, 1);
+    state.selectedFiles = mergeChargeAnalysisFiles(state.selectedFiles, files);
     state.selectedFile = state.selectedFiles[0] || null;
     renderUpload();
   });
