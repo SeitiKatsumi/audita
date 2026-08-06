@@ -154,6 +154,16 @@ const EXPLANATORY_VIDEO_URL =
   "https://youtube.com/shorts/rzxDS0cbdlc?is=G23u_WrPjxUIQTug";
 const EXPLANATORY_VIDEO_EMBED_URL =
   "https://www.youtube-nocookie.com/embed/rzxDS0cbdlc";
+const ITAU_INVOICE_CHANNELS_URL =
+  "https://www.itau.com.br/atendimento-itau/para-voce/cartao-de-credito/onde-consigo-a-segunda-via-da-fatura-do-meu-cartao";
+const ITAU_PHONE_CHANNELS_URL =
+  "https://www.itau.com.br/atendimento-itau/para-voce/telefones";
+const ITAU_OMBUDSMAN_URL =
+  "https://www.itau.com.br/atendimento-itau/para-voce/ouvidoria";
+
+export const ITAU_DOCUMENT_REQUEST_TEMPLATE = `Solicito cópia das faturas e/ou extratos referentes ao período de [MÊS/ANO INICIAL] a [MÊS/ANO FINAL], incluindo os lançamentos detalhados de seguros, assistências, tarifas e serviços vinculados ao cartão ou à conta.
+
+Peço também o número do protocolo deste atendimento e a confirmação do período efetivamente disponibilizado.`;
 
 const RECOVERY_UFS = Object.freeze([
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -300,7 +310,9 @@ export function buildChargeJecHandoff({
     : [];
   const audit = buildChargeAuditSnapshot({ candidates: sourceCandidates });
   const declaredEstimate =
-    Number(estimate?.monthlyAmount) > 0 && Number(estimate?.months) > 0
+    documentAvailability === "partial" &&
+    Number(estimate?.monthlyAmount) > 0 &&
+    Number(estimate?.months) > 0
       ? {
           description: String(estimate.description || "Cobrança informada pelo cliente").trim(),
           monthlyAmount: Number(Number(estimate.monthlyAmount).toFixed(2)),
@@ -311,7 +323,7 @@ export function buildChargeJecHandoff({
         }
       : null;
   const mayUseDeclaration =
-    Boolean(declaredEstimate) && sourceCandidates.length === 0 && documentAvailability !== "complete";
+    Boolean(declaredEstimate) && sourceCandidates.length === 0 && documentAvailability === "partial";
   const candidates = mayUseDeclaration
     ? [
         {
@@ -322,7 +334,7 @@ export function buildChargeJecHandoff({
           date: "",
           amount: null,
           answer: "not_recognized",
-          reason: "Cobrança declarada pelo cliente sem extrato histórico disponível.",
+          reason: "Cobrança declarada pelo cliente com histórico documental parcial.",
           confidence: "declared",
           source: "consumer_declaration",
         },
@@ -334,7 +346,8 @@ export function buildChargeJecHandoff({
   const pendingCount = candidates.filter(
     (candidate) => !candidate.answer || candidate.answer === "pending",
   ).length;
-  const ready = disputedCount > 0 && pendingCount === 0;
+  const hasRequiredDocuments = documentAvailability !== "none";
+  const ready = hasRequiredDocuments && disputedCount > 0 && pendingCount === 0;
   const suggestedDouble =
     audit.totalDisputed > 0
       ? audit.hypotheticalDouble
@@ -348,14 +361,18 @@ export function buildChargeJecHandoff({
     historicalDocumentsAvailable === "yes" || Number(declaredEstimate?.months) > 1
       ? "yes"
       : String(caseData?.answers?.historicalEvidence || "unknown");
-  const suggestionSource = mayUseDeclaration
-    ? "charge_analysis_declared_estimate"
-    : "charge_analysis_documentary_evidence";
+  const suggestionSource = !hasRequiredDocuments
+    ? "charge_analysis_documents_required"
+    : mayUseDeclaration
+      ? "charge_analysis_declared_estimate"
+      : "charge_analysis_documentary_evidence";
 
   return {
     ready,
     reason:
-      disputedCount === 0
+      !hasRequiredDocuments
+        ? "Anexe ao menos uma fatura ou extrato antes de preparar a documentação jurídica."
+        : disputedCount === 0
         ? "Confirme ao menos uma cobrança não reconhecida antes de preparar a documentação."
         : pendingCount > 0
           ? "Revise todos os lançamentos encontrados antes de preparar a documentação."
@@ -389,9 +406,11 @@ export function buildChargeJecHandoff({
         caseValue: formatChargeAmountInput(suggestedDouble),
       },
       notes: [
-        mayUseDeclaration
-          ? "Os valores foram informados pelo cliente e permanecem estimados até a apresentação dos documentos."
-          : "A estimativa inicial usa somente cobranças documentadas e marcadas como não reconhecidas.",
+        !hasRequiredDocuments
+          ? "Nenhum cálculo ou encaminhamento jurídico deve ser preparado sem ao menos uma fatura ou extrato."
+          : mayUseDeclaration
+            ? "Os valores foram informados pelo cliente e complementam um histórico documental parcial."
+            : "A estimativa inicial usa somente cobranças documentadas e marcadas como não reconhecidas.",
       ],
       disclaimer:
         "A repetição em dobro, os danos e o valor da causa dependem de revisão jurídica e decisão judicial.",
@@ -678,11 +697,11 @@ if (stage) {
       tribunal: "Tribunal",
     };
     let progressState = "authorization";
-    if (state.screen === "documents") {
+    if (["documents", "no-documents"].includes(state.screen)) {
       progressState = "statements";
     } else if (["upload", "analyzing", "estimate"].includes(state.screen)) {
       progressState = "analysis";
-    } else if (["result", "estimate-result"].includes(state.screen)) {
+    } else if (state.screen === "result") {
       progressState = "result";
     } else if (state.screen === "recovery") {
       progressState = state.recovery.phase === "guide"
@@ -713,13 +732,13 @@ if (stage) {
     const responseButtons = `
       <div class="charge-analysis-actions" aria-label="Respostas da primeira etapa">
         <button type="button" data-charge-action="not-authorized">
-          <strong>N&atilde;o autorizei / Desconhe&ccedil;o a contrata&ccedil;&atilde;o destes seguros</strong>
+          <strong>Acredito que tenho alguma cobran&ccedil;a indevida no meu cart&atilde;o ou conta Ita&uacute;</strong>
         </button>
         <button type="button" data-charge-action="authorized">
-          <strong>Sim, eu autorizei e assinei contrato com o Ita&uacute;</strong>
+          <strong>Acredito que n&atilde;o tenho nenhuma cobran&ccedil;a indevida</strong>
         </button>
         <button type="button" data-charge-action="verify-statement">
-          <strong>N&atilde;o tenho certeza / Quero verificar o extrato</strong>
+          <strong>N&atilde;o sei, gostaria de mais informa&ccedil;&otilde;es</strong>
         </button>
         <button type="button" class="secondary" data-charge-action="lawyer" aria-label="Sou advogado ou advogada e quero auditar o documento de um cliente">
           <strong>Sou advogado(a)</strong>
@@ -772,8 +791,8 @@ if (stage) {
       `, "Contexto verificado"),
       assistantMessage(`<p>Para entender melhor o seu caso, vou fazer algumas perguntas r&aacute;pidas.</p>`),
       assistantMessage(`
-        <p><strong>Voc&ecirc; contratou ou autorizou expressamente a cobran&ccedil;a de algum seguro ou servi&ccedil;o no seu cart&atilde;o/conta Ita&uacute; desde 2011?</strong></p>
-        <p class="charge-analysis-choice-hint">Se tiver d&uacute;vida, consulte os tipos de seguro considerados nesta verifica&ccedil;&atilde;o.</p>
+        <p><strong>Qual destas op&ccedil;&otilde;es descreve melhor a sua situa&ccedil;&atilde;o?</strong></p>
+        <p class="charge-analysis-choice-hint">Se ainda n&atilde;o souber, a Audita pode mostrar mais informa&ccedil;&otilde;es e refer&ecirc;ncias para ajudar na triagem.</p>
         <details class="charge-analysis-disclosure charge-analysis-insurance-details">
           <summary>
             <span>Seguros e servi&ccedil;os considerados</span>
@@ -813,10 +832,10 @@ if (stage) {
 
     stage.innerHTML = `
       <div class="charge-analysis-conversation compact">
-        ${userMessage("Não tenho certeza sobre a marca do cartão.")}
+        ${userMessage("Não sei, gostaria de mais informações.")}
         ${assistantMessage(`
-          <p><strong>Pesquise pelo nome que aparece na fatura ou no cartão.</strong></p>
-          <p>Esta é uma lista ampliada de referências para triagem. A presença de uma marca não confirma, por si só, vínculo com o Itaú no período analisado; a fatura será a fonte principal.</p>
+          <p><strong>Você pode pesquisar pelo nome que aparece na fatura ou no cartão.</strong></p>
+          <p>As 113 referências abaixo servem apenas como apoio à triagem. Selecionar uma delas não confirma vínculo com o Itaú nem impede a análise; você também pode continuar sem selecionar.</p>
         `, "Lista de referência")}
       </div>
 
@@ -880,13 +899,15 @@ if (stage) {
       return "Sou advogado(a) e quero auditar para um cliente.";
     }
     if (state.authorizationAnswer === "denied") {
-      return "Não autorizei e desconheço a contratação destes seguros.";
+      return "Acredito que tenho alguma cobrança indevida no meu cartão ou conta Itaú.";
     }
     if (state.authorizationAnswer === "confirmed") {
-      return "Autorizei e assinei um contrato com o Itaú.";
+      return "Acredito que não tenho nenhuma cobrança indevida.";
     }
     if (state.authorizationAnswer === "uncertain") {
-      return "Não tenho certeza e quero verificar o extrato.";
+      return state.selectedBrand
+        ? `Não sei se há cobrança indevida; selecionei ${state.selectedBrand} apenas como referência para a triagem.`
+        : "Não sei se há cobrança indevida e gostaria de mais informações.";
     }
     if (state.selectedBrand) return `Meu cartão pode ser ${state.selectedBrand}.`;
     return "Possuo ou já possuí cartão Itaú ou de marca parceira.";
@@ -898,7 +919,7 @@ if (stage) {
         ${userMessage(routeIdentityMessage())}
         ${assistantMessage(`
           <p><strong>Você possui as faturas ou os extratos de todo o período em que acredita ter recebido essa cobrança?</strong></p>
-          <p class="charge-analysis-choice-hint">Escolha a situação mais próxima da sua. A falta do histórico completo não impede a simulação.</p>
+          <p class="charge-analysis-choice-hint">Documentos parciais permitem uma triagem inicial, mas não comprovam integralmente todo o período.</p>
           <div class="charge-analysis-actions charge-document-actions" aria-label="Disponibilidade dos extratos">
             <button type="button" data-charge-action="documents-complete">
               <strong>Tenho todos ou a maior parte</strong>
@@ -915,24 +936,24 @@ if (stage) {
     `;
   }
 
-  function estimateFormMarkup({ inline = false } = {}) {
+  function partialEstimateFormMarkup() {
     const draft = state.estimateDraft;
     const audit = buildChargeAuditSnapshot(state.caseData || {});
     const detectedAmount = audit.totalDisputed || audit.totalDetected || 0;
     const detectedDescription = state.caseData?.candidates?.find(
       (candidate) => candidate.answer === "not_recognized",
     )?.label || state.caseData?.candidates?.[0]?.label || "";
-    const descriptionValue = draft.description || (inline ? detectedDescription : "");
-    const monthlyValue = draft.monthlyAmount || (inline && detectedAmount ? String(detectedAmount) : "");
+    const descriptionValue = draft.description || detectedDescription;
+    const monthlyValue = draft.monthlyAmount || (detectedAmount ? String(detectedAmount) : "");
 
     return `
-      <form class="charge-estimate-panel ${inline ? "inline" : ""}" id="chargeEstimateForm">
+      <form class="charge-estimate-panel inline" id="chargeEstimateForm">
         <div class="charge-estimate-heading">
           <div>
             <p class="eyebrow">Simulação estimada</p>
             <h3>Informe o que você lembra sobre a cobrança</h3>
           </div>
-          <span>${inline ? "Complemento do documento" : "Sem extrato histórico"}</span>
+          <span>Complemento com documentos parciais</span>
         </div>
 
         <div class="charge-estimate-grid">
@@ -989,10 +1010,10 @@ if (stage) {
           <span>Confirmo que esses dados são aproximados e foram informados com base no que consigo recordar.</span>
         </label>
 
-        <p class="charge-upload-privacy">A simulação não substitui a análise dos extratos. O Relatório Técnico deve identificar esses valores como declarados e estimados.</p>
+        <p class="charge-upload-privacy">A estimativa complementa apenas os documentos parciais enviados. Ela não comprova o período ausente e deve permanecer separada da base documental.</p>
 
         <div class="charge-upload-actions">
-          <button type="button" class="secondary-action" data-charge-action="${inline ? "new-document" : "back-documents"}">${inline ? "Revisar documento" : "Voltar"}</button>
+          <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
           <button type="submit" class="primary-action">Calcular simulação</button>
         </div>
       </form>
@@ -1008,7 +1029,7 @@ if (stage) {
         <header>
           <div>
             <p class="eyebrow">Relatório preliminar</p>
-            <h3>Simulação baseada na declaração do cliente</h3>
+            <h3>Complemento estimado aos documentos parciais</h3>
           </div>
           <span>Valores estimados</span>
         </header>
@@ -1051,45 +1072,85 @@ if (stage) {
           </table>
         </div>
         <footer>
-          <p>Este cálculo usa informações aproximadas fornecidas pelo cliente. O Relatório Técnico deverá registrar a ausência de extratos históricos e poderá indicar a necessidade de apresentação dos documentos pelo banco, quando juridicamente cabível.</p>
+          <p>Este cálculo combina informações aproximadas do cliente com documentos parciais. Ele não comprova os meses ausentes nem substitui as faturas ou extratos do período completo.</p>
         </footer>
       </section>
     `;
   }
 
-  function renderEstimate() {
+  function renderNoDocuments() {
     stage.innerHTML = `
       <div class="charge-analysis-conversation compact">
         ${userMessage("Não tenho nenhum extrato disponível.")}
         ${assistantMessage(`
-          <p><strong>Tudo bem. Você ainda pode fazer uma simulação aproximada.</strong></p>
-          <p>Informe o valor mensal e por quanto tempo lembra de ter recebido a cobrança. Esses dados ficarão claramente marcados como declarados, não comprovados por extratos.</p>
-        `, "Caminho sem documentos")}
+          <p><strong>As faturas ou os extratos são necessários para continuar.</strong></p>
+          <p>A Audita não consegue substituir documentos por estimativas. Sem ao menos um documento, não há base para calcular valores, gerar relatório técnico ou preparar uma eventual medida jurídica.</p>
+          <p>Solicite os documentos ao Itaú pelos canais oficiais e retorne quando receber ao menos parte do período.</p>
+        `, "Documentos necessários")}
       </div>
-      ${estimateFormMarkup()}
+      <section class="charge-no-documents" aria-labelledby="chargeNoDocumentsTitle">
+        <header>
+          <p class="eyebrow">Como solicitar ao Itaú</p>
+          <h3 id="chargeNoDocumentsTitle">Peça as faturas e os extratos do período relevante</h3>
+          <p>Comece pelos canais digitais. Se o período não estiver disponível, registre a solicitação no atendimento e peça o protocolo.</p>
+        </header>
+        <ol class="charge-no-documents-channels">
+          <li>
+            <strong>App Itaú, app Itaú Cartões ou Itaú na internet</strong>
+            <span>Consulte e baixe as faturas disponíveis na área de cartões.</span>
+            <a href="${ITAU_INVOICE_CHANNELS_URL}" target="_blank" rel="noreferrer">Ver orientação oficial do Itaú</a>
+          </li>
+          <li>
+            <strong>WhatsApp Itaú: 11 4004-4828</strong>
+            <span>Envie a palavra “fatura” e confirme quais meses podem ser fornecidos.</span>
+            <a href="${ITAU_INVOICE_CHANNELS_URL}" target="_blank" rel="noreferrer">Confirmar canal oficial</a>
+          </li>
+          <li>
+            <strong>SAC Itaú: 0800 728 0728</strong>
+            <span>Use o atendimento para solicitar o período que não estiver disponível nos canais digitais e anote o protocolo.</span>
+            <a href="${ITAU_PHONE_CHANNELS_URL}" target="_blank" rel="noreferrer">Consultar telefones oficiais</a>
+          </li>
+          <li>
+            <strong>Ouvidoria: 0800 570 0011</strong>
+            <span>Use somente se uma solicitação anterior não tiver sido resolvida; tenha o protocolo em mãos.</span>
+            <a href="${ITAU_OMBUDSMAN_URL}" target="_blank" rel="noreferrer">Abrir página oficial da Ouvidoria</a>
+          </li>
+        </ol>
+        <div class="charge-document-request">
+          <label for="chargeDocumentRequestTemplate">Modelo para copiar e preencher</label>
+          <textarea id="chargeDocumentRequestTemplate" rows="6" readonly>${escapeChargeHtml(ITAU_DOCUMENT_REQUEST_TEMPLATE)}</textarea>
+          <p>Preencha apenas no canal oficial escolhido. A Audita não envia esta solicitação em seu nome.</p>
+          <button type="button" class="secondary-action" data-charge-action="copy-document-request">Copiar modelo</button>
+          <span id="chargeDocumentRequestCopyStatus" role="status" aria-live="polite"></span>
+        </div>
+        <p class="charge-no-documents-warning"><strong>Guarde os protocolos e os arquivos recebidos.</strong> Esta orientação não promete restituição nem define uma tese jurídica.</p>
+      </section>
+      <div class="charge-result-actions charge-no-documents-actions">
+        <button type="button" class="secondary-action" data-charge-action="back-documents">Voltar e revisar</button>
+        <button type="button" class="primary-action" data-charge-action="resume-document-upload">Já tenho documentos para anexar</button>
+      </div>
     `;
   }
 
-  function renderEstimateResult() {
-    stage.innerHTML = `
-      <div class="charge-result-heading">
-        <div>
-          <p class="eyebrow">Simulação concluída</p>
-          <h3>Base estimada para o Relatório Técnico</h3>
-          <p>Sem extratos históricos · valores declarados pelo cliente</p>
-        </div>
-        <span>Estimativa</span>
-      </div>
-      ${estimateReportMarkup()}
-      <section class="charge-petition-note" aria-label="Próxima etapa da recuperação">
-        <strong>Como esta informação será utilizada</strong>
-        <p>A simulação poderá compor o Relatório Técnico de Auditoria, sempre identificada como estimativa. Na próxima etapa, você revisará os dados, gerará o PDF e receberá o passo a passo do tribunal.</p>
-      </section>
-      <div class="charge-result-actions">
-        <button type="button" class="secondary-action" data-charge-action="edit-estimate">Editar informações</button>
-        ${documentationActionMarkup()}
-      </div>
-    `;
+  async function copyDocumentRequestTemplate() {
+    const field = document.querySelector("#chargeDocumentRequestTemplate");
+    const statusElement = document.querySelector("#chargeDocumentRequestCopyStatus");
+    if (!field || !statusElement) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(ITAU_DOCUMENT_REQUEST_TEMPLATE);
+      } else {
+        field.focus();
+        field.select();
+        if (!document.execCommand("copy")) throw new Error("copy_failed");
+      }
+      statusElement.textContent = "Modelo copiado.";
+    } catch {
+      field.focus();
+      field.select();
+      statusElement.textContent = "Selecione o texto e copie manualmente.";
+    }
   }
 
   function renderUpload() {
@@ -1115,7 +1176,7 @@ if (stage) {
       : "Envie uma ou mais faturas, extratos ou prints recentes para localizar a possível cobrança.";
     const documentDetail = isCompleteHistory
       ? "Os documentos serão analisados individualmente e reunidos em uma única visão, preservando a origem de cada lançamento."
-      : "Depois da leitura, você poderá informar há quanto tempo lembra de receber a cobrança para gerar a simulação.";
+      : "A triagem considerará somente os arquivos enviados. Documentos parciais não comprovam integralmente o período e não serão apresentados como histórico completo.";
 
     stage.innerHTML = `
       <div class="charge-analysis-conversation compact">
@@ -1290,7 +1351,7 @@ if (stage) {
       : "Apuração da evidência recente";
     const reportFooter = isCompleteHistory
       ? "Os valores usam somente os documentos enviados. Meses ausentes, correção, juros, indenizações e aplicação jurídica dependem de revisão do caso."
-      : "Os valores desta seção usam apenas o documento recente. Para estimar o período sem extratos, complete a simulação abaixo; ela ficará separada da base documental.";
+      : "Os valores desta seção usam apenas os documentos enviados. Documentos parciais não comprovam integralmente o período; qualquer complemento estimado ficará separado da base documental.";
 
     stage.innerHTML = `
       <div class="charge-result-heading">
@@ -1366,7 +1427,7 @@ if (stage) {
         </footer>
       </section>
 
-      ${isPartialHistory ? (state.estimate ? estimateReportMarkup() : estimateFormMarkup({ inline: true })) : ""}
+      ${isPartialHistory ? (state.estimate ? estimateReportMarkup() : partialEstimateFormMarkup()) : ""}
 
       ${
         state.estimate
@@ -1758,11 +1819,10 @@ if (stage) {
     if (state.screen !== "triage") messageSequenceId += 1;
     if (state.screen === "brands") renderBrands();
     else if (state.screen === "documents") renderDocumentAvailability();
+    else if (state.screen === "no-documents") renderNoDocuments();
     else if (state.screen === "upload") renderUpload();
     else if (state.screen === "analyzing") renderAnalyzing();
     else if (state.screen === "result") renderResult();
-    else if (state.screen === "estimate") renderEstimate();
-    else if (state.screen === "estimate-result") renderEstimateResult();
     else if (state.screen === "recovery") renderRecovery();
     else if (state.screen === "ended") renderEnded();
     else renderTriage();
@@ -1890,24 +1950,24 @@ if (stage) {
     state.error = "";
 
     if (action === "not-authorized") {
-      continueFromTriage("Não autorizei / Desconheço a contratação destes seguros.", () => {
+      continueFromTriage("Acredito que tenho alguma cobrança indevida no meu cartão ou conta Itaú.", () => {
         state.route = "consumer";
         state.authorizationAnswer = "denied";
         state.screen = "documents";
       });
       return;
     } else if (action === "authorized") {
-      continueFromTriage("Sim, eu autorizei e assinei contrato com o Itaú.", () => {
+      continueFromTriage("Acredito que não tenho nenhuma cobrança indevida.", () => {
         state.route = "consumer";
         state.authorizationAnswer = "confirmed";
         state.screen = "documents";
       });
       return;
     } else if (action === "verify-statement") {
-      continueFromTriage("Não tenho certeza / Quero verificar o extrato.", () => {
+      continueFromTriage("Não sei, gostaria de mais informações.", () => {
         state.route = "consumer";
         state.authorizationAnswer = "uncertain";
-        state.screen = "documents";
+        state.screen = "brands";
       });
       return;
     } else if (action === "lawyer") {
@@ -1961,9 +2021,23 @@ if (stage) {
       continueFromTriage("Não tenho nenhum extrato.", () => {
         resetEstimateDraft();
         state.documentAvailability = "none";
-        state.screen = "estimate";
+        state.screen = "no-documents";
       });
       return;
+    } else if (action === "copy-document-request") {
+      void copyDocumentRequestTemplate();
+      return;
+    } else if (action === "resume-document-upload") {
+      state.selectedFile = null;
+      state.selectedFiles = [];
+      state.consent = false;
+      state.caseData = null;
+      state.caseBatches = [];
+      state.estimate = null;
+      resetEstimateDraft();
+      resetRecovery();
+      state.documentAvailability = "partial";
+      state.screen = "upload";
     } else if (action === "back-documents") {
       state.selectedFile = null;
       state.selectedFiles = [];
@@ -1994,14 +2068,11 @@ if (stage) {
       resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
-    } else if (action === "edit-estimate") {
-      state.estimate = null;
-      state.screen = "estimate";
     } else if (action === "start-recovery") {
       startRecoveryFlow();
       return;
     } else if (action === "back-to-result") {
-      state.screen = state.documentAvailability === "none" ? "estimate-result" : "result";
+      state.screen = "result";
     } else if (action === "open-recovery-report") {
       state.recovery.phase = "report";
     } else if (action === "back-to-recovery-intro") {
@@ -2126,7 +2197,7 @@ if (stage) {
           durationUnit: state.estimateDraft.durationUnit,
         }),
       };
-      state.screen = state.documentAvailability === "partial" ? "result" : "estimate-result";
+      state.screen = "result";
       render();
       return;
     }

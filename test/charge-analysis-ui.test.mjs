@@ -7,6 +7,7 @@ import {
   buildChargeEstimate,
   buildChargeJecHandoff,
   CHARGE_ANALYSIS_BRANDS,
+  ITAU_DOCUMENT_REQUEST_TEMPLATE,
   mergeChargeAnalysisFiles,
 } from "../charge-analysis.js";
 
@@ -123,17 +124,35 @@ test("charge analysis reveals agent messages before moving to the selected path"
   assert.match(chargeAnalysisJs, /Math\.min\(1700, Math\.max\(900, visibleLength \* 4\)\)/);
 });
 
-test("charge analysis starts by asking about express authorization", () => {
+test("charge analysis starts with the four supported self-assessment paths", () => {
   assert.match(
     chargeAnalysisJs,
-    /Voc&ecirc; contratou ou autorizou expressamente a cobran&ccedil;a de algum seguro ou servi&ccedil;o/,
+    /Qual destas op&ccedil;&otilde;es descreve melhor a sua situa&ccedil;&atilde;o/,
   );
   assert.match(chargeAnalysisJs, /data-charge-action="not-authorized"/);
   assert.match(chargeAnalysisJs, /data-charge-action="authorized"/);
   assert.match(chargeAnalysisJs, /data-charge-action="verify-statement"/);
-  assert.match(chargeAnalysisJs, /N&atilde;o tenho certeza \/ Quero verificar o extrato/);
+  assert.match(chargeAnalysisJs, /Acredito que tenho alguma cobran&ccedil;a indevida no meu cart&atilde;o ou conta Ita&uacute;/);
+  assert.match(chargeAnalysisJs, /Acredito que n&atilde;o tenho nenhuma cobran&ccedil;a indevida/);
+  assert.match(chargeAnalysisJs, /N&atilde;o sei, gostaria de mais informa&ccedil;&otilde;es/);
+  assert.match(chargeAnalysisJs, /<strong>Sou advogado\(a\)<\/strong>/);
   assert.match(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
   assert.match(chargeAnalysisJs, /Seguro Prestamista/);
+});
+
+test("the information path opens the searchable reference list before documents", () => {
+  assert.match(
+    chargeAnalysisJs,
+    /action === "verify-statement"[\s\S]*?authorizationAnswer = "uncertain";[\s\S]*?state\.screen = "brands";/,
+  );
+  assert.match(chargeAnalysisJs, /Buscar entre 113 referências/);
+  assert.match(chargeAnalysisJs, /data-charge-action="select-brand"/);
+  assert.match(chargeAnalysisJs, /data-charge-action="continue-brand"/);
+  assert.match(chargeAnalysisJs, /Selecionar uma delas não confirma vínculo com o Itaú nem impede a análise/);
+  assert.match(
+    chargeAnalysisJs,
+    /action === "continue-brand"[\s\S]*?state\.screen = "documents";/,
+  );
 });
 
 test("charge analysis context exposes the explanatory memorandum and video", () => {
@@ -151,15 +170,32 @@ test("charge analysis keeps optional context collapsed by default", () => {
   assert.doesNotMatch(chargeAnalysisJs, /<details class="[^"]*charge-analysis-(?:transaction|context|insurance-details)[^"]*" open>/);
 });
 
-test("charge analysis separates complete, partial and no-statement journeys", () => {
+test("charge analysis separates complete, partial and no-document journeys", () => {
   assert.match(chargeAnalysisJs, /documents-complete/);
   assert.match(chargeAnalysisJs, /documents-partial/);
   assert.match(chargeAnalysisJs, /documents-none/);
   assert.match(chargeAnalysisJs, /Tenho todos ou a maior parte/);
   assert.match(chargeAnalysisJs, /Tenho apenas alguns ou um print recente/);
   assert.match(chargeAnalysisJs, /Não tenho nenhum extrato/);
+  assert.match(chargeAnalysisJs, /state\.screen = "no-documents"/);
   assert.match(chargeAnalysisJs, /multiple/);
   assert.match(chargeAnalysisJs, /aggregateChargeCases/);
+});
+
+test("the no-document path requests evidence without calculation or legal handoff", () => {
+  assert.match(chargeAnalysisJs, /A Audita não consegue substituir documentos por estimativas/);
+  assert.match(chargeAnalysisJs, /Sem ao menos um documento, não há base para calcular valores, gerar relatório técnico ou preparar uma eventual medida jurídica/);
+  assert.match(chargeAnalysisJs, /data-charge-action="copy-document-request"/);
+  assert.match(chargeAnalysisJs, /data-charge-action="resume-document-upload"/);
+  assert.match(chargeAnalysisJs, /0800 728 0728/);
+  assert.match(chargeAnalysisJs, /0800 570 0011/);
+  assert.match(chargeAnalysisJs, /www\.itau\.com\.br\/atendimento-itau/);
+  assert.doesNotMatch(ITAU_DOCUMENT_REQUEST_TEMPLATE, /\d{3}\.\d{3}\.\d{3}-\d{2}/);
+  assert.match(ITAU_DOCUMENT_REQUEST_TEMPLATE, /\[MÊS\/ANO INICIAL\]/);
+  assert.match(ITAU_DOCUMENT_REQUEST_TEMPLATE, /número do protocolo/);
+  assert.doesNotMatch(chargeAnalysisJs, /function renderEstimate\(/);
+  assert.doesNotMatch(chargeAnalysisJs, /function renderEstimateResult\(/);
+  assert.doesNotMatch(chargeAnalysisJs, /state\.screen = "estimate-result"/);
 });
 
 test("charge analysis accepts and manages multiple documents in every upload journey", () => {
@@ -201,7 +237,7 @@ test("preliminary audit calculates only evidenced and user-disputed amounts", ()
   );
 });
 
-test("declaratory simulation keeps estimated values separate from documentary totals", () => {
+test("partial-document estimate stays separate from documentary totals", () => {
   assert.deepEqual(
     buildChargeEstimate({
       monthlyAmount: 19,
@@ -217,8 +253,8 @@ test("declaratory simulation keeps estimated values separate from documentary to
       hypotheticalDouble: 6840,
     },
   );
-  assert.match(chargeAnalysisJs, /valores como declarados e estimados/);
-  assert.match(chargeAnalysisJs, /não comprovados por extratos/);
+  assert.match(chargeAnalysisJs, /A estimativa complementa apenas os documentos parciais enviados/);
+  assert.match(chargeAnalysisJs, /Documentos parciais não comprovam integralmente o período/);
   assert.match(chargeAnalysisJs, /A definir na revisão/);
 });
 
@@ -248,7 +284,7 @@ test("guided documentary journey hands evidenced charges to JEC model 1", () => 
   assert.equal(handoff.caseData.candidates[0].amount, 19);
 });
 
-test("guided no-statement journey hands a declared estimate to JEC model 2", () => {
+test("guided no-document journey blocks estimates and JEC preparation", () => {
   const estimate = {
     description: "Proteção do cartão",
     ...buildChargeEstimate({
@@ -264,14 +300,15 @@ test("guided no-statement journey hands a declared estimate to JEC model 2", () 
     estimate,
   });
 
-  assert.equal(handoff.ready, true);
+  assert.equal(handoff.ready, false);
   assert.equal(handoff.journey, "without_historical_documents");
   assert.equal(handoff.caseData.answers.historicalDocumentsAvailable, "no");
   assert.equal(handoff.caseData.answers.authorizationAnswer, "confirmed");
-  assert.equal(handoff.caseData.answers.declaredEstimate.estimatedPaid, 3420);
-  assert.equal(handoff.caseData.candidates[0].answer, "not_recognized");
-  assert.equal(handoff.caseData.candidates[0].amount, null);
-  assert.equal(handoff.suggestion.values.doubleRefundAmount, "6.840,00");
+  assert.equal(handoff.caseData.answers.declaredEstimate, undefined);
+  assert.deepEqual(handoff.caseData.candidates, []);
+  assert.equal(handoff.suggestion.values.doubleRefundAmount, "");
+  assert.equal(handoff.suggestion.values.caseValue, "");
+  assert.match(handoff.reason, /Anexe ao menos uma fatura ou extrato/);
 });
 
 test("guided results continue through recovery without redirecting to chat", () => {

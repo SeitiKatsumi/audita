@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  buildChargeEstimate,
-  buildChargeJecHandoff,
-} from "../charge-analysis.js";
+import { buildChargeJecHandoff } from "../charge-analysis.js";
 import { prepareJecPetition } from "../services/jec-petition.service.mjs";
 
 const claimant = {
@@ -51,33 +48,23 @@ test("documentary charge flow reaches a ready model 1 petition", () => {
   assert.match(prepared.draft, /Seguro Fatura Protegida/i);
 });
 
-test("no-statement charge flow reaches a ready declaratory model 2 petition", () => {
+test("no-document charge flow cannot reach petition preparation", () => {
   const handoff = buildChargeJecHandoff({
     handoffId: "model-2",
     documentAvailability: "none",
     authorizationAnswer: "confirmed",
     estimate: {
       description: "Proteção do cartão",
-      ...buildChargeEstimate({
-        monthlyAmount: 19.9,
-        durationValue: 12,
-        durationUnit: "months",
-      }),
+      monthlyAmount: 19.9,
+      months: 12,
+      estimatedPaid: 238.8,
+      hypotheticalDouble: 477.6,
     },
   });
-  const prepared = prepareJecPetition({
-    caseData: handoff.caseData,
-    claimant: { ...claimant, ...handoff.suggestion.values },
-    uf: "SP",
-    city: "São Paulo",
-  });
 
-  assert.equal(handoff.ready, true);
+  assert.equal(handoff.ready, false);
   assert.equal(handoff.caseData.answers.authorizationAnswer, "confirmed");
-  assert.equal(prepared.ready, true);
-  assert.equal(prepared.template.sourceModel, 2);
-  assert.equal(prepared.template.id, "document_exhibition");
-  assert.match(prepared.draft, /valor mensal aproximado/i);
-  assert.match(prepared.draft, /estimativa inicial sujeita à apuração/i);
-  assert.doesNotMatch(prepared.draft, /documento recente fornecido/i);
+  assert.equal(handoff.caseData.answers.declaredEstimate, undefined);
+  assert.deepEqual(handoff.caseData.candidates, []);
+  assert.match(handoff.reason, /Anexe ao menos uma fatura ou extrato/);
 });
