@@ -471,11 +471,11 @@
             <ol class="charge-analysis-progress charge-module-progress" id="chargeAnalysisProgress" aria-label="Progresso completo do m&oacute;dulo">
               <li class="active" data-charge-progress="authorization" aria-current="step">
                 <span aria-hidden="true">1</span>
-                <div><strong>Autoriza&ccedil;&atilde;o</strong><small>Confirma&ccedil;&atilde;o inicial</small></div>
+                <div><strong>Identifica&ccedil;&atilde;o</strong><small>Triagem inicial</small></div>
               </li>
               <li class="locked" data-charge-progress="statements">
                 <span aria-hidden="true">2</span>
-                <div><strong>Extratos</strong><small>Disponibilidade</small></div>
+                <div><strong>Anexos</strong><small>Documentos enviados</small></div>
               </li>
               <li class="locked" data-charge-progress="analysis">
                 <span aria-hidden="true">3</span>
@@ -483,22 +483,30 @@
               </li>
               <li class="locked" data-charge-progress="result">
                 <span aria-hidden="true">4</span>
-                <div><strong>Resultado</strong><small>Apura&ccedil;&atilde;o</small></div>
+                <div><strong>Revis&atilde;o</strong><small>Confirmar ocorr&ecirc;ncias</small></div>
               </li>
               <li class="locked" data-charge-progress="recovery">
                 <span aria-hidden="true">5</span>
-                <div><strong>Recupera&ccedil;&atilde;o</strong><small>Pr&oacute;ximo passo</small></div>
+                <div><strong>C&aacute;lculo</strong><small>Somente valores documentados</small></div>
               </li>
               <li class="locked" data-charge-progress="report">
                 <span aria-hidden="true">6</span>
-                <div><strong>Relat&oacute;rio</strong><small>Gerar PDF</small></div>
+                <div><strong>Documento</strong><small>Revisar e gerar PDF</small></div>
               </li>
               <li class="locked" data-charge-progress="tribunal">
                 <span aria-hidden="true">7</span>
-                <div><strong>Tribunal</strong><small>Guia do Estado</small></div>
+                <div><strong>Protocolo</strong><small>Conclus&atilde;o humana</small></div>
               </li>
             </ol>
-            <span class="charge-analysis-status" id="chargeAnalysisStatus">Etapa 1 de 7 &middot; Autoriza&ccedil;&atilde;o</span>
+            <section class="charge-progress-summary" aria-label="Progresso do processo">
+              <div>
+                <strong id="chargeAnalysisProgressPercent">0%</strong>
+                <span id="chargeAnalysisProgressMessage">Responda &agrave; triagem inicial para come&ccedil;ar.</span>
+              </div>
+              <progress id="chargeAnalysisProgressMeter" max="100" value="0" aria-label="Percentual conclu&iacute;do">0%</progress>
+              <small>O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano.</small>
+            </section>
+            <span class="charge-analysis-status" id="chargeAnalysisStatus">0% conclu&iacute;do &middot; Etapa 1 de 7 &middot; Identifica&ccedil;&atilde;o</span>
 
             <main
               class="charge-analysis-stage"

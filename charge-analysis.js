@@ -218,29 +218,6 @@ function formatChargeCurrency(value) {
   });
 }
 
-function parseChargeAmount(value) {
-  const normalized = String(value || "").trim().replace(/\s/g, "");
-  if (!normalized) return Number.NaN;
-  if (normalized.includes(",")) {
-    return Number(normalized.replace(/\./g, "").replace(",", "."));
-  }
-  return Number(normalized);
-}
-
-function chargeClassificationLabel(evaluation = {}) {
-  return (
-    {
-      review_required: "Revisão do cliente necessária",
-      no_candidate_found: "Nenhuma cobrança conhecida foi localizada",
-      possible_unauthorized: "Possível cobrança não autorizada",
-      strong_indication: "Forte indício para revisão",
-      recognized_charges: "Cobranças reconhecidas pelo cliente",
-    }[evaluation.classification] ||
-    evaluation.classificationLabel ||
-    "Análise preliminar concluída"
-  );
-}
-
 export function buildChargeAuditSnapshot(caseData = {}) {
   const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
   const totalDetected = candidates.reduce(
@@ -267,6 +244,131 @@ export function buildChargeAuditSnapshot(caseData = {}) {
     totalDetected: Number(totalDetected.toFixed(2)),
     totalDisputed: Number(totalDisputed.toFixed(2)),
     hypotheticalDouble: Number((totalDisputed * 2).toFixed(2)),
+  };
+}
+
+export function buildChargeCalculationSnapshot(caseData = {}) {
+  const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
+  const items = candidates
+    .filter((candidate) => candidate.answer === "not_recognized")
+    .map((candidate) => ({ ...candidate }))
+    .filter((candidate) => Number.isFinite(Number(candidate.amount)) && Number(candidate.amount) > 0);
+  const principal = items.reduce((total, candidate) => total + Number(candidate.amount), 0);
+  return {
+    items,
+    itemCount: items.length,
+    principal: Number(principal.toFixed(2)),
+    hypotheticalDouble: Number((principal * 2).toFixed(2)),
+    excludedWithoutAmount: candidates.filter(
+      (candidate) =>
+        candidate.answer === "not_recognized" &&
+        (!Number.isFinite(Number(candidate.amount)) || Number(candidate.amount) <= 0),
+    ).length,
+  };
+}
+
+export function buildChargeProgressSnapshot(flowState = {}) {
+  const screen = String(flowState.screen || "triage");
+  const documentAvailability = String(flowState.documentAvailability || "");
+  const selectedFileCount = Array.isArray(flowState.selectedFiles)
+    ? flowState.selectedFiles.filter(Boolean).length
+    : flowState.selectedFile
+      ? 1
+      : 0;
+  const caseData = flowState.caseData && typeof flowState.caseData === "object"
+    ? flowState.caseData
+    : null;
+  const recovery = flowState.recovery && typeof flowState.recovery === "object"
+    ? flowState.recovery
+    : {};
+  const audit = buildChargeAuditSnapshot(caseData || {});
+  const calculation = buildChargeCalculationSnapshot(caseData || {});
+  const authorizationComplete = Boolean(flowState.authorizationAnswer);
+  const documentChoiceComplete = ["complete", "partial", "none"].includes(
+    documentAvailability,
+  );
+  const analysisComplete = Boolean(caseData);
+  const reviewComplete = analysisComplete && audit.candidateCount > 0 && audit.pendingCount === 0;
+  const calculationOpened = ["result", "recovery"].includes(screen) && reviewComplete;
+  const recoveryStarted = Boolean(recovery.handoff);
+  const documentPrepared = Boolean(recovery.prepared?.ready);
+  const documentGenerated = Boolean(recovery.pdfGeneratedAt);
+
+  let percent = 0;
+  if (authorizationComplete) percent = 10;
+  if (documentChoiceComplete) percent = 20;
+  if (selectedFileCount > 0) percent = 30;
+  if (analysisComplete) percent = 45;
+  if (reviewComplete) percent = 55;
+  if (calculationOpened) percent = 65;
+  if (recoveryStarted) percent = 72;
+  if (documentPrepared) percent = 80;
+  if (documentGenerated) percent = 90;
+
+  if (documentAvailability === "none") {
+    percent = Math.min(percent, 20);
+  }
+
+  let activeStep = "authorization";
+  if (["documents", "no-documents", "upload"].includes(screen)) {
+    activeStep = "statements";
+  } else if (screen === "analyzing") {
+    activeStep = "analysis";
+  } else if (screen === "review") {
+    activeStep = "result";
+  } else if (screen === "result") {
+    activeStep = "recovery";
+  } else if (screen === "recovery") {
+    activeStep = recovery.phase === "guide"
+      ? "tribunal"
+      : recovery.phase === "report"
+        ? "report"
+        : "recovery";
+  }
+
+  let message = "Responda à triagem inicial para começar.";
+  if (authorizationComplete) message = "Triagem registrada. Informe quais documentos estão disponíveis.";
+  if (documentAvailability === "none") {
+    message = "Faltam faturas ou extratos. Sem documentos, a análise e a preparação jurídica não avançam.";
+  } else if (documentChoiceComplete && selectedFileCount === 0) {
+    message = "Selecione e autorize o processamento dos documentos para continuar.";
+  } else if (selectedFileCount > 0 && !analysisComplete) {
+    message = "Documentos selecionados. Falta concluir a análise dos anexos.";
+  } else if (analysisComplete && !audit.candidateCount) {
+    message = "Análise concluída, mas nenhuma ocorrência foi localizada. Refine a busca ou envie mais documentos.";
+  } else if (analysisComplete && audit.pendingCount > 0) {
+    message = `Falta revisar ${audit.pendingCount} ${audit.pendingCount === 1 ? "ocorrência" : "ocorrências"}.`;
+  } else if (reviewComplete && !calculationOpened) {
+    message = "Revisão concluída. Confirme para abrir o cálculo documental.";
+  } else if (calculationOpened && !calculation.itemCount) {
+    message = "Revisão concluída, mas nenhuma cobrança não reconhecida foi confirmada para cálculo.";
+  } else if (calculationOpened && !recoveryStarted) {
+    message = "Cálculo documental concluído. Falta iniciar e revisar a preparação dos documentos.";
+  } else if (recoveryStarted && !documentPrepared) {
+    message = "Preparação iniciada. Complete e revise os dados necessários para gerar o documento.";
+  } else if (documentPrepared && !documentGenerated) {
+    message = "Documento preparado. Falta revisar o conteúdo e gerar o PDF.";
+  } else if (documentGenerated) {
+    message = "Documento gerado. O protocolo final continua pendente e deve ser concluído por uma pessoa.";
+  }
+
+  if (documentAvailability === "partial" && selectedFileCount > 0) {
+    message = `${message} A cobertura é parcial e ainda faltam documentos do período completo.`;
+  }
+
+  return {
+    percent,
+    activeStep,
+    message,
+    evidenceCoverage:
+      documentAvailability === "complete"
+        ? "complete"
+        : documentAvailability === "partial"
+          ? "partial"
+          : documentAvailability === "none"
+            ? "absent"
+            : "unknown",
+    protocolStatus: "human_pending",
   };
 }
 
@@ -299,51 +401,20 @@ function formatChargeAmountInput(value) {
 export function buildChargeJecHandoff({
   caseData = {},
   documentAvailability = "",
-  estimate = null,
   authorizationAnswer = "",
   selectedBrand = "",
   handoffId = "",
 } = {}) {
   const historicalDocumentsAvailable = documentAvailability === "complete" ? "yes" : "no";
   const sourceCandidates = Array.isArray(caseData?.candidates)
-    ? caseData.candidates.map((candidate) => ({ ...candidate }))
+    ? caseData.candidates
+        .filter((candidate) => candidate.answer === "not_recognized")
+        .map((candidate) => ({ ...candidate }))
     : [];
   const audit = buildChargeAuditSnapshot({ candidates: sourceCandidates });
-  const declaredEstimate =
-    documentAvailability === "partial" &&
-    Number(estimate?.monthlyAmount) > 0 &&
-    Number(estimate?.months) > 0
-      ? {
-          description: String(estimate.description || "Cobrança informada pelo cliente").trim(),
-          monthlyAmount: Number(Number(estimate.monthlyAmount).toFixed(2)),
-          months: Math.floor(Number(estimate.months)),
-          estimatedPaid: Number(Number(estimate.estimatedPaid || 0).toFixed(2)),
-          hypotheticalDouble: Number(Number(estimate.hypotheticalDouble || 0).toFixed(2)),
-          source: "consumer_declaration",
-        }
-      : null;
-  const mayUseDeclaration =
-    Boolean(declaredEstimate) && sourceCandidates.length === 0 && documentAvailability === "partial";
-  const candidates = mayUseDeclaration
-    ? [
-        {
-          id: `declared-charge-${handoffId || "estimate"}`,
-          label: declaredEstimate.description,
-          description: declaredEstimate.description,
-          category: "declaracao",
-          date: "",
-          amount: null,
-          answer: "not_recognized",
-          reason: "Cobrança declarada pelo cliente com histórico documental parcial.",
-          confidence: "declared",
-          source: "consumer_declaration",
-        },
-      ]
-    : sourceCandidates;
-  const disputedCount = candidates.filter(
-    (candidate) => candidate.answer === "not_recognized",
-  ).length;
-  const pendingCount = candidates.filter(
+  const candidates = sourceCandidates;
+  const disputedCount = candidates.length;
+  const pendingCount = (Array.isArray(caseData?.candidates) ? caseData.candidates : []).filter(
     (candidate) => !candidate.answer || candidate.answer === "pending",
   ).length;
   const hasRequiredDocuments = documentAvailability !== "none";
@@ -351,21 +422,17 @@ export function buildChargeJecHandoff({
   const suggestedDouble =
     audit.totalDisputed > 0
       ? audit.hypotheticalDouble
-      : mayUseDeclaration
-        ? declaredEstimate.hypotheticalDouble
-        : 0;
+      : 0;
   const normalizedId = String(handoffId || caseData?.id || "estimate")
     .replace(/[^a-zA-Z0-9_-]/g, "-")
     .slice(0, 120);
   const historicalEvidence =
-    historicalDocumentsAvailable === "yes" || Number(declaredEstimate?.months) > 1
+    historicalDocumentsAvailable === "yes"
       ? "yes"
       : String(caseData?.answers?.historicalEvidence || "unknown");
   const suggestionSource = !hasRequiredDocuments
     ? "charge_analysis_documents_required"
-    : mayUseDeclaration
-      ? "charge_analysis_declared_estimate"
-      : "charge_analysis_documentary_evidence";
+    : "charge_analysis_documentary_evidence";
 
   return {
     ready,
@@ -390,7 +457,6 @@ export function buildChargeJecHandoff({
         authorizationAnswer,
         selectedBrand,
         documentAvailability,
-        ...(declaredEstimate ? { declaredEstimate } : {}),
       },
     },
     suggestion: {
@@ -408,9 +474,7 @@ export function buildChargeJecHandoff({
       notes: [
         !hasRequiredDocuments
           ? "Nenhum cálculo ou encaminhamento jurídico deve ser preparado sem ao menos uma fatura ou extrato."
-          : mayUseDeclaration
-            ? "Os valores foram informados pelo cliente e complementam um histórico documental parcial."
-            : "A estimativa inicial usa somente cobranças documentadas e marcadas como não reconhecidas.",
+          : "A apuração usa somente cobranças documentadas e marcadas como não reconhecidas.",
       ],
       disclaimer:
         "A repetição em dobro, os danos e o valor da causa dependem de revisão jurídica e decisão judicial.",
@@ -431,6 +495,9 @@ if (stage) {
   const shell = stage.closest(".charge-analysis-shell");
   const status = document.querySelector("#chargeAnalysisStatus");
   const errorBox = document.querySelector("#chargeAnalysisError");
+  const progressPercent = document.querySelector("#chargeAnalysisProgressPercent");
+  const progressMeter = document.querySelector("#chargeAnalysisProgressMeter");
+  const progressMessage = document.querySelector("#chargeAnalysisProgressMessage");
   const progressItems = document.querySelectorAll("[data-charge-progress]");
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   let messageSequenceId = 0;
@@ -447,13 +514,12 @@ if (stage) {
     consent: false,
     caseData: null,
     caseBatches: [],
-    estimate: null,
-    estimateDraft: {
-      description: "",
-      monthlyAmount: "",
-      durationValue: "",
-      durationUnit: "months",
-      confirmed: false,
+    directedSearch: {
+      open: false,
+      query: "",
+      busy: false,
+      message: "",
+      error: "",
     },
     recovery: {
       phase: "intro",
@@ -470,16 +536,6 @@ if (stage) {
     busy: false,
     error: "",
   };
-
-  function resetEstimateDraft() {
-    state.estimateDraft = {
-      description: "",
-      monthlyAmount: "",
-      durationValue: "",
-      durationUnit: "months",
-      confirmed: false,
-    };
-  }
 
   function resetRecovery() {
     state.recovery = {
@@ -600,7 +656,6 @@ if (stage) {
     return buildChargeJecHandoff({
       caseData: state.caseData || {},
       documentAvailability: state.documentAvailability,
-      estimate: state.estimate,
       authorizationAnswer: state.authorizationAnswer,
       selectedBrand: state.selectedBrand,
     });
@@ -654,7 +709,6 @@ if (stage) {
     const handoff = buildChargeJecHandoff({
       caseData: state.caseData || {},
       documentAvailability: state.documentAvailability,
-      estimate: state.estimate,
       authorizationAnswer: state.authorizationAnswer,
       selectedBrand: state.selectedBrand,
       handoffId:
@@ -688,28 +742,16 @@ if (stage) {
       "tribunal",
     ];
     const labels = {
-      authorization: "Autorização",
-      statements: "Extratos",
+      authorization: "Identificação",
+      statements: "Anexos",
       analysis: "Análise",
-      result: "Resultado",
-      recovery: "Recuperação",
-      report: "Relatório",
-      tribunal: "Tribunal",
+      result: "Revisão",
+      recovery: "Cálculo",
+      report: "Documento",
+      tribunal: "Protocolo",
     };
-    let progressState = "authorization";
-    if (["documents", "no-documents"].includes(state.screen)) {
-      progressState = "statements";
-    } else if (["upload", "analyzing", "estimate"].includes(state.screen)) {
-      progressState = "analysis";
-    } else if (state.screen === "result") {
-      progressState = "result";
-    } else if (state.screen === "recovery") {
-      progressState = state.recovery.phase === "guide"
-        ? "tribunal"
-        : state.recovery.phase === "report"
-          ? "report"
-          : "recovery";
-    }
+    const snapshot = buildChargeProgressSnapshot(state);
+    const progressState = snapshot.activeStep;
     const currentIndex = order.indexOf(progressState);
 
     progressItems.forEach((item) => {
@@ -722,9 +764,19 @@ if (stage) {
     });
 
     if (status) {
-      status.textContent = `Etapa ${currentIndex + 1} de ${order.length} · ${labels[progressState]}`;
+      status.textContent = `${snapshot.percent}% concluído · Etapa ${currentIndex + 1} de ${order.length} · ${labels[progressState]}. ${snapshot.message}`;
     }
-    if (shell) shell.dataset.flowStage = progressState;
+    if (progressPercent) progressPercent.textContent = `${snapshot.percent}%`;
+    if (progressMeter) {
+      progressMeter.value = snapshot.percent;
+      progressMeter.setAttribute("aria-valuenow", String(snapshot.percent));
+    }
+    if (progressMessage) progressMessage.textContent = snapshot.message;
+    if (shell) {
+      shell.dataset.flowStage = progressState;
+      shell.dataset.evidenceCoverage = snapshot.evidenceCoverage;
+      shell.dataset.protocolStatus = snapshot.protocolStatus;
+    }
   }
 
   function renderTriage() {
@@ -936,146 +988,14 @@ if (stage) {
     `;
   }
 
-  function partialEstimateFormMarkup() {
-    const draft = state.estimateDraft;
-    const audit = buildChargeAuditSnapshot(state.caseData || {});
-    const detectedAmount = audit.totalDisputed || audit.totalDetected || 0;
-    const detectedDescription = state.caseData?.candidates?.find(
-      (candidate) => candidate.answer === "not_recognized",
-    )?.label || state.caseData?.candidates?.[0]?.label || "";
-    const descriptionValue = draft.description || detectedDescription;
-    const monthlyValue = draft.monthlyAmount || (detectedAmount ? String(detectedAmount) : "");
-
-    return `
-      <form class="charge-estimate-panel inline" id="chargeEstimateForm">
-        <div class="charge-estimate-heading">
-          <div>
-            <p class="eyebrow">Simulação estimada</p>
-            <h3>Informe o que você lembra sobre a cobrança</h3>
-          </div>
-          <span>Complemento com documentos parciais</span>
-        </div>
-
-        <div class="charge-estimate-grid">
-          <label class="wide">
-            <span>Nome ou descrição aproximada da cobrança</span>
-            <input
-              id="chargeEstimateDescription"
-              name="description"
-              type="text"
-              maxlength="120"
-              value="${escapeChargeHtml(descriptionValue)}"
-              placeholder="Ex.: seguro, proteção do cartão, assistência"
-              required
-            />
-          </label>
-          <label>
-            <span>Valor cobrado por mês</span>
-            <div class="charge-money-input">
-              <small>R$</small>
-              <input
-                id="chargeEstimateMonthlyAmount"
-                name="monthlyAmount"
-                type="text"
-                inputmode="decimal"
-                value="${escapeChargeHtml(monthlyValue)}"
-                placeholder="19,90"
-                required
-              />
-            </div>
-          </label>
-          <label>
-            <span>Por quanto tempo lembra de ter pago?</span>
-            <div class="charge-duration-input">
-              <input
-                id="chargeEstimateDurationValue"
-                name="durationValue"
-                type="number"
-                min="1"
-                max="600"
-                value="${escapeChargeHtml(draft.durationValue)}"
-                placeholder="12"
-                required
-              />
-              <select id="chargeEstimateDurationUnit" name="durationUnit">
-                <option value="months" ${draft.durationUnit === "months" ? "selected" : ""}>meses</option>
-                <option value="years" ${draft.durationUnit === "years" ? "selected" : ""}>anos</option>
-              </select>
-            </div>
-          </label>
-        </div>
-
-        <label class="charge-upload-consent">
-          <input id="chargeEstimateConfirmed" name="confirmed" type="checkbox" ${draft.confirmed ? "checked" : ""} />
-          <span>Confirmo que esses dados são aproximados e foram informados com base no que consigo recordar.</span>
-        </label>
-
-        <p class="charge-upload-privacy">A estimativa complementa apenas os documentos parciais enviados. Ela não comprova o período ausente e deve permanecer separada da base documental.</p>
-
-        <div class="charge-upload-actions">
-          <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
-          <button type="submit" class="primary-action">Calcular simulação</button>
-        </div>
-      </form>
-    `;
-  }
-
-  function estimateReportMarkup() {
-    const estimate = state.estimate;
-    if (!estimate) return "";
-
-    return `
-      <section class="charge-audit-report charge-estimate-report" aria-label="Relatório de simulação estimada">
-        <header>
-          <div>
-            <p class="eyebrow">Relatório preliminar</p>
-            <h3>Complemento estimado aos documentos parciais</h3>
-          </div>
-          <span>Valores estimados</span>
-        </header>
-        <div class="charge-audit-table-wrap">
-          <table>
-            <thead>
-              <tr><th>Rubrica</th><th>Base da simulação</th><th>Valor estimado</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th>Cobrança informada</th>
-                <td>${escapeChargeHtml(estimate.description)}</td>
-                <td>${formatChargeCurrency(estimate.monthlyAmount)} / mês</td>
-              </tr>
-              <tr>
-                <th>Período aproximado</th>
-                <td>${estimate.months} mês(es) declarados</td>
-                <td>${estimate.months} parcelas</td>
-              </tr>
-              <tr>
-                <th>Total estimado pago</th>
-                <td>${formatChargeCurrency(estimate.monthlyAmount)} × ${estimate.months} meses</td>
-                <td>${formatChargeCurrency(estimate.estimatedPaid)}</td>
-              </tr>
-              <tr>
-                <th>Cenário matemático em dobro</th>
-                <td>Simulação sujeita à prova e à revisão jurídica do caso concreto</td>
-                <td>${formatChargeCurrency(estimate.hypotheticalDouble)}</td>
-              </tr>
-              <tr>
-                <th>Correção, juros e demais pedidos</th>
-                <td>Dependem de datas, documentos e definição jurídica</td>
-                <td>Pendente</td>
-              </tr>
-              <tr class="total">
-                <th colspan="2">Valor da causa</th>
-                <td>A definir na revisão</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <footer>
-          <p>Este cálculo combina informações aproximadas do cliente com documentos parciais. Ele não comprova os meses ausentes nem substitui as faturas ou extratos do período completo.</p>
-        </footer>
-      </section>
-    `;
+  function resetDirectedSearch() {
+    state.directedSearch = {
+      open: false,
+      query: "",
+      busy: false,
+      message: "",
+      error: "",
+    };
   }
 
   function renderNoDocuments() {
@@ -1260,13 +1180,18 @@ if (stage) {
 
   function candidateMarkup(candidate, caseId) {
     const answer = String(candidate.answer || "pending");
+    const date = String(candidate.date || "");
+    const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`))
+      : "Data não identificada";
+    const directed = candidate.origin === "directed_search";
     return `
-      <article class="charge-result-candidate">
+      <article class="charge-result-candidate ${directed ? "directed" : "automatic"}">
         <div>
-          <span>${escapeChargeHtml(candidate.category || "lançamento")}</span>
+          <span class="charge-candidate-origin">${directed ? "Localizada por busca dirigida" : "Detectada automaticamente"}</span>
           <strong>${escapeChargeHtml(candidate.label || candidate.description || "Cobrança a revisar")}</strong>
-          <small>${escapeChargeHtml(candidate.reason || "Descrição compatível encontrada no documento.")}</small>
-          ${candidate.sourceFileName ? `<small class="charge-candidate-source">Fonte: ${escapeChargeHtml(candidate.sourceFileName)}</small>` : ""}
+          <small>${escapeChargeHtml(dateLabel)} · ${escapeChargeHtml(candidate.category || "lançamento")}</small>
+          <small class="charge-candidate-evidence">Evidência: ${escapeChargeHtml(candidate.evidence || candidate.reason || "Descrição compatível encontrada no documento.")}</small>
         </div>
         <b>${candidate.amount == null ? "Valor não identificado" : formatChargeCurrency(candidate.amount)}</b>
         <div class="charge-result-answer" role="group" aria-label="Você reconhece esta contratação?">
@@ -1292,6 +1217,51 @@ if (stage) {
             .join("")}
         </div>
       </article>
+    `;
+  }
+
+  function candidateGroupsMarkup(candidates = [], caseId = "") {
+    const groups = new Map();
+    for (const candidate of candidates) {
+      const source = candidate.sourceFileName || "Documento sem nome";
+      if (!groups.has(source)) groups.set(source, []);
+      groups.get(source).push(candidate);
+    }
+    return [...groups.entries()]
+      .map(([source, items]) => `
+        <section class="charge-review-file" aria-label="Lançamentos de ${escapeChargeHtml(source)}">
+          <header>
+            <div><small>Arquivo de origem</small><strong>${escapeChargeHtml(source)}</strong></div>
+            <span>${items.length} ${items.length === 1 ? "ocorrência" : "ocorrências"}</span>
+          </header>
+          ${items.map((candidate) => candidateMarkup(candidate, caseId)).join("")}
+        </section>
+      `)
+      .join("");
+  }
+
+  function directedSearchMarkup() {
+    const search = state.directedSearch;
+    return `
+      <section class="charge-directed-search" aria-label="Busca dirigida nos anexos">
+        <div>
+          <strong>Não encontrou a cobrança que suspeita?</strong>
+          <p>Informe apenas como ela aparece ou uma variação do nome. A Audita procurará nos documentos já enviados; você não informa valor nem data.</p>
+        </div>
+        ${
+          search.open
+            ? `<form id="chargeDirectedSearchForm">
+                <label for="chargeDirectedSearchQuery">Nome ou descrição da cobrança</label>
+                <div>
+                  <input id="chargeDirectedSearchQuery" name="query" maxlength="120" minlength="3" value="${escapeChargeHtml(search.query)}" placeholder="Ex.: StreamPlay, proteção horizonte" required />
+                  <button type="submit" class="primary-action" ${search.busy ? "disabled" : ""}>${search.busy ? "Procurando..." : "Procurar nos anexos"}</button>
+                </div>
+              </form>`
+            : `<button type="button" class="secondary-action" data-charge-action="open-directed-search">Indicar uma cobrança para procurar nos meus anexos</button>`
+        }
+        ${search.message ? `<p class="charge-directed-search-message" role="status">${escapeChargeHtml(search.message)}</p>` : ""}
+        ${search.error ? `<p class="charge-directed-search-error" role="alert">${escapeChargeHtml(search.error)}</p>` : ""}
+      </section>
     `;
   }
 
@@ -1334,55 +1304,85 @@ if (stage) {
     };
   }
 
-  function renderResult() {
+  function renderReview() {
     const caseData = state.caseData || {};
     const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
     const audit = buildChargeAuditSnapshot(caseData);
-    const analysisLabel = chargeClassificationLabel(caseData.evaluation || {});
-    const hypotheticalDouble = audit.disputedCount
-      ? formatChargeCurrency(audit.hypotheticalDouble)
-      : "Aguardando confirmação";
-
-    const isCompleteHistory = state.documentAvailability === "complete";
-    const isPartialHistory = state.documentAvailability === "partial";
-    const resultEyebrow = isCompleteHistory ? "Auditoria documental" : "Análise parcial";
-    const reportTitle = isCompleteHistory
-      ? "Apuração dos documentos enviados"
-      : "Apuração da evidência recente";
-    const reportFooter = isCompleteHistory
-      ? "Os valores usam somente os documentos enviados. Meses ausentes, correção, juros, indenizações e aplicação jurídica dependem de revisão do caso."
-      : "Os valores desta seção usam apenas os documentos enviados. Documentos parciais não comprovam integralmente o período; qualquer complemento estimado ficará separado da base documental.";
 
     stage.innerHTML = `
       <div class="charge-result-heading">
         <div>
-          <p class="eyebrow">${resultEyebrow}</p>
-          <h3>${escapeChargeHtml(analysisLabel)}</h3>
-          <p>${escapeChargeHtml(caseData.document?.fileName || "Documento analisado")} · leitura automatizada e regras verificáveis</p>
+          <p class="eyebrow">Revisão dos documentos</p>
+          <h3>Confirme cada ocorrência localizada</h3>
+          <p>Revise descrição, data, valor, evidência e arquivo de origem. O cálculo só será aberto depois desta confirmação.</p>
         </div>
-        <span>${audit.candidateCount} ${audit.candidateCount === 1 ? "sinal" : "sinais"}</span>
+        <span>${audit.pendingCount} pendente${audit.pendingCount === 1 ? "" : "s"}</span>
       </div>
 
       <section class="charge-result-candidates" aria-label="Lançamentos encontrados">
         ${
           candidates.length
-            ? candidates.map((candidate) => candidateMarkup(candidate, caseData.id)).join("")
+            ? candidateGroupsMarkup(candidates, caseData.id)
             : `
               <div class="charge-analysis-empty">
                 <strong>Nenhuma descrição conhecida foi localizada.</strong>
-                <p>Isso não certifica que a fatura esteja correta. A qualidade do documento e descrições não catalogadas podem exigir revisão humana.</p>
+                <p>Isso não certifica que os documentos estejam corretos. Você pode indicar um nome para a Audita procurar nos próprios anexos.</p>
               </div>
             `
         }
       </section>
 
-      <section class="charge-audit-report" aria-label="Relatório técnico preliminar">
+      ${directedSearchMarkup()}
+
+      <div class="charge-result-actions">
+        <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
+        <button type="button" class="primary-action" data-charge-action="confirm-review" ${!candidates.length || audit.pendingCount ? "disabled" : ""}>Confirmar revisão e calcular</button>
+      </div>
+    `;
+  }
+
+  function renderResult() {
+    const caseData = state.caseData || {};
+    const calculation = buildChargeCalculationSnapshot(caseData);
+    const isPartialHistory = state.documentAvailability === "partial";
+    const reportFooter = isPartialHistory
+      ? "Esta apuração é parcial e limitada aos documentos enviados. Ela não comprova integralmente períodos ausentes e não contém estimativas."
+      : "Esta apuração usa somente os lançamentos presentes nos documentos enviados e confirmados como não reconhecidos.";
+
+    stage.innerHTML = `
+      <div class="charge-result-heading">
+        <div>
+          <p class="eyebrow">Cálculo documental</p>
+          <h3>${calculation.itemCount ? "Cobranças não reconhecidas confirmadas" : "Nenhuma cobrança confirmada para cálculo"}</h3>
+          <p>Somente ocorrências encontradas nos anexos e marcadas por você como “Não reconheço” aparecem nesta etapa.</p>
+        </div>
+        <span>${calculation.itemCount} ${calculation.itemCount === 1 ? "item" : "itens"}</span>
+      </div>
+
+      ${
+        calculation.itemCount
+          ? `<section class="charge-calculation-items" aria-label="Itens usados no cálculo">
+              ${calculation.items.map((candidate) => `
+                <article>
+                  <div>
+                    <strong>${escapeChargeHtml(candidate.label || candidate.description || "Cobrança")}</strong>
+                    <small>${escapeChargeHtml(candidate.date || "Data não identificada")} · ${escapeChargeHtml(candidate.sourceFileName || "Arquivo de origem não informado")}</small>
+                    <small>${candidate.origin === "directed_search" ? "Localizada após busca dirigida pelo usuário; a origem não representa conclusão jurídica da IA." : "Detectada automaticamente e confirmada pelo usuário."}</small>
+                  </div>
+                  <b>${formatChargeCurrency(candidate.amount)}</b>
+                </article>
+              `).join("")}
+            </section>`
+          : `<div class="charge-analysis-empty"><strong>Nenhum valor será calculado.</strong><p>Volte à revisão para marcar uma ocorrência documentada como não reconhecida ou procure outra descrição nos anexos.</p></div>`
+      }
+
+      <section class="charge-audit-report" aria-label="Cálculo documental preliminar">
         <header>
           <div>
-            <p class="eyebrow">Relatório técnico preliminar</p>
-            <h3>${reportTitle}</h3>
+            <p class="eyebrow">Base documental confirmada</p>
+            <h3>Apuração limitada à prova enviada</h3>
           </div>
-          <span>Não é decisão jurídica</span>
+          <span>Sem estimativas</span>
         </header>
         <div class="charge-audit-table-wrap">
           <table>
@@ -1391,19 +1391,14 @@ if (stage) {
             </thead>
             <tbody>
               <tr>
-                <th>Cobranças sinalizadas</th>
-                <td>${audit.candidateCount} lançamento(s) localizado(s) no documento</td>
-                <td>${formatChargeCurrency(audit.totalDetected)}</td>
-              </tr>
-              <tr>
                 <th>Valores não reconhecidos</th>
-                <td>${audit.disputedCount} lançamento(s) marcado(s) pelo usuário</td>
-                <td>${formatChargeCurrency(audit.totalDisputed)}</td>
+                <td>${calculation.itemCount} lançamento(s) documentado(s) e confirmado(s)</td>
+                <td>${formatChargeCurrency(calculation.principal)}</td>
               </tr>
               <tr>
                 <th>Cenário matemático em dobro</th>
                 <td>Art. 42 do CDC, condicionado à análise jurídica e ao caso concreto</td>
-                <td>${hypotheticalDouble}</td>
+                <td>${calculation.itemCount ? formatChargeCurrency(calculation.hypotheticalDouble) : "Sem base"}</td>
               </tr>
               <tr>
                 <th>Correção monetária e juros</th>
@@ -1427,19 +1422,8 @@ if (stage) {
         </footer>
       </section>
 
-      ${isPartialHistory ? (state.estimate ? estimateReportMarkup() : partialEstimateFormMarkup()) : ""}
-
-      ${
-        state.estimate
-          ? `<section class="charge-petition-note" aria-label="Próxima etapa da recuperação">
-              <strong>Base documental e estimativa separadas</strong>
-              <p>O Relatório Técnico poderá usar a evidência recente e a simulação declaratória em seções distintas, sem apresentar o período estimado como comprovado.</p>
-            </section>`
-          : ""
-      }
-
       <div class="charge-result-actions">
-        <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
+        <button type="button" class="secondary-action" data-charge-action="back-to-review">Voltar à revisão</button>
         ${documentationActionMarkup()}
       </div>
     `;
@@ -1545,6 +1529,7 @@ if (stage) {
           <label><span>Profissão</span><input name="profession" required maxlength="120" autocomplete="organization-title" value="${escapeChargeHtml(claimant.profession || "")}" /></label>
           <label><span>E-mail</span><input name="email" required type="email" maxlength="160" autocomplete="email" value="${escapeChargeHtml(claimant.email || "")}" /></label>
           <label><span>Telefone</span><input name="phone" required inputmode="tel" maxlength="15" autocomplete="tel" data-recovery-mask="phone" placeholder="(00) 00000-0000" value="${escapeChargeHtml(formatRecoveryPhone(claimant.phone || ""))}" /></label>
+          <label><span>Agência Itaú <small>opcional</small></span><input name="bankAgency" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="Ex.: 1234" value="${escapeChargeHtml(claimant.bankAgency || "")}" /></label>
         </div>
 
         <div class="charge-recovery-section-title"><strong>Endereço</strong><span>Usado para identificar o consumidor e a competência territorial.</span></div>
@@ -1686,6 +1671,7 @@ if (stage) {
       profession: normalizeRecoveryText(data.get("profession")),
       email: normalizeRecoveryText(data.get("email")).toLocaleLowerCase("pt-BR"),
       phone: String(data.get("phone") || "").replace(/\D/g, "").slice(0, 11),
+      bankAgency: normalizeRecoveryText(data.get("bankAgency")),
       postalCode: String(data.get("postalCode") || "").replace(/\D/g, "").slice(0, 8),
       street: normalizeRecoveryText(data.get("street")),
       addressNumber: normalizeRecoveryText(data.get("addressNumber")),
@@ -1822,6 +1808,7 @@ if (stage) {
     else if (state.screen === "no-documents") renderNoDocuments();
     else if (state.screen === "upload") renderUpload();
     else if (state.screen === "analyzing") renderAnalyzing();
+    else if (state.screen === "review") renderReview();
     else if (state.screen === "result") renderResult();
     else if (state.screen === "recovery") renderRecovery();
     else if (state.screen === "ended") renderEnded();
@@ -1884,7 +1871,8 @@ if (stage) {
       }
       state.caseBatches = analyzedCases;
       state.caseData = aggregateChargeCases(analyzedCases);
-      state.screen = "result";
+      resetDirectedSearch();
+      state.screen = "review";
     } catch (error) {
       state.screen = "upload";
       state.error = error?.message || "Falha ao analisar o documento.";
@@ -1943,6 +1931,54 @@ if (stage) {
     }
   }
 
+  async function searchDirectedCharge(form) {
+    if (state.directedSearch.busy) return;
+    const query = String(new FormData(form).get("query") || "").replace(/\s+/g, " ").trim();
+    if (query.length < 3) {
+      state.directedSearch.error = "Informe ao menos 3 caracteres para procurar nos anexos.";
+      renderReview();
+      return;
+    }
+    state.directedSearch = {
+      ...state.directedSearch,
+      query,
+      busy: true,
+      message: "",
+      error: "",
+    };
+    renderReview();
+    try {
+      const response = await fetch("/api/itau-refund/cases/search", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({
+          caseIds: state.caseBatches.map((item) => item.id),
+          query,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        document.querySelector("#loginButton")?.click();
+        throw new Error("Entre na Audita para procurar nos documentos.");
+      }
+      if (!response.ok || !Array.isArray(data.cases)) {
+        throw new Error(data.message || "Não foi possível procurar nos documentos agora.");
+      }
+      state.caseBatches = data.cases;
+      state.caseData = aggregateChargeCases(data.cases);
+      const count = Array.isArray(data.matches) ? data.matches.length : 0;
+      state.directedSearch.message = count
+        ? `${count} ${count === 1 ? "ocorrência localizada" : "ocorrências localizadas"} nos documentos enviados. Revise abaixo antes de confirmar.`
+        : `“${query}” não localizada nos documentos enviados. Refine a descrição ou anexe mais extratos.`;
+      state.directedSearch.error = "";
+    } catch (error) {
+      state.directedSearch.error = error?.message || "Falha ao procurar nos documentos.";
+    } finally {
+      state.directedSearch.busy = false;
+      renderReview();
+    }
+  }
+
   stage.addEventListener("click", (event) => {
     const button = event.target.closest("[data-charge-action]");
     if (!button) return;
@@ -1988,14 +2024,7 @@ if (stage) {
       state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
-      state.estimate = null;
-      state.estimateDraft = {
-        description: "",
-        monthlyAmount: "",
-        durationValue: "",
-        durationUnit: "months",
-        confirmed: false,
-      };
+      resetDirectedSearch();
       resetRecovery();
     } else if (action === "select-brand") {
       state.selectedBrand = button.dataset.chargeBrand || "";
@@ -2005,21 +2034,18 @@ if (stage) {
       state.screen = "documents";
     } else if (action === "documents-complete") {
       continueFromTriage("Tenho todos ou a maior parte dos extratos.", () => {
-        resetEstimateDraft();
         state.documentAvailability = "complete";
         state.screen = "upload";
       });
       return;
     } else if (action === "documents-partial") {
       continueFromTriage("Tenho apenas alguns documentos ou um print recente.", () => {
-        resetEstimateDraft();
         state.documentAvailability = "partial";
         state.screen = "upload";
       });
       return;
     } else if (action === "documents-none") {
       continueFromTriage("Não tenho nenhum extrato.", () => {
-        resetEstimateDraft();
         state.documentAvailability = "none";
         state.screen = "no-documents";
       });
@@ -2033,8 +2059,7 @@ if (stage) {
       state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
-      state.estimate = null;
-      resetEstimateDraft();
+      resetDirectedSearch();
       resetRecovery();
       state.documentAvailability = "partial";
       state.screen = "upload";
@@ -2044,8 +2069,7 @@ if (stage) {
       state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
-      state.estimate = null;
-      resetEstimateDraft();
+      resetDirectedSearch();
       resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
@@ -2063,14 +2087,29 @@ if (stage) {
       state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
-      state.estimate = null;
-      resetEstimateDraft();
+      resetDirectedSearch();
       resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
     } else if (action === "start-recovery") {
       startRecoveryFlow();
       return;
+    } else if (action === "open-directed-search") {
+      state.directedSearch.open = true;
+      state.directedSearch.message = "";
+      state.directedSearch.error = "";
+      renderReview();
+      return;
+    } else if (action === "confirm-review") {
+      const audit = buildChargeAuditSnapshot(state.caseData || {});
+      if (!audit.candidateCount || audit.pendingCount) {
+        state.error = "Revise todas as ocorrências antes de abrir o cálculo.";
+        render();
+        return;
+      }
+      state.screen = "result";
+    } else if (action === "back-to-review") {
+      state.screen = "review";
     } else if (action === "back-to-result") {
       state.screen = "result";
     } else if (action === "open-recovery-report") {
@@ -2095,15 +2134,6 @@ if (stage) {
       state.brandSearch = event.target.value;
       renderBrands();
     }
-    if (event.target.id === "chargeEstimateDescription") {
-      state.estimateDraft.description = event.target.value;
-    }
-    if (event.target.id === "chargeEstimateMonthlyAmount") {
-      state.estimateDraft.monthlyAmount = event.target.value;
-    }
-    if (event.target.id === "chargeEstimateDurationValue") {
-      state.estimateDraft.durationValue = event.target.value;
-    }
     if (event.target.matches("[data-recovery-mask]")) {
       const formatters = {
         cpf: formatRecoveryCpf,
@@ -2126,12 +2156,6 @@ if (stage) {
       state.consent = event.target.checked;
       renderUpload();
     }
-    if (event.target.id === "chargeEstimateDurationUnit") {
-      state.estimateDraft.durationUnit = event.target.value === "years" ? "years" : "months";
-    }
-    if (event.target.id === "chargeEstimateConfirmed") {
-      state.estimateDraft.confirmed = event.target.checked;
-    }
     if (event.target.id === "chargeRecoveryGuideUf") {
       state.recovery.guideUf = event.target.value;
       renderRecoveryGuide();
@@ -2139,6 +2163,12 @@ if (stage) {
   });
 
   stage.addEventListener("submit", (event) => {
+    if (event.target.id === "chargeDirectedSearchForm") {
+      event.preventDefault();
+      void searchDirectedCharge(event.target);
+      return;
+    }
+
     if (event.target.id === "chargeRecoveryForm") {
       event.preventDefault();
       const action = event.submitter?.dataset.recoverySubmit || "prepare";
@@ -2154,51 +2184,6 @@ if (stage) {
       } else {
         void prepareRecoveryReport(event.target);
       }
-      return;
-    }
-
-    if (event.target.id === "chargeEstimateForm") {
-      event.preventDefault();
-      const formData = new FormData(event.target);
-      const monthlyAmount = parseChargeAmount(formData.get("monthlyAmount"));
-      const durationValue = Number(formData.get("durationValue"));
-      const description = String(formData.get("description") || "").trim();
-      const confirmed = formData.get("confirmed") === "on";
-
-      if (!description) {
-        setError("Informe como a cobrança aparece ou como você se recorda dela.");
-        return;
-      }
-      if (!Number.isFinite(monthlyAmount) || monthlyAmount <= 0) {
-        setError("Informe um valor mensal maior que zero.");
-        return;
-      }
-      if (!Number.isInteger(durationValue) || durationValue <= 0) {
-        setError("Informe por quantos meses ou anos a cobrança ocorreu.");
-        return;
-      }
-      if (!confirmed) {
-        setError("Confirme que os dados informados são aproximados.");
-        return;
-      }
-
-      state.estimateDraft = {
-        description,
-        monthlyAmount: String(formData.get("monthlyAmount") || ""),
-        durationValue: String(durationValue),
-        durationUnit: formData.get("durationUnit") === "years" ? "years" : "months",
-        confirmed: true,
-      };
-      state.estimate = {
-        description,
-        ...buildChargeEstimate({
-          monthlyAmount,
-          durationValue,
-          durationUnit: state.estimateDraft.durationUnit,
-        }),
-      };
-      state.screen = "result";
-      render();
       return;
     }
 

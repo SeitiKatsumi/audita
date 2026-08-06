@@ -5,6 +5,8 @@ import {
   createItauRefundService,
   detectItauCandidateCharges,
   evaluateItauCase,
+  extractItauSearchableEntries,
+  findDirectedItauEntries,
   updateItauCaseSnapshot,
 } from "../services/itau-refund.service.mjs";
 
@@ -25,6 +27,22 @@ test("does not flag an ordinary card purchase", () => {
   );
 
   assert.deepEqual(candidates, []);
+});
+
+test("extracts searchable transactions without classifying them as candidates", () => {
+  const entries = extractItauSearchableEntries([
+    "18/07/2026 StreamPlay Assinatura mensal -R$ 34,90",
+    "22/07/2026 Protecao Horizonte Seguro -R$ 39.90",
+  ].join("\n"));
+
+  assert.equal(entries.length, 2);
+  assert.deepEqual(entries[0], {
+    description: "StreamPlay Assinatura mensal",
+    date: "2026-07-18",
+    amount: 34.9,
+    evidence: "18/07/2026 StreamPlay Assinatura mensal -R$ 34,90",
+  });
+  assert.equal(findDirectedItauEntries(entries, "stream play")[0].matchMethod, "fuzzy");
 });
 
 test("consumer confirmation changes a candidate into a possible unauthorized charge", () => {
@@ -216,6 +234,7 @@ test("service keeps only normalized findings and supports an authenticated revie
   assert.equal(analyzed.case.candidates.length, 1);
   assert.equal(analyzed.case.document.processedBy, "openai_and_rules");
   assert.equal("rawText" in analyzed.case, false);
+  assert.equal("searchEntries" in analyzed.case, false);
 
   const candidate = analyzed.case.candidates[0];
   const updated = service.updateCase(
@@ -236,6 +255,114 @@ test("service keeps only normalized findings and supports an authenticated revie
     service.getCase(analyzed.case.id, { tenantId: "tenant-b", userId: "user-a" }).forbidden,
     true,
   );
+});
+
+test("directed search recovers a missed charge from attached document evidence", async () => {
+  const service = createItauRefundService({
+    aiAnalyzer: async () => ({
+      document_readable: true,
+      institution_mentioned: true,
+      billing_period: "07/2026",
+      candidate_charges: [],
+      searchable_entries: [
+        {
+          description: "StreamPlay Assinatura mensal",
+          date: "2026-07-18",
+          amount: 34.9,
+          evidence: "18/07/2026 StreamPlay Assinatura mensal -R$ 34,90",
+        },
+      ],
+      notes: [],
+      model: "test-model",
+    }),
+  });
+  const analyzed = await service.analyze({
+    buffer: Buffer.from("Documento sem catalogo local."),
+    fileName: "julho.txt",
+    mimeType: "text/plain",
+    tenantId: "tenant-a",
+    userId: "user-a",
+  });
+  assert.equal(analyzed.case.candidates.length, 0);
+
+  const result = service.searchCases(
+    [analyzed.case.id],
+    "StreamPlay",
+    { tenantId: "tenant-a", userId: "user-a" },
+  );
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.cases[0].candidates.length, 1);
+  assert.equal(result.cases[0].candidates[0].origin, "directed_search");
+  assert.equal(result.cases[0].candidates[0].answer, "pending");
+  assert.equal(result.cases[0].candidates[0].amount, 34.9);
+  assert.equal(result.cases[0].candidates[0].date, "2026-07-18");
+});
+
+test("directed search keeps automatic candidates and adds only evidenced matches", async () => {
+  const service = createItauRefundService({
+    aiAnalyzer: async () => ({
+      document_readable: true,
+      institution_mentioned: true,
+      billing_period: "07/2026",
+      candidate_charges: [
+        {
+          label: "Protecao Horizonte",
+          description: "Protecao Horizonte",
+          category: "seguro",
+          date: "2026-07-22",
+          amount: 39.9,
+          evidence: "22/07/2026 Protecao Horizonte -R$ 39,90",
+          reason: "Seguro para confirmacao.",
+          confidence: "high",
+        },
+      ],
+      searchable_entries: [
+        {
+          description: "StreamPlay Assinatura mensal",
+          date: "2026-07-18",
+          amount: 34.9,
+          evidence: "18/07/2026 StreamPlay Assinatura mensal -R$ 34,90",
+        },
+      ],
+      notes: [],
+      model: "test-model",
+    }),
+  });
+  const analyzed = await service.analyze({
+    buffer: Buffer.from("Documento financeiro."),
+    fileName: "julho.txt",
+    mimeType: "text/plain",
+  });
+  const result = service.searchCases([analyzed.case.id], "StreamPlay");
+
+  assert.equal(result.cases[0].candidates.length, 2);
+  assert.deepEqual(
+    result.cases[0].candidates.map((candidate) => candidate.origin).sort(),
+    ["auto_detected", "directed_search"],
+  );
+});
+
+test("directed search without document evidence creates no candidate", async () => {
+  const service = createItauRefundService({
+    aiAnalyzer: async () => ({
+      document_readable: true,
+      institution_mentioned: true,
+      billing_period: "07/2026",
+      candidate_charges: [],
+      searchable_entries: [],
+      notes: [],
+      model: "test-model",
+    }),
+  });
+  const analyzed = await service.analyze({
+    buffer: Buffer.from("18/07/2026 Mercado Central -R$ 100,00"),
+    fileName: "julho.txt",
+    mimeType: "text/plain",
+  });
+  const result = service.searchCases([analyzed.case.id], "StreamPlay");
+
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.cases[0].candidates.length, 0);
 });
 
 test("reconciles the same charge found by AI and local rules without duplication", async () => {

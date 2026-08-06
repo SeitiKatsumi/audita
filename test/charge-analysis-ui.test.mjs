@@ -4,8 +4,10 @@ import test from "node:test";
 
 import {
   buildChargeAuditSnapshot,
+  buildChargeCalculationSnapshot,
   buildChargeEstimate,
   buildChargeJecHandoff,
+  buildChargeProgressSnapshot,
   CHARGE_ANALYSIS_BRANDS,
   ITAU_DOCUMENT_REQUEST_TEMPLATE,
   mergeChargeAnalysisFiles,
@@ -84,11 +86,11 @@ test("sidebar keeps expanded groups scrollable and collapsed icons centered", ()
 });
 
 test("charge analysis exposes a guided flow without an open chat input", () => {
-  const moduleMarkup = indexHtml.match(
-    /<section class="charge-analysis-page"[\s\S]*?<\/section>/,
-  )?.[0];
+  const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page"');
+  const moduleEnd = indexHtml.indexOf('<section class="assistant-workbench"', moduleStart);
+  const moduleMarkup = indexHtml.slice(moduleStart, moduleEnd);
 
-  assert.ok(moduleMarkup);
+  assert.ok(moduleStart >= 0 && moduleEnd > moduleStart);
   assert.match(moduleMarkup, /Fluxo guiado/);
   assert.match(moduleMarkup, /sem conversa aberta com IA/);
   assert.match(moduleMarkup, /id="chargeAnalysisStage"/);
@@ -109,10 +111,64 @@ test("charge analysis uses one module-wide progress rail from authorization to t
   assert.match(progressMarkup, /data-charge-progress="recovery"/);
   assert.match(progressMarkup, /data-charge-progress="report"/);
   assert.match(progressMarkup, /data-charge-progress="tribunal"/);
-  assert.match(indexHtml, /Etapa 1 de 7/);
-  assert.match(chargeAnalysisJs, /state\.recovery\.phase === "guide"[\s\S]*?"tribunal"/);
+  assert.match(indexHtml, /id="chargeAnalysisProgressPercent">0%/);
+  assert.match(indexHtml, /id="chargeAnalysisProgressMeter" max="100" value="0"/);
+  assert.match(indexHtml, /O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano/);
+  assert.match(chargeAnalysisJs, /buildChargeProgressSnapshot\(state\)/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-recovery-progress/);
   assert.match(stylesCss, /\.charge-module-progress\s*\{/);
+  assert.match(stylesCss, /\.charge-progress-summary\s*\{/);
+});
+
+test("charge progress is evidence-based and never treats document generation as filing", () => {
+  assert.deepEqual(
+    buildChargeProgressSnapshot({
+      screen: "no-documents",
+      authorizationAnswer: "denied",
+      documentAvailability: "none",
+    }),
+    {
+      percent: 20,
+      activeStep: "statements",
+      message: "Faltam faturas ou extratos. Sem documentos, a análise e a preparação jurídica não avançam.",
+      evidenceCoverage: "absent",
+      protocolStatus: "human_pending",
+    },
+  );
+
+  const partial = buildChargeProgressSnapshot({
+    screen: "result",
+    authorizationAnswer: "denied",
+    documentAvailability: "partial",
+    selectedFiles: [{ name: "julho.pdf" }],
+    caseData: {
+      candidates: [{ amount: 39.9, answer: "not_recognized" }],
+    },
+  });
+  assert.equal(partial.percent, 65);
+  assert.equal(partial.activeStep, "recovery");
+  assert.equal(partial.evidenceCoverage, "partial");
+  assert.match(partial.message, /cobertura é parcial/);
+
+  const generated = buildChargeProgressSnapshot({
+    screen: "recovery",
+    authorizationAnswer: "denied",
+    documentAvailability: "complete",
+    selectedFiles: [{ name: "historico.pdf" }],
+    caseData: {
+      candidates: [{ amount: 39.9, answer: "not_recognized" }],
+    },
+    recovery: {
+      phase: "guide",
+      handoff: { ready: true },
+      prepared: { ready: true },
+      pdfGeneratedAt: "2026-08-06T12:00:00.000Z",
+    },
+  });
+  assert.equal(generated.percent, 90);
+  assert.equal(generated.activeStep, "tribunal");
+  assert.equal(generated.protocolStatus, "human_pending");
+  assert.match(generated.message, /protocolo final continua pendente/);
 });
 
 test("charge analysis reveals agent messages before moving to the selected path", () => {
@@ -237,25 +293,46 @@ test("preliminary audit calculates only evidenced and user-disputed amounts", ()
   );
 });
 
-test("partial-document estimate stays separate from documentary totals", () => {
+test("review and documentary calculation are separate sequential stages", () => {
+  assert.match(chargeAnalysisJs, /state\.screen = "review"/);
+  assert.match(chargeAnalysisJs, /function renderReview\(\)/);
+  assert.match(chargeAnalysisJs, /data-charge-action="confirm-review"/);
+  assert.match(chargeAnalysisJs, /Confirmar revisão e calcular/);
+  assert.match(chargeAnalysisJs, /Somente ocorrências encontradas nos anexos/);
+  assert.doesNotMatch(chargeAnalysisJs, /id="chargeEstimateForm"/);
+  assert.doesNotMatch(chargeAnalysisJs, /Complemento estimado aos documentos parciais/);
+});
+
+test("calculation uses only confirmed non-recognized documentary occurrences", () => {
   assert.deepEqual(
-    buildChargeEstimate({
-      monthlyAmount: 19,
-      durationValue: 15,
-      durationUnit: "years",
+    buildChargeCalculationSnapshot({
+      candidates: [
+        { id: "auto", amount: 39.9, answer: "not_recognized", origin: "auto_detected", sourceFileName: "julho.pdf" },
+        { id: "directed", amount: 34.9, answer: "not_recognized", origin: "directed_search", sourceFileName: "agosto.pdf" },
+        { id: "known", amount: 12, answer: "recognized", sourceFileName: "julho.pdf" },
+        { id: "pending", amount: 10, answer: "pending", sourceFileName: "agosto.pdf" },
+      ],
     }),
     {
-      monthlyAmount: 19,
-      durationValue: 15,
-      durationUnit: "years",
-      months: 180,
-      estimatedPaid: 3420,
-      hypotheticalDouble: 6840,
+      items: [
+        { id: "auto", amount: 39.9, answer: "not_recognized", origin: "auto_detected", sourceFileName: "julho.pdf" },
+        { id: "directed", amount: 34.9, answer: "not_recognized", origin: "directed_search", sourceFileName: "agosto.pdf" },
+      ],
+      itemCount: 2,
+      principal: 74.8,
+      hypotheticalDouble: 149.6,
+      excludedWithoutAmount: 0,
     },
   );
-  assert.match(chargeAnalysisJs, /A estimativa complementa apenas os documentos parciais enviados/);
-  assert.match(chargeAnalysisJs, /Documentos parciais não comprovam integralmente o período/);
-  assert.match(chargeAnalysisJs, /A definir na revisão/);
+});
+
+test("false negatives can only be recovered by searching existing attachments", () => {
+  assert.match(chargeAnalysisJs, /Indicar uma cobrança para procurar nos meus anexos/);
+  assert.match(chargeAnalysisJs, /\/api\/itau-refund\/cases\/search/);
+  assert.match(chargeAnalysisJs, /não localizada nos documentos enviados/);
+  assert.match(chargeAnalysisJs, /caseIds: state\.caseBatches\.map/);
+  assert.doesNotMatch(chargeAnalysisJs, /Adicionar cobrança que não apareceu/);
+  assert.doesNotMatch(chargeAnalysisJs, /name="(?:amount|date)"/);
 });
 
 test("guided documentary journey hands evidenced charges to JEC model 1", () => {
@@ -335,5 +412,9 @@ test("recovery report reuses calculated values without asking for another review
   assert.match(chargeAnalysisJs, /const calculatedValues = state\.recovery\.handoff\?\.suggestion\?\.values \|\| \{\}/);
   assert.match(chargeAnalysisJs, /type="hidden" name="doubleRefundAmount"/);
   assert.match(chargeAnalysisJs, /type="hidden" name="caseValue"/);
+  assert.match(chargeAnalysisJs, /name="bankAgency"/);
+  assert.match(appJs, /name="bankAgency"/);
+  assert.match(chargeAnalysisJs, /bankAgency: normalizeRecoveryText/);
+  assert.match(appJs, /bankAgency: normalizeJecText/);
   assert.match(chargeAnalysisJs, /Os valores calculados na análise serão incluídos automaticamente/);
 });

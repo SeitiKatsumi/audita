@@ -712,56 +712,156 @@ function buildEvidenceSummary(caseData = {}) {
     : `as cobranças ${items.join("; ")}`;
 }
 
-function getDeclaredEstimate(caseData = {}) {
-  const estimate = caseData?.answers?.declaredEstimate;
-  if (!estimate || estimate.source !== "consumer_declaration") return null;
-  const monthlyAmount = normalizeMoney(estimate.monthlyAmount);
-  const estimatedPaid = normalizeMoney(estimate.estimatedPaid);
-  const months = Math.max(0, Math.floor(Number(estimate.months) || 0));
-  if (!(monthlyAmount > 0) || months < 1) return null;
-  return {
-    description: cleanText(estimate.description, 120) || "cobrança contestada",
-    monthlyAmount,
-    estimatedPaid,
-    months,
-  };
-}
+const OMIT_TEMPLATE_SECTION = "__AUDITA_OMIT_SECTION__";
 
-function buildEvidenceContext(caseData = {}) {
-  const estimate = getDeclaredEstimate(caseData);
-  if (estimate) {
-    const total = Number.isFinite(estimate.estimatedPaid) && estimate.estimatedPaid > 0
-      ? `, totalizando aproximadamente R$ ${formatPetitionMoney(estimate.estimatedPaid)}`
-      : "";
-    return `O(A) Autor(a) é titular de conta e/ou cartão de crédito junto à instituição financeira Ré e relata não reconhecer a cobrança “${estimate.description}”, no valor mensal aproximado de R$ ${formatPetitionMoney(estimate.monthlyAmount)}, durante cerca de ${estimate.months} mês(es)${total}. Nenhum extrato histórico foi apresentado nesta etapa.`;
-  }
-  return `O(A) Autor(a) é titular de conta e/ou cartão de crédito junto à instituição financeira Ré. Ao analisar o documento recente fornecido pelo(a) consumidor(a), a plataforma IA AUDITA identificou ${buildEvidenceSummary(caseData)}, que o(a) Autor(a) declarou não reconhecer.`;
-}
-
-function buildQuantificationContext(caseData = {}) {
-  if (getDeclaredEstimate(caseData)) {
-    return "A quantificação indicada nesta etapa é uma simulação aritmética baseada na memória e na declaração do(a) consumidor(a), não um valor comprovado por extratos. A origem, a duração e o total da cobrança permanecem sujeitos à exibição dos documentos pela Ré e à revisão do caso concreto.";
-  }
-  return "Nesta etapa, a quantificação está limitada aos lançamentos efetivamente apresentados. O(A) Autor(a) não dispõe dos extratos históricos completos nem do instrumento contratual que permita verificar a origem, a duração e a regularidade da cobrança contestada.";
-}
-
-function buildRefundScope(caseData = {}) {
-  return getDeclaredEstimate(caseData)
-    ? "dos valores que vierem a ser comprovados, tomando-se o montante informado apenas como estimativa inicial sujeita à apuração"
-    : "dos valores comprovados nesta etapa";
-}
-
-function buildHistoricalContext(caseData = {}) {
-  if (getDeclaredEstimate(caseData)) {
-    return "O(A) Autor(a) relata que a cobrança ocorreu durante o período aproximado informado. Essa recorrência fundamenta apenas a estimativa declaratória inicial e permanece não comprovada até a apresentação dos extratos e demais documentos pertinentes.";
-  }
-  const historicalEvidence = String(
-    caseData?.answers?.historicalEvidence || "pending",
+function getDisputedCandidates(caseData = {}) {
+  return (Array.isArray(caseData?.candidates) ? caseData.candidates : []).filter(
+    (candidate) => candidate?.answer === "not_recognized",
   );
-  if (historicalEvidence === "yes") {
-    return "O(A) Autor(a) relata que a cobrança também ocorreu em período anterior. Como os extratos históricos ainda não foram apresentados, a extensão temporal permanece não comprovada e não integra o cálculo inicial; sua apuração depende da exibição dos documentos pela Ré.";
+}
+
+function resolveDocumentAvailability(caseData = {}, journey = "") {
+  const explicit = String(caseData?.answers?.documentAvailability || "").trim();
+  if (["complete", "partial", "none"].includes(explicit)) return explicit;
+  if (journey === "with_historical_documents") return "complete";
+  return getDisputedCandidates(caseData).length ? "partial" : "none";
+}
+
+function collectEvidenceFiles(caseData = {}) {
+  const names = [
+    ...(Array.isArray(caseData?.cases)
+      ? caseData.cases.map((item) => item?.document?.fileName)
+      : []),
+    ...getDisputedCandidates(caseData).map((candidate) => candidate?.sourceFileName),
+    caseData?.document?.fileName,
+  ];
+  return [...new Set(names.map((item) => cleanText(item, 120)).filter(Boolean))];
+}
+
+function firstDebitPeriod(caseData = {}) {
+  const dates = getDisputedCandidates(caseData)
+    .map((candidate) => cleanText(candidate?.date, 40))
+    .filter(Boolean)
+    .sort();
+  if (dates.length) return formatEvidenceDate(dates[0]) || dates[0];
+  return cleanText(
+    caseData?.answers?.firstDebitPeriod ||
+      caseData?.answers?.priorComplaintDateApproximate,
+    80,
+  ) || "período ainda sujeito a comprovação";
+}
+
+function buildBankRelationshipContext(claimant = {}) {
+  const agency = cleanText(claimant.bankAgency, 20);
+  return agency
+    ? `O(A) Autor(a) é titular de conta e/ou cartão gerido pela instituição financeira Ré, mantido na agência ${agency}.`
+    : "O(A) Autor(a) é titular de conta e/ou cartão gerido pela instituição financeira Ré. O número da agência não foi informado neste rascunho.";
+}
+
+function buildDocumentAvailabilityContext(caseData = {}, journey = "") {
+  const availability = resolveDocumentAvailability(caseData, journey);
+  if (availability === "complete") {
+    return "O(A) Autor(a) apresentou os extratos/faturas do período indicado para auditoria, preservados como documentos de origem do relatório técnico.";
   }
-  return "Não há, nesta etapa, documentação histórica suficiente para afirmar recorrência ou duração da cobrança. Por isso, a quantificação inicial foi limitada aos lançamentos efetivamente apresentados.";
+  if (availability === "partial") {
+    return "O(A) Autor(a) apresentou somente parte dos extratos/faturas. Os demais documentos do período permanecem em poder da instituição financeira e são necessários para completar a apuração.";
+  }
+  return "O(A) Autor(a) não dispõe dos extratos/faturas necessários para quantificar a cobrança. Nenhum valor foi estimado pela Audita; a apuração depende da exibição dos documentos pela instituição financeira.";
+}
+
+function buildEvidenceContext(caseData = {}, journey = "") {
+  const summary = buildEvidenceSummary(caseData);
+  const availability = resolveDocumentAvailability(caseData, journey);
+  if (summary) {
+    return `Nos documentos apresentados, a Audita localizou ${summary}. O(A) Autor(a) marcou esses lançamentos como não reconhecidos. A classificação jurídica e a regularidade da contratação permanecem sujeitas à prova e à revisão do caso concreto.`;
+  }
+  if (availability === "none") {
+    const description = cleanText(
+      caseData?.answers?.suspectedChargeDescription ||
+        caseData?.answers?.selectedBrand,
+      120,
+    );
+    return description
+      ? `O(A) Autor(a) relata suspeitar da cobrança “${description}”, mas nenhum lançamento com valor e data foi comprovado por documento nesta etapa.`
+      : "O(A) Autor(a) relata suspeitar de cobrança não reconhecida, mas ainda não apresentou documento que individualize descrição, valor e data.";
+  }
+  return "A documentação apresentada não individualizou lançamento confirmado como não reconhecido; o rascunho permanece incompleto até revisão da evidência.";
+}
+
+function buildContractConfirmationContext(caseData = {}) {
+  if (!getDisputedCandidates(caseData).length) {
+    return "A existência, o conteúdo e a forma de eventual contratação permanecem sujeitos à exibição do instrumento e dos registros de consentimento pela instituição financeira.";
+  }
+  return "O(A) Autor(a) declarou não reconhecer a contratação correspondente aos lançamentos indicados e não localizou, entre os documentos submetidos à Audita, contrato ou registro de consentimento. Cabe à instituição financeira apresentar eventual prova de adesão, sem que a ausência do documento em poder do consumidor seja tratada isoladamente como prova definitiva.";
+}
+
+function buildPriorComplaintContext(caseData = {}) {
+  const answers = caseData?.answers || {};
+  if (String(answers.priorComplaint || "") !== "yes") {
+    return OMIT_TEMPLATE_SECTION;
+  }
+  const date = cleanText(
+    answers.priorComplaintDate || answers.priorComplaintDateApproximate,
+    80,
+  );
+  const protocol = cleanText(answers.priorComplaintProtocol, 80);
+  const details = [
+    date ? `em ${date}` : "em data não informada",
+    protocol ? `sob o protocolo nº ${protocol}` : "sem protocolo disponível",
+  ].join(", ");
+  return `O(A) Autor(a) relata ter buscado solução diretamente com o banco ${details}. Essa informação deve ser conferida com os comprovantes disponíveis antes do protocolo.`;
+}
+
+function buildDocumentExhibitionScope(caseData = {}, journey = "") {
+  const availability = resolveDocumentAvailability(caseData, journey);
+  return availability === "partial"
+    ? "A cópia integral e analítica dos extratos/faturas que completem os períodos não abrangidos pelos documentos apresentados, desde o início da cobrança contestada, discriminando cada lançamento pertinente;"
+    : "A cópia integral e analítica dos extratos/faturas desde o início da relação ou da cobrança relatada, discriminando cada lançamento pertinente;";
+}
+
+function buildTechnicalReportSection(caseData = {}, journey = "") {
+  const availability = resolveDocumentAvailability(caseData, journey);
+  const files = collectEvidenceFiles(caseData);
+  const attachmentText = files.length
+    ? ` Os documentos de origem identificados são: ${files.join(", ")}.`
+    : "";
+  if (availability === "complete") {
+    return `Junta-se o Relatório Técnico de Auditoria da Audita, limitado aos lançamentos extraídos dos documentos apresentados e confirmados pelo consumidor como não reconhecidos.${attachmentText}`;
+  }
+  if (availability === "partial") {
+    return `Junta-se relatório técnico parcial, limitado aos lançamentos efetivamente localizados nos documentos apresentados. O relatório não presume cobranças nos períodos ausentes e deve ser complementado após a exibição dos documentos faltantes.${attachmentText}`;
+  }
+  return "Sem extratos/faturas, não há relatório financeiro de valores apurados. O pedido de exibição documental busca obter a base necessária para futura análise, sem estimativa automática pela Audita.";
+}
+
+function hasCurrentChargeRisk(caseData = {}) {
+  const answers = caseData?.answers || {};
+  return answers.continuedAfterCancellation === "yes" || answers.currentChargeActive === "yes";
+}
+
+function buildEmergencyGrounds(caseData = {}) {
+  return hasCurrentChargeRisk(caseData)
+    ? "O(A) Autor(a) relata que a cobrança permanece ativa, circunstância que poderá justificar tutela de urgência se confirmada pelos documentos e pelos requisitos do art. 300 do CPC."
+    : OMIT_TEMPLATE_SECTION;
+}
+
+function buildEmergencyRequest(caseData = {}) {
+  return hasCurrentChargeRisk(caseData)
+    ? "A concessão da Tutela de Urgência, se presentes os requisitos legais, para suspender novos lançamentos da mesma origem até decisão judicial, sob pena de multa a ser arbitrada pelo Juízo;"
+    : OMIT_TEMPLATE_SECTION;
+}
+
+function buildDoubleRefundRequest(claimant = {}, templateId = "") {
+  const amount = normalizeMoney(claimant.doubleRefundAmount);
+  if (!(amount > 0)) {
+    return templateId === "document_exhibition"
+      ? "b) Condenar a Ré à restituição, na forma definida pelo Juízo, dos valores que vierem a ser comprovados após a exibição documental, sem quantificação automática nesta etapa;"
+      : OMIT_TEMPLATE_SECTION;
+  }
+  const scope = templateId === "document_exhibition"
+    ? "dos lançamentos comprovados nesta etapa, sem prejuízo da apuração dos documentos faltantes"
+    : "dos lançamentos comprovados no relatório técnico";
+  return `b) Condenar a Ré à Repetição do Indébito em Dobro ${scope}, no valor revisado de R$ ${formatPetitionMoney(amount)}, acrescido de atualização e juros na forma definida pelo Juízo;`;
 }
 
 function buildActionTitle(templateId, claimant) {
@@ -778,7 +878,7 @@ function buildActionTitle(templateId, claimant) {
 }
 
 function buildOptionalClaimText(claimant) {
-  const omitted = "__AUDITA_OMIT_SECTION__";
+  const omitted = OMIT_TEMPLATE_SECTION;
   let requestLetterCode = "c".charCodeAt(0);
   const lostProfitsGrounds =
     claimant.lostProfitsAmount > 0
@@ -802,6 +902,7 @@ function buildOptionalClaimText(claimant) {
 
 function buildDraft({ caseData, claimant, templateId, generatedAt }) {
   const optionalClaims = buildOptionalClaimText(claimant);
+  const journey = resolveJourney(caseData, claimant);
   return renderJecPetitionTemplate(templateId, {
     ACTION_TITLE: buildActionTitle(templateId, claimant),
     CITY_UF:
@@ -816,14 +917,24 @@ function buildDraft({ caseData, claimant, templateId, generatedAt }) {
     EMAIL: claimant.email,
     PHONE: formatProfilePhone(claimant.phone),
     EVIDENCE_SUMMARY: buildEvidenceSummary(caseData),
-    EVIDENCE_CONTEXT: buildEvidenceContext(caseData),
-    QUANTIFICATION_CONTEXT: buildQuantificationContext(caseData),
-    REFUND_SCOPE: buildRefundScope(caseData),
-    HISTORICAL_CONTEXT: buildHistoricalContext(caseData),
+    EVIDENCE_CONTEXT: buildEvidenceContext(caseData, journey),
+    BANK_RELATIONSHIP_CONTEXT: buildBankRelationshipContext(claimant),
+    DOCUMENT_AVAILABILITY_CONTEXT: buildDocumentAvailabilityContext(
+      caseData,
+      journey,
+    ),
+    CONTRACT_CONFIRMATION_CONTEXT: buildContractConfirmationContext(caseData),
+    PRIOR_COMPLAINT_CONTEXT: buildPriorComplaintContext(caseData),
+    DOCUMENT_EXHIBITION_SCOPE: buildDocumentExhibitionScope(caseData, journey),
+    FIRST_DEBIT_PERIOD: firstDebitPeriod(caseData),
+    TECHNICAL_REPORT_SECTION: buildTechnicalReportSection(caseData, journey),
+    EMERGENCY_GROUNDS: buildEmergencyGrounds(caseData),
+    EMERGENCY_REQUEST: buildEmergencyRequest(caseData),
     DOUBLE_REFUND: formatPetitionMoney(claimant.doubleRefundAmount),
     LOST_PROFITS: formatPetitionMoney(claimant.lostProfitsAmount),
     MORAL_DAMAGES: formatPetitionMoney(claimant.moralDamagesAmount),
     LOST_PROFITS_GROUNDS: optionalClaims.lostProfitsGrounds,
+    DOUBLE_REFUND_REQUEST: buildDoubleRefundRequest(claimant, templateId),
     LOST_PROFITS_REQUEST: optionalClaims.lostProfitsRequest,
     MORAL_DAMAGES_REQUEST: optionalClaims.moralDamagesRequest,
     CASE_VALUE: formatPetitionMoney(claimant.caseValue),
@@ -861,8 +972,9 @@ export function prepareJecPetition({
   const structuredAddress = buildProfileAddress(claimant);
   const normalizedAddress = structuredAddress || cleanText(claimant.address, 300);
   const journey = resolveJourney(caseData, claimant);
+  const documentAvailability = resolveDocumentAvailability(caseData, journey);
   const templateId =
-    journey === "with_historical_documents"
+    documentAvailability === "complete"
       ? "audited_values"
       : "document_exhibition";
   const template = getJecPetitionTemplate(templateId);
@@ -887,7 +999,9 @@ export function prepareJecPetition({
   const lostProfitsAmount = normalizeMoney(claimant.lostProfitsAmount);
   const moralDamagesAmount = normalizeMoney(claimant.moralDamagesAmount);
   const caseValue = normalizeMoney(claimant.caseValue);
-  if (!(doubleRefundAmount > 0)) missingFields.push("doubleRefundAmount");
+  if (templateId === "audited_values" && !(doubleRefundAmount > 0)) {
+    missingFields.push("doubleRefundAmount");
+  }
   if (!(caseValue > 0)) missingFields.push("caseValue");
 
   const normalizedClaimant = {
@@ -907,6 +1021,7 @@ export function prepareJecPetition({
     address: normalizedAddress,
     city: normalizedCity,
     uf: normalizedUf,
+    bankAgency: cleanText(claimant.bankAgency, 20),
     historicalDocumentsAvailable:
       journey === "with_historical_documents"
         ? "yes"
@@ -937,7 +1052,20 @@ export function prepareJecPetition({
       id: template.id,
       label: template.label,
       sourceModel: template.sourceModel,
+      sourceFile: template.sourceFile,
+      evidenceMode: template.evidenceMode,
       reviewNotes: [...template.reviewNotes],
+    },
+    attachments: {
+      evidenceFiles: collectEvidenceFiles(caseData),
+      required: [
+        "Documento pessoal",
+        "Comprovante de endereço",
+        ...(documentAvailability === "none"
+          ? []
+          : ["Relatório Técnico da Audita", "Extratos/faturas de origem" ]),
+      ],
+      documentaryCoverage: documentAvailability,
     },
     disputedCount: disputed.length,
     knownAmountCount: knownAmounts.length,
@@ -946,7 +1074,17 @@ export function prepareJecPetition({
     generatedAt: new Date(generatedAt).toISOString(),
     warnings: [
       "Rascunho baseado no modelo fornecido: revise fatos, competência territorial, pedidos e valor da causa.",
-      "Os valores jurídicos não são calculados nem presumidos pelo Audita; devem ser informados e revisados.",
+      `Fonte do texto-base: ${template.sourceFile}.`,
+      "Os valores jurídicos não são presumidos pela Audita; a sugestão usa somente lançamentos documentados e todos os valores devem ser revisados.",
+      ...(documentAvailability === "partial"
+        ? ["A prova é parcial: o relatório e os valores abrangem somente os documentos enviados; o Modelo 2 pede a exibição do restante."]
+        : []),
+      ...(documentAvailability === "none"
+        ? ["Sem extratos/faturas, nenhum valor é estimado e o rascunho não fica pronto enquanto faltarem fatos e valor da causa revisados."]
+        : []),
+      ...(templateId === "document_exhibition" && !normalizedClaimant.bankAgency
+        ? ["O número da agência Itaú não foi informado e ficou identificado como ausente no rascunho."]
+        : []),
       ...(!(lostProfitsAmount > 0)
         ? ["Lucros cessantes não foram incluídos porque nenhum valor positivo foi informado."]
         : []),

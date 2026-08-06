@@ -1,4 +1,11 @@
-const MODEL_1 = `
+import {
+  JEC_SOURCE_MODEL_1,
+} from "./jec-petition-source-model-1.mjs";
+import {
+  JEC_SOURCE_MODEL_2,
+} from "./jec-petition-source-model-2.mjs";
+
+const LEGACY_MODEL_1 = `
 EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUIZADO ESPECIAL CÍVEL DA COMARCA DE {{CITY_UF}}
 
 {{FULL_NAME}}, {{NATIONALITY}}, {{MARITAL_STATUS}}, {{PROFESSION}}, portador(a) do RG nº {{RG}} e inscrito(a) no CPF sob o nº {{DOCUMENT}}, residente e domiciliado(a) na {{ADDRESS}}, e-mail: {{EMAIL}}, telefone: {{PHONE}}, com base na capacidade postulatória própria conferida pelo art. 9º da Lei nº 9.099/95 (sem necessidade de advogado), vem, respeitosamente, à presença de Vossa Excelência, propor a presente:
@@ -96,7 +103,7 @@ CPF nº {{DOCUMENT}}
 (Jus Postulandi - Art. 9º da Lei 9.099/95)
 `.trim();
 
-const MODEL_2 = `
+const LEGACY_MODEL_2 = `
 EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUIZADO ESPECIAL CÍVEL DA COMARCA DE {{CITY_UF}}
 
 {{FULL_NAME}}, {{NATIONALITY}}, {{MARITAL_STATUS}}, {{PROFESSION}}, portador(a) do RG nº {{RG}} e inscrito(a) no CPF sob o nº {{DOCUMENT}}, residente e domiciliado(a) na {{ADDRESS}}, e-mail: {{EMAIL}}, telefone: {{PHONE}}, com base na capacidade postulatória própria conferida pelo art. 9º da Lei nº 9.099/95 (sem necessidade de advogado), vem, respeitosamente, à presença de Vossa Excelência, propor a presente:
@@ -200,21 +207,28 @@ export const JEC_PETITION_TEMPLATES = Object.freeze({
   audited_values: Object.freeze({
     id: "audited_values",
     label: "Relatório Técnico de Auditoria - Modelo 1 (valores apurados)",
-    text: MODEL_1,
+    text: JEC_SOURCE_MODEL_1,
     sourceModel: 1,
+    sourceFile: "MODELO 1 PETIÇÃO ITAU CLIENTE TEM TODOS EXTRATOS.docx",
+    evidenceMode: "complete",
     reviewNotes: [
-      "Confirme se a auditoria abrange o período afirmado e se o relatório será anexado.",
+      "Modelo 1 reservado a extratos/faturas completos e valores efetivamente apurados nos anexos.",
+      "Confirme se a auditoria abrange o período afirmado e se o relatório técnico e os documentos de origem serão anexados.",
       "Confirme separadamente repetição em dobro, lucros cessantes, danos morais e valor da causa.",
     ],
   }),
   document_exhibition: Object.freeze({
     id: "document_exhibition",
     label: "Relatório Técnico de Auditoria - Modelo 2 (documentos a apresentar)",
-    text: MODEL_2,
+    text: JEC_SOURCE_MODEL_2,
     sourceModel: 2,
+    sourceFile: "MODELO 2 ITAU CLIENTE TEM PARTE OU NÃO TEM EXTRATOS.docx",
+    evidenceMode: "partial_or_absent",
     reviewNotes: [
+      "Modelo 2 aplicável a extratos/faturas parciais ou ausentes, com pedido de exibição dos documentos faltantes.",
       "A recorrência relatada não é tratada como fato comprovado sem os extratos históricos.",
-      "A quantificação inicial fica limitada às cobranças efetivamente evidenciadas.",
+      "Com documentos parciais, a quantificação inicial fica limitada às cobranças efetivamente evidenciadas.",
+      "Sem documentos, nenhum valor é estimado e o rascunho permanece incompleto até revisão humana dos fatos e do valor da causa.",
       "Pedidos facultativos sem valor positivo informado são omitidos do rascunho.",
       "Fatos, competência, fundamentos e pedidos ainda exigem revisão jurídica antes do protocolo.",
     ],

@@ -3199,6 +3199,10 @@ function renderJecPetitionPanel(caseData = {}) {
             <span>Telefone</span>
             <input name="phone" required inputmode="tel" maxlength="15" autocomplete="tel" data-jec-mask="phone" placeholder="(00) 00000-0000" value="${escapeHtml(formatJecPhone(claimant.phone || ""))}" />
           </label>
+          <label>
+            <span>Agência Itaú <small>opcional</small></span>
+            <input name="bankAgency" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="Ex.: 1234" value="${escapeHtml(claimant.bankAgency || "")}" />
+          </label>
           <div class="jec-form-section-title jec-field-wide">
             <strong>Endereço</strong>
             <span>Informe os campos separadamente para uso consistente nos portais.</span>
@@ -3818,6 +3822,7 @@ function readJecClaimant(form) {
     profession: normalizeJecText(data.get("profession")),
     email: normalizeJecText(data.get("email")).toLocaleLowerCase("pt-BR"),
     phone: String(data.get("phone") || "").replace(/\D/g, "").slice(0, 11),
+    bankAgency: normalizeJecText(data.get("bankAgency")),
     postalCode: String(data.get("postalCode") || "").replace(/\D/g, "").slice(0, 8),
     street: normalizeJecText(data.get("street")),
     addressNumber: normalizeJecText(data.get("addressNumber")),

@@ -4626,6 +4626,44 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/itau-refund/cases/search" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const input = await readJsonBody(request);
+      const result = itauRefundService.searchCases(
+        input.caseIds,
+        input.query,
+        {
+          tenantId: authContext.tenantId,
+          userId: authContext.user?.id || null,
+        },
+      );
+      if (result.invalid) {
+        sendJson(response, 400, { error: result.reason });
+        return true;
+      }
+      if (result.notFound) {
+        sendJson(response, 404, { error: "itau_case_not_found" });
+        return true;
+      }
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "itau_case_forbidden" });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch {
+      sendJson(response, 500, {
+        error: "itau_directed_search_failed",
+        message: "Nao foi possivel procurar a cobranca nos documentos agora.",
+      });
+    }
+    return true;
+  }
+
   const itauCaseMatch = pathname.match(/^\/api\/itau-refund\/cases\/([^/]+)$/);
   if (itauCaseMatch && ["GET", "POST"].includes(request.method)) {
     try {

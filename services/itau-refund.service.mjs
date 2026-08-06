@@ -264,8 +264,104 @@ function createCandidate(input = {}) {
         "O lançamento se parece com seguro, proteção, garantia ou serviço que deve ser confirmado pelo titular.",
     ).slice(0, 260),
     confidence: ["low", "medium", "high"].includes(input.confidence) ? input.confidence : "medium",
+    origin: input.origin === "directed_search" ? "directed_search" : "auto_detected",
+    matchMethod: ["deterministic", "fuzzy"].includes(input.matchMethod)
+      ? input.matchMethod
+      : "",
     answer: "pending",
   };
+}
+
+function normalizeSearchableEntry(input = {}) {
+  const description = String(input.description || input.label || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+  const parsedDate = parseDate(input.date);
+  const amount = Number(input.amount);
+  if (!description || !parsedDate || !Number.isFinite(amount) || amount <= 0) return null;
+  return {
+    description,
+    date: parsedDate.toISOString().slice(0, 10),
+    amount: Number(amount.toFixed(2)),
+    evidence: String(input.evidence || description).replace(/\s+/g, " ").trim().slice(0, 220),
+  };
+}
+
+export function extractItauSearchableEntries(rawText) {
+  const entries = [];
+  const seen = new Set();
+  const lines = String(rawText || "").split(/\r?\n/);
+  const datePattern = /\b(?:0?[1-9]|[12]\d|3[01])[/-](?:0?[1-9]|1[0-2])[/-](?:19|20)?\d{2}\b/;
+  const amountPattern = /-?\s*(?:R\$\s*)?\d[\d.]*[,.]\d{2}\b/i;
+
+  for (const sourceLine of lines) {
+    const line = sourceLine.replace(/\s+/g, " ").trim();
+    const dateMatch = line.match(datePattern);
+    const amountMatches = [...line.matchAll(new RegExp(amountPattern.source, "gi"))];
+    const amountMatch = amountMatches.at(-1);
+    if (!dateMatch || !amountMatch) continue;
+    const description = line
+      .replace(dateMatch[0], " ")
+      .replace(amountMatch[0], " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const entry = normalizeSearchableEntry({
+      description,
+      date: dateMatch[0],
+      amount: parseBrazilianAmount(amountMatch[0].replace(/^\s*-/, "")),
+      evidence: line,
+    });
+    if (!entry) continue;
+    const key = `${normalizeForMatch(entry.description)}|${entry.date}|${entry.amount}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push(entry);
+    if (entries.length >= 160) break;
+  }
+  return entries;
+}
+
+function mergeSearchableEntries(...groups) {
+  const entries = [];
+  const seen = new Set();
+  for (const input of groups.flat()) {
+    const entry = normalizeSearchableEntry(input);
+    if (!entry) continue;
+    const key = `${normalizeForMatch(entry.description)}|${entry.date}|${entry.amount}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    entries.push(entry);
+    if (entries.length >= 160) break;
+  }
+  return entries;
+}
+
+export function findDirectedItauEntries(entries = [], query = "") {
+  const normalizedQuery = normalizeForMatch(query);
+  if (normalizedQuery.length < 3) return [];
+  const queryTokens = normalizedQuery.split(" ").filter((token) => token.length >= 3);
+  const normalizedEntries = entries.map((entry) => ({
+    entry,
+    text: normalizeForMatch(`${entry.description || ""} ${entry.evidence || ""}`),
+  }));
+  const deterministic = normalizedEntries
+    .filter(({ text }) => text.includes(normalizedQuery))
+    .map(({ entry }) => ({ ...entry, matchMethod: "deterministic" }));
+  if (deterministic.length) return deterministic.slice(0, 30);
+  if (!queryTokens.length) return [];
+  const compactQuery = normalizedQuery.replace(/\s+/g, "");
+  return normalizedEntries
+    .map(({ entry, text }) => {
+      const matchedTokens = queryTokens.filter((token) => text.includes(token));
+      const compactMatch = compactQuery.length >= 5 && text.replace(/\s+/g, "").includes(compactQuery);
+      const score = compactMatch ? 1 : matchedTokens.length / queryTokens.length;
+      return { entry, score };
+    })
+    .filter(({ score }) => score >= 0.67)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 30)
+    .map(({ entry }) => ({ ...entry, matchMethod: "fuzzy" }));
 }
 
 export function detectItauCandidateCharges(rawText) {
@@ -462,6 +558,21 @@ function openAIResultSchema() {
           ],
         },
       },
+      searchable_entries: {
+        type: "array",
+        maxItems: 160,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            description: { type: "string" },
+            date: { type: "string" },
+            amount: { type: "number" },
+            evidence: { type: "string" },
+          },
+          required: ["description", "date", "amount", "evidence"],
+        },
+      },
       notes: { type: "array", items: { type: "string" }, maxItems: 8 },
     },
     required: [
@@ -469,6 +580,7 @@ function openAIResultSchema() {
       "institution_mentioned",
       "billing_period",
       "candidate_charges",
+      "searchable_entries",
       "notes",
     ],
   };
@@ -493,6 +605,8 @@ function buildAnalysisPrompt() {
     "Datas devem usar AAAA-MM-DD quando completas; caso contrário, use string vazia.",
     "Se o documento estiver ilegível, marque document_readable=false e retorne lista vazia.",
     "Ignore compras comuns, pagamentos, encargos financeiros e tributos que não sejam seguro ou serviço candidato.",
+    "Em searchable_entries, transcreva todos os lançamentos legíveis que tenham descrição, data completa, valor e um pequeno trecho literal de evidência.",
+    "searchable_entries é apenas um índice privado para busca posterior do usuário: não classifique esses lançamentos como indevidos e não invente linhas ausentes.",
   ].join("\n");
 }
 
@@ -786,6 +900,16 @@ export function createItauRefundService({
       ? aiResult.candidate_charges
       : [];
     const candidates = mergeCandidates(localCandidates, aiCandidates);
+    const searchEntries = mergeSearchableEntries(
+      extractItauSearchableEntries(extractedText),
+      Array.isArray(aiResult?.searchable_entries) ? aiResult.searchable_entries : [],
+      candidates.map((candidate) => ({
+        description: candidate.description || candidate.label,
+        date: candidate.date,
+        amount: candidate.amount,
+        evidence: candidate.evidence,
+      })),
+    );
     const timestamp = now();
     const id = crypto.randomUUID();
     const record = {
@@ -819,6 +943,7 @@ export function createItauRefundService({
               : "analysis_unavailable",
       },
       candidates,
+      searchEntries,
       answers: {
         historicalEvidence: "pending",
         historicalDocumentsAvailable: "pending",
@@ -885,9 +1010,69 @@ export function createItauRefundService({
     return { case: publicCaseView(record) };
   }
 
+  function searchCases(ids = [], query = "", auth = {}) {
+    purgeExpired();
+    const normalizedIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(Boolean))]
+      .slice(0, 20);
+    const normalizedQuery = String(query || "").replace(/\s+/g, " ").trim().slice(0, 120);
+    if (!normalizedIds.length || normalizedQuery.length < 3) {
+      return { invalid: true, reason: "invalid_directed_search" };
+    }
+
+    const records = [];
+    for (const id of normalizedIds) {
+      const found = getCase(id, auth);
+      if (found.notFound || found.forbidden) return found;
+      records.push(cases.get(id));
+    }
+
+    const matches = [];
+    for (const record of records) {
+      const foundEntries = findDirectedItauEntries(record.searchEntries, normalizedQuery);
+      for (const entry of foundEntries) {
+        const duplicate = record.candidates.some((candidate) =>
+          candidate.date === entry.date &&
+          candidate.amount === entry.amount &&
+          normalizeForMatch(candidate.description || candidate.label) === normalizeForMatch(entry.description),
+        );
+        if (duplicate) {
+          const existing = record.candidates.find((candidate) =>
+            candidate.date === entry.date &&
+            candidate.amount === entry.amount &&
+            normalizeForMatch(candidate.description || candidate.label) === normalizeForMatch(entry.description),
+          );
+          matches.push({ caseId: record.id, candidateId: existing?.id || "", existing: true });
+          continue;
+        }
+        const candidate = createCandidate({
+          label: entry.description,
+          description: entry.description,
+          category: "outro",
+          date: entry.date,
+          amount: entry.amount,
+          evidence: entry.evidence,
+          reason: "Ocorrência localizada nos documentos após busca dirigida pelo usuário.",
+          confidence: entry.matchMethod === "deterministic" ? "high" : "medium",
+          origin: "directed_search",
+          matchMethod: entry.matchMethod,
+        });
+        record.candidates.push(candidate);
+        record.status = "review_required";
+        matches.push({ caseId: record.id, candidateId: candidate.id });
+      }
+    }
+
+    return {
+      query: normalizedQuery,
+      matches,
+      cases: records.map(publicCaseView),
+    };
+  }
+
   return {
     analyze,
     getCase,
     updateCase,
+    searchCases,
   };
 }

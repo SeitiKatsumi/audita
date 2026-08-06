@@ -18,11 +18,13 @@ const sampleCase = {
       date: "2026-07-22",
       amount: 39.9,
       answer: "not_recognized",
+      sourceFileName: "fatura-julho.pdf",
     },
   ],
   answers: {
     historicalEvidence: "yes",
     historicalDocumentsAvailable: "yes",
+    documentAvailability: "complete",
     priorComplaint: "yes",
     priorComplaintDate: "2026-07-23",
     priorComplaintProtocol: "ABC123",
@@ -115,6 +117,11 @@ test("petition draft uses the supplied audited-values model", () => {
   assert.equal(prepared.ready, true);
   assert.equal(prepared.template.id, "audited_values");
   assert.equal(prepared.template.sourceModel, 1);
+  assert.equal(
+    prepared.template.sourceFile,
+    "MODELO 1 PETIÇÃO ITAU CLIENTE TEM TODOS EXTRATOS.docx",
+  );
+  assert.equal(prepared.template.evidenceMode, "complete");
   assert.equal(prepared.disputedCount, 1);
   assert.equal(prepared.knownAmountCount, 1);
   assert.equal(prepared.totalDisputed, 39.9);
@@ -123,6 +130,9 @@ test("petition draft uses the supplied audited-values model", () => {
   assert.match(prepared.draft, /R\$\s+79,80/);
   assert.match(prepared.draft, /R\$\s+5\.079,80/);
   assert.doesNotMatch(prepared.draft, /\[PENDENTE:/);
+  assert.doesNotMatch(prepared.draft, /\{\{/);
+  assert.deepEqual(prepared.attachments.evidenceFiles, ["fatura-julho.pdf"]);
+  assert.equal(prepared.attachments.documentaryCoverage, "complete");
 
   const profile = buildJecAgentProfile(prepared);
   assert.equal(profile.blockAutomatedSubmit, true);
@@ -222,6 +232,7 @@ test("petition omits optional claims that do not have a positive reviewed value"
       answers: {
         ...sampleCase.answers,
         historicalDocumentsAvailable: "no",
+        documentAvailability: "partial",
       },
     },
     uf: "SP",
@@ -237,8 +248,8 @@ test("petition omits optional claims that do not have a positive reviewed value"
 
   assert.equal(prepared.ready, true);
   assert.doesNotMatch(prepared.draft, /\[PENDENTE: (?:LOST_PROFITS|MORAL_DAMAGES)\]/);
-  assert.doesNotMatch(prepared.draft, /Lucros Cessantes/i);
-  assert.doesNotMatch(prepared.draft, /Danos Morais/i);
+  assert.doesNotMatch(prepared.draft, /Condenar a Ré ao pagamento de Lucros Cessantes[^\n]*R\$/i);
+  assert.doesNotMatch(prepared.draft, /Condenar a Ré ao pagamento de Danos Morais[^\n]*R\$/i);
   assert.doesNotMatch(prepared.draft, /R\$\s+0,00/);
   assert.match(prepared.warnings.join("\n"), /Danos morais não foram incluídos/i);
 });
@@ -298,6 +309,7 @@ test("journey without historical statements selects the supplied exhibition mode
       answers: {
         ...sampleCase.answers,
         historicalDocumentsAvailable: "no",
+        documentAvailability: "partial",
       },
     },
     uf: "SP",
@@ -311,6 +323,11 @@ test("journey without historical statements selects the supplied exhibition mode
   assert.equal(prepared.journey, "without_historical_documents");
   assert.equal(prepared.template.id, "document_exhibition");
   assert.equal(prepared.template.sourceModel, 2);
+  assert.equal(
+    prepared.template.sourceFile,
+    "MODELO 2 ITAU CLIENTE TEM PARTE OU NÃO TEM EXTRATOS.docx",
+  );
+  assert.equal(prepared.template.evidenceMode, "partial_or_absent");
   assert.ok(
     prepared.template.reviewNotes.some((note) =>
       /recorrência relatada/i.test(note),
@@ -321,40 +338,49 @@ test("journey without historical statements selects the supplied exhibition mode
     prepared.draft,
     /AÇÃO DECLARATÓRIA DE INEXISTÊNCIA DE RELAÇÃO JURÍDICA C\/C EXIBIÇÃO INCIDENTAL DE DOCUMENTOS/i,
   );
-  assert.match(prepared.draft, /documento recente fornecido/i);
+  assert.match(prepared.draft, /somente parte dos extratos\/faturas/i);
   assert.match(prepared.draft, /Proteção Horizonte/i);
   assert.match(prepared.draft, /22\/07\/2026/i);
-  assert.match(prepared.draft, /extensão temporal permanece não comprovada/i);
-  assert.match(prepared.draft, /exiba em juízo/i);
+  assert.match(prepared.draft, /permanecem sujeitas à prova/i);
+  assert.match(prepared.draft, /deferimento da EXIBIÇÃO INCIDENTAL DE DOCUMENTOS/i);
   assert.doesNotMatch(prepared.draft, /auditoria analítica de seus extratos e faturas/i);
   assert.doesNotMatch(prepared.draft, /totalizando o valor atualizado/i);
   assert.doesNotMatch(prepared.draft, /R\$\s+0,00/);
-  assert.doesNotMatch(prepared.draft, /Lucros Cessantes/i);
+  assert.doesNotMatch(prepared.draft, /Condenar a Ré ao pagamento de Lucros Cessantes[^\n]*R\$/i);
+  assert.deepEqual(prepared.attachments.evidenceFiles, ["fatura-julho.pdf"]);
+  assert.equal(prepared.attachments.documentaryCoverage, "partial");
 });
 
-test("document-exhibition model keeps a no-statement estimate explicitly declaratory", () => {
+test("explicit partial coverage always selects Model 2 even when historical documents exist", () => {
   const prepared = prepareJecPetition({
     caseData: {
-      candidates: [
-        {
-          id: "declared-charge",
-          label: "Proteção do cartão",
-          amount: null,
-          answer: "not_recognized",
-          source: "consumer_declaration",
-        },
-      ],
+      ...sampleCase,
       answers: {
-        historicalEvidence: "yes",
+        ...sampleCase.answers,
+        historicalDocumentsAvailable: "yes",
+        documentAvailability: "partial",
+      },
+    },
+    uf: "SP",
+    city: "SÃ£o Paulo",
+    claimant: completeClaimant,
+  });
+
+  assert.equal(prepared.journey, "with_historical_documents");
+  assert.equal(prepared.template.id, "document_exhibition");
+  assert.equal(prepared.template.sourceModel, 2);
+  assert.equal(prepared.attachments.documentaryCoverage, "partial");
+  assert.match(prepared.warnings.join("\n"), /prova . parcial/i);
+});
+
+test("document-exhibition model never invents values when no statement was supplied", () => {
+  const prepared = prepareJecPetition({
+    caseData: {
+      candidates: [],
+      answers: {
+        historicalEvidence: "unknown",
         historicalDocumentsAvailable: "no",
-        declaredEstimate: {
-          description: "Proteção do cartão",
-          monthlyAmount: 19,
-          months: 180,
-          estimatedPaid: 3420,
-          hypotheticalDouble: 6840,
-          source: "consumer_declaration",
-        },
+        documentAvailability: "none",
       },
     },
     uf: "SP",
@@ -362,22 +388,27 @@ test("document-exhibition model keeps a no-statement estimate explicitly declara
     claimant: {
       ...completeClaimant,
       historicalDocumentsAvailable: "no",
-      doubleRefundAmount: "6840,00",
+      doubleRefundAmount: "",
       moralDamagesAmount: "0",
-      caseValue: "6840,00",
+      caseValue: "",
     },
   });
 
-  assert.equal(prepared.ready, true);
+  assert.equal(prepared.ready, false);
   assert.equal(prepared.template.id, "document_exhibition");
   assert.equal(prepared.template.sourceModel, 2);
   assert.equal(prepared.knownAmountCount, 0);
-  assert.match(prepared.draft, /memória e na declaração do\(a\) consumidor/i);
-  assert.match(prepared.draft, /Nenhum extrato histórico foi apresentado/i);
-  assert.match(prepared.draft, /R\$\s+3\.420,00/);
-  assert.match(prepared.draft, /estimativa inicial sujeita à apuração/i);
-  assert.doesNotMatch(prepared.draft, /documento recente fornecido/i);
-  assert.doesNotMatch(prepared.draft, /valores comprovados nesta etapa/i);
+  assert.ok(prepared.missingFields.includes("disputedCharge"));
+  assert.ok(prepared.missingFields.includes("caseValue"));
+  assert.match(prepared.draft, /Nenhum valor foi estimado pela Audita/i);
+  assert.doesNotMatch(prepared.draft, /R\$\s+3\.420,00/);
+  assert.doesNotMatch(prepared.draft, /R\$\s+6\.840,00/);
+  assert.doesNotMatch(prepared.draft, /R\$\s+10\.000,00/);
+  assert.doesNotMatch(prepared.draft, /R\$\s+15\.000,00/);
+  assert.doesNotMatch(prepared.draft, /R\$\s+20\.000,00/);
+  assert.deepEqual(prepared.attachments.evidenceFiles, []);
+  assert.equal(prepared.attachments.documentaryCoverage, "none");
+  assert.match(prepared.warnings.join("\n"), /nenhum valor é estimado/i);
 });
 
 test("document-exhibition model includes optional claims only when a positive value is supplied", () => {
@@ -387,6 +418,7 @@ test("document-exhibition model includes optional claims only when a positive va
       answers: {
         ...sampleCase.answers,
         historicalDocumentsAvailable: "no",
+        documentAvailability: "partial",
       },
     },
     uf: "SP",
