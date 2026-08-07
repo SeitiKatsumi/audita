@@ -7785,6 +7785,289 @@ body[data-active-page="chat"] .workspace {
   font-size: 0.75rem;
 }
 
+.charge-analysis-help {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px 6px 7px;
+  margin-left: auto;
+  border: 1px solid rgba(82, 183, 231, 0.38);
+  border-radius: 8px;
+  color: #d9edf8;
+  background: rgba(8, 38, 61, 0.82);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.charge-analysis-help > span:first-child {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(49, 247, 143, 0.5);
+  border-radius: 50%;
+  color: var(--lime);
+  font-size: 0.86rem;
+  line-height: 1;
+}
+
+.charge-analysis-help:hover,
+.charge-analysis-help:focus-visible {
+  border-color: rgba(49, 247, 143, 0.7);
+  outline: 0;
+  background: rgba(12, 56, 82, 0.96);
+}
+
+.charge-faq-dialog {
+  width: min(820px, calc(100vw - 32px));
+  max-height: min(820px, calc(100vh - 32px));
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(82, 183, 231, 0.36);
+  border-radius: 8px;
+  color: #e8f2f8;
+  background: #071a2b;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52);
+}
+
+.charge-faq-dialog::backdrop {
+  background: rgba(1, 10, 18, 0.78);
+  backdrop-filter: blur(5px);
+}
+
+.charge-faq-shell {
+  display: grid;
+  max-height: min(820px, calc(100vh - 32px));
+  grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
+}
+
+.charge-faq-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid rgba(82, 183, 231, 0.18);
+}
+
+.charge-faq-header h2,
+.charge-faq-header p,
+.charge-faq-notice h3,
+.charge-faq-notice p {
+  margin: 0;
+}
+
+.charge-faq-header h2 {
+  margin-top: 3px;
+  font-size: 1.35rem;
+}
+
+.charge-faq-header > div > p:last-child {
+  margin-top: 6px;
+  color: #9eb8c9;
+  font-size: 0.88rem;
+}
+
+.charge-faq-close {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(82, 183, 231, 0.3);
+  border-radius: 8px;
+  color: #d9edf8;
+  background: rgba(12, 48, 73, 0.78);
+  font-size: 1.45rem;
+  cursor: pointer;
+}
+
+.charge-faq-close:hover,
+.charge-faq-close:focus-visible {
+  border-color: rgba(49, 247, 143, 0.7);
+  outline: 0;
+  color: var(--lime);
+}
+
+.charge-faq-search {
+  display: grid;
+  gap: 7px;
+  padding: 18px 24px 8px;
+  color: #cce0eb;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.charge-faq-search input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 13px;
+  border: 1px solid rgba(82, 183, 231, 0.34);
+  border-radius: 7px;
+  color: #f2f8fb;
+  background: #051424;
+  font: inherit;
+}
+
+.charge-faq-search input:focus {
+  border-color: rgba(49, 247, 143, 0.72);
+  outline: 2px solid rgba(49, 247, 143, 0.14);
+  outline-offset: 1px;
+}
+
+.charge-faq-count {
+  padding: 0 24px 10px;
+  margin: 0;
+  color: #7899ae;
+  font-size: 0.75rem;
+}
+
+.charge-faq-list {
+  padding: 0 24px 20px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.charge-faq-item {
+  border-top: 1px solid rgba(82, 183, 231, 0.18);
+}
+
+.charge-faq-item:last-child {
+  border-bottom: 1px solid rgba(82, 183, 231, 0.18);
+}
+
+.charge-faq-item summary {
+  display: grid;
+  min-height: 52px;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px;
+  color: #e5f0f6;
+  font-size: 0.88rem;
+  font-weight: 750;
+  line-height: 1.45;
+  cursor: pointer;
+  list-style: none;
+}
+
+.charge-faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.charge-faq-item summary:focus-visible {
+  outline: 2px solid rgba(49, 247, 143, 0.55);
+  outline-offset: 2px;
+}
+
+.charge-faq-chevron {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(82, 183, 231, 0.28);
+  border-radius: 50%;
+  color: #81bad7;
+  transition: transform 160ms ease;
+}
+
+.charge-faq-item[open] .charge-faq-chevron {
+  color: var(--lime);
+  transform: rotate(45deg);
+}
+
+.charge-faq-answer {
+  padding: 0 44px 16px 4px;
+  color: #abc1cf;
+  font-size: 0.84rem;
+  line-height: 1.62;
+}
+
+.charge-faq-answer p,
+.charge-faq-answer ul,
+.charge-faq-answer ol {
+  margin: 0 0 10px;
+}
+
+.charge-faq-answer li + li {
+  margin-top: 4px;
+}
+
+.charge-faq-empty {
+  padding: 28px 0;
+  text-align: center;
+}
+
+.charge-faq-empty p {
+  margin: 6px 0 0;
+  color: #89a6b8;
+}
+
+.charge-faq-notice {
+  padding: 16px 24px 18px;
+  border-top: 1px solid rgba(49, 247, 143, 0.2);
+  background: rgba(8, 40, 48, 0.5);
+}
+
+.charge-faq-notice h3 {
+  color: var(--lime);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.charge-faq-notice p {
+  margin-top: 6px;
+  color: #92acba;
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 520px) {
+  .charge-analysis-help {
+    min-height: 34px;
+    padding: 4px;
+    margin-right: 2px;
+  }
+
+  .charge-analysis-help > span:first-child {
+    width: 24px;
+    height: 24px;
+  }
+
+  .charge-analysis-help > span:last-child {
+    display: none;
+  }
+
+  .charge-faq-dialog {
+    width: 100vw;
+    max-width: none;
+    max-height: 100dvh;
+    margin: 0;
+    border-width: 0;
+    border-radius: 0;
+  }
+
+  .charge-faq-shell {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+
+  .charge-faq-header,
+  .charge-faq-search,
+  .charge-faq-notice {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .charge-faq-list {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+}
+
 .charge-upload-file-list li > span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -10337,7 +10620,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0;
   padding: 0;
-  margin: 8px 72px 16px 0;
+  margin: 0 72px 18px 0;
   border: 0;
   background: transparent;
   transform: none;
@@ -10449,7 +10732,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   align-items: end;
   gap: 7px 22px;
   padding: 12px 14px;
-  margin: 0 72px 18px 0;
+  margin: 8px 72px 12px 0;
   border: 1px solid rgba(73, 169, 255, 0.18);
   border-radius: 8px;
   background: rgba(7, 26, 43, 0.72);
@@ -10507,7 +10790,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 @media (max-width: 760px) {
   .charge-module-progress {
     width: calc(100% - 24px);
-    margin: 4px 12px 7px;
+    margin: 0 12px 14px;
   }
 
   .charge-module-progress li,
@@ -10541,7 +10824,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   .charge-progress-summary {
     width: calc(100% - 24px);
     grid-template-columns: 1fr;
-    margin: 0 12px 14px;
+    margin: 4px 12px 10px;
   }
 
   .charge-progress-summary > div {
@@ -10557,6 +10840,9 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 
 @media (max-width: 520px) {
   .charge-analysis-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
     padding: 11px 18px 11px 84px;
   }
 }

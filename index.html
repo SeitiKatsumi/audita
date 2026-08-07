@@ -462,13 +462,32 @@
                 </span>
                 <p><strong>Audita</strong> est&aacute; analisando com voc&ecirc;</p>
               </div>
+              <button
+                class="charge-analysis-help"
+                id="chargeAnalysisHelpButton"
+                type="button"
+                aria-haspopup="dialog"
+                aria-controls="chargeAnalysisFaqDialog"
+                title="Abrir perguntas frequentes"
+              >
+                <span aria-hidden="true">?</span>
+                <span>Ajuda</span>
+              </button>
               <div class="charge-analysis-visually-hidden">
                 <h2>An&aacute;lise de cobran&ccedil;as indevidas</h2>
                 <p>Fluxo guiado, sem conversa aberta com IA.</p>
               </div>
             </header>
 
-            <ol class="charge-analysis-progress charge-module-progress" id="chargeAnalysisProgress" aria-label="Progresso completo do m&oacute;dulo">
+            <section class="charge-progress-summary" aria-label="Progresso do processo">
+              <div>
+                <strong id="chargeAnalysisProgressPercent">0%</strong>
+                <span id="chargeAnalysisProgressMessage">Responda &agrave; triagem inicial para come&ccedil;ar.</span>
+              </div>
+              <progress id="chargeAnalysisProgressMeter" max="100" value="0" aria-label="Percentual conclu&iacute;do">0%</progress>
+              <small>O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano.</small>
+            </section>
+            <ol class="charge-analysis-progress charge-module-progress" id="chargeAnalysisProgress" aria-label="Etapas do processo">
               <li class="active" data-charge-progress="authorization" aria-current="step">
                 <span aria-hidden="true">1</span>
                 <div><strong>Identifica&ccedil;&atilde;o</strong><small>Triagem inicial</small></div>
@@ -498,14 +517,6 @@
                 <div><strong>Protocolo</strong><small>Conclus&atilde;o humana</small></div>
               </li>
             </ol>
-            <section class="charge-progress-summary" aria-label="Progresso do processo">
-              <div>
-                <strong id="chargeAnalysisProgressPercent">0%</strong>
-                <span id="chargeAnalysisProgressMessage">Responda &agrave; triagem inicial para come&ccedil;ar.</span>
-              </div>
-              <progress id="chargeAnalysisProgressMeter" max="100" value="0" aria-label="Percentual conclu&iacute;do">0%</progress>
-              <small>O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano.</small>
-            </section>
             <span class="charge-analysis-status" id="chargeAnalysisStatus">0% conclu&iacute;do &middot; Etapa 1 de 7 &middot; Identifica&ccedil;&atilde;o</span>
 
             <main
@@ -527,6 +538,31 @@
 
             <p class="charge-analysis-error hidden" id="chargeAnalysisError" role="alert"></p>
           </div>
+
+          <dialog class="charge-faq-dialog" id="chargeAnalysisFaqDialog" aria-labelledby="chargeFaqTitle">
+            <div class="charge-faq-shell">
+              <header class="charge-faq-header">
+                <div>
+                  <p class="eyebrow">Central de ajuda</p>
+                  <h2 id="chargeFaqTitle">Perguntas frequentes</h2>
+                  <p>D&uacute;vidas sobre a auditoria de cobran&ccedil;as do Ita&uacute; e os pr&oacute;ximos passos.</p>
+                </div>
+                <button class="charge-faq-close" type="button" data-charge-faq-close aria-label="Fechar perguntas frequentes" title="Fechar">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </header>
+              <label class="charge-faq-search" for="chargeFaqSearch">
+                <span>Buscar no FAQ</span>
+                <input id="chargeFaqSearch" type="search" autocomplete="off" placeholder="Ex.: extratos, advogado, custas" />
+              </label>
+              <p class="charge-faq-count" id="chargeFaqCount" aria-live="polite"></p>
+              <div class="charge-faq-list" id="chargeFaqList"></div>
+              <section class="charge-faq-notice" aria-labelledby="chargeFaqNoticeTitle">
+                <h3 id="chargeFaqNoticeTitle">Aviso jur&iacute;dico geral</h3>
+                <div id="chargeFaqNotice"></div>
+              </section>
+            </div>
+          </dialog>
         </section>
 
         <section class="assistant-workbench" id="assistente" data-page="assistente">
@@ -1800,7 +1836,7 @@
     </div>
 
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
-    <script type="module" src="charge-analysis.js?v=20260803-official-logo-1"></script>
+    <script type="module" src="charge-analysis.js?v=20260807-itau-faq-1"></script>
     <script type="module" src="app.js?v=20260803-official-logo-1"></script>
   </body>
 </html>

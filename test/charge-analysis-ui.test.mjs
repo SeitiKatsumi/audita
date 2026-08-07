@@ -12,11 +12,13 @@ import {
   ITAU_DOCUMENT_REQUEST_TEMPLATE,
   mergeChargeAnalysisFiles,
 } from "../charge-analysis.js";
+import { ITAU_FAQ_ITEMS, ITAU_FAQ_LEGAL_NOTICE } from "../itau-faq.js";
 
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const plansHtml = readFileSync(new URL("../plans.html", import.meta.url), "utf8");
 const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 const stylesCss = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+const dockerfile = readFileSync(new URL("../Dockerfile", import.meta.url), "utf8");
 const chargeAnalysisJs = readFileSync(
   new URL("../charge-analysis.js", import.meta.url),
   "utf8",
@@ -114,10 +116,31 @@ test("charge analysis uses one module-wide progress rail from authorization to t
   assert.match(indexHtml, /id="chargeAnalysisProgressPercent">0%/);
   assert.match(indexHtml, /id="chargeAnalysisProgressMeter" max="100" value="0"/);
   assert.match(indexHtml, /O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano/);
+  assert.ok(
+    indexHtml.indexOf('class="charge-progress-summary"') <
+      indexHtml.indexOf('id="chargeAnalysisProgress"'),
+  );
   assert.match(chargeAnalysisJs, /buildChargeProgressSnapshot\(state\)/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-recovery-progress/);
   assert.match(stylesCss, /\.charge-module-progress\s*\{/);
   assert.match(stylesCss, /\.charge-progress-summary\s*\{/);
+});
+
+test("charge analysis exposes a searchable accessible FAQ dialog", () => {
+  assert.equal(ITAU_FAQ_ITEMS.length, 34);
+  assert.match(ITAU_FAQ_ITEMS[0].question, /ressarcimento/);
+  assert.match(ITAU_FAQ_ITEMS.at(-1).question, /indeniza&ccedil;&atilde;o ou restitui&ccedil;&atilde;o/);
+  assert.match(ITAU_FAQ_LEGAL_NOTICE, /n&atilde;o presta servi&ccedil;os de advocacia/);
+  assert.match(indexHtml, /id="chargeAnalysisHelpButton"/);
+  assert.match(indexHtml, /aria-haspopup="dialog"/);
+  assert.match(indexHtml, /id="chargeAnalysisFaqDialog" aria-labelledby="chargeFaqTitle"/);
+  assert.match(indexHtml, /id="chargeFaqSearch" type="search"/);
+  assert.match(chargeAnalysisJs, /ITAU_FAQ_ITEMS\.filter/);
+  assert.match(chargeAnalysisJs, /faqDialog\.showModal/);
+  assert.match(chargeAnalysisJs, /faqButton\?\.focus\(\)/);
+  assert.match(stylesCss, /\.charge-faq-dialog::backdrop/);
+  assert.match(stylesCss, /@media \(max-width: 520px\)[\s\S]*?\.charge-faq-dialog/);
+  assert.match(dockerfile, /COPY[^\n]*itau-faq\.js[^\n]*server\.mjs/);
 });
 
 test("charge progress is evidence-based and never treats document generation as filing", () => {
@@ -197,17 +220,31 @@ test("charge analysis starts with the four supported self-assessment paths", () 
 });
 
 test("the information path opens the searchable reference list before documents", () => {
+  assert.equal(
+    buildChargeProgressSnapshot({
+      screen: "brands",
+      authorizationAnswer: "uncertain",
+    }).message,
+    "Confira as referências e informe se já teve um dos cartões apresentados.",
+  );
   assert.match(
     chargeAnalysisJs,
     /action === "verify-statement"[\s\S]*?authorizationAnswer = "uncertain";[\s\S]*?state\.screen = "brands";/,
   );
   assert.match(chargeAnalysisJs, /Buscar entre 113 referências/);
   assert.match(chargeAnalysisJs, /data-charge-action="select-brand"/);
-  assert.match(chargeAnalysisJs, /data-charge-action="continue-brand"/);
-  assert.match(chargeAnalysisJs, /Selecionar uma delas não confirma vínculo com o Itaú nem impede a análise/);
+  assert.match(chargeAnalysisJs, /data-charge-action="brand-history-yes"/);
+  assert.match(chargeAnalysisJs, /data-charge-action="brand-history-no"/);
+  assert.match(chargeAnalysisJs, /Sim, já tive ou tenho um desses cartões/);
+  assert.match(chargeAnalysisJs, /Não, nunca tive um desses cartões/);
+  assert.match(chargeAnalysisJs, /encontrar uma referência não comprova, por si só, que houve cobrança indevida/);
   assert.match(
     chargeAnalysisJs,
-    /action === "continue-brand"[\s\S]*?state\.screen = "documents";/,
+    /action === "brand-history-yes"[\s\S]*?state\.screen = "documents";/,
+  );
+  assert.match(
+    chargeAnalysisJs,
+    /action === "brand-history-no"[\s\S]*?state\.screen = "ended";/,
   );
 });
 

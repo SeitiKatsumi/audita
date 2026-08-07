@@ -1,3 +1,5 @@
+import { ITAU_FAQ_ITEMS, ITAU_FAQ_LEGAL_NOTICE } from "./itau-faq.js";
+
 export const CHARGE_ANALYSIS_BRAND_GROUPS = Object.freeze([
   {
     name: "Varejo e departamentos",
@@ -356,6 +358,14 @@ export function buildChargeProgressSnapshot(flowState = {}) {
     message = `${message} A cobertura é parcial e ainda faltam documentos do período completo.`;
   }
 
+  if (screen === "brands") {
+    message = "Confira as referências e informe se já teve um dos cartões apresentados.";
+  }
+
+  if (screen === "ended") {
+    message = "Triagem encerrada. Esta hipótese específica tem baixa aderência à situação informada.";
+  }
+
   return {
     percent,
     activeStep,
@@ -493,6 +503,12 @@ const stage =
 
 if (stage) {
   const shell = stage.closest(".charge-analysis-shell");
+  const faqButton = document.querySelector("#chargeAnalysisHelpButton");
+  const faqDialog = document.querySelector("#chargeAnalysisFaqDialog");
+  const faqSearch = document.querySelector("#chargeFaqSearch");
+  const faqList = document.querySelector("#chargeFaqList");
+  const faqCount = document.querySelector("#chargeFaqCount");
+  const faqNotice = document.querySelector("#chargeFaqNotice");
   const status = document.querySelector("#chargeAnalysisStatus");
   const errorBox = document.querySelector("#chargeAnalysisError");
   const progressPercent = document.querySelector("#chargeAnalysisProgressPercent");
@@ -502,11 +518,64 @@ if (stage) {
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   let messageSequenceId = 0;
 
+  function renderFaq(query = "") {
+    if (!faqList || !faqCount) return;
+    const normalizedQuery = String(query).trim().toLocaleLowerCase("pt-BR");
+    const visibleItems = ITAU_FAQ_ITEMS.filter((item) => {
+      if (!normalizedQuery) return true;
+      const decoder = document.createElement("div");
+      decoder.innerHTML = `${item.question} ${item.answer}`;
+      return decoder.textContent.toLocaleLowerCase("pt-BR").includes(normalizedQuery);
+    });
+
+    faqList.innerHTML = visibleItems.length
+      ? visibleItems.map((item, index) => `
+          <details class="charge-faq-item">
+            <summary>
+              <span>${item.question}</span>
+              <span class="charge-faq-chevron" aria-hidden="true">+</span>
+            </summary>
+            <div class="charge-faq-answer">${item.answer}</div>
+          </details>
+        `).join("")
+      : `<div class="charge-faq-empty"><strong>Nenhuma pergunta encontrada.</strong><p>Tente buscar por outra palavra.</p></div>`;
+    faqCount.textContent = `${visibleItems.length} ${visibleItems.length === 1 ? "pergunta encontrada" : "perguntas encontradas"}`;
+  }
+
+  function openFaq() {
+    if (!faqDialog) return;
+    renderFaq("");
+    if (faqSearch) faqSearch.value = "";
+    if (faqNotice) faqNotice.innerHTML = ITAU_FAQ_LEGAL_NOTICE;
+    if (typeof faqDialog.showModal === "function") faqDialog.showModal();
+    else faqDialog.setAttribute("open", "");
+    window.requestAnimationFrame(() => faqSearch?.focus());
+  }
+
+  function closeFaq() {
+    if (!faqDialog) return;
+    if (typeof faqDialog.close === "function") faqDialog.close();
+    else faqDialog.removeAttribute("open");
+    faqButton?.focus();
+  }
+
+  faqButton?.addEventListener("click", openFaq);
+  faqSearch?.addEventListener("input", () => renderFaq(faqSearch.value));
+  faqDialog?.addEventListener("click", (event) => {
+    if (event.target === faqDialog || event.target.closest("[data-charge-faq-close]")) closeFaq();
+  });
+  faqDialog?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeFaq();
+  });
+  faqDialog?.addEventListener("close", () => faqButton?.focus());
+
   const state = {
     screen: "triage",
     route: "consumer",
     authorizationAnswer: "",
     selectedBrand: "",
+    brandHistoryAnswer: "",
     brandSearch: "",
     documentAvailability: "",
     selectedFile: null,
@@ -886,8 +955,9 @@ if (stage) {
       <div class="charge-analysis-conversation compact">
         ${userMessage("Não sei, gostaria de mais informações.")}
         ${assistantMessage(`
-          <p><strong>Você pode pesquisar pelo nome que aparece na fatura ou no cartão.</strong></p>
-          <p>As 113 referências abaixo servem apenas como apoio à triagem. Selecionar uma delas não confirma vínculo com o Itaú nem impede a análise; você também pode continuar sem selecionar.</p>
+          <p><strong>Para investigarmos melhor, confira a lista de bandeiras e cartões parceiros do Itaú.</strong></p>
+          <p>Se você teve um desses cartões entre 2011 e 2026, pode haver cobranças de seguros ou serviços que mereçam investigação. Esse tema foi levantado na Ação Civil Coletiva promovida pelo Ministério Público contra o Itaú, no TJMG.</p>
+          <p>Você pode pesquisar pelo nome que aparece na fatura ou no cartão. A lista serve como apoio à triagem: encontrar uma referência não comprova, por si só, que houve cobrança indevida.</p>
         `, "Lista de referência")}
       </div>
 
@@ -932,14 +1002,13 @@ if (stage) {
                     `,
                   )
                   .join("")
-              : `<p class="charge-analysis-empty">Nenhuma referência encontrada. Você ainda pode continuar e enviar a fatura.</p>`
+              : `<p class="charge-analysis-empty">Nenhuma referência encontrada. Ajuste a busca ou responda abaixo considerando os cartões que já teve.</p>`
           }
         </div>
         <div class="charge-brand-actions">
           <button type="button" class="secondary-action" data-charge-action="back-triage">Voltar</button>
-          <button type="button" class="primary-action" data-charge-action="continue-brand">
-            ${selected ? "Continuar com esta marca" : "Continuar sem localizar a marca"}
-          </button>
+          <button type="button" class="secondary-action" data-charge-action="brand-history-no">Não, nunca tive um desses cartões</button>
+          <button type="button" class="primary-action" data-charge-action="brand-history-yes">Sim, já tive ou tenho um desses cartões</button>
         </div>
       </section>
     `;
@@ -957,6 +1026,11 @@ if (stage) {
       return "Acredito que não tenho nenhuma cobrança indevida.";
     }
     if (state.authorizationAnswer === "uncertain") {
+      if (state.brandHistoryAnswer === "yes") {
+        return state.selectedBrand
+          ? `Sim, já tive ou tenho um desses cartões. Selecionei ${state.selectedBrand} como referência.`
+          : "Sim, já tive ou tenho um desses cartões.";
+      }
       return state.selectedBrand
         ? `Não sei se há cobrança indevida; selecionei ${state.selectedBrand} apenas como referência para a triagem.`
         : "Não sei se há cobrança indevida e gostaria de mais informações.";
@@ -1794,7 +1868,8 @@ if (stage) {
         </span>
         <p class="eyebrow">Triagem encerrada</p>
         <h3>Este fluxo é específico para cartões Itaú, Itaucard e possíveis marcas parceiras.</h3>
-        <p>Como você informou que nunca teve um desses cartões, não é necessário enviar documentos agora. Isso não impede a análise de outra instituição em um fluxo apropriado.</p>
+        <p>Como você informou que nunca teve nenhum dos cartões apresentados, é pouco provável que a hipótese investigada neste fluxo explique cobranças indevidas nas suas faturas.</p>
+        <p>Não é necessário enviar extratos agora. Esta triagem não exclui outras cobranças ou problemas com instituições financeiras, que devem ser analisados em um fluxo apropriado.</p>
         <button type="button" class="secondary-action" data-charge-action="restart">Revisar minha resposta</button>
       </div>
     `;
@@ -2018,6 +2093,7 @@ if (stage) {
       state.route = "consumer";
       state.authorizationAnswer = "";
       state.selectedBrand = "";
+      state.brandHistoryAnswer = "";
       state.documentAvailability = "";
       state.selectedFile = null;
       state.selectedFiles = [];
@@ -2030,8 +2106,12 @@ if (stage) {
       state.selectedBrand = button.dataset.chargeBrand || "";
       render();
       return;
-    } else if (action === "continue-brand") {
+    } else if (action === "brand-history-yes") {
+      state.brandHistoryAnswer = "yes";
       state.screen = "documents";
+    } else if (action === "brand-history-no") {
+      state.brandHistoryAnswer = "no";
+      state.screen = "ended";
     } else if (action === "documents-complete") {
       continueFromTriage("Tenho todos ou a maior parte dos extratos.", () => {
         state.documentAvailability = "complete";
