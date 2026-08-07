@@ -464,6 +464,8 @@ test("recovery report reuses calculated values without asking for another review
   assert.match(appJs, /name="bankAgency"/);
   assert.match(chargeAnalysisJs, /bankAgency: normalizeRecoveryText/);
   assert.match(appJs, /bankAgency: normalizeJecText/);
+  assert.doesNotMatch(chargeAnalysisJs, /name="reviewConfirmed"/);
+  assert.doesNotMatch(chargeAnalysisJs, /event\.target\.elements\.reviewConfirmed/);
   assert.match(chargeAnalysisJs, /Os valores calculados na análise serão incluídos automaticamente/);
 });
 

@@ -1629,7 +1629,6 @@ if (stage) {
             <div><strong>${prepared.ready ? "Relatório pronto para revisão" : "Relatório incompleto"}</strong><span>${escapeChargeHtml(prepared.template?.label || "")}</span></div>
             <details><summary>Revisar conteúdo do PDF</summary><pre>${escapeChargeHtml(prepared.draft || "")}</pre></details>
             ${Array.isArray(prepared.warnings) && prepared.warnings.length ? `<details><summary>Avisos importantes</summary><ul>${prepared.warnings.map((warning) => `<li>${escapeChargeHtml(warning)}</li>`).join("")}</ul></details>` : ""}
-            <label class="charge-recovery-confirmation"><input name="reviewConfirmed" type="checkbox" /><span>Revisei os dados e o conteúdo do relatório antes de gerar o PDF.</span></label>
           </section>
         ` : ""}
 
@@ -2276,11 +2275,6 @@ if (stage) {
       if (action === "pdf") {
         const claimant = readRecoveryClaimant(event.target);
         state.recovery.claimant = claimant;
-        if (!event.target.elements.reviewConfirmed?.checked) {
-          state.recovery.error = "Confirme a revisão do relatório antes de gerar o PDF.";
-          renderRecoveryReport();
-          return;
-        }
         void downloadRecoveryReport(claimant);
       } else {
         void prepareRecoveryReport(event.target);

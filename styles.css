@@ -9418,21 +9418,6 @@ body[data-active-page="chat"] .workspace {
   line-height: 1.5;
 }
 
-.charge-recovery-confirmation {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  margin-top: 15px;
-  color: #c6d9e4;
-  font-size: 0.76rem;
-  line-height: 1.45;
-}
-
-.charge-recovery-confirmation input {
-  flex: 0 0 auto;
-  margin-top: 2px;
-}
-
 .charge-recovery-form-actions {
   padding-top: 22px;
   margin-top: 22px;
