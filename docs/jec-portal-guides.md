@@ -5,6 +5,24 @@
 Estes guias alimentam exclusivamente o navegador JEC aberto pelo chat da Audita.
 O fluxo de certidões não usa estes roteiros e permanece isolado.
 
+## Regra de pequenas causas
+
+Por enquanto, a Audita orienta o protocolo somente de causas com valor de até
+20 salários mínimos. O artigo 9º da Lei nº 9.099/1995 permite que as partes
+compareçam sem advogado até esse limite; acima dele, a assistência de advogado
+é obrigatória.
+
+Em 2026, o salário mínimo nacional é de R$ 1.621,00 (Decreto nº 12.797/2025),
+portanto o limite operacional exibido pela Audita é de R$ 32.420,00. A referência
+deve ser atualizada sempre que o salário mínimo mudar. Acima do limite, a
+interface não oferece o link de protocolo e mostra somente o contato provisório
+do time Audita.
+
+Fontes nacionais:
+
+- https://www.planalto.gov.br/ccivil_03/leis/l9099.htm
+- https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm
+
 A IA pode observar a estrutura visível da página, conversar com o usuário e
 orientar uma ação por vez. Valores digitados em campos não são enviados ao
 modelo. Login, senha, CAPTCHA, anexos sensíveis, decisões jurídicas ambíguas e
@@ -78,6 +96,34 @@ Sequência:
 5. Anexar os documentos exigidos pelo formulário.
 6. Revisar tudo.
 7. `Enviar Formulário`: exclusivamente humano.
+
+## Distrito Federal
+
+Fontes oficiais verificadas em 07/08/2026:
+
+- https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais
+- https://www.tjdft.jus.br/carta-de-servicos/servicos/processo-judicial-1a-instancia/iniciar-processo-juizados-especiais
+
+Como a Audita já gera o PDF, o caminho principal recomendado é o peticionamento
+por e-mail do NUPEVI:
+
+1. Confirmar que o valor é de até 20 salários mínimos e que o pedido pode seguir
+   no Juizado Especial Cível sem advogado.
+2. Confirmar a competência territorial no guia do TJDFT.
+3. Escolher a opção de petição pronta enviada por e-mail ao NUPEVI.
+4. Cadastrar previamente o e-mail pessoal no PJe, se necessário.
+5. Revisar e assinar a petição em PDF, física ou digitalmente.
+6. Separar RG ou CNH, CPF, comprovante de endereço e provas em arquivos legíveis.
+7. Enviar, pelo e-mail cadastrado no PJe, a petição assinada e os documentos para
+   `peticionarnojuizado@tjdft.jus.br`.
+8. Guardar a confirmação de distribuição, conferir a audiência de conciliação e
+   acompanhar pessoalmente as movimentações do processo.
+
+O TJDFT também oferece videochamada agendada pelo NUREVI e atendimento
+presencial nos NAJs. Cadastro, assinatura, anexos, envio, agendamento e aceite
+final permanecem exclusivamente humanos. O serviço é gratuito na primeira
+instância, mas ausência injustificada em audiência ou recurso improvido podem
+gerar despesas conforme as orientações do próprio tribunal.
 
 ## Regra operacional
 

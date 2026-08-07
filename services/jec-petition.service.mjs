@@ -9,6 +9,16 @@ import {
   validateProfileCpf,
 } from "./user-profile.service.mjs";
 
+export const JEC_SMALL_CLAIMS_POLICY = Object.freeze({
+  salaryCount: 20,
+  referenceYear: 2026,
+  minimumWageBrl: 1621,
+  maximumCaseValueBrl: 32420,
+  lawSource: "https://www.planalto.gov.br/ccivil_03/leis/l9099.htm",
+  wageSource:
+    "https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2025/decreto/d12797.htm",
+});
+
 const JEC_PORTALS = Object.freeze({
   SP: {
     uf: "SP",
@@ -223,23 +233,50 @@ const JEC_PORTALS = Object.freeze({
   DF: {
     uf: "DF",
     tribunal: "TJDFT",
-    name: "Atendimento NUREVI dos Juizados Especiais do Distrito Federal",
+    name: "Peticionamento Virtual dos Juizados Especiais do Distrito Federal",
     officialUrl: "https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais",
     startUrl: "https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais",
     mode: "triagem_remota",
     allowedHosts: ["tjdft.jus.br", "atalho.tjdft.jus.br"],
-    checkpoint: "Agendamento NUREVI, identificação, documentos ou entrada na videochamada.",
-    requirements: ["Atendimento remoto conduzido por servidor para redução a termo."],
+    checkpoint: "Cadastro no PJe, assinatura, envio por e-mail, agendamento ou atendimento humano.",
+    requirements: [
+      "Valor da causa de até 20 salários mínimos para seguir sem advogado no fluxo de pequenas causas da Audita.",
+      "Petição inicial revisada, assinada e salva em PDF.",
+      "RG ou CNH, CPF, comprovante de endereço e documentos que comprovem a reclamação, em arquivos separados.",
+      "E-mail pessoal previamente cadastrado no PJe para usar o peticionamento por e-mail.",
+    ],
     instructions: [
-      "Abra a orientação oficial e apenas identifique a Agenda Virtual do NUREVI.",
-      "Não selecione dia, horário, identificação ou entre em videoconferência.",
+      "Abra a orientação oficial e identifique as opções NUPEVI, NUREVI e atendimento presencial.",
+      "Não cadastre e-mail, envie documentos, agende atendimento ou entre em videoconferência.",
     ],
     guide: {
-      verifiedAt: "2026-07-30",
-      sources: ["https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais"],
-      steps: ["Localize a opção de agenda remota sem iniciar o agendamento."],
-      humanOnly: ["Agendamento, atendimento com servidor, documentos e distribuição."],
-      caseNotes: ["A petição é reduzida a termo e distribuída pelo atendimento humano."],
+      verifiedAt: "2026-08-07",
+      sources: [
+        "https://www.tjdft.jus.br/servicos/distribuicao-e-atendimento/como-iniciar-um-processo-nos-juizados-especiais",
+        "https://www.tjdft.jus.br/carta-de-servicos/servicos/processo-judicial-1a-instancia/iniciar-processo-juizados-especiais",
+      ],
+      steps: [
+        "Confirme que o valor da causa é de até 20 salários mínimos e que o caso pode seguir no Juizado Especial Cível sem advogado.",
+        "Confirme a competência territorial. Em regra, use o local indicado para o seu domicílio, mas confira a orientação do TJDFT para o caso concreto.",
+        "Como a Audita já prepara o PDF, escolha a opção do NUPEVI para enviar uma petição pronta por e-mail.",
+        "Cadastre previamente seu e-mail pessoal no PJe, caso ainda não tenha cadastro.",
+        "Revise e assine a petição, com assinatura física digitalizada ou assinatura digital.",
+        "Separe, em arquivos legíveis, RG ou CNH, CPF, comprovante de endereço e todas as provas da cobrança.",
+        "Envie a petição assinada e os documentos a partir do e-mail cadastrado no PJe para peticionarnojuizado@tjdft.jus.br.",
+        "Guarde a confirmação de distribuição, confira a data da audiência de conciliação e acompanhe pessoalmente as movimentações do processo.",
+      ],
+      humanOnly: [
+        "Confirmar competência territorial e que o valor está dentro do limite de pequenas causas sem advogado.",
+        "Cadastrar o e-mail no PJe e assinar a petição.",
+        "Selecionar os anexos, enviar o e-mail e conferir o comprovante de distribuição.",
+        "Acompanhar o processo e comparecer pessoalmente às audiências marcadas.",
+        "Se preferir o NUREVI, agendar e participar pessoalmente das videochamadas.",
+      ],
+      caseNotes: [
+        "O TJDFT também oferece atendimento por videochamada no NUREVI e atendimento presencial nos NAJs.",
+        "O peticionamento por e-mail é gratuito e deve partir do e-mail previamente cadastrado no PJe.",
+        "Depois da distribuição, o acompanhamento é responsabilidade da parte; o tribunal não avisa todas as movimentações por iniciativa própria.",
+      ],
     },
   },
   GO: {
@@ -435,6 +472,7 @@ const JEC_PORTALS = Object.freeze({
 const SUPPORTED_UFS = Object.freeze(Object.keys(JEC_PORTALS));
 const MANUAL_FILING_STEPS = Object.freeze({
   SP: Object.freeze([
+    "Confirme que o valor da causa é de até 20 salários mínimos e que o pedido pode seguir como pequena causa sem advogado.",
     "Acesse o Peticionamento Eletrônico do TJSP e selecione o Foro/Comarca e a competência do Juizado Especial Cível.",
     "Entre no eproc com a sua própria conta e escolha Petição inicial.",
     "Revise comarca, rito, classe, assunto, valor da causa, sigilo e gratuidade antes de avançar.",
@@ -443,6 +481,7 @@ const MANUAL_FILING_STEPS = Object.freeze({
     "Confira o resumo completo e finalize o protocolo pessoalmente.",
   ]),
   RJ: Object.freeze([
+    "Confirme que o valor da causa é de até 20 salários mínimos e que o pedido pode seguir como pequena causa sem advogado.",
     "Acesse o Petição Cidadã do TJRJ e confirme a categoria adequada para a cobrança relatada.",
     "Entre com a sua própria conta gov.br prata ou ouro.",
     "Revise os dados do autor e do réu e anexe apenas documentos escolhidos por você.",
@@ -450,6 +489,7 @@ const MANUAL_FILING_STEPS = Object.freeze({
     "Confira integralmente a petição e envie pessoalmente.",
   ]),
   MG: Object.freeze([
+    "Confirme que o valor da causa é de até 20 salários mínimos e que o pedido pode seguir como pequena causa sem advogado.",
     "Acesse a página oficial dos Juizados Especiais do TJMG.",
     "Para Belo Horizonte, use a pré-atermação da capital. No interior, confirme a unidade competente.",
     "Preencha autor, réu, fatos, pedidos e valor da causa com os dados revisados.",
@@ -457,18 +497,29 @@ const MANUAL_FILING_STEPS = Object.freeze({
     "Confira a unidade e o resumo antes de enviar pessoalmente.",
   ]),
   PR: Object.freeze([
+    "Confirme que o valor da causa é de até 20 salários mínimos e que o pedido pode seguir como pequena causa sem advogado.",
     "Acesse o Formulário Virtual dos Juizados Especiais do TJPR.",
     "Em Curitiba, use a opção BANCÁRIO para matéria bancária. Em outra cidade, selecione a comarca.",
     "Preencha os dados do autor e do réu e revise fatos, pedidos e valor da causa.",
     "Anexe o PDF, identificação, comprovante de residência e as provas escolhidas por você.",
     "Confira todos os dados e envie o formulário pessoalmente.",
   ]),
+  DF: Object.freeze([
+    "Confirme que o valor da causa é de até 20 salários mínimos e que o pedido pode seguir no Juizado Especial Cível sem advogado.",
+    "Abra a orientação oficial do TJDFT, confira a competência territorial e escolha a opção de preparar a petição em casa e enviá-la por e-mail ao NUPEVI.",
+    "Se ainda não tiver cadastro, cadastre seu e-mail pessoal no PJe pelos canais indicados pelo TJDFT.",
+    "Revise e assine o PDF da petição, com assinatura física digitalizada ou assinatura digital.",
+    "Separe em arquivos legíveis RG ou CNH, CPF, comprovante de endereço e todas as provas da cobrança.",
+    "Envie a petição e os documentos, a partir do e-mail cadastrado no PJe, para peticionarnojuizado@tjdft.jus.br.",
+    "Guarde a confirmação de distribuição, confira a audiência de conciliação e acompanhe pessoalmente as movimentações do processo.",
+  ]),
 });
 
 function genericManualFilingSteps(portal) {
   return [
+    "Confirme que o valor da causa é de até 20 salários mínimos e que o pedido pode seguir como pequena causa sem advogado.",
     `Acesse o canal oficial do ${portal.tribunal} pelo link indicado pela Audita.`,
-    "Confirme a comarca, a unidade e se o pedido deve seguir pelo Juizado Especial Cível.",
+    "Confirme a comarca, a unidade competente e o caminho do Juizado Especial Cível.",
     "Faça o login, cadastro, agendamento ou atendimento somente no ambiente oficial quando solicitado.",
     "Apresente os dados do consumidor, do Itaú e o relato conforme o Relatório Técnico revisado.",
     "Anexe o Relatório Técnico de Auditoria, documento pessoal, comprovante de residência e as provas disponíveis, se o canal permitir anexos.",
@@ -523,22 +574,24 @@ export function getJecPortal(uf, { city = "" } = {}) {
   return portal ? publicPortal(portal, city) : null;
 }
 
-export function getJecManualFilingGuide(uf, { city = "" } = {}) {
+export function getJecManualFilingGuide(uf, { city = "", caseValue = null } = {}) {
   const portal = getJecPortal(uf, { city });
   if (!portal) return null;
   const stateSteps = MANUAL_FILING_STEPS[portal.uf];
+  const smallClaims = evaluateJecSmallClaims(caseValue);
   return {
     uf: portal.uf,
     tribunal: portal.tribunal,
-    title: `Protocolo manual no ${portal.tribunal}`,
+    title: `Pequenas causas no ${portal.tribunal}`,
     portalUrl: portal.startUrl,
     informationUrl: portal.officialUrl,
     steps: [...(stateSteps || genericManualFilingSteps(portal))],
     requirements: [...(portal.requirements || [])],
     verifiedAt: portal.guide?.verifiedAt || "",
+    smallClaims,
     finalActionHumanOnly: true,
     note:
-      "A Audita prepara o Relatório Técnico em PDF e orienta o caminho. Login, anexos, escolhas jurídicas e protocolo final são feitos pelo usuário.",
+      "A Audita atua, por enquanto, somente com pequenas causas de até 20 salários mínimos. Ela prepara o Relatório Técnico em PDF e orienta o caminho; login, anexos, escolhas jurídicas e protocolo final são feitos pelo usuário.",
   };
 }
 
@@ -564,6 +617,28 @@ function normalizeMoney(value) {
     : raw.replace(/[^\d.-]/g, "");
   const amount = Number(normalized);
   return Number.isFinite(amount) && amount >= 0 ? Number(amount.toFixed(2)) : null;
+}
+
+export function evaluateJecSmallClaims(caseValue) {
+  const normalizedCaseValue = normalizeMoney(caseValue);
+  const known = Number.isFinite(normalizedCaseValue) && normalizedCaseValue > 0;
+  const eligible = known
+    ? normalizedCaseValue <= JEC_SMALL_CLAIMS_POLICY.maximumCaseValueBrl
+    : null;
+  return {
+    status: !known ? "unknown" : eligible ? "eligible" : "above_limit",
+    known,
+    eligible,
+    caseValue: known ? normalizedCaseValue : null,
+    ...JEC_SMALL_CLAIMS_POLICY,
+    explanation:
+      "Pequenas causas são tratadas no Juizado Especial Cível. Em causas de até 20 salários mínimos, a pessoa pode comparecer sem advogado; acima desse limite, a assistência de advogado é obrigatória.",
+    contact: {
+      available: false,
+      label: "Falar com o time Audita",
+      message: "Canal de atendimento em preparação. Em breve você poderá solicitar uma avaliação do time Audita por aqui.",
+    },
+  };
 }
 
 function formatPetitionMoney(value) {
@@ -999,6 +1074,7 @@ export function prepareJecPetition({
   const lostProfitsAmount = normalizeMoney(claimant.lostProfitsAmount);
   const moralDamagesAmount = normalizeMoney(claimant.moralDamagesAmount);
   const caseValue = normalizeMoney(claimant.caseValue);
+  const smallClaimsEligibility = evaluateJecSmallClaims(caseValue);
   if (templateId === "audited_values" && !(doubleRefundAmount > 0)) {
     missingFields.push("doubleRefundAmount");
   }
@@ -1040,7 +1116,9 @@ export function prepareJecPetition({
     portal,
     manualFiling: getJecManualFilingGuide(normalizedUf, {
       city: normalizedCity,
+      caseValue,
     }),
+    smallClaimsEligibility,
     claimant: normalizedClaimant,
     draft: buildDraft({
       caseData,
@@ -1082,6 +1160,11 @@ export function prepareJecPetition({
       ...(documentAvailability === "none"
         ? ["Sem extratos/faturas, nenhum valor é estimado e o rascunho não fica pronto enquanto faltarem fatos e valor da causa revisados."]
         : []),
+      ...(smallClaimsEligibility.status === "above_limit"
+        ? [
+            `O valor da causa ultrapassa o limite operacional de R$ ${formatPetitionMoney(smallClaimsEligibility.maximumCaseValueBrl)} para o fluxo sem advogado. A Audita não abrirá o portal de pequenas causas e exibirá o contato provisório do time.`,
+          ]
+        : []),
       ...(templateId === "document_exhibition" && !normalizedClaimant.bankAgency
         ? ["O número da agência Itaú não foi informado e ficou identificado como ausente no rascunho."]
         : []),
@@ -1099,7 +1182,9 @@ export function prepareJecPetition({
 
 export function buildJecAgentProfile(prepared) {
   const portal = prepared?.portal;
-  if (!portal) return null;
+  if (!portal || prepared?.smallClaimsEligibility?.status === "above_limit") {
+    return null;
+  }
   return {
     uf: portal.uf,
     court: portal.tribunal,

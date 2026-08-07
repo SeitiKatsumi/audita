@@ -3822,6 +3822,13 @@ async function handleApi(request, response, pathname) {
         });
         return true;
       }
+      if (prepared.smallClaimsEligibility?.status === "above_limit") {
+        sendJson(response, 422, {
+          error: "jec_small_claims_limit_exceeded",
+          eligibility: prepared.smallClaimsEligibility,
+        });
+        return true;
+      }
 
       const profile = buildJecAgentProfile(prepared);
       const owner = {

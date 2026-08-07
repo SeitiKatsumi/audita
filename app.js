@@ -3082,6 +3082,14 @@ function renderJecManualFiling(caseData = {}, state = {}) {
   const prepared = state.prepared;
   const guide = prepared?.manualFiling;
   if (!prepared?.ready || !state.pdfDownloadedAt || !guide) return "";
+  const eligibility = prepared.smallClaimsEligibility || guide.smallClaims || {};
+  const aboveLimit = eligibility.status === "above_limit";
+  const limitLabel = Number(eligibility.maximumCaseValueBrl || 0) > 0
+    ? formatChatCurrency(eligibility.maximumCaseValueBrl)
+    : "20 salários mínimos";
+  const caseValueLabel = Number(eligibility.caseValue || 0) > 0
+    ? formatChatCurrency(eligibility.caseValue)
+    : "valor ainda não confirmado";
 
   return `
     <section class="jec-manual-filing" aria-label="Próximos passos para protocolo manual">
@@ -3090,25 +3098,40 @@ function renderJecManualFiling(caseData = {}, state = {}) {
           <span>PDF gerado</span>
           <strong>${escapeHtml(guide.title || "Protocolo manual")}</strong>
         </div>
-        <a class="primary-action" href="${escapeHtml(guide.portalUrl)}" target="_blank" rel="noreferrer">Acessar portal oficial</a>
+        ${aboveLimit ? "" : `<a class="primary-action" href="${escapeHtml(guide.portalUrl)}" target="_blank" rel="noreferrer">Acessar portal oficial</a>`}
       </div>
-      <ol>${(Array.isArray(guide.steps) ? guide.steps : [])
-        .map((step) => `<li>${escapeHtml(step)}</li>`)
-        .join("")}</ol>
-      <p>${escapeHtml(guide.note || "")}</p>
-      ${
-        guide.informationUrl
-          ? `<a class="jec-official-info" href="${escapeHtml(guide.informationUrl)}" target="_blank" rel="noreferrer">Ver orientações oficiais do tribunal</a>`
-          : ""
-      }
-      <div class="jec-next-options">
-        ${renderJecCourtMonitoring(caseData, state)}
-        <section class="jec-next-option">
-          <strong>Precisa de suporte profissional?</strong>
-          <p>A IA continua disponível para dúvidas. Se preferir, conheça também o atendimento opcional de um advogado da Audita.</p>
-          <button class="secondary-action" type="button" data-chat-prompt="Quero entender como funciona o suporte profissional de um advogado da Audita para revisar meu caso.">Conhecer suporte profissional</button>
-        </section>
+      <div class="jec-small-claims-explainer ${aboveLimit ? "is-blocked" : "is-eligible"}" role="note">
+        <strong>${aboveLimit ? "Fora do limite de pequenas causas atendido" : "Pequenas causas"}</strong>
+        <p>O Juizado Especial Cível recebe as pequenas causas. A Audita orienta, por enquanto, somente casos de até 20 salários mínimos, que podem seguir sem advogado. Em 2026, o limite corresponde a ${escapeHtml(limitLabel)}.</p>
+        ${eligibility.known ? `<span>Valor da causa nesta simulação: ${escapeHtml(caseValueLabel)}.</span>` : ""}
       </div>
+      ${aboveLimit ? `
+        <div class="jec-contact-placeholder">
+          <strong>Fale com o time Audita</strong>
+          <p>Este caso ultrapassa 20 salários mínimos e exige atendimento profissional. O canal de contato ainda está em preparação.</p>
+          <button class="secondary-action" type="button" disabled>Contato em breve</button>
+        </div>
+      ` : `
+        <ol>${(Array.isArray(guide.steps) ? guide.steps : [])
+          .map((step) => `<li>${escapeHtml(step)}</li>`)
+          .join("")}</ol>
+        <p>${escapeHtml(guide.note || "")}</p>
+        ${
+          guide.informationUrl
+            ? `<a class="jec-official-info" href="${escapeHtml(guide.informationUrl)}" target="_blank" rel="noreferrer">Ver orientações oficiais do tribunal</a>`
+            : ""
+        }
+      `}
+      ${aboveLimit ? "" : `
+        <div class="jec-next-options">
+          ${renderJecCourtMonitoring(caseData, state)}
+          <section class="jec-next-option">
+            <strong>Precisa de suporte profissional?</strong>
+            <p>A IA continua disponível para dúvidas. Se preferir, conheça também o atendimento opcional de um advogado da Audita.</p>
+            <button class="secondary-action" type="button" data-chat-prompt="Quero entender como funciona o suporte profissional de um advogado da Audita para revisar meu caso.">Conhecer suporte profissional</button>
+          </section>
+        </div>
+      `}
     </section>
   `;
 }
@@ -3118,6 +3141,8 @@ function renderJecPetitionPanel(caseData = {}) {
   const state = jecCaseStates.get(caseData.id) || {};
   const claimant = state.claimant || {};
   const prepared = state.prepared || null;
+  const smallClaimsAboveLimit =
+    prepared?.smallClaimsEligibility?.status === "above_limit";
   const suggestion = state.suggestion || null;
   const missingFields = Array.isArray(prepared?.missingFields) ? prepared.missingFields : [];
   const historicalDocumentsAvailable =
@@ -3318,10 +3343,12 @@ function renderJecPetitionPanel(caseData = {}) {
                 <input name="reviewConfirmed" type="checkbox" />
                 <span>Revisei o rascunho e os dados acima.</span>
               </label>
-              <label class="jec-confirmation">
-                <input name="transmissionAuthorized" type="checkbox" />
-                <span>Autorizo somente a abertura assistida do portal oficial. O protocolo final continua sob meu controle.</span>
-              </label>
+              ${smallClaimsAboveLimit ? "" : `
+                <label class="jec-confirmation">
+                  <input name="transmissionAuthorized" type="checkbox" />
+                  <span>Autorizo somente a abertura assistida do portal oficial. O protocolo final continua sob meu controle.</span>
+                </label>
+              `}
               ${
                 Array.isArray(prepared.warnings) && prepared.warnings.length
                   ? `<ul class="jec-template-warnings">${prepared.warnings
@@ -3338,7 +3365,7 @@ function renderJecPetitionPanel(caseData = {}) {
             prepared?.ready
               ? `
                 <button class="secondary-action" type="submit" data-jec-action="pdf">Gerar Relatório Técnico em PDF</button>
-                <button class="secondary-action" type="submit" data-jec-action="browser">Abrir navegador assistido</button>
+                ${smallClaimsAboveLimit ? "" : `<button class="secondary-action" type="submit" data-jec-action="browser">Abrir navegador assistido</button>`}
               `
               : ""
           }
@@ -7565,7 +7592,7 @@ function keepNavGroupVisible(group) {
 
   const collapsedDesktop =
     document.body.classList.contains("sidebar-collapsed") &&
-    !window.matchMedia("(max-width: 1120px)").matches;
+    !window.matchMedia("(max-width: 960px)").matches;
   if (collapsedDesktop) {
     return;
   }
@@ -7602,7 +7629,7 @@ navGroups.forEach((group) => {
 });
 
 sidebarToggle?.addEventListener("click", () => {
-  if (window.matchMedia("(max-width: 1120px)").matches) {
+  if (window.matchMedia("(max-width: 960px)").matches) {
     setMobileMenu(false);
     return;
   }

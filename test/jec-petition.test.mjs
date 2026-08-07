@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildJecAgentProfile,
+  evaluateJecSmallClaims,
   getJecManualFilingGuide,
   getJecPortal,
   listJecPortals,
@@ -93,6 +94,22 @@ test("manual filing guide exposes official links and keeps final submission huma
   assert.match(guide.portalUrl, /^https:\/\/.*tjsp\.jus\.br/);
   assert.ok(guide.steps.length >= 5);
   assert.match(guide.steps.at(-1), /pessoalmente/i);
+  assert.equal(guide.smallClaims.status, "unknown");
+  assert.equal(guide.smallClaims.maximumCaseValueBrl, 32420);
+});
+
+test("small-claims policy accepts up to 20 minimum wages and redirects larger cases", () => {
+  const atLimit = evaluateJecSmallClaims("32.420,00");
+  const aboveLimit = evaluateJecSmallClaims("32.420,01");
+
+  assert.equal(atLimit.status, "eligible");
+  assert.equal(atLimit.eligible, true);
+  assert.equal(atLimit.referenceYear, 2026);
+  assert.equal(atLimit.minimumWageBrl, 1621);
+  assert.equal(aboveLimit.status, "above_limit");
+  assert.equal(aboveLimit.eligible, false);
+  assert.equal(aboveLimit.contact.available, false);
+  assert.match(aboveLimit.contact.message, /em breve/i);
 });
 
 test("every supported state exposes a complete manual recovery guide", () => {
@@ -100,6 +117,7 @@ test("every supported state exposes a complete manual recovery guide", () => {
     const guide = getJecManualFilingGuide(portal.uf);
     assert.equal(guide.uf, portal.uf);
     assert.ok(guide.steps.length >= 5);
+    assert.match(guide.steps[0], /20 salários mínimos/i);
     assert.equal(guide.finalActionHumanOnly, true);
     assert.match(guide.note, /Relatório Técnico/i);
   }
@@ -349,6 +367,36 @@ test("journey without historical statements selects the supplied exhibition mode
   assert.doesNotMatch(prepared.draft, /Condenar a Ré ao pagamento de Lucros Cessantes[^\n]*R\$/i);
   assert.deepEqual(prepared.attachments.evidenceFiles, ["fatura-julho.pdf"]);
   assert.equal(prepared.attachments.documentaryCoverage, "partial");
+});
+
+test("DF guide uses the verified NUPEVI email flow after the petition PDF", () => {
+  const portal = getJecPortal("DF");
+  const guide = getJecManualFilingGuide("DF", { caseValue: "5.079,80" });
+
+  assert.equal(portal.guide.verifiedAt, "2026-08-07");
+  assert.equal(guide.finalActionHumanOnly, true);
+  assert.match(guide.portalUrl, /^https:\/\/www\.tjdft\.jus\.br/);
+  assert.match(guide.steps.join(" "), /NUPEVI/i);
+  assert.match(guide.steps.join(" "), /peticionarnojuizado@tjdft\.jus\.br/i);
+  assert.match(guide.steps.join(" "), /e-mail.*cadastrado no PJe/i);
+  assert.match(guide.steps.join(" "), /audiência de conciliação/i);
+  assert.equal(guide.smallClaims.status, "eligible");
+  assert.ok(portal.guide.sources.length >= 2);
+});
+
+test("petition above the small-claims limit keeps the PDF but blocks portal automation", () => {
+  const prepared = prepareJecPetition({
+    caseData: sampleCase,
+    uf: "DF",
+    city: "Brasília",
+    claimant: { ...completeClaimant, uf: "DF", city: "Brasília", caseValue: "40.000,00" },
+  });
+
+  assert.equal(prepared.ready, true);
+  assert.equal(prepared.smallClaimsEligibility.status, "above_limit");
+  assert.equal(prepared.manualFiling.smallClaims.status, "above_limit");
+  assert.match(prepared.warnings.join(" "), /ultrapassa o limite operacional/i);
+  assert.equal(buildJecAgentProfile(prepared), null);
 });
 
 test("explicit partial coverage always selects Model 2 even when historical documents exist", () => {

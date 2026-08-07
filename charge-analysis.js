@@ -1688,18 +1688,39 @@ if (stage) {
     const requirements = Array.isArray(portal.requirements) ? portal.requirements : [];
     const humanOnly = Array.isArray(portal.guide?.humanOnly) ? portal.guide.humanOnly : [];
     const notes = Array.isArray(portal.guide?.caseNotes) ? portal.guide.caseNotes : [];
+    const eligibility = state.recovery.prepared?.smallClaimsEligibility || portal.manualFiling?.smallClaims || null;
+    const aboveLimit = eligibility?.status === "above_limit";
+    const limitLabel = eligibility?.maximumCaseValueBrl
+      ? formatChargeCurrency(eligibility.maximumCaseValueBrl)
+      : "20 salários mínimos";
+    const caseValueLabel = eligibility?.caseValue
+      ? formatChargeCurrency(eligibility.caseValue)
+      : "valor ainda não confirmado";
     return `
       <section class="charge-recovery-guide" aria-label="Passo a passo do ${escapeChargeHtml(portal.tribunal || "tribunal")}">
         <header><div><p class="eyebrow">${escapeChargeHtml(portal.uf)}</p><h3>${escapeChargeHtml(portal.name || portal.tribunal)}</h3></div><span>${escapeChargeHtml(portal.tribunal || "")}</span></header>
-        <ol>${steps.map((step) => `<li><span>${escapeChargeHtml(step)}</span></li>`).join("")}</ol>
-        ${requirements.length ? `<details><summary>O que separar antes de começar</summary><ul>${requirements.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
-        ${humanOnly.length ? `<details><summary>Etapas que dependem de você</summary><ul>${humanOnly.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
-        ${notes.length ? `<p class="charge-recovery-guide-note">${escapeChargeHtml(notes.join(" "))}</p>` : ""}
-        <div class="charge-recovery-guide-actions">
-          <a class="primary-action" href="${escapeChargeHtml(portal.startUrl || portal.officialUrl || "#")}" target="_blank" rel="noreferrer">Abrir portal oficial</a>
-          ${portal.officialUrl && portal.officialUrl !== portal.startUrl ? `<a class="secondary-action" href="${escapeChargeHtml(portal.officialUrl)}" target="_blank" rel="noreferrer">Ver orientações do tribunal</a>` : ""}
+        <div class="charge-small-claims-explainer ${aboveLimit ? "is-blocked" : "is-eligible"}" role="note">
+          <strong>${aboveLimit ? "Este caso ultrapassa o limite atendido pela Audita" : "O que são pequenas causas?"}</strong>
+          <p>Pequenas causas são tratadas no Juizado Especial Cível. A Audita orienta, por enquanto, somente casos de até 20 salários mínimos, que podem seguir sem advogado. Em 2026, esse limite corresponde a ${escapeChargeHtml(limitLabel)}.</p>
+          ${eligibility?.known ? `<span>Valor da causa nesta simulação: ${escapeChargeHtml(caseValueLabel)}.</span>` : ""}
         </div>
-        <small>O login, a escolha da unidade, os anexos e o protocolo final são realizados pelo usuário. A Audita não envia o processo automaticamente.</small>
+        ${aboveLimit ? `
+          <div class="charge-recovery-contact-placeholder">
+            <strong>Este caso precisa de atendimento profissional</strong>
+            <p>Como o valor ultrapassa 20 salários mínimos, não vamos direcionar você ao protocolo de pequenas causas. O contato com o time Audita será disponibilizado em breve.</p>
+            <button type="button" class="secondary-action" disabled>Falar com o time Audita · em breve</button>
+          </div>
+        ` : `
+          <ol>${steps.map((step) => `<li><span>${escapeChargeHtml(step)}</span></li>`).join("")}</ol>
+          ${requirements.length ? `<details><summary>O que separar antes de começar</summary><ul>${requirements.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
+          ${humanOnly.length ? `<details><summary>Etapas que dependem de você</summary><ul>${humanOnly.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
+          ${notes.length ? `<p class="charge-recovery-guide-note">${escapeChargeHtml(notes.join(" "))}</p>` : ""}
+          <div class="charge-recovery-guide-actions">
+            <a class="primary-action" href="${escapeChargeHtml(portal.startUrl || portal.officialUrl || "#")}" target="_blank" rel="noreferrer">Abrir portal oficial</a>
+            ${portal.officialUrl && portal.officialUrl !== portal.startUrl ? `<a class="secondary-action" href="${escapeChargeHtml(portal.officialUrl)}" target="_blank" rel="noreferrer">Ver orientações do tribunal</a>` : ""}
+          </div>
+          <small>O login, a escolha da unidade, os anexos e o protocolo final são realizados pelo usuário. A Audita não envia o processo automaticamente.</small>
+        `}
       </section>
     `;
   }
@@ -1710,7 +1731,7 @@ if (stage) {
       <div class="charge-analysis-conversation charge-recovery-conversation compact">
         ${assistantMessage(`
           <p><strong>Seu Relatório Técnico foi gerado.</strong></p>
-          <p>Agora selecione o estado onde pretende iniciar o pedido. A Audita mostrará o caminho oficial conhecido para o tribunal, mas você ainda deve confirmar a comarca e a competência territorial.</p>
+          <p>Agora selecione o estado onde pretende iniciar a pequena causa. A Audita mostrará o caminho oficial conhecido para o tribunal, mas você ainda deve confirmar a comarca e a competência territorial.</p>
         `, "Audita · Tribunal")}
       </div>
       <section class="charge-recovery-tribunal-picker">

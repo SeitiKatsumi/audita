@@ -87,6 +87,17 @@ test("sidebar keeps expanded groups scrollable and collapsed icons centered", ()
   assert.match(appJs, /navList\.scrollBy\(\{/);
 });
 
+test("sidebar stays in compact desktop mode until the true mobile breakpoint", () => {
+  assert.match(stylesCss, /@media \(max-width: 960px\)\s*\{[\s\S]*?\.mobile-menu-button/);
+  assert.match(
+    stylesCss,
+    /@media \(min-width: 961px\) and \(max-width: 1280px\)\s*\{[\s\S]*?--sidebar-width:\s*300px/,
+  );
+  assert.match(stylesCss, /@media \(max-width: 1120px\)\s*\{[\s\S]*?\.hero-grid/);
+  assert.equal((appJs.match(/max-width: 960px/g) || []).length, 2);
+  assert.doesNotMatch(appJs, /max-width: 1120px/);
+});
+
 test("charge analysis exposes a guided flow without an open chat input", () => {
   const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page"');
   const moduleEnd = indexHtml.indexOf('<section class="assistant-workbench"', moduleStart);
@@ -454,4 +465,14 @@ test("recovery report reuses calculated values without asking for another review
   assert.match(chargeAnalysisJs, /bankAgency: normalizeRecoveryText/);
   assert.match(appJs, /bankAgency: normalizeJecText/);
   assert.match(chargeAnalysisJs, /Os valores calculados na análise serão incluídos automaticamente/);
+});
+
+test("tribunal guide explains small claims and redirects cases above 20 minimum wages", () => {
+  assert.match(chargeAnalysisJs, /O que são pequenas causas\?/);
+  assert.match(chargeAnalysisJs, /Falar com o time Audita · em breve/);
+  assert.match(chargeAnalysisJs, /eligibility\?\.status === "above_limit"/);
+  assert.match(chargeAnalysisJs, />Abrir portal oficial<\/a>/);
+  assert.match(appJs, /Pequenas causas/);
+  assert.match(appJs, /Contato em breve/);
+  assert.match(appJs, /smallClaimsAboveLimit/);
 });

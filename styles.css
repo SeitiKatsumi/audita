@@ -2872,7 +2872,7 @@ h2 {
   font-weight: 800;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 960px) {
   .shell {
     grid-template-columns: 1fr;
   }
@@ -3026,6 +3026,29 @@ h2 {
     padding: 12px 24px 14px;
     place-items: stretch;
   }
+}
+
+@media (min-width: 961px) and (max-width: 1280px) {
+  :root {
+    --sidebar-width: 300px;
+  }
+
+  .workspace {
+    padding: 22px;
+  }
+
+  .nav-list a,
+  .nav-list summary {
+    gap: 16px;
+    padding-inline: 12px;
+  }
+
+  .sidebar-header {
+    padding-inline: 16px;
+  }
+}
+
+@media (max-width: 1120px) {
 
   .hero-grid,
   .profile-fields,
@@ -7785,6 +7808,48 @@ body[data-active-page="chat"] .workspace {
   font-size: 0.75rem;
 }
 
+.jec-small-claims-explainer,
+.jec-contact-placeholder {
+  display: grid;
+  gap: 7px;
+  padding: 14px 16px;
+  border: 1px solid rgba(82, 230, 166, 0.26);
+  border-left: 3px solid #52e6a6;
+  border-radius: 6px;
+  background: rgba(20, 92, 78, 0.14);
+}
+
+.jec-small-claims-explainer.is-blocked,
+.jec-contact-placeholder {
+  border-color: rgba(255, 191, 105, 0.32);
+  border-left-color: #ffbf69;
+  background: rgba(177, 111, 31, 0.12);
+}
+
+.jec-small-claims-explainer strong,
+.jec-contact-placeholder strong {
+  color: #ecfbff;
+  font-size: 0.82rem;
+}
+
+.jec-small-claims-explainer p,
+.jec-contact-placeholder p,
+.jec-small-claims-explainer span {
+  margin: 0;
+  color: #b8d0dc;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.jec-small-claims-explainer span {
+  color: #8fe8b6;
+  font-weight: 700;
+}
+
+.jec-contact-placeholder .secondary-action {
+  width: fit-content;
+}
+
 .charge-analysis-help {
   display: inline-flex;
   min-height: 38px;
@@ -9401,6 +9466,50 @@ body[data-active-page="chat"] .workspace {
 
 .charge-recovery-guide {
   padding: 22px;
+}
+
+.charge-small-claims-explainer,
+.charge-recovery-contact-placeholder {
+  display: grid;
+  gap: 7px;
+  padding: 15px 16px;
+  margin-top: 18px;
+  border: 1px solid rgba(49, 247, 143, 0.26);
+  border-left: 3px solid #31f78f;
+  border-radius: 6px;
+  background: rgba(24, 112, 84, 0.13);
+}
+
+.charge-small-claims-explainer.is-blocked,
+.charge-recovery-contact-placeholder {
+  border-color: rgba(255, 191, 105, 0.34);
+  border-left-color: #ffbf69;
+  background: rgba(177, 111, 31, 0.11);
+}
+
+.charge-small-claims-explainer strong,
+.charge-recovery-contact-placeholder strong {
+  color: #eff9fd;
+  font-size: 0.84rem;
+}
+
+.charge-small-claims-explainer p,
+.charge-recovery-contact-placeholder p,
+.charge-small-claims-explainer span {
+  margin: 0;
+  color: #b7ccd8;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.charge-small-claims-explainer span {
+  color: #8feeb7;
+  font-weight: 750;
+}
+
+.charge-recovery-contact-placeholder .secondary-action {
+  width: fit-content;
+  margin-top: 4px;
 }
 
 .charge-recovery-guide > ol {
