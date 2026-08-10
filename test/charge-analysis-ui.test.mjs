@@ -290,12 +290,17 @@ test("the no-document path requests evidence without calculation or legal handof
   assert.match(chargeAnalysisJs, /A Audita não consegue substituir documentos por estimativas/);
   assert.match(chargeAnalysisJs, /Sem ao menos um documento, não há base para calcular valores, gerar relatório técnico ou preparar uma eventual medida jurídica/);
   assert.match(chargeAnalysisJs, /data-charge-action="copy-document-request"/);
+  assert.match(chargeAnalysisJs, /Carta copiada\./);
+  assert.doesNotMatch(chargeAnalysisJs, /itau-solicitacao-extratos-e-autorizacao-debito\.docx/);
   assert.match(chargeAnalysisJs, /data-charge-action="resume-document-upload"/);
   assert.match(chargeAnalysisJs, /0800 728 0728/);
   assert.match(chargeAnalysisJs, /0800 570 0011/);
   assert.match(chargeAnalysisJs, /www\.itau\.com\.br\/atendimento-itau/);
   assert.doesNotMatch(ITAU_DOCUMENT_REQUEST_TEMPLATE, /\d{3}\.\d{3}\.\d{3}-\d{2}/);
+  assert.match(ITAU_DOCUMENT_REQUEST_TEMPLATE, /\[NOME COMPLETO\]/);
   assert.match(ITAU_DOCUMENT_REQUEST_TEMPLATE, /\[MÊS\/ANO INICIAL\]/);
+  assert.match(ITAU_DOCUMENT_REQUEST_TEMPLATE, /contrato, proposta ou termo de adesão/);
+  assert.match(ITAU_DOCUMENT_REQUEST_TEMPLATE, /autorização prévia e expressa/);
   assert.match(ITAU_DOCUMENT_REQUEST_TEMPLATE, /número do protocolo/);
   assert.doesNotMatch(chargeAnalysisJs, /function renderEstimate\(/);
   assert.doesNotMatch(chargeAnalysisJs, /function renderEstimateResult\(/);
@@ -471,6 +476,9 @@ test("recovery report reuses calculated values without asking for another review
 
 test("tribunal guide explains small claims and redirects cases above 20 minimum wages", () => {
   assert.match(chargeAnalysisJs, /O que são pequenas causas\?/);
+  assert.match(chargeAnalysisJs, /Entenda advogado, custos e recursos/);
+  assert.match(chargeAnalysisJs, /não existe garantia de “risco zero”/);
+  assert.match(chargeAnalysisJs, /Lei 9\.099\/1995/);
   assert.match(chargeAnalysisJs, /Falar com o time Audita · em breve/);
   assert.match(chargeAnalysisJs, /eligibility\?\.status === "above_limit"/);
   assert.match(chargeAnalysisJs, />Abrir portal oficial<\/a>/);

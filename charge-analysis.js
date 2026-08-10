@@ -162,10 +162,35 @@ const ITAU_PHONE_CHANNELS_URL =
   "https://www.itau.com.br/atendimento-itau/para-voce/telefones";
 const ITAU_OMBUDSMAN_URL =
   "https://www.itau.com.br/atendimento-itau/para-voce/ouvidoria";
+const JEC_LAW_URL = "https://www.planalto.gov.br/ccivil_03/leis/l9099.htm";
 
-export const ITAU_DOCUMENT_REQUEST_TEMPLATE = `Solicito cópia das faturas e/ou extratos referentes ao período de [MÊS/ANO INICIAL] a [MÊS/ANO FINAL], incluindo os lançamentos detalhados de seguros, assistências, tarifas e serviços vinculados ao cartão ou à conta.
+export const ITAU_DOCUMENT_REQUEST_TEMPLATE = `SOLICITAÇÃO DE DOCUMENTOS, EXTRATOS E COMPROVAÇÃO DE AUTORIZAÇÃO
 
-Peço também o número do protocolo deste atendimento e a confirmação do período efetivamente disponibilizado.`;
+À ITAÚ UNIBANCO S.A. / instituição responsável pelo cartão
+
+SOLICITANTE
+Nome: [NOME COMPLETO]
+CPF: [CPF]
+RG: [RG]
+Endereço: [ENDEREÇO COMPLETO]
+Telefone: [TELEFONE]
+E-mail: [E-MAIL]
+Cartão: final [4 ÚLTIMOS DÍGITOS]
+Bandeira ou emissor: [BANDEIRA OU EMISSOR]
+Início aproximado da relação: [MÊS/ANO]
+
+Solicito, para conferência da relação contratual e dos lançamentos:
+
+1. cópia do contrato, proposta ou termo de adesão original do cartão;
+2. cópia de proposta, termo, apólice ou registro que comprove minha autorização prévia e expressa para seguros, assistências, proteções, tarifas ou serviços vinculados;
+3. cópia das faturas e/ou extratos completos de [MÊS/ANO INICIAL] a [MÊS/ANO FINAL], com todos os lançamentos;
+4. número do protocolo, confirmação do período disponibilizado e indicação do canal de entrega.
+
+Peço que os documentos sejam enviados para [E-MAIL] ou disponibilizados pelo canal oficial do atendimento.
+
+[CIDADE/UF], [DATA]
+
+[NOME COMPLETO]`;
 
 const RECOVERY_UFS = Object.freeze([
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
@@ -1085,8 +1110,8 @@ if (stage) {
       <section class="charge-no-documents" aria-labelledby="chargeNoDocumentsTitle">
         <header>
           <p class="eyebrow">Como solicitar ao Itaú</p>
-          <h3 id="chargeNoDocumentsTitle">Peça as faturas e os extratos do período relevante</h3>
-          <p>Comece pelos canais digitais. Se o período não estiver disponível, registre a solicitação no atendimento e peça o protocolo.</p>
+          <h3 id="chargeNoDocumentsTitle">Peça os extratos, o contrato e as autorizações</h3>
+          <p>Além das faturas, solicite o contrato do cartão e os registros que comprovem a autorização de seguros ou serviços. Comece pelos canais digitais e peça o protocolo quando precisar registrar o atendimento.</p>
         </header>
         <ol class="charge-no-documents-channels">
           <li>
@@ -1111,10 +1136,10 @@ if (stage) {
           </li>
         </ol>
         <div class="charge-document-request">
-          <label for="chargeDocumentRequestTemplate">Modelo para copiar e preencher</label>
-          <textarea id="chargeDocumentRequestTemplate" rows="6" readonly>${escapeChargeHtml(ITAU_DOCUMENT_REQUEST_TEMPLATE)}</textarea>
+          <label for="chargeDocumentRequestTemplate">Carta completa para copiar e preencher</label>
+          <textarea id="chargeDocumentRequestTemplate" rows="18" readonly>${escapeChargeHtml(ITAU_DOCUMENT_REQUEST_TEMPLATE)}</textarea>
           <p>Preencha apenas no canal oficial escolhido. A Audita não envia esta solicitação em seu nome.</p>
-          <button type="button" class="secondary-action" data-charge-action="copy-document-request">Copiar modelo</button>
+          <button type="button" class="secondary-action" data-charge-action="copy-document-request">Copiar carta</button>
           <span id="chargeDocumentRequestCopyStatus" role="status" aria-live="polite"></span>
         </div>
         <p class="charge-no-documents-warning"><strong>Guarde os protocolos e os arquivos recebidos.</strong> Esta orientação não promete restituição nem define uma tese jurídica.</p>
@@ -1139,7 +1164,7 @@ if (stage) {
         field.select();
         if (!document.execCommand("copy")) throw new Error("copy_failed");
       }
-      statusElement.textContent = "Modelo copiado.";
+      statusElement.textContent = "Carta copiada.";
     } catch {
       field.focus();
       field.select();
@@ -1700,8 +1725,20 @@ if (stage) {
         <header><div><p class="eyebrow">${escapeChargeHtml(portal.uf)}</p><h3>${escapeChargeHtml(portal.name || portal.tribunal)}</h3></div><span>${escapeChargeHtml(portal.tribunal || "")}</span></header>
         <div class="charge-small-claims-explainer ${aboveLimit ? "is-blocked" : "is-eligible"}" role="note">
           <strong>${aboveLimit ? "Este caso ultrapassa o limite atendido pela Audita" : "O que são pequenas causas?"}</strong>
-          <p>Pequenas causas são tratadas no Juizado Especial Cível. A Audita orienta, por enquanto, somente casos de até 20 salários mínimos, que podem seguir sem advogado. Em 2026, esse limite corresponde a ${escapeChargeHtml(limitLabel)}.</p>
+          <p>Pequenas causas são tratadas no Juizado Especial Cível. A Audita orienta, por enquanto, somente casos de até 20 salários mínimos. Nessa faixa, o advogado é facultativo na primeira instância. Em 2026, esse limite corresponde a ${escapeChargeHtml(limitLabel)}.</p>
           ${eligibility?.known ? `<span>Valor da causa nesta simulação: ${escapeChargeHtml(caseValueLabel)}.</span>` : ""}
+          ${aboveLimit ? "" : `
+            <details>
+              <summary>Entenda advogado, custos e recursos</summary>
+              <ul>
+                <li>O ingresso no Juizado Especial não exige pagamento antecipado de custas, taxas ou despesas em primeiro grau.</li>
+                <li>A sentença de primeiro grau não condena o vencido em custas e honorários, salvo litigância de má-fé.</li>
+                <li>Em recurso, a representação por advogado é obrigatória e pode haver preparo, custas e honorários conforme o resultado e eventual gratuidade.</li>
+                <li>Ausência em audiência e outras situações processuais podem gerar consequências. Por isso, não existe garantia de “risco zero”.</li>
+              </ul>
+              <a href="${JEC_LAW_URL}" target="_blank" rel="noreferrer">Consultar a Lei 9.099/1995</a>
+            </details>
+          `}
         </div>
         ${aboveLimit ? `
           <div class="charge-recovery-contact-placeholder">

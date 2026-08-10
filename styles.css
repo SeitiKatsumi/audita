@@ -8377,7 +8377,7 @@ body[data-active-page="chat"] .workspace {
 
 .charge-document-request textarea {
   width: 100%;
-  min-height: 142px;
+  min-height: 340px;
   resize: vertical;
   padding: 12px;
   border: 1px solid rgba(73, 169, 255, 0.28);
@@ -8395,8 +8395,9 @@ body[data-active-page="chat"] .workspace {
   box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
 }
 
-.charge-document-request button {
+.charge-document-request .secondary-action {
   justify-self: start;
+  min-height: 42px;
 }
 
 #chargeDocumentRequestCopyStatus {
@@ -8436,7 +8437,7 @@ body[data-active-page="chat"] .workspace {
     padding: 16px;
   }
 
-  .charge-document-request button,
+  .charge-document-request .secondary-action,
   .charge-no-documents-actions button {
     width: 100%;
   }
@@ -9489,6 +9490,34 @@ body[data-active-page="chat"] .workspace {
 
 .charge-small-claims-explainer span {
   color: #8feeb7;
+  font-weight: 750;
+}
+
+.charge-small-claims-explainer details {
+  padding-top: 9px;
+  border-top: 1px solid rgba(105, 165, 204, 0.18);
+}
+
+.charge-small-claims-explainer summary {
+  color: #dff5ff;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.charge-small-claims-explainer ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 18px;
+  margin: 10px 0;
+  color: #b7ccd8;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.charge-small-claims-explainer a {
+  color: var(--aqua);
+  font-size: 0.73rem;
   font-weight: 750;
 }
 

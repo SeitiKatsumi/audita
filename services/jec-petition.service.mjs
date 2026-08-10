@@ -632,7 +632,7 @@ export function evaluateJecSmallClaims(caseValue) {
     caseValue: known ? normalizedCaseValue : null,
     ...JEC_SMALL_CLAIMS_POLICY,
     explanation:
-      "Pequenas causas são tratadas no Juizado Especial Cível. Em causas de até 20 salários mínimos, a pessoa pode comparecer sem advogado; acima desse limite, a assistência de advogado é obrigatória.",
+      "Pequenas causas são tratadas no Juizado Especial Cível. Em causas de até 20 salários mínimos, a assistência por advogado é facultativa na primeira instância; recursos exigem advogado e podem envolver custas e honorários. Não existe garantia de risco zero.",
     contact: {
       available: false,
       label: "Falar com o time Audita",
