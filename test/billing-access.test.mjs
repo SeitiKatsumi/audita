@@ -59,3 +59,26 @@ test("tenant owner cannot grant access to a user from another tenant", async () 
   assert.equal(result.forbidden, true);
 });
 
+test("member can activate only their own Standard demo access", async () => {
+  const service = createBillingAccessService({
+    listFallbackUsers: fallbackUsers,
+    now: () => Date.UTC(2026, 7, 12),
+  });
+
+  const result = await service.grantOwnDemoAccess(MEMBER, { interval: "monthly" });
+  const access = await service.getEntitlement(MEMBER);
+
+  assert.equal(result.grant.userId, "member-1");
+  assert.equal(result.grant.tenantId, "tenant-1");
+  assert.equal(result.grant.accessType, "tester");
+  assert.equal(result.grant.expiresAt, "2026-09-12T00:00:00.000Z");
+  assert.equal(access.entitled, true);
+  assert.equal(access.source, "tester");
+});
+
+test("member cannot activate demo access without a supported interval", async () => {
+  const service = createBillingAccessService({ listFallbackUsers: fallbackUsers });
+  const result = await service.grantOwnDemoAccess(MEMBER, { interval: "weekly" });
+  assert.equal(result.invalid, true);
+  assert.equal((await service.getEntitlement(MEMBER)).entitled, false);
+});

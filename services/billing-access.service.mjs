@@ -167,6 +167,75 @@ export function createBillingAccessService({
     return { grant: publicGrant(result.rows[0]) };
   }
 
+  async function grantOwnDemoAccess(authContext, input = {}) {
+    const userId = text(authContext?.user?.id);
+    const tenantId = text(authContext?.tenantId);
+    if (!userId || !tenantId) return { unauthorized: true };
+
+    const interval = text(input.interval);
+    if (!['monthly', 'annual'].includes(interval)) {
+      return { invalid: true, reason: "invalid_subscription_selection" };
+    }
+
+    const expiresAt = new Date(now());
+    if (interval === "annual") {
+      expiresAt.setUTCFullYear(expiresAt.getUTCFullYear() + 1);
+    } else {
+      expiresAt.setUTCMonth(expiresAt.getUTCMonth() + 1);
+    }
+
+    const { pool, ready } = database();
+    if (!ready) {
+      const grant = publicGrant({
+        id: `demo:${userId}`,
+        tenantId,
+        userId,
+        planId: "standard",
+        accessType: "tester",
+        status: "active",
+        expiresAt: expiresAt.toISOString(),
+        note: `Demonstracao Standard ${interval}`,
+        updatedAt: new Date(now()).toISOString(),
+      });
+      memoryGrants.set(userId, grant);
+      return { grant };
+    }
+
+    const targetResult = await pool.query(
+      `SELECT id, tenant_id FROM audita_users WHERE id = $1 LIMIT 1`,
+      [authContext.user.id],
+    );
+    const target = targetResult.rows[0];
+    if (!target || text(target.tenant_id) !== tenantId) {
+      return { forbidden: true };
+    }
+
+    const result = await pool.query(
+      `INSERT INTO audita_billing_access_grants (
+         tenant_id, user_id, plan_id, access_type, status,
+         granted_by_user_id, expires_at, note, created_at, updated_at
+       )
+       VALUES ($1, $2, 'standard', 'tester', 'active', $2, $3, $4, NOW(), NOW())
+       ON CONFLICT (user_id, access_type)
+       DO UPDATE SET
+         tenant_id = EXCLUDED.tenant_id,
+         plan_id = EXCLUDED.plan_id,
+         status = 'active',
+         granted_by_user_id = EXCLUDED.granted_by_user_id,
+         expires_at = EXCLUDED.expires_at,
+         note = EXCLUDED.note,
+         updated_at = NOW()
+       RETURNING *`,
+      [
+        target.tenant_id,
+        target.id,
+        expiresAt.toISOString(),
+        `Demonstracao Standard ${interval}`,
+      ],
+    );
+    return { grant: publicGrant(result.rows[0]) };
+  }
+
   async function listUsers(actor) {
     const { pool, ready } = database();
     if (!ready) {
@@ -252,9 +321,9 @@ export function createBillingAccessService({
   }
 
   return {
+    grantOwnDemoAccess,
     getEntitlement,
     listUsers,
     setTesterGrant,
   };
 }
-

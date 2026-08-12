@@ -557,15 +557,31 @@ export function createStripeBillingService({
 
   async function createDemoSubscription(authContext, input = {}) {
     if (!authContext?.tenantId || !authContext?.user) return { unauthorized: true };
-    if (!["super_admin", "owner", "admin"].includes(authContext.user.role)) {
-      return { forbidden: true };
-    }
     const config = configuration();
     if (!config.demoMode) return { unavailable: true, reason: "billing_demo_disabled" };
     const interval = text(input.interval);
     if (!["monthly", "annual"].includes(interval)) {
       return { invalid: true, reason: "invalid_subscription_selection" };
     }
+
+    if (!["super_admin", "owner", "admin"].includes(authContext.user.role)) {
+      if (!accessService?.grantOwnDemoAccess) {
+        return { unavailable: true, reason: "billing_demo_access_unavailable" };
+      }
+      const granted = await accessService.grantOwnDemoAccess(authContext, { interval });
+      if (granted.unauthorized || granted.forbidden || granted.invalid || !granted.grant) {
+        return {
+          unavailable: true,
+          reason: granted.reason || "billing_demo_access_failed",
+        };
+      }
+      return {
+        demo: true,
+        subscription: null,
+        access: await accessState(authContext),
+      };
+    }
+
     const start = new Date(now());
     const end = new Date(start);
     if (interval === "annual") end.setUTCFullYear(end.getUTCFullYear() + 1);

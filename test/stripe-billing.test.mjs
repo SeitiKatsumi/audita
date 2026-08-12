@@ -256,3 +256,32 @@ test("only tenant billing managers can create checkout sessions", async () => {
   );
   assert.deepEqual(result, { forbidden: true });
 });
+
+test("demo mode lets a member activate only their own tester access", async () => {
+  const calls = [];
+  const member = { ...AUTH, user: { ...AUTH.user, role: "member" } };
+  const service = createStripeBillingService({
+    env: configuredEnv({ AUDITA_BILLING_DEMO_MODE: "true" }),
+    accessService: {
+      grantOwnDemoAccess: async (authContext, input) => {
+        calls.push({ authContext, input });
+        return { grant: { userId: authContext.user.id, status: "active" } };
+      },
+      getEntitlement: async () => ({
+        entitled: true,
+        source: "tester",
+        planId: "standard",
+      }),
+    },
+  });
+
+  const result = await service.createDemoSubscription(member, { interval: "monthly" });
+
+  assert.equal(result.demo, true);
+  assert.equal(result.subscription, null);
+  assert.equal(result.access.entitled, true);
+  assert.equal(result.access.source, "tester");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].authContext.user.id, "user-1");
+  assert.equal(calls[0].input.interval, "monthly");
+});
