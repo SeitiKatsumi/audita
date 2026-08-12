@@ -339,7 +339,7 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   let activeStep = "authorization";
   if (["documents", "no-documents", "upload"].includes(screen)) {
     activeStep = "statements";
-  } else if (screen === "analyzing") {
+  } else if (["analyzing", "paywall"].includes(screen)) {
     activeStep = "analysis";
   } else if (screen === "review") {
     activeStep = "result";
@@ -359,6 +359,8 @@ export function buildChargeProgressSnapshot(flowState = {}) {
     message = "Faltam faturas ou extratos. Sem documentos, a análise e a preparação jurídica não avançam.";
   } else if (documentChoiceComplete && selectedFileCount === 0) {
     message = "Selecione e autorize o processamento dos documentos para continuar.";
+  } else if (screen === "paywall") {
+    message = "A análise localizou cobranças a revisar. Assine o Standard para acessar os detalhes e a simulação.";
   } else if (selectedFileCount > 0 && !analysisComplete) {
     message = "Documentos selecionados. Falta concluir a análise dos anexos.";
   } else if (analysisComplete && !audit.candidateCount) {
@@ -608,6 +610,8 @@ if (stage) {
     consent: false,
     caseData: null,
     caseBatches: [],
+    access: null,
+    billingCatalog: null,
     directedSearch: {
       open: false,
       query: "",
@@ -1277,6 +1281,124 @@ if (stage) {
     `;
   }
 
+  function standardPlan() {
+    return state.billingCatalog?.plans?.find((plan) => plan.id === "standard") || null;
+  }
+
+  function paywallPrice(interval) {
+    const plan = standardPlan();
+    const cents = Number(
+      plan?.prices?.[interval]?.cents || (interval === "annual" ? 118800 : 19900),
+    );
+    if (interval === "annual") {
+      return {
+        headline: formatChargeCurrency(cents / 100 / 12),
+        detail: `${formatChargeCurrency(cents / 100)} cobrados uma vez por ano`,
+      };
+    }
+    return {
+      headline: formatChargeCurrency(cents / 100),
+      detail: "cobrança mensal, cancele para o próximo ciclo",
+    };
+  }
+
+  function renderPaywall() {
+    const monthly = paywallPrice("monthly");
+    const annual = paywallPrice("annual");
+    const demoMode = Boolean(state.billingCatalog?.billing?.demoMode);
+    stage.innerHTML = `
+      <div class="charge-paywall">
+        <section class="charge-paywall-result" role="status">
+          <span class="charge-analysis-mark" aria-hidden="true"><img src="assets/audita-logo-original.png" alt="" /></span>
+          <div>
+            <p class="eyebrow">Análise concluída</p>
+            <h3>Sim, encontramos cobranças que podem ser indevidas nos seus extratos.</h3>
+            <p>Os detalhes, valores e a simulação permanecem protegidos até a ativação do plano. A conclusão depende da sua confirmação sobre cada lançamento.</p>
+          </div>
+        </section>
+
+        <section class="charge-paywall-explainer" aria-labelledby="chargePaywallInfoTitle">
+          <div><p class="eyebrow">Antes de continuar</p><h3 id="chargePaywallInfoTitle">O que você precisa saber</h3></div>
+          <ul>
+            <li>A Audita mostrará descrição, data, valor, evidência e arquivo de origem de cada ocorrência localizada.</li>
+            <li>Você deverá confirmar se reconhece ou não cada cobrança antes de qualquer cálculo.</li>
+            <li>Documentos parciais produzem uma análise limitada ao período enviado; não estimamos meses ausentes.</li>
+            <li>Devolução em dobro, indenização e êxito judicial não são automáticos e dependem das provas e da avaliação jurídica.</li>
+            <li>Consultas pagas de terceiros, custas, protocolo e representação jurídica não estão incluídos, salvo quando informados expressamente.</li>
+          </ul>
+        </section>
+
+        <section class="charge-paywall-plans" aria-label="Planos Standard">
+          <article>
+            <div><span>Standard mensal</span><strong>${escapeChargeHtml(monthly.headline)}<small>/mês</small></strong><p>${escapeChargeHtml(monthly.detail)}</p></div>
+            <ul><li>Plataforma e IA Audita</li><li>Análise e simulação Itaú</li><li>Relatório e orientação dos próximos passos</li></ul>
+            <button type="button" class="secondary-action" data-charge-action="subscribe-standard" data-charge-interval="monthly" ${state.busy ? "disabled" : ""}>${demoMode ? "Ativar demonstração mensal" : "Assinar mensal"}</button>
+          </article>
+          <article class="recommended">
+            <div><span>Standard anual</span><strong>${escapeChargeHtml(annual.headline)}<small>/mês</small></strong><p>${escapeChargeHtml(annual.detail)}</p></div>
+            <ul><li>Todos os recursos do Standard</li><li>Economia de ${formatChargeCurrency(1200)} por ano</li><li>Suporte de advogado parceiro para o caso Itaú incluído</li></ul>
+            <p class="charge-paywall-legal-note">O suporte jurídico não significa garantia de resultado. Representação, protocolo e despesas externas exigem aceite específico quando aplicáveis.</p>
+            <button type="button" class="primary-action" data-charge-action="subscribe-standard" data-charge-interval="annual" ${state.busy ? "disabled" : ""}>${demoMode ? "Ativar demonstração anual" : "Assinar anual"}</button>
+          </article>
+        </section>
+        ${demoMode ? `<p class="charge-paywall-demo" role="note">Ambiente demonstrativo: nenhum valor será cobrado e nenhuma transação será enviada à Stripe.</p>` : ""}
+        <div class="charge-result-actions"><button type="button" class="secondary-action" data-charge-action="new-document">Voltar aos documentos</button></div>
+      </div>
+    `;
+  }
+
+  async function unlockAnalyzedCases() {
+    const cases = [];
+    for (const lockedCase of state.caseBatches) {
+      const response = await fetch(`/api/itau-refund/cases/${encodeURIComponent(lockedCase.id)}`, {
+        headers: { accept: "application/json" },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.case) {
+        throw new Error(data.message || "Não foi possível liberar a análise agora.");
+      }
+      cases.push(data.case);
+    }
+    state.caseBatches = cases;
+    state.caseData = aggregateChargeCases(cases);
+    state.screen = "review";
+  }
+
+  async function subscribeStandard(interval) {
+    if (state.busy) return;
+    state.busy = true;
+    state.error = "";
+    renderPaywall();
+    try {
+      const demoMode = Boolean(state.billingCatalog?.billing?.demoMode);
+      const response = await fetch(
+        demoMode ? "/api/billing/demo-subscription" : "/api/billing/checkout",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify(
+            demoMode
+              ? { interval }
+              : { kind: "subscription", planId: "standard", interval, requestId: crypto.randomUUID() },
+          ),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "A contratação ainda não está disponível.");
+      if (!demoMode && data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+      state.access = data.access || { entitled: true, source: "subscription" };
+      await unlockAnalyzedCases();
+    } catch (error) {
+      state.error = error?.message || "Não foi possível ativar o plano.";
+    } finally {
+      state.busy = false;
+      render();
+    }
+  }
+
   function candidateMarkup(candidate, caseId) {
     const answer = String(candidate.answer || "pending");
     const date = String(candidate.date || "");
@@ -1940,6 +2062,7 @@ if (stage) {
     else if (state.screen === "no-documents") renderNoDocuments();
     else if (state.screen === "upload") renderUpload();
     else if (state.screen === "analyzing") renderAnalyzing();
+    else if (state.screen === "paywall") renderPaywall();
     else if (state.screen === "review") renderReview();
     else if (state.screen === "result") renderResult();
     else if (state.screen === "recovery") renderRecovery();
@@ -1975,6 +2098,7 @@ if (stage) {
 
     try {
       const analyzedCases = [];
+      let lockedPositiveResult = false;
       for (const file of files) {
         const params = new URLSearchParams({ filename: file.name });
         const response = await fetch(`/api/itau-refund/analyze?${params.toString()}`, {
@@ -2000,11 +2124,16 @@ if (stage) {
           throw new Error(messages[data.error] || data.message || `Não foi possível analisar ${file.name}.`);
         }
         if (data.case) analyzedCases.push(data.case);
+        if (data.finding?.positive && !data.finding?.detailsAvailable) {
+          lockedPositiveResult = true;
+        }
+        if (data.access) state.access = data.access;
+        if (data.billing) state.billingCatalog = data.billing;
       }
       state.caseBatches = analyzedCases;
       state.caseData = aggregateChargeCases(analyzedCases);
       resetDirectedSearch();
-      state.screen = "review";
+      state.screen = lockedPositiveResult ? "paywall" : "review";
     } catch (error) {
       state.screen = "upload";
       state.error = error?.message || "Falha ao analisar o documento.";
@@ -2228,6 +2357,9 @@ if (stage) {
       resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
+    } else if (action === "subscribe-standard") {
+      void subscribeStandard(button.dataset.chargeInterval || "monthly");
+      return;
     } else if (action === "start-recovery") {
       startRecoveryFlow();
       return;

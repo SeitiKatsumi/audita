@@ -21,16 +21,11 @@ const AUTH = {
 function configuredEnv(overrides = {}) {
   return {
     AUDITA_BILLING_ENABLED: "true",
-    AUDITA_CREDITS_ENABLED: "true",
     APP_URL: "https://audita.example",
     STRIPE_SECRET_KEY: "sk_test_example",
     STRIPE_WEBHOOK_SECRET: "whsec_example",
-    STRIPE_PRICE_ESSENTIAL_MONTHLY: "price_essential_month",
-    STRIPE_PRICE_ESSENTIAL_ANNUAL: "price_essential_year",
-    STRIPE_PRICE_PROFESSIONAL_MONTHLY: "price_professional_month",
-    STRIPE_PRICE_PROFESSIONAL_ANNUAL: "price_professional_year",
-    STRIPE_PRICE_TEAM_MONTHLY: "price_team_month",
-    STRIPE_PRICE_TEAM_ANNUAL: "price_team_year",
+    STRIPE_PRICE_STANDARD_MONTHLY: "price_standard_month",
+    STRIPE_PRICE_STANDARD_ANNUAL: "price_standard_year",
     STRIPE_PRICE_CREDITS_25: "price_credits_25",
     STRIPE_PRICE_CREDITS_100: "price_credits_100",
     STRIPE_PRICE_CREDITS_500: "price_credits_500",
@@ -74,9 +69,9 @@ test("Stripe webhook signatures are verified against the untouched body", () => 
   );
 });
 
-test("checkout remains unavailable until billing and credits are both enabled", async () => {
+test("checkout remains unavailable until billing itself is enabled", async () => {
   const service = createStripeBillingService({
-    env: configuredEnv({ AUDITA_CREDITS_ENABLED: "false" }),
+    env: configuredEnv({ AUDITA_BILLING_ENABLED: "false" }),
     creditsService: {
       getWallet: async () => ({ enabled: false, balance: 0 }),
       grant: async () => {
@@ -87,11 +82,11 @@ test("checkout remains unavailable until billing and credits are both enabled", 
 
   const result = await service.createCheckoutSession(AUTH, {
     kind: "subscription",
-    planId: "essencial",
+    planId: "standard",
     interval: "monthly",
   });
   assert.equal(result.unavailable, true);
-  assert.ok(result.missing.includes("AUDITA_CREDITS_ENABLED"));
+  assert.ok(result.missing.includes("AUDITA_BILLING_ENABLED"));
 });
 
 test("hosted subscription checkout uses the configured price and tenant metadata", async () => {
@@ -117,7 +112,7 @@ test("hosted subscription checkout uses the configured price and tenant metadata
 
   const result = await service.createCheckoutSession(AUTH, {
     kind: "subscription",
-    planId: "profissional",
+    planId: "standard",
     interval: "monthly",
     requestId: "request-1",
   });
@@ -128,7 +123,7 @@ test("hosted subscription checkout uses the configured price and tenant metadata
   assert.equal(checkout.body.get("mode"), "subscription");
   assert.equal(
     checkout.body.get("line_items[0][price]"),
-    "price_professional_month",
+    "price_standard_month",
   );
   assert.equal(checkout.body.get("metadata[audita_tenant_id]"), "tenant-1");
   assert.equal(checkout.options.headers["idempotency-key"], "audita-checkout-tenant-1-request-1");
@@ -186,7 +181,7 @@ test("paid credit pack webhook grants credits once even when Stripe retries it",
   assert.equal(grants[0].referenceId, "stripe:checkout:cs_pack_1");
 });
 
-test("paid subscription invoice grants the plan allowance and records active state", async () => {
+test("paid subscription invoice records active Standard access without fake credits", async () => {
   const grants = [];
   const now = 1_800_000_000_000;
   const event = {
@@ -202,7 +197,7 @@ test("paid subscription invoice grants the plan allowance and records active sta
         lines: {
           data: [
             {
-              price: { id: "price_essential_year" },
+              price: { id: "price_standard_year" },
               period: {
                 start: Math.floor(now / 1000),
                 end: Math.floor(now / 1000) + 31_536_000,
@@ -223,7 +218,7 @@ test("paid subscription invoice grants the plan allowance and records active sta
     env: configuredEnv(),
     now: () => now,
     creditsService: {
-      getWallet: async () => ({ enabled: true, balance: 360 }),
+      getWallet: async () => ({ enabled: true, balance: 0 }),
       grant: async (_auth, input) => {
         grants.push(input);
         return { ok: true, state: "granted" };
@@ -235,8 +230,8 @@ test("paid subscription invoice grants the plan allowance and records active sta
   const state = await service.billingState(AUTH);
 
   assert.equal(result.status, "processed");
-  assert.equal(grants[0].amount, 360);
-  assert.equal(state.subscription.planId, "essencial");
+  assert.equal(grants.length, 0);
+  assert.equal(state.subscription.planId, "standard");
   assert.equal(state.subscription.interval, "annual");
   assert.equal(state.subscription.active, true);
 });
@@ -255,7 +250,7 @@ test("only tenant billing managers can create checkout sessions", async () => {
     { ...AUTH, user: { ...AUTH.user, role: "member" } },
     {
       kind: "subscription",
-      planId: "essencial",
+      planId: "standard",
       interval: "monthly",
     },
   );

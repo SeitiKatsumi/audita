@@ -250,6 +250,21 @@ CREATE TABLE IF NOT EXISTS audita_subscriptions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS audita_billing_access_grants (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES audita_users(id) ON DELETE CASCADE,
+  plan_id TEXT NOT NULL DEFAULT 'standard',
+  access_type TEXT NOT NULL DEFAULT 'tester' CHECK (access_type IN ('tester', 'complimentary')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revoked')),
+  granted_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  expires_at TIMESTAMPTZ,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, access_type)
+);
+
 CREATE TABLE IF NOT EXISTS audita_billing_events (
   id BIGSERIAL PRIMARY KEY,
   tenant_id BIGINT REFERENCES audita_tenants(id) ON DELETE SET NULL,
@@ -550,6 +565,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS audita_credit_ledger_reference_idx ON audita_c
 CREATE INDEX IF NOT EXISTS audita_billing_customers_tenant_idx ON audita_billing_customers(tenant_id);
 CREATE INDEX IF NOT EXISTS audita_subscriptions_tenant_idx ON audita_subscriptions(tenant_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS audita_subscriptions_status_idx ON audita_subscriptions(tenant_id, status, current_period_end);
+CREATE INDEX IF NOT EXISTS audita_billing_access_grants_tenant_idx ON audita_billing_access_grants(tenant_id, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS audita_billing_access_grants_user_idx ON audita_billing_access_grants(user_id, status, expires_at);
 CREATE INDEX IF NOT EXISTS audita_billing_events_tenant_idx ON audita_billing_events(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS audita_api_pricing_tenant_idx ON audita_api_pricing(tenant_id, provider, active);
 CREATE INDEX IF NOT EXISTS audita_api_usage_tenant_idx ON audita_api_usage(tenant_id, created_at DESC);

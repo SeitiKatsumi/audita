@@ -3028,6 +3028,135 @@ h2 {
   }
 }
 
+.charge-paywall {
+  display: grid;
+  gap: 20px;
+  width: min(100%, 1020px);
+  margin: 0 auto;
+}
+
+.charge-paywall-result,
+.charge-paywall-explainer,
+.charge-paywall-plans > article {
+  border: 1px solid var(--line, #17496b);
+  border-radius: 8px;
+  background: #061c30;
+}
+
+.charge-paywall-result {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 22px;
+  border-color: #1c8e72;
+  background: #08293a;
+}
+
+.charge-paywall-result h3,
+.charge-paywall-explainer h3 {
+  margin: 4px 0 8px;
+  letter-spacing: 0;
+}
+
+.charge-paywall-result p,
+.charge-paywall-explainer li,
+.charge-paywall-plans p,
+.charge-paywall-plans li {
+  color: #b8cee0;
+  line-height: 1.55;
+}
+
+.charge-paywall-explainer {
+  padding: 22px;
+}
+
+.charge-paywall-explainer ul,
+.charge-paywall-plans ul {
+  margin: 14px 0 0;
+  padding-left: 20px;
+}
+
+.charge-paywall-plans {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.charge-paywall-plans > article {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+}
+
+.charge-paywall-plans > article.recommended {
+  border-color: #35e6a1;
+  box-shadow: inset 0 3px 0 #35e6a1;
+}
+
+.charge-paywall-plans article > div > span {
+  display: block;
+  color: #63f3af;
+  font-weight: 700;
+}
+
+.charge-paywall-plans strong {
+  display: block;
+  margin-top: 10px;
+  color: #eef8ff;
+  font-size: clamp(26px, 3vw, 36px);
+  letter-spacing: 0;
+}
+
+.charge-paywall-plans strong small {
+  margin-left: 5px;
+  color: #9eb6ca;
+  font-size: 14px;
+}
+
+.charge-paywall-plans button {
+  width: 100%;
+  margin-top: auto;
+}
+
+.charge-paywall-legal-note,
+.charge-paywall-demo {
+  font-size: 13px;
+}
+
+.charge-paywall-demo {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid #2e8aa0;
+  border-radius: 6px;
+  color: #bfefff;
+  background: #082837;
+}
+
+.billing-user-access-action {
+  min-width: 132px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.billing-user-table td {
+  vertical-align: middle;
+}
+
+.annual-benefit {
+  color: #98ffd0;
+}
+
+@media (max-width: 720px) {
+  .charge-paywall-plans {
+    grid-template-columns: 1fr;
+  }
+
+  .charge-paywall-result {
+    flex-direction: column;
+  }
+}
+
 @media (min-width: 961px) and (max-width: 1280px) {
   :root {
     --sidebar-width: 300px;

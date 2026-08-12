@@ -27,6 +27,8 @@ const billingAdminSubscriptionRows = document.querySelector(
 const billingSubscriptionStatus = document.querySelector(
   "#billingSubscriptionStatus",
 );
+const billingAdminUserRows = document.querySelector("#billingAdminUserRows");
+const billingUserSearch = document.querySelector("#billingUserSearch");
 const billingTabs = document.querySelectorAll("[data-billing-tab]");
 const billingPanels = document.querySelectorAll("[data-billing-panel]");
 
@@ -157,8 +159,8 @@ function renderReadiness(configuration = {}, databaseReady = false) {
     },
     {
       label: "Checkout",
-      ready: Boolean(configuration.checkoutReady && planPricesReady && packsReady),
-      detail: `${configuration.configuredPlanPrices || 0}/${configuration.expectedPlanPrices || 0} pre\u00e7os de planos e ${configuration.configuredCreditPacks || 0}/${configuration.expectedCreditPacks || 0} pacotes`,
+      ready: Boolean(configuration.checkoutReady && planPricesReady),
+      detail: `${configuration.configuredPlanPrices || 0}/${configuration.expectedPlanPrices || 0} preços de planos; pacotes avulsos são opcionais`,
     },
     {
       label: "Webhooks",
@@ -360,6 +362,60 @@ function renderSubscriptions(subscriptions = []) {
     .join("");
 }
 
+function userAccess(user = {}) {
+  if (["active", "trialing"].includes(user.subscription?.status)) {
+    return {
+      label: `${user.subscription.planId === "standard" ? "Standard" : user.subscription.planId} · ${user.subscription.interval === "annual" ? "anual" : "mensal"}`,
+      source: user.subscription.provider === "demo" ? "Demonstração" : "Assinatura",
+      active: true,
+    };
+  }
+  const grant = user.testerGrant;
+  const expired = grant?.expiresAt && new Date(grant.expiresAt).getTime() <= Date.now();
+  if (grant?.status === "active" && !expired) {
+    return { label: "Standard tester", source: "Liberação manual", active: true };
+  }
+  return { label: "Sem acesso", source: "", active: false };
+}
+
+function renderUsers(users = []) {
+  if (!billingAdminUserRows) return;
+  const query = String(billingUserSearch?.value || "").trim().toLocaleLowerCase("pt-BR");
+  const filtered = users.filter((user) =>
+    !query || [user.name, user.email, user.tenantName].some((value) =>
+      String(value || "").toLocaleLowerCase("pt-BR").includes(query),
+    ),
+  );
+  if (!filtered.length) {
+    billingAdminUserRows.innerHTML = emptyRow("Nenhum usuário encontrado.", 5);
+    return;
+  }
+  billingAdminUserRows.innerHTML = filtered.map((user) => {
+    const access = userAccess(user);
+    const testerActive = user.testerGrant?.status === "active" && access.source === "Liberação manual";
+    return `
+      <tr>
+        <td><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.email)}</small></td>
+        <td>${escapeHtml(user.tenantName || "-")}</td>
+        <td><span class="billing-table-status" data-tone="neutral">${escapeHtml(user.role || "member")}</span></td>
+        <td>
+          <span class="billing-table-status" data-tone="${access.active ? "positive" : "neutral"}">${escapeHtml(access.label)}</span>
+          ${access.source ? `<small>${escapeHtml(access.source)}</small>` : ""}
+        </td>
+        <td>
+          <button
+            type="button"
+            class="${testerActive ? "secondary-action" : "primary-action"} billing-user-access-action"
+            data-billing-user-id="${escapeHtml(user.id)}"
+            data-billing-access-action="${testerActive ? "revoke" : "grant"}"
+            ${user.subscription && access.active ? "disabled title=\"A assinatura já libera esta organização\"" : ""}
+          >${testerActive ? "Revogar tester" : "Liberar tester"}</button>
+        </td>
+      </tr>
+    `;
+  }).join("");
+}
+
 function renderEvents(events = []) {
   if (!billingAdminEventRows) return;
   if (!events.length) {
@@ -394,6 +450,7 @@ function renderBillingDashboard(dashboard) {
   renderPlans(dashboard.catalog);
   renderOperations(dashboard.operations, dashboard.catalog);
   renderSubscriptions(dashboard.subscriptions);
+  renderUsers(dashboard.users || []);
   renderEvents(dashboard.recentEvents);
 }
 
@@ -461,6 +518,33 @@ billingTabs.forEach((tab) => {
 billingAdminRefresh?.addEventListener("click", loadBillingDashboard);
 billingSubscriptionStatus?.addEventListener("change", () => {
   renderSubscriptions(billingDashboard?.subscriptions || []);
+});
+billingUserSearch?.addEventListener("input", () => {
+  renderUsers(billingDashboard?.users || []);
+});
+billingAdminUserRows?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-billing-user-id]");
+  if (!button || billingAdminLoading) return;
+  button.disabled = true;
+  try {
+    const response = await fetch(
+      `/api/admin/billing/users/${encodeURIComponent(button.dataset.billingUserId)}/access`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ action: button.dataset.billingAccessAction }),
+      },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || "Não foi possível alterar o acesso.");
+    await loadBillingDashboard();
+  } catch (error) {
+    if (billingAdminError) {
+      billingAdminError.textContent = error.message;
+      billingAdminError.classList.remove("hidden");
+    }
+    button.disabled = false;
+  }
 });
 window.addEventListener("hashchange", () => {
   if (window.location.hash === "#admin-planos") loadBillingDashboard();

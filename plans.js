@@ -112,7 +112,9 @@ function setBusy(busy) {
 }
 
 function billingConfigured() {
-  return Boolean(state.catalog?.billing?.checkoutReady);
+  return Boolean(
+    state.catalog?.billing?.checkoutReady || state.catalog?.billing?.demoMode,
+  );
 }
 
 function currentSubscription() {
@@ -120,7 +122,8 @@ function currentSubscription() {
 }
 
 function currentPlanId() {
-  return currentSubscription()?.active ? currentSubscription().planId : "explorar";
+  if (state.billing?.access?.entitled) return state.billing.access.planId || "standard";
+  return currentSubscription()?.active ? currentSubscription().planId : "";
 }
 
 function planPriceMarkup(plan) {
@@ -132,10 +135,13 @@ function planPriceMarkup(plan) {
     return `<div class="plan-price"><strong>Gr\u00e1tis</strong><span>Para come\u00e7ar</span></div>`;
   }
   const annual = state.interval === "annual";
+  const displayAmount = annual
+    ? { ...selectedPrice, cents: Math.round(selectedPrice.cents / 12) }
+    : selectedPrice;
   return `
     <div class="plan-price">
-      <strong>${escapeHtml(formatMoney(selectedPrice))}</strong>
-      <span>${annual ? "por ano, cobrado anualmente" : "por m\u00eas"}</span>
+      <strong>${escapeHtml(formatMoney(displayAmount))}</strong>
+      <span>${annual ? `por m\u00eas; ${formatMoney(selectedPrice)} cobrados anualmente` : "por m\u00eas"}</span>
     </div>
   `;
 }
@@ -201,6 +207,7 @@ function renderPlans() {
           <p class="plan-description">${escapeHtml(plan.description)}</p>
           <ul>
             ${plan.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("")}
+            ${state.interval === "annual" ? (plan.annualBenefits || []).map((feature) => `<li class="annual-benefit">${escapeHtml(feature)}</li>`).join("") : ""}
           </ul>
           ${planButton(plan)}
         </article>
@@ -270,8 +277,10 @@ function renderAccount() {
   accountSummary.classList.toggle("hidden", !state.user);
   const subscription = currentSubscription();
   const plan = state.catalog?.plans?.find((item) => item.id === currentPlanId());
-  currentPlanValue.textContent = plan?.name || "Explorar";
-  subscriptionStatusValue.textContent = statusLabel(subscription?.status);
+  currentPlanValue.textContent = plan?.name || "Sem plano";
+  subscriptionStatusValue.textContent = state.billing?.access?.source === "tester"
+    ? "Tester liberado"
+    : statusLabel(subscription?.status);
   creditBalanceValue.textContent = String(state.billing?.wallet?.balance || 0);
   renewalValue.textContent = formatDate(subscription?.currentPeriodEnd);
   manageSubscriptionButton.classList.toggle(
@@ -366,13 +375,23 @@ async function beginPurchase(selection) {
   setBusy(true);
   clearStatus();
   try {
-    const payload = await fetchJson("/api/billing/checkout", {
+    const demoMode = Boolean(state.catalog?.billing?.demoMode);
+    const payload = await fetchJson(
+      demoMode ? "/api/billing/demo-subscription" : "/api/billing/checkout",
+      {
       method: "POST",
-      body: JSON.stringify({
-        ...selection,
-        requestId: crypto.randomUUID(),
-      }),
-    });
+      body: JSON.stringify(demoMode
+        ? { interval: selection.interval }
+        : { ...selection, requestId: crypto.randomUUID() }),
+      },
+    );
+    if (demoMode) {
+      await loadAccount();
+      render();
+      showStatus("Demonstração ativada. Nenhuma cobrança foi realizada.", "success");
+      setBusy(false);
+      return;
+    }
     if (!payload.url) throw new Error("Checkout indispon\u00edvel.");
     window.location.assign(payload.url);
   } catch (error) {
@@ -437,7 +456,7 @@ async function initialize() {
     state.catalog = catalog;
     render();
     checkoutMessage();
-    if (!catalog.billing.checkoutReady) {
+    if (!catalog.billing.checkoutReady && !catalog.billing.demoMode) {
       showStatus(
         "Os planos est\u00e3o definidos, mas o checkout ainda aguarda a configura\u00e7\u00e3o segura da Stripe.",
       );

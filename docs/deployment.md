@@ -33,6 +33,12 @@ Cada app deve ter:
 - health check;
 - deploy rastreavel por commit.
 
+O painel administrativo de dados usa um app Directus separado, com imagem
+oficial fixada por versao, porta interna `8055`, HTTPS e volumes persistentes
+para `/directus/uploads` e `/directus/extensions`. Ele se conecta ao mesmo
+PostgreSQL somente pela rede interna do CapRover e com credencial propria de
+menor privilegio.
+
 ## Deploy Docker atual
 
 O projeto possui uma primeira versao estatica pronta para build Docker via CapRover:
@@ -99,6 +105,14 @@ Smoke test recomendado:
 ```bash
 AUDITA_BASE_URL=https://audita.seudominio.com.br npm run smoke:production
 ```
+
+Depois de provisionar ou atualizar o Directus, validar tambem:
+
+- `GET /server/health` retorna estado operacional;
+- login administrativo funciona via HTTPS;
+- as colecoes `audita_*` aparecem sem expor acesso publico anonimo;
+- reiniciar o app preserva metadados e uploads;
+- nenhuma porta PostgreSQL foi publicada.
 
 ## Arquivos esperados
 

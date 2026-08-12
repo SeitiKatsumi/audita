@@ -21,6 +21,7 @@ function envEnabled(env, name) {
 function publicSubscription(row = {}) {
   return {
     id: text(row.provider_subscription_id),
+    provider: text(row.provider, "stripe"),
     tenantId: text(row.tenant_id),
     tenantName: text(row.tenant_name, "Organizacao"),
     customerEmail: text(row.customer_email),
@@ -151,6 +152,8 @@ function computeSummary(subscriptions, catalog, outstandingCredits, eventCount) 
 export function createBillingAdminService({
   getDb,
   env = process.env,
+  accessService,
+  getSubscription,
 } = {}) {
   function database() {
     const state = getDb ? getDb() : {};
@@ -160,7 +163,7 @@ export function createBillingAdminService({
     };
   }
 
-  async function getDashboard() {
+  async function getDashboard(authContext = {}) {
     const catalog = getPublicBillingCatalog(env);
     const configuration = billingConfiguration(env);
     const operations = getCommercialOperations(env);
@@ -170,6 +173,10 @@ export function createBillingAdminService({
     let recentEvents = [];
     let outstandingCredits = 0;
     let processedEvents30d = 0;
+    let users = accessService ? await accessService.listUsers(authContext) : [];
+    const scopeTenantId = authContext?.user?.role === "super_admin"
+      ? ""
+      : text(authContext?.tenantId);
 
     if (ready) {
       const [
@@ -188,10 +195,12 @@ export function createBillingAdminService({
            INNER JOIN audita_tenants t ON t.id = s.tenant_id
            LEFT JOIN audita_billing_customers bc ON bc.tenant_id = s.tenant_id
            LEFT JOIN audita_credit_wallets w ON w.tenant_id = s.tenant_id
+           WHERE ($1::text = '' OR s.tenant_id::text = $1)
            ORDER BY
              CASE WHEN s.status IN ('active', 'trialing', 'past_due') THEN 0 ELSE 1 END,
              s.updated_at DESC
            LIMIT 200`,
+          [scopeTenantId],
         ),
         pool.query(
           `SELECT
@@ -203,24 +212,52 @@ export function createBillingAdminService({
              t.name AS tenant_name
            FROM audita_billing_events be
            LEFT JOIN audita_tenants t ON t.id = be.tenant_id
+           WHERE ($1::text = '' OR be.tenant_id::text = $1)
            ORDER BY COALESCE(be.event_created_at, be.created_at) DESC
            LIMIT 20`,
+          [scopeTenantId],
         ),
         pool.query(
           `SELECT COALESCE(SUM(balance), 0)::int AS outstanding_credits
-           FROM audita_credit_wallets`,
+           FROM audita_credit_wallets
+           WHERE ($1::text = '' OR tenant_id::text = $1)`,
+          [scopeTenantId],
         ),
         pool.query(
           `SELECT COUNT(*)::int AS total
            FROM audita_billing_events
            WHERE status = 'processed'
+             AND ($1::text = '' OR tenant_id::text = $1)
              AND created_at >= NOW() - INTERVAL '30 days'`,
+          [scopeTenantId],
         ),
       ]);
       subscriptions = subscriptionsResult.rows.map(publicSubscription);
       recentEvents = eventsResult.rows.map(publicEvent);
       outstandingCredits = walletResult.rows[0]?.outstanding_credits || 0;
       processedEvents30d = eventCountResult.rows[0]?.total || 0;
+    } else if (getSubscription) {
+      const subscriptionsByTenant = new Map();
+      users = await Promise.all(users.map(async (user) => {
+        let subscription = subscriptionsByTenant.get(user.tenantId);
+        if (subscription === undefined) {
+          subscription = await getSubscription(user.tenantId);
+          subscriptionsByTenant.set(user.tenantId, subscription || null);
+        }
+        return { ...user, subscription: subscription || null };
+      }));
+      subscriptions = [...subscriptionsByTenant.entries()]
+        .filter(([, subscription]) => subscription)
+        .map(([tenantId, subscription]) => {
+          const owner = users.find((user) => user.tenantId === tenantId);
+          return {
+            ...subscription,
+            tenantId,
+            tenantName: owner?.tenantName || "Ambiente local",
+            customerEmail: owner?.email || "",
+            creditBalance: 0,
+          };
+        });
     }
 
     const configuredPlanPrices = catalog.plans
@@ -229,7 +266,7 @@ export function createBillingAdminService({
         (total, plan) =>
           total +
           ["monthly", "annual"].filter(
-            (interval) => plan.prices?.[interval]?.checkoutAvailable,
+            (interval) => plan.prices?.[interval]?.stripeConfigured,
           ).length,
         0,
       );
@@ -242,6 +279,7 @@ export function createBillingAdminService({
       databaseReady: ready,
       configuration: {
         billingEnabled: configuration.enabled,
+        demoMode: configuration.demoMode,
         creditsEnabled: configuration.creditsEnabled,
         checkoutReady: configuration.checkoutReady,
         webhookReady: configuration.webhookReady,
@@ -251,7 +289,7 @@ export function createBillingAdminService({
             ? "test"
             : "not_configured",
         configuredPlanPrices,
-        expectedPlanPrices: 6,
+        expectedPlanPrices: 2,
         configuredCreditPacks,
         expectedCreditPacks: catalog.creditPacks.length,
         missing: [...configuration.missing],
@@ -265,6 +303,7 @@ export function createBillingAdminService({
       catalog,
       operations,
       subscriptions,
+      users,
       recentEvents,
     };
   }

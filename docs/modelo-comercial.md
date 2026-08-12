@@ -1,6 +1,6 @@
 # Modelo comercial da Audita
 
-Status: hipotese inicial para validacao comercial.
+Status: oferta Standard inicial aprovada para implementacao em demonstracao.
 
 ## Decisao recomendada
 
@@ -16,16 +16,19 @@ margem quando Direct Data, OpenAI, ONR ou outro provedor alterar precos.
 
 ## Oferta inicial
 
-| Plano | Preco mensal | Preco anual | Creditos | Usuarios | Publico |
-| --- | ---: | ---: | ---: | ---: | --- |
-| Explorar | Gratis | Gratis | 0 | 1 | Primeiro contato |
-| Essencial | R$ 49,90 | R$ 499,00 | 30/mes | 1 | Pessoa fisica e uso pontual |
-| Profissional | R$ 149,90 | R$ 1.499,00 | 150/mes | 3 | Profissionais e pequenos escritorios |
-| Equipe | R$ 399,90 | R$ 3.999,00 | 500/mes | 10 | Operacoes juridicas recorrentes |
-| Enterprise | Sob consulta | Sob consulta | Personalizado | Personalizado | Alto volume e integracoes |
+| Plano | Mensal | Anual | Usuarios | Publico |
+| --- | ---: | ---: | ---: | --- |
+| Standard | R$ 199/mes | R$ 1.188/ano (equivalente a R$ 99/mes) | 1 | Pessoa fisica e uso individual |
 
-Os valores sao uma hipotese de lancamento, nao uma tabela definitiva. O plano
-Profissional deve ser a opcao recomendada na vitrine.
+O Standard inclui acesso a plataforma, chat com a IA Audita, analise de
+documentos e cobrancas Itau, simulacao, relatorio e orientacao de proximos
+passos. O anual inclui suporte de advogado parceiro para o caso Itau. Esse
+suporte nao representa automaticamente contratacao para representacao,
+protocolo, custas ou garantia de resultado.
+
+Enquanto a conta Stripe nao estiver pronta, `AUDITA_BILLING_DEMO_MODE=true`
+habilita somente uma demonstracao local/controlada. Essa demonstracao deve ser
+identificada na interface e nunca pode afirmar que houve cobranca real.
 
 ## Pacotes adicionais
 
@@ -40,7 +43,13 @@ de cada consulta no painel administrativo.
 
 ## Regras de consumo
 
-- Chat, orientacao e historico fazem parte da assinatura.
+- Chat, orientacao e historico fazem parte da assinatura Standard.
+- O fluxo Itau permanece aberto ate a analise dos anexos.
+- Quando houver achado positivo sem acesso Standard, descricoes, valores,
+  calculo e simulacao ficam bloqueados pelo backend ate a contratacao ou uma
+  liberacao tester valida.
+- Acesso tester e temporario/administrativo, auditavel e revogavel; nao e uma
+  assinatura Stripe.
 - Uma operacao paga deve mostrar o custo em creditos antes da confirmacao.
 - Creditos incluidos renovam a cada ciclo e nao acumulam.
 - Creditos adicionais entram na carteira da organizacao.
@@ -62,9 +71,9 @@ bruta minima de 65% por operacao.
 
 ### 1. Beta comercial
 
-- Stripe em modo de teste.
-- Planos Essencial e Profissional.
-- Pacotes de 25 e 100 creditos.
+- Standard mensal e anual em modo demonstrativo ou Stripe Test Mode.
+- Liberacoes tester controladas no painel administrativo.
+- Validacao do paywall positivo no fluxo Itau.
 - Convite para um grupo pequeno de clientes.
 - Medir ativacao, consumo e suporte por consulta.
 

@@ -1480,6 +1480,7 @@
             <button data-billing-tab="plans" type="button">Planos</button>
             <button data-billing-tab="queries" type="button">Por consulta</button>
             <button data-billing-tab="subscriptions" type="button">Assinaturas</button>
+            <button data-billing-tab="users" type="button">Usu&aacute;rios</button>
           </nav>
 
           <div class="billing-admin-panel active" data-billing-panel="overview">
@@ -1642,6 +1643,35 @@
                     </tr>
                   </thead>
                   <tbody id="billingAdminSubscriptionRows"></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div class="billing-admin-panel" data-billing-panel="users">
+            <div class="billing-panel-heading">
+              <div>
+                <p class="eyebrow">Acessos</p>
+                <h2>Usu&aacute;rios e testers</h2>
+              </div>
+              <label class="billing-subscription-filter">
+                Buscar
+                <input id="billingUserSearch" type="search" placeholder="Nome ou e-mail" autocomplete="off" />
+              </label>
+            </div>
+            <article class="module billing-subscription-module">
+              <div class="api-usage-table-wrap">
+                <table class="api-usage-table billing-user-table">
+                  <thead>
+                    <tr>
+                      <th>Usu&aacute;rio</th>
+                      <th>Organiza&ccedil;&atilde;o</th>
+                      <th>Perfil</th>
+                      <th>Acesso Standard</th>
+                      <th>A&ccedil;&atilde;o</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billingAdminUserRows"></tbody>
                 </table>
               </div>
             </article>

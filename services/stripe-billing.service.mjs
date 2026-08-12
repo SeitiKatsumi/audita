@@ -9,10 +9,10 @@ import {
 
 const STRIPE_API_BASE_URL = "https://api.stripe.com";
 const WEBHOOK_TOLERANCE_SECONDS = 300;
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"]);
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
 
-function text(value) {
-  return String(value ?? "").trim();
+function text(value, fallback = "") {
+  return String(value ?? fallback).trim();
 }
 
 function integer(value, fallback = 0) {
@@ -204,6 +204,7 @@ function publicSubscription(row = {}) {
   if (!row || !Object.keys(row).length) return null;
   return {
     id: row.provider_subscription_id ?? row.providerSubscriptionId ?? null,
+    provider: text(row.provider, "stripe"),
     planId: text(row.plan_id ?? row.planId),
     interval: text(row.billing_interval ?? row.interval),
     status: text(row.status, "inactive"),
@@ -224,6 +225,7 @@ function publicSubscription(row = {}) {
 export function createStripeBillingService({
   getDb,
   creditsService,
+  accessService,
   fetchImpl = globalThis.fetch,
   env = process.env,
   now = () => Date.now(),
@@ -378,6 +380,7 @@ export function createStripeBillingService({
     if (!providerSubscriptionId) return null;
     const normalized = {
       providerSubscriptionId,
+      provider: text(subscription.provider, "stripe"),
       planId: text(subscription.planId),
       interval: text(subscription.interval),
       status: text(subscription.status, "inactive"),
@@ -400,10 +403,11 @@ export function createStripeBillingService({
          status, monthly_credits, member_limit, current_period_start,
          current_period_end, cancel_at_period_end, created_at, updated_at
        )
-       VALUES ($1, 'stripe', $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
        ON CONFLICT (provider_subscription_id)
        DO UPDATE SET
          tenant_id = EXCLUDED.tenant_id,
+         provider = EXCLUDED.provider,
          plan_id = EXCLUDED.plan_id,
          billing_interval = EXCLUDED.billing_interval,
          status = EXCLUDED.status,
@@ -416,6 +420,7 @@ export function createStripeBillingService({
        RETURNING *`,
       [
         tenantId,
+        normalized.provider,
         normalized.providerSubscriptionId,
         normalized.planId,
         normalized.interval,
@@ -522,17 +527,64 @@ export function createStripeBillingService({
       return { unauthorized: true };
     }
     const config = configuration();
+    const subscription = await loadSubscription(authContext.tenantId);
+    const access = accessService
+      ? await accessService.getEntitlement(authContext, subscription)
+      : { entitled: Boolean(subscription?.active), source: subscription?.active ? "subscription" : "none" };
     return {
       billing: {
         enabled: config.enabled,
         checkoutReady: config.checkoutReady && Boolean(config.appUrl),
+        demoMode: config.demoMode,
         provider: "stripe",
       },
-      subscription: await loadSubscription(authContext.tenantId),
+      subscription,
+      access,
       wallet: creditsService
         ? await creditsService.getWallet(authContext)
         : { enabled: false, balance: 0, consumed: 0, reserved: 0, unit: "credito" },
       canManage: ["super_admin", "owner", "admin"].includes(authContext.user?.role),
+    };
+  }
+
+  async function accessState(authContext) {
+    if (!authContext?.tenantId) return { unauthorized: true };
+    const subscription = await loadSubscription(authContext.tenantId);
+    return accessService
+      ? accessService.getEntitlement(authContext, subscription)
+      : { entitled: Boolean(subscription?.active), source: subscription?.active ? "subscription" : "none" };
+  }
+
+  async function createDemoSubscription(authContext, input = {}) {
+    if (!authContext?.tenantId || !authContext?.user) return { unauthorized: true };
+    if (!["super_admin", "owner", "admin"].includes(authContext.user.role)) {
+      return { forbidden: true };
+    }
+    const config = configuration();
+    if (!config.demoMode) return { unavailable: true, reason: "billing_demo_disabled" };
+    const interval = text(input.interval);
+    if (!["monthly", "annual"].includes(interval)) {
+      return { invalid: true, reason: "invalid_subscription_selection" };
+    }
+    const start = new Date(now());
+    const end = new Date(start);
+    if (interval === "annual") end.setUTCFullYear(end.getUTCFullYear() + 1);
+    else end.setUTCMonth(end.getUTCMonth() + 1);
+    const subscription = await saveSubscription(authContext.tenantId, {
+      id: `demo:${text(authContext.tenantId)}`,
+      provider: "demo",
+      planId: "standard",
+      interval,
+      status: "active",
+      monthlyCredits: 0,
+      memberLimit: 1,
+      currentPeriodStart: start.toISOString(),
+      currentPeriodEnd: end.toISOString(),
+    });
+    return {
+      demo: true,
+      subscription,
+      access: await accessState(authContext),
     };
   }
 
@@ -709,6 +761,9 @@ export function createStripeBillingService({
         currentPeriodEnd: period.end,
       });
     }
+    if (!product.credits) {
+      return { tenantId, subscriptionUpdated: true };
+    }
     if (!creditsService) {
       return { ignored: true, tenantId, reason: "credit_grant_unavailable" };
     }
@@ -842,10 +897,13 @@ export function createStripeBillingService({
   }
 
   return {
+    accessState,
     billingState,
     catalog: () => getPublicBillingCatalog(env),
     createCheckoutSession,
     createPortalSession,
+    createDemoSubscription,
+    getSubscription: loadSubscription,
     handleWebhook,
   };
 }

@@ -39,6 +39,10 @@ O schema inicial cria:
 - `audita_sources`: fontes por tenant.
 - `audita_audit_events`: eventos/sinais por tenant.
 - `audita_reports`: relatorios por tenant.
+- `audita_billing_customers`, `audita_billing_subscriptions` e
+  `audita_billing_events`: estado de cobranca recorrente e webhooks.
+- `audita_billing_access_grants`: acessos tester ou complementares concedidos
+  manualmente, separados de assinaturas Stripe.
 
 Toda consulta operacional deve filtrar por `tenant_id`. Dados reais de clientes diferentes nao devem compartilhar consultas sem filtro de tenant.
 
@@ -56,6 +60,20 @@ Criar usuarios separados por finalidade:
 - `audita_migration`: usado para migracoes controladas.
 - `audita_readonly`: usado para diagnostico excepcional.
 - usuario administrativo: uso restrito.
+
+## Directus administrativo
+
+O Directus de producao deve ser um app separado no CapRover e usar somente a
+rede interna para falar com o PostgreSQL. A porta 5432 permanece privada.
+
+- As tabelas internas `directus_*` ficam sob um usuario/schema proprio.
+- As tabelas operacionais `audita_*` sao disponibilizadas para visualizacao
+  administrativa com privilegio minimo.
+- A conta administrativa do Directus e independente da autenticacao da Audita.
+- Uploads e extensoes usam volumes persistentes proprios do app Directus.
+- Credenciais e chaves ficam apenas nas variaveis do CapRover.
+- Mudancas de schema da Audita continuam versionadas em `db/schema.sql`; o
+  Directus nao substitui as migracoes da aplicacao.
 
 ## Regras
 

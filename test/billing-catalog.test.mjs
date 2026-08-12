@@ -11,16 +11,11 @@ import {
 function configuredEnv(overrides = {}) {
   return {
     AUDITA_BILLING_ENABLED: "true",
-    AUDITA_CREDITS_ENABLED: "true",
     APP_URL: "https://audita.example",
     STRIPE_SECRET_KEY: "sk_test_example",
     STRIPE_WEBHOOK_SECRET: "whsec_example",
-    STRIPE_PRICE_ESSENTIAL_MONTHLY: "price_essential_month",
-    STRIPE_PRICE_ESSENTIAL_ANNUAL: "price_essential_year",
-    STRIPE_PRICE_PROFESSIONAL_MONTHLY: "price_professional_month",
-    STRIPE_PRICE_PROFESSIONAL_ANNUAL: "price_professional_year",
-    STRIPE_PRICE_TEAM_MONTHLY: "price_team_month",
-    STRIPE_PRICE_TEAM_ANNUAL: "price_team_year",
+    STRIPE_PRICE_STANDARD_MONTHLY: "price_standard_month",
+    STRIPE_PRICE_STANDARD_ANNUAL: "price_standard_year",
     STRIPE_PRICE_CREDITS_25: "price_credits_25",
     STRIPE_PRICE_CREDITS_100: "price_credits_100",
     STRIPE_PRICE_CREDITS_500: "price_credits_500",
@@ -28,72 +23,77 @@ function configuredEnv(overrides = {}) {
   };
 }
 
-test("billing is ready only when payments, credits and required secrets are configured", () => {
+test("billing readiness depends on Stripe, not the optional credit wallet", () => {
   const ready = billingConfiguration(configuredEnv());
   assert.equal(ready.checkoutReady, true);
   assert.equal(ready.webhookReady, true);
 
-  const missingCredits = billingConfiguration(
-    configuredEnv({ AUDITA_CREDITS_ENABLED: "false" }),
-  );
-  assert.equal(missingCredits.checkoutReady, false);
-  assert.ok(missingCredits.missing.includes("AUDITA_CREDITS_ENABLED"));
+  const missingSecret = billingConfiguration(configuredEnv({ STRIPE_SECRET_KEY: "" }));
+  assert.equal(missingSecret.checkoutReady, false);
+  assert.ok(missingSecret.missing.includes("STRIPE_SECRET_KEY"));
 });
 
-test("public catalog exposes commercial rules without Stripe price IDs", () => {
+test("public catalog exposes the Standard monthly and annual offer", () => {
   const catalog = getPublicBillingCatalog(configuredEnv());
-  const professional = catalog.plans.find((plan) => plan.id === "profissional");
+  const standard = catalog.plans.find((plan) => plan.id === "standard");
 
   assert.equal(catalog.billing.checkoutReady, true);
-  assert.equal(professional.monthlyCredits, 150);
-  assert.equal(professional.annualCredits, 1800);
-  assert.equal(professional.prices.monthly.cents, 14990);
-  assert.equal(professional.prices.monthly.checkoutAvailable, true);
-  assert.equal(JSON.stringify(catalog).includes("price_professional_month"), false);
+  assert.equal(catalog.plans.length, 1);
+  assert.equal(standard.prices.monthly.cents, 19900);
+  assert.equal(standard.prices.annual.cents, 118800);
+  assert.equal(standard.prices.monthly.checkoutAvailable, true);
+  assert.match(standard.annualBenefits[0], /advogado parceiro/);
+  assert.equal(catalog.rules.annualItauLegalSupportIncluded, true);
+  assert.equal(catalog.rules.legalRepresentationIncluded, false);
+  assert.equal(JSON.stringify(catalog).includes("price_standard_month"), false);
 });
 
-test("annual subscription selection grants twelve monthly credit allowances", () => {
+test("demo catalog exposes checkout without claiming Stripe readiness", () => {
+  const catalog = getPublicBillingCatalog({ AUDITA_BILLING_DEMO_MODE: "true" });
+  const standard = catalog.plans[0];
+  assert.equal(catalog.billing.demoMode, true);
+  assert.equal(catalog.billing.checkoutReady, false);
+  assert.equal(standard.prices.monthly.checkoutAvailable, true);
+  assert.equal(standard.prices.monthly.stripeConfigured, false);
+});
+
+test("annual Standard selection resolves the annual charge", () => {
   const selection = resolveBillingSelection(
-    { kind: "subscription", planId: "essencial", interval: "annual" },
+    { kind: "subscription", planId: "standard", interval: "annual" },
     configuredEnv(),
   );
 
   assert.equal(selection.invalid, undefined);
-  assert.equal(selection.priceId, "price_essential_year");
-  assert.equal(selection.credits, 360);
-  assert.equal(selection.monthlyCredits, 30);
+  assert.equal(selection.priceId, "price_standard_year");
+  assert.equal(selection.amount.cents, 118800);
+  assert.equal(selection.monthlyCredits, 0);
 });
 
-test("credit pack selection resolves its configured Stripe price", () => {
+test("credit pack selection remains available for future paid tools", () => {
   const selection = resolveBillingSelection(
     { kind: "credit_pack", packId: "creditos-100" },
     configuredEnv(),
   );
-
   assert.equal(selection.priceId, "price_credits_100");
   assert.equal(selection.credits, 100);
-  assert.equal(selection.amount.cents, 12900);
 });
 
-test("selection stays unavailable when the corresponding Stripe price is absent", () => {
+test("missing Standard price prevents real checkout", () => {
   const selection = resolveBillingSelection(
-    { kind: "subscription", planId: "equipe", interval: "monthly" },
-    configuredEnv({ STRIPE_PRICE_TEAM_MONTHLY: "" }),
+    { kind: "subscription", planId: "standard", interval: "monthly" },
+    configuredEnv({ STRIPE_PRICE_STANDARD_MONTHLY: "" }),
   );
-
   assert.deepEqual(selection, {
     unavailable: true,
     reason: "stripe_price_not_configured",
   });
 });
 
-test("configured price IDs map back to the commercial product", () => {
+test("configured price maps back to Standard", () => {
   const product = resolveBillingProductFromPrice(
-    "price_professional_year",
+    "price_standard_year",
     configuredEnv(),
   );
-
-  assert.equal(product.id, "profissional");
+  assert.equal(product.id, "standard");
   assert.equal(product.interval, "annual");
-  assert.equal(product.credits, 1800);
 });

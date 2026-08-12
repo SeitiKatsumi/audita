@@ -356,6 +356,18 @@ test("review and documentary calculation are separate sequential stages", () => 
   assert.doesNotMatch(chargeAnalysisJs, /Complemento estimado aos documentos parciais/);
 });
 
+test("positive analysis is paywalled before descriptions, values and simulation", () => {
+  assert.match(chargeAnalysisJs, /state\.screen = lockedPositiveResult \? "paywall" : "review"/);
+  assert.match(chargeAnalysisJs, /Sim, encontramos cobranças que podem ser indevidas nos seus extratos/);
+  assert.match(chargeAnalysisJs, /Os detalhes, valores e a simulação permanecem protegidos/);
+  assert.match(chargeAnalysisJs, /Standard mensal/);
+  assert.match(chargeAnalysisJs, /Standard anual/);
+  assert.match(chargeAnalysisJs, /Suporte de advogado parceiro para o caso Itaú incluído/);
+  assert.match(chargeAnalysisJs, /Ambiente demonstrativo: nenhum valor será cobrado/);
+  assert.match(chargeAnalysisJs, /\/api\/billing\/demo-subscription/);
+  assert.match(chargeAnalysisJs, /unlockAnalyzedCases/);
+});
+
 test("calculation uses only confirmed non-recognized documentary occurrences", () => {
   assert.deepEqual(
     buildChargeCalculationSnapshot({

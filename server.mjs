@@ -22,6 +22,7 @@ import {
   StripeBillingError,
 } from "./services/stripe-billing.service.mjs";
 import { createBillingAdminService } from "./services/billing-admin.service.mjs";
+import { createBillingAccessService } from "./services/billing-access.service.mjs";
 import { createDirectDataCourtService } from "./services/direct-data-court.service.mjs";
 import { createDirectDataCertificatesService } from "./services/direct-data-certificates.service.mjs";
 import {
@@ -1381,6 +1382,22 @@ function canManageIntegrations(user) {
   return ["super_admin", "owner", "admin"].includes(user?.role);
 }
 
+function lockedItauCase(caseData = {}) {
+  return {
+    id: caseData.id || "",
+    status: "access_required",
+    locked: true,
+    document: {
+      fileName: caseData.document?.fileName || "Documento analisado",
+      mimeType: caseData.document?.mimeType || "",
+    },
+  };
+}
+
+function itauCaseHasFindings(caseData = {}) {
+  return Array.isArray(caseData.candidates) && caseData.candidates.length > 0;
+}
+
 async function createSession(response, request, userId) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashToken(token);
@@ -1425,12 +1442,19 @@ const auditService = createAuditService({
   recordApiUsage: (usageContext, event) => apiUsageService.record(usageContext, event),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
+const billingAccessService = createBillingAccessService({
+  getDb: () => ({ pool, dbReady }),
+  listFallbackUsers: () => [...fallbackUsers.values()],
+});
 const stripeBillingService = createStripeBillingService({
   getDb: () => ({ pool, dbReady }),
   creditsService,
+  accessService: billingAccessService,
 });
 const billingAdminService = createBillingAdminService({
   getDb: () => ({ pool, dbReady }),
+  accessService: billingAccessService,
+  getSubscription: (tenantId) => stripeBillingService.getSubscription(tenantId),
 });
 const directDataCourtService = createDirectDataCourtService({
   creditsService,
@@ -3042,6 +3066,39 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/billing/demo-subscription" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const result = await stripeBillingService.createDemoSubscription(
+        authContext,
+        await readJsonBody(request),
+      );
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "billing_manager_required" });
+        return true;
+      }
+      if (result.invalid) {
+        sendJson(response, 400, { error: result.reason });
+        return true;
+      }
+      if (result.unavailable) {
+        sendJson(response, 503, { error: result.reason });
+        return true;
+      }
+      sendJson(response, 201, result);
+    } catch {
+      sendJson(response, 500, {
+        error: "billing_demo_failed",
+        message: "Nao foi possivel ativar a demonstracao.",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/billing/checkout" && request.method === "POST") {
     try {
       const authContext = await getTenantIdForRequest(request);
@@ -3141,7 +3198,7 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 403, { error: "insufficient_role" });
         return true;
       }
-      sendJson(response, 200, await billingAdminService.getDashboard());
+      sendJson(response, 200, await billingAdminService.getDashboard(authContext));
     } catch (error) {
       sendJson(response, 500, {
         error: "billing_admin_query_failed",
@@ -3149,6 +3206,45 @@ async function handleApi(request, response, pathname) {
           error instanceof Error
             ? error.message
             : "Nao foi possivel carregar a gestao comercial.",
+      });
+    }
+    return true;
+  }
+
+  const billingUserAccessMatch = pathname.match(/^\/api\/admin\/billing\/users\/([^/]+)\/access$/);
+  if (billingUserAccessMatch && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (authRequired && !canManageIntegrations(authContext.user)) {
+        sendJson(response, 403, { error: "insufficient_role" });
+        return true;
+      }
+      const result = await billingAccessService.setTesterGrant(
+        authContext,
+        decodeURIComponent(billingUserAccessMatch[1]),
+        await readJsonBody(request),
+      );
+      if (result.invalid) {
+        sendJson(response, 400, { error: result.reason });
+        return true;
+      }
+      if (result.notFound) {
+        sendJson(response, 404, { error: "billing_user_not_found" });
+        return true;
+      }
+      if (result.forbidden) {
+        sendJson(response, 403, { error: "insufficient_role" });
+        return true;
+      }
+      sendJson(response, 200, result);
+    } catch {
+      sendJson(response, 500, {
+        error: "billing_access_update_failed",
+        message: "Nao foi possivel atualizar a liberacao do usuario.",
       });
     }
     return true;
@@ -4620,7 +4716,17 @@ async function handleApi(request, response, pathname) {
           ],
         );
       }
-      sendJson(response, 200, { case: result.case });
+      const access = await stripeBillingService.accessState(authContext);
+      const locked = itauCaseHasFindings(result.case) && !access.entitled;
+      sendJson(response, 200, {
+        case: locked ? lockedItauCase(result.case) : result.case,
+        finding: {
+          positive: itauCaseHasFindings(result.case),
+          detailsAvailable: !locked,
+        },
+        access,
+        billing: stripeBillingService.catalog(),
+      });
     } catch (error) {
       sendJson(response, error?.code === "BODY_TOO_LARGE" ? 413 : 500, {
         error: error?.code === "BODY_TOO_LARGE" ? "document_too_large" : "itau_analysis_failed",
@@ -4638,6 +4744,14 @@ async function handleApi(request, response, pathname) {
       const authContext = await getTenantIdForRequest(request);
       if (authContext.unauthorized) {
         sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const access = await stripeBillingService.accessState(authContext);
+      if (!access.entitled) {
+        sendJson(response, 402, {
+          error: "subscription_required",
+          access,
+        });
         return true;
       }
       const input = await readJsonBody(request);
@@ -4683,22 +4797,29 @@ async function handleApi(request, response, pathname) {
         tenantId: authContext.tenantId,
         userId: authContext.user?.id || null,
       };
-      const result =
-        request.method === "POST"
-          ? itauRefundService.updateCase(
-              decodeURIComponent(itauCaseMatch[1]),
-              await readJsonBody(request),
-              auth,
-            )
-          : itauRefundService.getCase(decodeURIComponent(itauCaseMatch[1]), auth);
-      if (result.notFound) {
+      const caseId = decodeURIComponent(itauCaseMatch[1]);
+      const current = itauRefundService.getCase(caseId, auth);
+      if (current.notFound) {
         sendJson(response, 404, { error: "itau_case_not_found" });
         return true;
       }
-      if (result.forbidden) {
+      if (current.forbidden) {
         sendJson(response, 403, { error: "itau_case_forbidden" });
         return true;
       }
+      const access = await stripeBillingService.accessState(authContext);
+      if (itauCaseHasFindings(current.case) && !access.entitled) {
+        sendJson(response, 402, {
+          error: "subscription_required",
+          case: lockedItauCase(current.case),
+          access,
+        });
+        return true;
+      }
+      const result =
+        request.method === "POST"
+          ? itauRefundService.updateCase(caseId, await readJsonBody(request), auth)
+          : current;
       sendJson(response, 200, result);
     } catch {
       sendJson(response, 500, {

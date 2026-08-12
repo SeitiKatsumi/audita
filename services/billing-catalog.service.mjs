@@ -13,116 +13,31 @@ function money(cents) {
 
 export const BILLING_PLANS = Object.freeze([
   {
-    id: "explorar",
-    name: "Explorar",
-    audience: "Para conhecer a Audita",
-    description: "Converse com a IA e entenda quais consultas podem ajudar no seu caso.",
-    kind: "free",
+    id: "standard",
+    name: "Standard",
+    audience: "Para pessoas que querem usar a Audita",
+    description: "Acesso \u00e0 plataforma, \u00e0 IA e \u00e0s ferramentas inclu\u00eddas no plano.",
+    kind: "subscription",
+    recommended: true,
     monthlyCredits: 0,
     memberLimit: 1,
     prices: {
-      monthly: money(0),
-      annual: money(0),
-    },
-    features: [
-      "Acesso ao chat da Audita",
-      "Orienta\u00e7\u00e3o inicial sobre consultas",
-      "Sem consultas pagas inclu\u00eddas",
-    ],
-  },
-  {
-    id: "essencial",
-    name: "Essencial",
-    audience: "Para uso individual",
-    description: "An\u00e1lises e consultas pontuais com previsibilidade de custo.",
-    kind: "subscription",
-    monthlyCredits: 30,
-    memberLimit: 1,
-    prices: {
-      monthly: money(4990),
-      annual: money(49900),
+      monthly: money(19900),
+      annual: money(118800),
     },
     priceEnv: {
-      monthly: "STRIPE_PRICE_ESSENTIAL_MONTHLY",
-      annual: "STRIPE_PRICE_ESSENTIAL_ANNUAL",
+      monthly: "STRIPE_PRICE_STANDARD_MONTHLY",
+      annual: "STRIPE_PRICE_STANDARD_ANNUAL",
     },
     features: [
-      "30 cr\u00e9ditos por m\u00eas",
-      "1 usu\u00e1rio",
-      "Chat jur\u00eddico e an\u00e1lise de documentos",
-      "Certid\u00f5es e consultas por cr\u00e9dito",
-      "Hist\u00f3rico das an\u00e1lises",
+      "Uso da plataforma Audita",
+      "Chat com a IA Audita",
+      "An\u00e1lise de documentos e cobran\u00e7as Ita\u00fa",
+      "Simula\u00e7\u00e3o, relat\u00f3rio e orienta\u00e7\u00e3o de pr\u00f3ximos passos",
+      "Ferramentas inclu\u00eddas conforme disponibilidade",
     ],
-  },
-  {
-    id: "profissional",
-    name: "Profissional",
-    audience: "Para profissionais e pequenos escrit\u00f3rios",
-    description: "Mais volume, colabora\u00e7\u00e3o e controle do consumo da equipe.",
-    kind: "subscription",
-    recommended: true,
-    monthlyCredits: 150,
-    memberLimit: 3,
-    prices: {
-      monthly: money(14990),
-      annual: money(149900),
-    },
-    priceEnv: {
-      monthly: "STRIPE_PRICE_PROFESSIONAL_MONTHLY",
-      annual: "STRIPE_PRICE_PROFESSIONAL_ANNUAL",
-    },
-    features: [
-      "150 cr\u00e9ditos por m\u00eas",
-      "At\u00e9 3 usu\u00e1rios",
-      "Tudo do Essencial",
-      "Gest\u00e3o de consumo por usu\u00e1rio",
-      "Exporta\u00e7\u00e3o de relat\u00f3rios e peti\u00e7\u00f5es",
-      "Suporte prioritario",
-    ],
-  },
-  {
-    id: "equipe",
-    name: "Equipe",
-    audience: "Para opera\u00e7\u00f5es jur\u00eddicas",
-    description: "Capacidade compartilhada para equipes com consultas recorrentes.",
-    kind: "subscription",
-    monthlyCredits: 500,
-    memberLimit: 10,
-    prices: {
-      monthly: money(39990),
-      annual: money(399900),
-    },
-    priceEnv: {
-      monthly: "STRIPE_PRICE_TEAM_MONTHLY",
-      annual: "STRIPE_PRICE_TEAM_ANNUAL",
-    },
-    features: [
-      "500 cr\u00e9ditos por m\u00eas",
-      "At\u00e9 10 usu\u00e1rios",
-      "Tudo do Profissional",
-      "Administra\u00e7\u00e3o centralizada",
-      "Relat\u00f3rios de consumo da equipe",
-      "Prioridade nas filas de processamento",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    audience: "Para alto volume e integra\u00e7\u00f5es",
-    description: "Contrato sob medida, SLA e integra\u00e7\u00e3o com os processos da empresa.",
-    kind: "contact",
-    monthlyCredits: null,
-    memberLimit: null,
-    prices: {
-      monthly: null,
-      annual: null,
-    },
-    features: [
-      "Volume de cr\u00e9ditos personalizado",
-      "Usu\u00e1rios e unidades sob medida",
-      "API e integra\u00e7\u00f5es dedicadas",
-      "SLA, seguran\u00e7a e governan\u00e7a",
-      "Onboarding acompanhado",
+    annualBenefits: [
+      "Suporte de advogado parceiro para o caso Ita\u00fa inclu\u00eddo",
     ],
   },
 ]);
@@ -154,6 +69,7 @@ export const CREDIT_PACKS = Object.freeze([
 
 export function billingConfiguration(env = process.env) {
   const billingFlag = envValue(env, "AUDITA_BILLING_ENABLED").toLowerCase() === "true";
+  const demoMode = envValue(env, "AUDITA_BILLING_DEMO_MODE").toLowerCase() === "true";
   const creditsFlag = envValue(env, "AUDITA_CREDITS_ENABLED").toLowerCase() === "true";
   const secretKey = envValue(env, "STRIPE_SECRET_KEY");
   const webhookSecret = envValue(env, "STRIPE_WEBHOOK_SECRET");
@@ -161,14 +77,14 @@ export function billingConfiguration(env = process.env) {
 
   return {
     enabled: billingFlag,
-    checkoutReady: Boolean(billingFlag && creditsFlag && secretKey && appUrl),
-    webhookReady: Boolean(billingFlag && creditsFlag && secretKey && webhookSecret),
+    demoMode,
+    checkoutReady: Boolean(billingFlag && secretKey && appUrl),
+    webhookReady: Boolean(billingFlag && secretKey && webhookSecret),
     creditsEnabled: creditsFlag,
     provider: "stripe",
     appUrl,
     missing: [
       !billingFlag ? "AUDITA_BILLING_ENABLED" : "",
-      !creditsFlag ? "AUDITA_CREDITS_ENABLED" : "",
       !secretKey ? "STRIPE_SECRET_KEY" : "",
       !webhookSecret ? "STRIPE_WEBHOOK_SECRET" : "",
       !appUrl ? "APP_URL" : "",
@@ -186,6 +102,7 @@ function publicPrice(price) {
 
 function publicPlan(plan, env) {
   const prices = {};
+  const demoMode = envValue(env, "AUDITA_BILLING_DEMO_MODE").toLowerCase() === "true";
   for (const interval of ["monthly", "annual"]) {
     const price = plan.prices?.[interval];
     const stripePriceId = plan.priceEnv?.[interval]
@@ -194,7 +111,8 @@ function publicPlan(plan, env) {
     prices[interval] = price
       ? {
           ...publicPrice(price),
-          checkoutAvailable: plan.kind === "free" || Boolean(stripePriceId),
+          checkoutAvailable: plan.kind === "free" || demoMode || Boolean(stripePriceId),
+          stripeConfigured: Boolean(stripePriceId),
         }
       : null;
   }
@@ -214,6 +132,7 @@ function publicPlan(plan, env) {
     memberLimit: plan.memberLimit,
     prices,
     features: [...plan.features],
+    annualBenefits: [...(plan.annualBenefits || [])],
   };
 }
 
@@ -237,12 +156,15 @@ export function getPublicBillingCatalog(env = process.env) {
       enabled: configuration.enabled,
       checkoutReady: configuration.checkoutReady,
       provider: configuration.provider,
+      demoMode: configuration.demoMode,
     },
     rules: {
       includedCreditsRenew: "billing_cycle",
       includedCreditsRollover: false,
       paidOperationsRequireConfirmation: true,
       legalServicesIncluded: false,
+      annualItauLegalSupportIncluded: true,
+      legalRepresentationIncluded: false,
     },
     plans: BILLING_PLANS.map((plan) => publicPlan(plan, env)),
     creditPacks: CREDIT_PACKS.map((pack) => publicPack(pack, env)),
