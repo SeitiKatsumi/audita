@@ -10825,15 +10825,30 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 }
 
 .charge-analysis-bubble {
+  position: relative;
   max-width: 590px;
   padding: 15px 18px;
   border: 1px solid rgba(89, 154, 203, 0.2);
-  border-radius: 8px;
+  border-radius: 10px 10px 10px 3px;
   color: #e4eef7;
   background: rgba(12, 42, 67, 0.74);
   box-shadow: none;
   font-size: 0.91rem;
   line-height: 1.55;
+}
+
+.charge-analysis-message.assistant .charge-analysis-bubble::before {
+  position: absolute;
+  top: 15px;
+  left: -7px;
+  width: 13px;
+  height: 13px;
+  content: "";
+  border-bottom: inherit;
+  border-left: inherit;
+  border-radius: 0 0 0 2px;
+  background: inherit;
+  transform: rotate(45deg);
 }
 
 .charge-analysis-message.question .charge-analysis-bubble {

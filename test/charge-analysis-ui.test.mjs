@@ -300,6 +300,13 @@ test("the initial question aligns with the standard assistant message width", ()
   );
 });
 
+test("assistant messages use a visual speech-bubble tail", () => {
+  assert.match(
+    stylesCss,
+    /\.charge-analysis-message\.assistant \.charge-analysis-bubble::before\s*\{[\s\S]*?left:\s*-7px;[\s\S]*?transform:\s*rotate\(45deg\)/,
+  );
+});
+
 test("charge analysis uses the full available desktop workspace", () => {
   assert.match(
     stylesCss,
