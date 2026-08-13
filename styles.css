@@ -3036,6 +3036,7 @@ h2 {
 }
 
 .charge-paywall-result,
+.charge-paywall-benefits,
 .charge-paywall-explainer,
 .charge-paywall-plans > article {
   border: 1px solid var(--line, #17496b);
@@ -3053,12 +3054,14 @@ h2 {
 }
 
 .charge-paywall-result h3,
+.charge-paywall-benefits h3,
 .charge-paywall-explainer h3 {
   margin: 4px 0 8px;
   letter-spacing: 0;
 }
 
 .charge-paywall-result p,
+.charge-paywall-benefits p,
 .charge-paywall-explainer li,
 .charge-paywall-plans p,
 .charge-paywall-plans li {
@@ -3066,8 +3069,60 @@ h2 {
   line-height: 1.55;
 }
 
+.charge-paywall-benefits,
 .charge-paywall-explainer {
   padding: 22px;
+}
+
+.charge-paywall-section-heading {
+  max-width: 720px;
+}
+
+.charge-paywall-section-heading > p:last-child {
+  margin: 0;
+}
+
+.charge-paywall-journey {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.charge-paywall-journey li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-content: start;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(64, 147, 191, 0.34);
+  border-radius: 6px;
+  background: #08243a;
+}
+
+.charge-paywall-journey li > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #35e6a1;
+  border-radius: 50%;
+  color: #63f3af;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.charge-paywall-journey strong {
+  color: #eef8ff;
+  line-height: 1.3;
+}
+
+.charge-paywall-journey p {
+  margin: 6px 0 0;
+  font-size: 13px;
 }
 
 .charge-paywall-explainer ul,
@@ -3098,6 +3153,19 @@ h2 {
   display: block;
   color: #63f3af;
   font-weight: 700;
+}
+
+.charge-paywall-plans article > div > span em {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 3px 7px;
+  border: 1px solid rgba(99, 243, 175, 0.44);
+  border-radius: 999px;
+  color: #baffd7;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.2;
+  vertical-align: 2px;
 }
 
 .charge-paywall-plans strong {
@@ -3148,12 +3216,19 @@ h2 {
 }
 
 @media (max-width: 720px) {
+  .charge-paywall-journey,
   .charge-paywall-plans {
     grid-template-columns: 1fr;
   }
 
   .charge-paywall-result {
     flex-direction: column;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 980px) {
+  .charge-paywall-journey {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

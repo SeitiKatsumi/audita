@@ -1313,15 +1313,39 @@ if (stage) {
           <div>
             <p class="eyebrow">Análise concluída</p>
             <h3>Sim, encontramos cobranças que podem ser indevidas nos seus extratos.</h3>
-            <p>Os detalhes, valores e a simulação permanecem protegidos até a ativação do plano. A conclusão depende da sua confirmação sobre cada lançamento.</p>
+            <p>A Audita já concluiu a triagem inicial. Ative o Standard para abrir os achados, revisar cada lançamento e transformar os documentos enviados em uma análise organizada. Os detalhes, valores e a simulação permanecem protegidos até a ativação do plano.</p>
           </div>
         </section>
 
+        <section class="charge-paywall-benefits" aria-labelledby="chargePaywallBenefitsTitle">
+          <div class="charge-paywall-section-heading">
+            <p class="eyebrow">O que você libera agora</p>
+            <h3 id="chargePaywallBenefitsTitle">Da suspeita a um caso documentado</h3>
+            <p>Você acompanha cada etapa, confere a origem das informações e decide quais cobranças devem seguir para o cálculo.</p>
+          </div>
+          <ol class="charge-paywall-journey">
+            <li>
+              <span aria-hidden="true">1</span>
+              <div><strong>Achados detalhados</strong><p>Descrição, data, valor, evidência e arquivo de origem de cada ocorrência localizada.</p></div>
+            </li>
+            <li>
+              <span aria-hidden="true">2</span>
+              <div><strong>Revisão sob seu controle</strong><p>Você informa o que reconhece, o que não reconhece e o que ainda precisa confirmar.</p></div>
+            </li>
+            <li>
+              <span aria-hidden="true">3</span>
+              <div><strong>Cálculo rastreável</strong><p>O cálculo considera somente valores encontrados nos anexos e marcados por você como não reconhecidos.</p></div>
+            </li>
+            <li>
+              <span aria-hidden="true">4</span>
+              <div><strong>Documentação organizada</strong><p>Relatório técnico em PDF, histórico da análise e orientação para os próximos passos.</p></div>
+            </li>
+          </ol>
+        </section>
+
         <section class="charge-paywall-explainer" aria-labelledby="chargePaywallInfoTitle">
-          <div><p class="eyebrow">Antes de continuar</p><h3 id="chargePaywallInfoTitle">O que você precisa saber</h3></div>
+          <div><p class="eyebrow">Transparência antes de contratar</p><h3 id="chargePaywallInfoTitle">Você continua no controle</h3></div>
           <ul>
-            <li>A Audita mostrará descrição, data, valor, evidência e arquivo de origem de cada ocorrência localizada.</li>
-            <li>Você deverá confirmar se reconhece ou não cada cobrança antes de qualquer cálculo.</li>
             <li>Documentos parciais produzem uma análise limitada ao período enviado; não estimamos meses ausentes.</li>
             <li>Devolução em dobro, indenização e êxito judicial não são automáticos e dependem das provas e da avaliação jurídica.</li>
             <li>Consultas pagas de terceiros, custas, protocolo e representação jurídica não estão incluídos, salvo quando informados expressamente.</li>
@@ -1331,12 +1355,12 @@ if (stage) {
         <section class="charge-paywall-plans" aria-label="Planos Standard">
           <article>
             <div><span>Standard mensal</span><strong>${escapeChargeHtml(monthly.headline)}<small>/mês</small></strong><p>${escapeChargeHtml(monthly.detail)}</p></div>
-            <ul><li>Plataforma e IA Audita</li><li>Análise e simulação Itaú</li><li>Relatório e orientação dos próximos passos</li></ul>
+            <ul><li>Acesso imediato aos achados da análise</li><li>Revisão guiada e cálculo baseado nos anexos</li><li>Relatório técnico em PDF e próximos passos</li><li>Plataforma, chat e IA Audita</li></ul>
             <button type="button" class="secondary-action" data-charge-action="subscribe-standard" data-charge-interval="monthly" ${state.busy ? "disabled" : ""}>${demoMode ? "Ativar demonstração mensal" : "Assinar mensal"}</button>
           </article>
           <article class="recommended">
-            <div><span>Standard anual</span><strong>${escapeChargeHtml(annual.headline)}<small>/mês</small></strong><p>${escapeChargeHtml(annual.detail)}</p></div>
-            <ul><li>Todos os recursos do Standard</li><li>Economia de ${formatChargeCurrency(1200)} por ano</li><li>Suporte de advogado parceiro para o caso Itaú incluído</li></ul>
+            <div><span>Standard anual <em>Melhor custo-benefício</em></span><strong>${escapeChargeHtml(annual.headline)}<small>/mês</small></strong><p>${escapeChargeHtml(annual.detail)}</p></div>
+            <ul><li>Todos os recursos do Standard mensal</li><li>Economia de ${formatChargeCurrency(1200)} por ano</li><li>Suporte de advogado parceiro para o caso Itaú incluído</li></ul>
             <p class="charge-paywall-legal-note">O suporte jurídico não significa garantia de resultado. Representação, protocolo e despesas externas exigem aceite específico quando aplicáveis.</p>
             <button type="button" class="primary-action" data-charge-action="subscribe-standard" data-charge-interval="annual" ${state.busy ? "disabled" : ""}>${demoMode ? "Ativar demonstração anual" : "Assinar anual"}</button>
           </article>

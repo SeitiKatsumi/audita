@@ -362,6 +362,13 @@ test("positive analysis is paywalled before descriptions, values and simulation"
   assert.match(chargeAnalysisJs, /Os detalhes, valores e a simulação permanecem protegidos/);
   assert.match(chargeAnalysisJs, /Standard mensal/);
   assert.match(chargeAnalysisJs, /Standard anual/);
+  assert.match(chargeAnalysisJs, /O que você libera agora/);
+  assert.match(chargeAnalysisJs, /Achados detalhados/);
+  assert.match(chargeAnalysisJs, /Revisão sob seu controle/);
+  assert.match(chargeAnalysisJs, /Cálculo rastreável/);
+  assert.match(chargeAnalysisJs, /Documentação organizada/);
+  assert.match(chargeAnalysisJs, /Acesso imediato aos achados da análise/);
+  assert.match(chargeAnalysisJs, /Melhor custo-benefício/);
   assert.match(chargeAnalysisJs, /Suporte de advogado parceiro para o caso Itaú incluído/);
   assert.match(chargeAnalysisJs, /Ambiente demonstrativo: nenhum valor será cobrado/);
   assert.match(chargeAnalysisJs, /\/api\/billing\/demo-subscription/);
