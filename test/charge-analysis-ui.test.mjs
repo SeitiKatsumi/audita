@@ -266,7 +266,12 @@ test("charge analysis reveals agent messages before moving to the selected path"
   assert.match(chargeAnalysisJs, /continueFromTriage/);
   assert.match(chargeAnalysisJs, /prefers-reduced-motion: reduce/);
   assert.match(chargeAnalysisJs, /function typingDelayFor\(message\)/);
-  assert.match(chargeAnalysisJs, /Math\.min\(1700, Math\.max\(900, visibleLength \* 4\)\)/);
+  assert.match(chargeAnalysisJs, /Math\.min\(2800, Math\.max\(1500, visibleLength \* 8\)\)/);
+  assert.match(chargeAnalysisJs, /await messageDelay\(1000\)/);
+  assert.match(chargeAnalysisJs, /await messageDelay\(1500\)/);
+  assert.match(chargeAnalysisJs, /function startTriageWhenOpened\(\)/);
+  assert.match(chargeAnalysisJs, /document\.body\.dataset\.activePage !== "analise-cobrancas"/);
+  assert.match(appJs, /new CustomEvent\("audita:pagechange"/);
 });
 
 test("charge analysis starts with the two current self-assessment paths", () => {

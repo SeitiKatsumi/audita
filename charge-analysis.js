@@ -539,6 +539,7 @@ if (stage) {
   const progressItems = document.querySelectorAll("[data-charge-progress]");
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   let messageSequenceId = 0;
+  let triageStarted = false;
 
   function renderFaq(query = "") {
     if (!faqList || !faqCount) return;
@@ -692,7 +693,7 @@ if (stage) {
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim().length;
-    return Math.min(1700, Math.max(900, visibleLength * 4));
+    return Math.min(2800, Math.max(1500, visibleLength * 8));
   }
 
   function scrollLatestMessage(container) {
@@ -708,7 +709,7 @@ if (stage) {
     conversation.insertAdjacentHTML("beforeend", messages[0]);
 
     for (const message of messages.slice(1)) {
-      await messageDelay(520);
+      await messageDelay(1000);
       if (sequenceId !== messageSequenceId) return;
       conversation.insertAdjacentHTML("beforeend", typingMessage());
       scrollLatestMessage(conversation);
@@ -729,11 +730,11 @@ if (stage) {
     conversation?.querySelector(".charge-analysis-message.question")?.remove();
     conversation?.insertAdjacentHTML("beforeend", userMessage(reply));
     scrollLatestMessage(conversation);
-    await messageDelay(420);
+    await messageDelay(900);
     if (sequenceId !== messageSequenceId) return;
     conversation?.insertAdjacentHTML("beforeend", typingMessage());
     scrollLatestMessage(conversation);
-    await messageDelay(900);
+    await messageDelay(1500);
     if (sequenceId !== messageSequenceId) return;
     updateState();
     render();
@@ -2064,8 +2065,16 @@ if (stage) {
     else if (state.screen === "result") renderResult();
     else if (state.screen === "recovery") renderRecovery();
     else if (state.screen === "ended") renderEnded();
-    else renderTriage();
+    else if (triageStarted) renderTriage();
+    else stage.innerHTML = '<div class="charge-analysis-conversation" data-charge-conversation></div>';
     setError(state.error);
+  }
+
+  function startTriageWhenOpened() {
+    if (triageStarted || state.screen !== "triage") return;
+    if (document.body.dataset.activePage !== "analise-cobrancas") return;
+    triageStarted = true;
+    render();
   }
 
   function inferDocumentType(file) {
@@ -2489,5 +2498,14 @@ if (stage) {
     renderUpload();
   });
 
+  document.addEventListener("audita:pagechange", (event) => {
+    if (event.detail?.page === "analise-cobrancas") {
+      startTriageWhenOpened();
+      return;
+    }
+    messageSequenceId += 1;
+  });
+
+  window.queueMicrotask(startTriageWhenOpened);
   render();
 }

@@ -1013,6 +1013,10 @@ function setActivePage(page) {
     renderChatWorkspace();
     requestAnimationFrame(() => chatInput?.focus());
   }
+
+  document.dispatchEvent(new CustomEvent("audita:pagechange", {
+    detail: { page: activePage },
+  }));
 }
 
 function moveEcosystemModules() {
