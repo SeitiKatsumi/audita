@@ -78,14 +78,19 @@ test("Audita AI uses the branded neural icon and standard sidebar colors", () =>
 });
 
 test("every Audita surface uses the official logo asset", () => {
-  const surfaces = [indexHtml, plansHtml, appJs, chargeAnalysisJs];
+  const surfaces = [indexHtml, plansHtml, appJs];
   for (const surface of surfaces) {
     assert.doesNotMatch(surface, /audita-logo-white\.svg/);
   }
   assert.match(indexHtml, /assets\/audita-logo-original\.png/);
   assert.match(plansHtml, /assets\/audita-logo-original\.png/);
   assert.match(appJs, /assets\/audita-logo-original\.png/);
-  assert.match(chargeAnalysisJs, /assets\/audita-logo-original\.png/);
+});
+
+test("charge analysis messages use the Audita profile avatar", () => {
+  assert.match(chargeAnalysisJs, /assets\/audita-profile-assistant\.png/);
+  assert.match(stylesCss, /\.charge-analysis-avatar\s*\{[\s\S]*?border-radius:\s*50%/);
+  assert.match(stylesCss, /\.charge-analysis-avatar img\s*\{[\s\S]*?transform:\s*scale\(2\.1\)/);
 });
 
 test("sidebar keeps expanded groups scrollable and collapsed icons centered", () => {

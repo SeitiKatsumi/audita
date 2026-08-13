@@ -648,7 +648,7 @@ if (stage) {
   function assistantAvatar() {
     return `
       <span class="charge-analysis-avatar" aria-hidden="true">
-        <img src="assets/audita-logo-original.png" alt="" />
+        <img src="assets/audita-profile-assistant.png" alt="" />
       </span>
     `;
   }

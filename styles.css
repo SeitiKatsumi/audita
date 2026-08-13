@@ -10748,8 +10748,18 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 .charge-analysis-avatar {
   width: 42px;
   height: 42px;
-  padding: 8px;
-  border-radius: 10px;
+  overflow: hidden;
+  padding: 0;
+  border-color: rgba(49, 247, 143, 0.62);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08), 0 0 20px rgba(49, 247, 143, 0.12);
+}
+
+.charge-analysis-avatar img {
+  display: block;
+  object-fit: cover;
+  transform: scale(2.1);
+  transform-origin: 50% 32%;
 }
 
 .charge-analysis-progress {
@@ -11201,7 +11211,10 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   .charge-analysis-avatar {
     width: 36px;
     height: 36px;
-    padding: 7px;
+  }
+
+  .charge-analysis-avatar {
+    padding: 0;
   }
 
   .charge-analysis-progress {
