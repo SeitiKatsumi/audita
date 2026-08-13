@@ -8101,9 +8101,27 @@ body[data-active-page="chat"] .workspace {
   color: #f1f8ff;
 }
 
-.charge-analysis-date {
-  color: var(--muted);
-  font-size: 0.75rem;
+.charge-analysis-inline-link {
+  display: inline;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  color: var(--aqua);
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(89, 210, 255, 0.52);
+  text-underline-offset: 3px;
+}
+
+.charge-analysis-inline-link:hover,
+.charge-analysis-inline-link:focus-visible {
+  color: var(--lime);
+  text-decoration-color: currentColor;
 }
 
 .charge-analysis-context {
@@ -10833,7 +10851,6 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   margin-top: 10px;
 }
 
-.charge-analysis-date,
 .charge-analysis-choice-hint {
   color: #8fa9bb;
   font-size: 0.76rem;

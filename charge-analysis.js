@@ -885,21 +885,14 @@ if (stage) {
         <button type="button" data-charge-action="not-authorized">
           <strong>Acredito que tenho alguma cobran&ccedil;a indevida no meu cart&atilde;o ou conta Ita&uacute;</strong>
         </button>
-        <button type="button" data-charge-action="authorized">
-          <strong>Acredito que n&atilde;o tenho nenhuma cobran&ccedil;a indevida</strong>
-        </button>
         <button type="button" data-charge-action="verify-statement">
           <strong>N&atilde;o sei, gostaria de mais informa&ccedil;&otilde;es</strong>
-        </button>
-        <button type="button" class="secondary" data-charge-action="lawyer" aria-label="Sou advogado ou advogada e quero auditar o documento de um cliente">
-          <strong>Sou advogado(a)</strong>
         </button>
       </div>
     `;
     const messages = [
       assistantMessage(`
-        <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard e marcas parceiras.</p>
-        <p class="charge-analysis-date">Conte&uacute;do atualizado em julho de 2026</p>
+        <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard e nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais dos 133 tipos hist&oacute;ricos de cart&otilde;es parceiros">133 tipos hist&oacute;ricos de cart&otilde;es de bandeiras parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
       `),
       assistantMessage(`
         <p>Em 2026, o MPMG e o Idec divulgaram um acordo com o Ita&uacute; relacionado a cobran&ccedil;as de seguros ou servi&ccedil;os sem consentimento entre 2011 e 2025.</p>
@@ -2299,7 +2292,14 @@ if (stage) {
     const action = button.dataset.chargeAction;
     state.error = "";
 
-    if (action === "not-authorized") {
+    if (action === "open-brand-references") {
+      event.preventDefault();
+      state.route = "consumer";
+      state.authorizationAnswer = "uncertain";
+      state.screen = "brands";
+      render();
+      return;
+    } else if (action === "not-authorized") {
       continueFromTriage("Acredito que tenho alguma cobrança indevida no meu cartão ou conta Itaú.", () => {
         state.route = "consumer";
         state.authorizationAnswer = "denied";
