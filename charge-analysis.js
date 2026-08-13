@@ -533,9 +533,6 @@ if (stage) {
   const faqNotice = document.querySelector("#chargeFaqNotice");
   const status = document.querySelector("#chargeAnalysisStatus");
   const errorBox = document.querySelector("#chargeAnalysisError");
-  const progressPercent = document.querySelector("#chargeAnalysisProgressPercent");
-  const progressMeter = document.querySelector("#chargeAnalysisProgressMeter");
-  const progressMessage = document.querySelector("#chargeAnalysisProgressMessage");
   const progressItems = document.querySelectorAll("[data-charge-progress]");
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   let messageSequenceId = 0;
@@ -860,12 +857,6 @@ if (stage) {
     if (status) {
       status.textContent = `${snapshot.percent}% concluído · Etapa ${currentIndex + 1} de ${order.length} · ${labels[progressState]}. ${snapshot.message}`;
     }
-    if (progressPercent) progressPercent.textContent = `${snapshot.percent}%`;
-    if (progressMeter) {
-      progressMeter.value = snapshot.percent;
-      progressMeter.setAttribute("aria-valuenow", String(snapshot.percent));
-    }
-    if (progressMessage) progressMessage.textContent = snapshot.message;
     if (shell) {
       shell.dataset.flowStage = progressState;
       shell.dataset.evidenceCoverage = snapshot.evidenceCoverage;
@@ -889,20 +880,6 @@ if (stage) {
       assistantMessage(`
         <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard ou nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras de cart&otilde;es de parceiras">133 bandeiras de cart&otilde;es de parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
         <p class="charge-analysis-intro-question"><strong>Voc&ecirc; possui ou possuiu algum cart&atilde;o dessas bandeiras?</strong></p>
-        <details class="charge-analysis-disclosure charge-analysis-insurance-details">
-          <summary>
-            <span>Seguros e servi&ccedil;os considerados</span>
-            <img class="charge-analysis-dropdown-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-          </summary>
-          <div class="charge-analysis-insurance-list">
-            <p><strong>Seguro Perda e Roubo / Cart&atilde;o Protegido / Prote&ccedil;&atilde;o Premiada:</strong> cobertura para transa&ccedil;&otilde;es sob coa&ccedil;&atilde;o ou furto do cart&atilde;o.</p>
-            <p><strong>Seguro Bolsa Protegida:</strong> cobertura de pertences levados junto com o cart&atilde;o.</p>
-            <p><strong>Seguro Prote&ccedil;&atilde;o Financeira / Perda de Renda:</strong> quita&ccedil;&atilde;o tempor&aacute;ria de faturas em caso de demiss&atilde;o ou incapacidade.</p>
-            <p><strong>Seguro Acidentes Pessoais / Vida Associado:</strong> ap&oacute;lices vinculadas diretamente ao lan&ccedil;amento autom&aacute;tico na fatura/conta.</p>
-            <p><strong>Seguro Prestamista:</strong> vinculado a contratos de empr&eacute;stimo pessoal, consignado ou financiamento de ve&iacute;culo.</p>
-          </div>
-        </details>
-        <p class="charge-analysis-choice-hint">Se n&atilde;o tiver certeza, consulte todas as bandeiras antes de continuar.</p>
         ${responseButtons}
       `, "Audita", "charge-analysis-intro-message"),
     ];
@@ -1014,27 +991,52 @@ if (stage) {
     return "Possuo ou já possuí cartão Itaú ou de marca parceira.";
   }
 
-  function renderDocumentAvailability() {
-    stage.innerHTML = `
+  function earlyJourneyMarkup({ documentChoice = false, documentSelected = false } = {}) {
+    const isCompleteHistory = state.documentAvailability === "complete";
+    const documentReply = isCompleteHistory
+      ? "Tenho todos ou a maior parte dos extratos."
+      : "Tenho apenas alguns documentos ou um print recente.";
+    const documentPrompt = isCompleteHistory
+      ? "Anexe todas as faturas ou extratos dispon&iacute;veis para uma an&aacute;lise documental mais completa."
+      : "Envie uma ou mais faturas, extratos ou prints recentes para localizar a poss&iacute;vel cobran&ccedil;a.";
+    const documentDetail = isCompleteHistory
+      ? "Os documentos ser&atilde;o analisados individualmente e reunidos em uma &uacute;nica vis&atilde;o, preservando a origem de cada lan&ccedil;amento."
+      : "A triagem considerar&aacute; somente os arquivos enviados. Documentos parciais n&atilde;o comprovam integralmente o per&iacute;odo e n&atilde;o ser&atilde;o apresentados como hist&oacute;rico completo.";
+    const routeCopy = state.route === "lawyer"
+      ? "Voc&ecirc; est&aacute; auditando para um cliente. Confirme que possui autoriza&ccedil;&atilde;o para processar o documento."
+      : state.selectedBrand
+        ? `Marca informada: ${escapeChargeHtml(state.selectedBrand)}.`
+        : "A pr&oacute;pria fatura ser&aacute; usada para confirmar o emissor e os lan&ccedil;amentos.";
+
+    return `
       <div class="charge-analysis-conversation compact" data-charge-conversation>
+        ${assistantMessage(`
+          <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard ou nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir as refer&ecirc;ncias de bandeiras parceiras">133 bandeiras de cart&otilde;es de parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
+        `, "Audita", "charge-analysis-intro-message")}
         ${userMessage(routeIdentityMessage())}
         ${assistantMessage(`
-          <p><strong>Você possui as faturas ou os extratos de todo o período em que acredita ter recebido essa cobrança?</strong></p>
-          <p class="charge-analysis-choice-hint">Documentos parciais permitem uma triagem inicial, mas não comprovam integralmente todo o período.</p>
-          <div class="charge-analysis-actions charge-document-actions" aria-label="Disponibilidade dos extratos">
-            <button type="button" data-charge-action="documents-complete">
-              <strong>Tenho todos ou a maior parte</strong>
-            </button>
-            <button type="button" data-charge-action="documents-partial">
-              <strong>Tenho apenas alguns ou um print recente</strong>
-            </button>
-            <button type="button" class="secondary" data-charge-action="documents-none">
-              <strong>Não tenho nenhum extrato</strong>
-            </button>
-          </div>
-        `, "Disponibilidade dos documentos", "question")}
+          <p><strong>Voc&ecirc; possui as faturas ou os extratos de todo o per&iacute;odo em que acredita ter recebido essa cobran&ccedil;a?</strong></p>
+          <p class="charge-analysis-choice-hint">Documentos parciais permitem uma triagem inicial, mas n&atilde;o comprovam integralmente todo o per&iacute;odo.</p>
+          ${documentChoice ? `
+            <div class="charge-analysis-actions charge-document-actions" aria-label="Disponibilidade dos extratos">
+              <button type="button" data-charge-action="documents-complete"><strong>Tenho todos ou a maior parte</strong></button>
+              <button type="button" data-charge-action="documents-partial"><strong>Tenho apenas alguns ou um print recente</strong></button>
+              <button type="button" class="secondary" data-charge-action="documents-none"><strong>N&atilde;o tenho nenhum extrato</strong></button>
+            </div>
+          ` : ""}
+        `, "Disponibilidade dos documentos", documentChoice ? "question" : "")}
+        ${documentSelected ? userMessage(documentReply) : ""}
+        ${documentSelected ? assistantMessage(`
+          <p><strong>${documentPrompt}</strong></p>
+          <p>${documentDetail}</p>
+          <p>${routeCopy}</p>
+        `, "Audita &middot; An&aacute;lise", "question") : ""}
       </div>
     `;
+  }
+
+  function renderDocumentAvailability() {
+    stage.innerHTML = earlyJourneyMarkup({ documentChoice: true });
   }
 
   function resetDirectedSearch() {
@@ -1123,12 +1125,6 @@ if (stage) {
   }
 
   function renderUpload() {
-    const routeCopy =
-      state.route === "lawyer"
-        ? "Você está auditando para um cliente. Confirme que possui autorização para processar o documento."
-        : state.selectedBrand
-          ? `Marca informada: ${escapeChargeHtml(state.selectedBrand)}.`
-          : "A própria fatura será usada para confirmar o emissor e os lançamentos.";
     const files = state.selectedFiles.length
       ? state.selectedFiles
       : state.selectedFile
@@ -1140,27 +1136,9 @@ if (stage) {
         ? `${files.length} documentos selecionados`
         : "";
     const isCompleteHistory = state.documentAvailability === "complete";
-    const documentPrompt = isCompleteHistory
-      ? "Anexe todas as faturas ou extratos disponíveis para uma análise documental mais completa."
-      : "Envie uma ou mais faturas, extratos ou prints recentes para localizar a possível cobrança.";
-    const documentDetail = isCompleteHistory
-      ? "Os documentos serão analisados individualmente e reunidos em uma única visão, preservando a origem de cada lançamento."
-      : "A triagem considerará somente os arquivos enviados. Documentos parciais não comprovam integralmente o período e não serão apresentados como histórico completo.";
 
     stage.innerHTML = `
-      <div class="charge-analysis-conversation compact">
-        ${userMessage(
-          isCompleteHistory
-            ? "Tenho todos ou a maior parte dos extratos."
-            : "Tenho apenas alguns documentos ou um print recente.",
-        )}
-        ${assistantMessage(`
-          <p><strong>${documentPrompt}</strong></p>
-          <p>${documentDetail}</p>
-          <p>${routeCopy}</p>
-        `, "Audita · Análise", "question")}
-      </div>
-
+      ${earlyJourneyMarkup({ documentSelected: true })}
       <form class="charge-upload-panel" id="chargeAnalysisUploadForm">
         <input
           class="hidden"
@@ -1216,6 +1194,7 @@ if (stage) {
   function renderAnalyzing() {
     const files = state.selectedFiles.length ? state.selectedFiles : [state.selectedFile].filter(Boolean);
     stage.innerHTML = `
+      ${earlyJourneyMarkup({ documentSelected: true })}
       <div class="charge-analysis-processing" role="status">
         <span class="charge-analysis-mark" aria-hidden="true">
           <img src="assets/audita-logo-original.png" alt="" />

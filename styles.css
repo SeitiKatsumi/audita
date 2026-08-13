@@ -11491,109 +11491,63 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 
   .charge-analysis-workspace {
     display: grid;
-    grid-template-columns: minmax(210px, 238px) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     min-height: calc(100dvh - 100px);
-    align-items: stretch;
-    gap: clamp(32px, 3vw, 52px);
+    gap: 22px;
   }
 
-  .charge-progress-rail {
+  .charge-analysis-workspace > .charge-module-progress {
     position: sticky;
-    top: 24px;
+    z-index: 5;
+    top: 0;
+    left: auto;
     display: grid;
-    height: calc(100dvh - 100px);
-    min-height: 560px;
-    grid-template-rows: auto minmax(0, 1fr);
-    align-self: start;
-    min-width: 0;
-    gap: 12px;
-    padding: 16px;
-    border: 1px solid rgba(73, 169, 255, 0.2);
-    border-radius: 8px;
-    background: rgba(7, 26, 43, 0.78);
+    width: 100%;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0;
+    padding: 12px 0;
+    margin: 0;
+    border-bottom: 1px solid rgba(73, 169, 255, 0.16);
+    background: rgba(3, 17, 31, 0.94);
+    transform: none;
+  }
+
+  .charge-analysis-workspace > .charge-module-progress li,
+  .charge-analysis-workspace > .charge-module-progress li + li {
+    min-height: 34px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 0;
+  }
+
+  .charge-analysis-workspace > .charge-module-progress li:not(:last-child)::after,
+  .charge-analysis-workspace > .charge-module-progress li.active:not(:last-child)::after {
+    z-index: 0;
+    top: 14px;
+    left: 28px;
+    width: calc(100% - 20px);
+    height: 1px;
+  }
+
+  .charge-analysis-workspace > .charge-module-progress li > span {
+    z-index: 1;
+    width: 28px;
+    height: 28px;
+  }
+
+  .charge-analysis-workspace > .charge-module-progress li div {
+    gap: 2px;
+    padding-top: 0 !important;
+  }
+
+  .charge-analysis-workspace > .charge-module-progress li strong {
+    font-size: 0.75rem;
   }
 
   .charge-analysis-content {
     display: block;
     min-width: 0;
-  }
-
-  .charge-progress-rail .charge-progress-summary {
-    width: 100%;
-    grid-template-columns: 1fr;
-    align-items: start;
-    gap: 10px;
-    padding: 0 0 16px;
-    margin: 0;
-    border: 0;
-    border-bottom: 1px solid rgba(73, 169, 255, 0.16);
-    border-radius: 0;
-    background: transparent;
-  }
-
-  .charge-progress-rail .charge-progress-summary > div {
-    display: grid;
-    align-items: start;
-    gap: 5px;
-  }
-
-  .charge-progress-rail .charge-progress-summary strong {
-    font-size: 1.75rem;
-    line-height: 1;
-  }
-
-  .charge-progress-rail .charge-progress-summary small {
-    grid-column: auto;
-  }
-
-  .charge-progress-rail .charge-module-progress {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(7, minmax(58px, 1fr));
-    gap: 0;
-    padding: 0;
-    margin: 0;
-  }
-
-  .charge-progress-rail .charge-module-progress li,
-  .charge-progress-rail .charge-module-progress li + li {
-    min-height: 58px;
-    grid-template-columns: 30px minmax(0, 1fr);
-    align-items: start;
-    gap: 10px;
-    padding: 8px 0;
-  }
-
-  .charge-progress-rail .charge-module-progress li:not(:last-child)::after,
-  .charge-progress-rail .charge-module-progress li.active:not(:last-child)::after {
-    z-index: 0;
-    top: 38px;
-    left: 14px;
-    width: 1px;
-    height: calc(100% - 18px);
-  }
-
-  .charge-progress-rail .charge-module-progress li > span {
-    z-index: 1;
-    width: 30px;
-    height: 30px;
-  }
-
-  .charge-progress-rail .charge-module-progress li div {
-    gap: 3px;
-    padding-top: 1px !important;
-  }
-
-  .charge-progress-rail .charge-module-progress li strong {
-    font-size: 0.78rem;
-  }
-
-  .charge-progress-rail .charge-module-progress li small {
-    display: block;
-    color: #7694a8;
-    font-size: 0.67rem;
-    line-height: 1.3;
   }
 
   .charge-analysis-content .charge-analysis-conversation,

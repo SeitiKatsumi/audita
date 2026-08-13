@@ -154,7 +154,7 @@ test("charge analysis exposes a guided flow without an open chat input", () => {
   assert.doesNotMatch(moduleMarkup, /textarea|contenteditable|chatInput/);
 });
 
-test("charge analysis uses one module-wide progress rail from authorization to tribunal", () => {
+test("charge analysis keeps the module-wide steps horizontal from authorization to tribunal", () => {
   const progressMarkup = indexHtml.match(
     /<ol class="charge-analysis-progress charge-module-progress"[\s\S]*?<\/ol>/,
   )?.[0];
@@ -167,29 +167,14 @@ test("charge analysis uses one module-wide progress rail from authorization to t
   assert.match(progressMarkup, /data-charge-progress="recovery"/);
   assert.match(progressMarkup, /data-charge-progress="report"/);
   assert.match(progressMarkup, /data-charge-progress="tribunal"/);
-  assert.match(indexHtml, /id="chargeAnalysisProgressPercent">0%/);
-  assert.match(indexHtml, /id="chargeAnalysisProgressMeter" max="100" value="0"/);
-  assert.match(indexHtml, /O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano/);
   assert.match(indexHtml, /class="charge-analysis-workspace"/);
-  assert.match(indexHtml, /class="charge-progress-rail" aria-label="Andamento da an&aacute;lise"/);
   assert.match(indexHtml, /class="charge-analysis-content"/);
-  assert.ok(
-    indexHtml.indexOf('class="charge-progress-summary"') <
-      indexHtml.indexOf('id="chargeAnalysisProgress"'),
-  );
+  assert.doesNotMatch(indexHtml, /chargeAnalysisProgressPercent|chargeAnalysisProgressMeter|charge-progress-summary|charge-progress-rail/);
   assert.match(chargeAnalysisJs, /buildChargeProgressSnapshot\(state\)/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-recovery-progress/);
   assert.match(stylesCss, /\.charge-module-progress\s*\{/);
-  assert.match(stylesCss, /\.charge-progress-summary\s*\{/);
-  assert.match(stylesCss, /@media \(min-width: 1081px\)[\s\S]*?\.charge-analysis-workspace\s*\{[\s\S]*?grid-template-columns: minmax\(210px, 238px\) minmax\(0, 1fr\)/);
-  assert.match(
-    stylesCss,
-    /\.charge-progress-rail\s*\{[\s\S]*?position: sticky[\s\S]*?height: calc\(100dvh - 100px\)[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\)/,
-  );
-  assert.match(
-    stylesCss,
-    /\.charge-progress-rail \.charge-module-progress\s*\{[\s\S]*?grid-template-rows: repeat\(7, minmax\(58px, 1fr\)\)/,
-  );
+  assert.match(stylesCss, /\.charge-analysis-workspace > \.charge-module-progress\s*\{/);
+  assert.match(stylesCss, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
 });
 
 test("charge analysis exposes a searchable accessible FAQ dialog", () => {
@@ -285,8 +270,16 @@ test("charge analysis starts with the two current self-assessment paths", () => 
   assert.match(chargeAnalysisJs, /N&atilde;o sei, quais s&atilde;o todas as bandeiras/);
   assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="authorized"/);
   assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="lawyer"/);
-  assert.match(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
-  assert.match(chargeAnalysisJs, /Seguro Prestamista/);
+  assert.doesNotMatch(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
+  assert.doesNotMatch(chargeAnalysisJs, /Seguro Prestamista/);
+});
+
+test("charge analysis keeps identification, attachments and analysis in one continuous journey", () => {
+  assert.match(chargeAnalysisJs, /function earlyJourneyMarkup\(/);
+  assert.match(chargeAnalysisJs, /stage\.innerHTML = earlyJourneyMarkup\(\{ documentChoice: true \}\)/);
+  assert.match(chargeAnalysisJs, /\$\{earlyJourneyMarkup\(\{ documentSelected: true \}\)\}/);
+  assert.match(chargeAnalysisJs, /function renderReview\(\)/);
+  assert.match(chargeAnalysisJs, /state\.screen = lockedPositiveResult \? "paywall" : "review"/);
 });
 
 test("charge analysis introduction links the historical card scope to the searchable references", () => {
@@ -373,9 +366,9 @@ test("charge analysis removes the agreement context from the triage opening", ()
   assert.doesNotMatch(chargeAnalysisJs, /youtube-nocookie\.com\/embed\/rzxDS0cbdlc/);
 });
 
-test("charge analysis keeps the insurance context collapsed by default", () => {
-  assert.match(chargeAnalysisJs, /<details class="charge-analysis-disclosure charge-analysis-insurance-details">/);
-  assert.doesNotMatch(chargeAnalysisJs, /<details class="[^"]*charge-analysis-insurance-details[^"]*" open>/);
+test("charge analysis keeps the initial triage focused on the card question", () => {
+  assert.doesNotMatch(chargeAnalysisJs, /Seguros e servi&ccedil;os considerados/);
+  assert.doesNotMatch(chargeAnalysisJs, /charge-analysis-insurance-details/);
 });
 
 test("charge analysis separates complete, partial and no-document journeys", () => {
