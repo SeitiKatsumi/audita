@@ -3,7 +3,6 @@ const ctx = canvas?.getContext("2d");
 const riskScore = document.querySelector("#riskScore");
 const assistantText = document.querySelector("#assistantText");
 const reportButton = document.querySelector("#generateReport");
-const metricCards = document.querySelectorAll(".metrics article");
 const signalList = document.querySelector(".signal-list");
 const loginScreen = document.querySelector("#loginScreen");
 const loginForm = document.querySelector("#loginForm");
@@ -4911,21 +4910,6 @@ renderChatWorkspace();
 syncChatBrowserUi();
 
 function renderDashboard(data) {
-  const metrics = data.metrics || {};
-  const values = [
-    formatNumber(metrics.consultationsToday || 0),
-    formatNumber(metrics.connectedSources || 0),
-    formatNumber(metrics.criticalAlerts || 0),
-    metrics.averageAnalysisTime || "0s",
-  ];
-
-  metricCards.forEach((card, index) => {
-    const value = card.querySelector("strong");
-    if (value && values[index]) {
-      value.textContent = values[index];
-    }
-  });
-
   if (Array.isArray(data.signals) && data.signals.length > 0) {
     signalList.innerHTML = data.signals
       .map(

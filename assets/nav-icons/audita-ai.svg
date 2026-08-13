@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <title>Audita IA</title>
+  <g fill="currentColor" transform="translate(2.5 9.5) scale(.034)">
+    <circle cx="91" cy="490" r="74" />
+    <path d="M121 342 280 18l227 467c36 74 98 106 179 82 93-27 125-113 99-221-26-110-109-203-246-203H432l49 84h68c67 0 110 37 127 99 19 70-7 121-64 133-45 10-77-10-99-56L314 0 121 342z" />
+    <path d="M208 463c17-59-8-101-80-158l80-145 103 211-103 92z" />
+  </g>
+  <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17.5 7h4.2l2.5-2.5M21.7 7l3.6 3.2" />
+    <circle cx="24.5" cy="4.2" r="1.45" fill="currentColor" stroke="none" />
+    <circle cx="26" cy="10.8" r="1.45" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="7" r="1.35" fill="currentColor" stroke="none" />
+  </g>
+</svg>

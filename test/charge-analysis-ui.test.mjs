@@ -65,6 +65,18 @@ test("sidebar keeps charge analysis at the main level and uses the selected adap
   assert.match(stylesCss, /body\.sidebar-collapsed \.nav-label\s*\{[\s\S]*?position:\s*absolute/);
 });
 
+test("Audita AI uses the branded neural icon and standard sidebar colors", () => {
+  const aiLink = indexHtml.match(
+    /<a class="nav-ai" href="\/chat"[\s\S]*?<\/a>/,
+  )?.[0];
+
+  assert.ok(aiLink);
+  assert.match(aiLink, /assets\/nav-icons\/audita-ai\.svg/);
+  assert.doesNotMatch(aiLink, /square-rounded-letter-a\.svg/);
+  assert.doesNotMatch(stylesCss, /\.nav-list a\.nav-ai \.nav-icon/);
+  assert.doesNotMatch(stylesCss, /\.nav-list a\.nav-ai\s*\{/);
+});
+
 test("every Audita surface uses the official logo asset", () => {
   const surfaces = [indexHtml, plansHtml, appJs, chargeAnalysisJs];
   for (const surface of surfaces) {
@@ -98,6 +110,24 @@ test("sidebar stays in compact desktop mode until the true mobile breakpoint", (
   assert.doesNotMatch(appJs, /max-width: 1120px/);
 });
 
+test("home exposes the two real product modules without mock indicators", () => {
+  const homeStart = indexHtml.indexOf('<section class="home-hero"');
+  const homeEnd = indexHtml.indexOf('<section class="seller-analysis-page"', homeStart);
+  const homeMarkup = indexHtml.slice(homeStart, homeEnd);
+
+  assert.ok(homeStart >= 0 && homeEnd > homeStart);
+  assert.equal((homeMarkup.match(/class="home-module-action"/g) || []).length, 2);
+  assert.match(homeMarkup, /href="#analise-cobrancas"/);
+  assert.match(homeMarkup, /Cobran&ccedil;as indevidas/);
+  assert.match(homeMarkup, /href="#analise-vendedor"/);
+  assert.match(homeMarkup, /Compra e venda de im&oacute;veis/);
+  assert.doesNotMatch(homeMarkup, /Consultas hoje|Fontes conectadas|Alertas cr&iacute;ticos|Tempo m&eacute;dio/);
+  assert.doesNotMatch(homeMarkup, /home-hero-features|class="metrics"/);
+  assert.match(stylesCss, /\.home-module-actions\s*\{/);
+  assert.match(stylesCss, /\.home-module-action:hover/);
+  assert.doesNotMatch(appJs, /metricCards|consultationsToday|connectedSources|criticalAlerts/);
+});
+
 test("charge analysis exposes a guided flow without an open chat input", () => {
   const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page"');
   const moduleEnd = indexHtml.indexOf('<section class="assistant-workbench"', moduleStart);
@@ -127,6 +157,9 @@ test("charge analysis uses one module-wide progress rail from authorization to t
   assert.match(indexHtml, /id="chargeAnalysisProgressPercent">0%/);
   assert.match(indexHtml, /id="chargeAnalysisProgressMeter" max="100" value="0"/);
   assert.match(indexHtml, /O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano/);
+  assert.match(indexHtml, /class="charge-analysis-workspace"/);
+  assert.match(indexHtml, /class="charge-progress-rail" aria-label="Andamento da an&aacute;lise"/);
+  assert.match(indexHtml, /class="charge-analysis-content"/);
   assert.ok(
     indexHtml.indexOf('class="charge-progress-summary"') <
       indexHtml.indexOf('id="chargeAnalysisProgress"'),
@@ -135,6 +168,8 @@ test("charge analysis uses one module-wide progress rail from authorization to t
   assert.doesNotMatch(chargeAnalysisJs, /charge-recovery-progress/);
   assert.match(stylesCss, /\.charge-module-progress\s*\{/);
   assert.match(stylesCss, /\.charge-progress-summary\s*\{/);
+  assert.match(stylesCss, /@media \(min-width: 1081px\)[\s\S]*?\.charge-analysis-workspace\s*\{[\s\S]*?grid-template-columns: minmax\(210px, 238px\) minmax\(0, 1fr\)/);
+  assert.match(stylesCss, /\.charge-progress-rail\s*\{[\s\S]*?position: sticky/);
 });
 
 test("charge analysis exposes a searchable accessible FAQ dialog", () => {
@@ -228,6 +263,13 @@ test("charge analysis starts with the four supported self-assessment paths", () 
   assert.match(chargeAnalysisJs, /<strong>Sou advogado\(a\)<\/strong>/);
   assert.match(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
   assert.match(chargeAnalysisJs, /Seguro Prestamista/);
+});
+
+test("the initial question aligns with the standard assistant message width", () => {
+  assert.match(
+    stylesCss,
+    /\.charge-analysis-message\.question \.charge-analysis-bubble\s*\{[\s\S]*?max-width:\s*590px/,
+  );
 });
 
 test("the information path opens the searchable reference list before documents", () => {

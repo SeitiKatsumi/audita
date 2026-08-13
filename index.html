@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Audita | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260813-paywall-benefits-1" />
+    <link rel="stylesheet" href="styles.css?v=20260813-audita-ai-icon-1" />
   </head>
   <body>
     <section class="login-screen hidden" id="loginScreen" aria-label="Login Audita">
@@ -68,7 +68,7 @@
             <span class="nav-label">Home</span>
           </a>
           <a class="nav-ai" href="/chat" data-app-route="chat">
-            <img class="nav-icon" src="assets/nav-icons/square-rounded-letter-a.svg" alt="" aria-hidden="true" />
+            <img class="nav-icon" src="assets/nav-icons/audita-ai.svg" alt="" aria-hidden="true" />
             <span class="nav-label">Audita IA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
           </a>
@@ -350,37 +350,30 @@
                 <em>an&aacute;lise inteligente</em>, laudos completos e uma linguagem simples para
                 <em>decis&otilde;es mais seguras</em>.
               </h2>
-              <div class="home-hero-features" aria-label="Recursos principais">
-                <span><i aria-hidden="true">□</i>Certid&otilde;es e documenta&ccedil;&otilde;es</span>
-                <span><i aria-hidden="true">◇</i>An&aacute;lise inteligente</span>
-                <span><i aria-hidden="true">✓</i>Laudos completos</span>
-                <span><i aria-hidden="true">○</i>Linguagem simples</span>
-              </div>
+              <nav class="home-module-actions" aria-label="M&oacute;dulos dispon&iacute;veis">
+                <a class="home-module-action" href="#analise-cobrancas">
+                  <span class="home-module-icon" aria-hidden="true">
+                    <img src="assets/nav-icons/file-dollar.svg" alt="" />
+                  </span>
+                  <span class="home-module-copy">
+                    <strong>Cobran&ccedil;as indevidas</strong>
+                    <small>Analise documentos e organize os pr&oacute;ximos passos.</small>
+                  </span>
+                  <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+                </a>
+                <a class="home-module-action" href="#analise-vendedor">
+                  <span class="home-module-icon" aria-hidden="true">
+                    <img src="assets/nav-icons/building.svg" alt="" />
+                  </span>
+                  <span class="home-module-copy">
+                    <strong>Compra e venda de im&oacute;veis</strong>
+                    <small>Consulte as certid&otilde;es do vendedor em um s&oacute; lugar.</small>
+                  </span>
+                  <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+                </a>
+              </nav>
             </div>
             <canvas id="signalCanvas" width="760" height="360" aria-label="Visualiza&ccedil;&atilde;o de sinais anal&iacute;ticos"></canvas>
-          </article>
-        </section>
-
-        <section class="metrics" aria-label="Indicadores" data-page="home">
-          <article>
-            <small>Consultas hoje</small>
-            <strong>1.284</strong>
-            <span>+18% vs. ontem</span>
-          </article>
-          <article>
-            <small>Fontes conectadas</small>
-            <strong>37</strong>
-            <span>Judicial, fiscal, im&oacute;veis e APIs</span>
-          </article>
-          <article>
-            <small>Alertas cr&iacute;ticos</small>
-            <strong>9</strong>
-            <span>3 exigem revis&atilde;o humana</span>
-          </article>
-          <article>
-            <small>Tempo m&eacute;dio</small>
-            <strong>4.8s</strong>
-            <span>An&aacute;lise preliminar</span>
           </article>
         </section>
 
@@ -479,64 +472,71 @@
               </div>
             </header>
 
-            <section class="charge-progress-summary" aria-label="Progresso do processo">
-              <div>
-                <strong id="chargeAnalysisProgressPercent">0%</strong>
-                <span id="chargeAnalysisProgressMessage">Responda &agrave; triagem inicial para come&ccedil;ar.</span>
-              </div>
-              <progress id="chargeAnalysisProgressMeter" max="100" value="0" aria-label="Percentual conclu&iacute;do">0%</progress>
-              <small>O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano.</small>
-            </section>
-            <ol class="charge-analysis-progress charge-module-progress" id="chargeAnalysisProgress" aria-label="Etapas do processo">
-              <li class="active" data-charge-progress="authorization" aria-current="step">
-                <span aria-hidden="true">1</span>
-                <div><strong>Identifica&ccedil;&atilde;o</strong><small>Triagem inicial</small></div>
-              </li>
-              <li class="locked" data-charge-progress="statements">
-                <span aria-hidden="true">2</span>
-                <div><strong>Anexos</strong><small>Documentos enviados</small></div>
-              </li>
-              <li class="locked" data-charge-progress="analysis">
-                <span aria-hidden="true">3</span>
-                <div><strong>An&aacute;lise</strong><small>Documento ou c&aacute;lculo</small></div>
-              </li>
-              <li class="locked" data-charge-progress="result">
-                <span aria-hidden="true">4</span>
-                <div><strong>Revis&atilde;o</strong><small>Confirmar ocorr&ecirc;ncias</small></div>
-              </li>
-              <li class="locked" data-charge-progress="recovery">
-                <span aria-hidden="true">5</span>
-                <div><strong>C&aacute;lculo</strong><small>Somente valores documentados</small></div>
-              </li>
-              <li class="locked" data-charge-progress="report">
-                <span aria-hidden="true">6</span>
-                <div><strong>Documento</strong><small>Revisar e gerar PDF</small></div>
-              </li>
-              <li class="locked" data-charge-progress="tribunal">
-                <span aria-hidden="true">7</span>
-                <div><strong>Protocolo</strong><small>Conclus&atilde;o humana</small></div>
-              </li>
-            </ol>
-            <span class="charge-analysis-status" id="chargeAnalysisStatus">0% conclu&iacute;do &middot; Etapa 1 de 7 &middot; Identifica&ccedil;&atilde;o</span>
+            <div class="charge-analysis-workspace">
+              <aside class="charge-progress-rail" aria-label="Andamento da an&aacute;lise">
+                <section class="charge-progress-summary" aria-label="Progresso do processo">
+                  <div>
+                    <strong id="chargeAnalysisProgressPercent">0%</strong>
+                    <span id="chargeAnalysisProgressMessage">Responda &agrave; triagem inicial para come&ccedil;ar.</span>
+                  </div>
+                  <progress id="chargeAnalysisProgressMeter" max="100" value="0" aria-label="Percentual conclu&iacute;do">0%</progress>
+                  <small>O processo s&oacute; chega a 100% ap&oacute;s o protocolo humano.</small>
+                </section>
+                <ol class="charge-analysis-progress charge-module-progress" id="chargeAnalysisProgress" aria-label="Etapas do processo">
+                  <li class="active" data-charge-progress="authorization" aria-current="step">
+                    <span aria-hidden="true">1</span>
+                    <div><strong>Identifica&ccedil;&atilde;o</strong><small>Triagem inicial</small></div>
+                  </li>
+                  <li class="locked" data-charge-progress="statements">
+                    <span aria-hidden="true">2</span>
+                    <div><strong>Anexos</strong><small>Documentos enviados</small></div>
+                  </li>
+                  <li class="locked" data-charge-progress="analysis">
+                    <span aria-hidden="true">3</span>
+                    <div><strong>An&aacute;lise</strong><small>Documento ou c&aacute;lculo</small></div>
+                  </li>
+                  <li class="locked" data-charge-progress="result">
+                    <span aria-hidden="true">4</span>
+                    <div><strong>Revis&atilde;o</strong><small>Confirmar ocorr&ecirc;ncias</small></div>
+                  </li>
+                  <li class="locked" data-charge-progress="recovery">
+                    <span aria-hidden="true">5</span>
+                    <div><strong>C&aacute;lculo</strong><small>Somente valores documentados</small></div>
+                  </li>
+                  <li class="locked" data-charge-progress="report">
+                    <span aria-hidden="true">6</span>
+                    <div><strong>Documento</strong><small>Revisar e gerar PDF</small></div>
+                  </li>
+                  <li class="locked" data-charge-progress="tribunal">
+                    <span aria-hidden="true">7</span>
+                    <div><strong>Protocolo</strong><small>Conclus&atilde;o humana</small></div>
+                  </li>
+                </ol>
+              </aside>
 
-            <main
-              class="charge-analysis-stage"
-              id="chargeAnalysisStage"
-              aria-label="Conversa guiada para an&aacute;lise de cobran&ccedil;as"
-              aria-live="polite"
-            >
-              <div class="charge-analysis-message assistant">
-                <span class="charge-analysis-avatar" aria-hidden="true">
-                  <img src="assets/audita-logo-original.png" alt="" />
-                </span>
-                <div class="charge-analysis-bubble">
-                  <small>Audita &middot; Triagem guiada</small>
-                  <p>Carregando a primeira etapa&hellip;</p>
-                </div>
-              </div>
-            </main>
+              <div class="charge-analysis-content">
+                <span class="charge-analysis-status" id="chargeAnalysisStatus">0% conclu&iacute;do &middot; Etapa 1 de 7 &middot; Identifica&ccedil;&atilde;o</span>
 
-            <p class="charge-analysis-error hidden" id="chargeAnalysisError" role="alert"></p>
+                <main
+                  class="charge-analysis-stage"
+                  id="chargeAnalysisStage"
+                  aria-label="Conversa guiada para an&aacute;lise de cobran&ccedil;as"
+                  aria-live="polite"
+                >
+                  <div class="charge-analysis-message assistant">
+                    <span class="charge-analysis-avatar" aria-hidden="true">
+                      <img src="assets/audita-logo-original.png" alt="" />
+                    </span>
+                    <div class="charge-analysis-bubble">
+                      <small>Audita &middot; Triagem guiada</small>
+                      <p>Carregando a primeira etapa&hellip;</p>
+                    </div>
+                  </div>
+                </main>
+
+                <p class="charge-analysis-error hidden" id="chargeAnalysisError" role="alert"></p>
+              </div>
+            </div>
           </div>
 
           <dialog class="charge-faq-dialog" id="chargeAnalysisFaqDialog" aria-labelledby="chargeFaqTitle">
@@ -1866,7 +1866,7 @@
     </div>
 
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
-    <script type="module" src="charge-analysis.js?v=20260813-paywall-benefits-1"></script>
+    <script type="module" src="charge-analysis.js?v=20260813-home-modules-1"></script>
     <script type="module" src="app.js?v=20260807-desktop-nav-1"></script>
   </body>
 </html>
