@@ -150,12 +150,6 @@ export function mergeChargeAnalysisFiles(currentFiles = [], incomingFiles = []) 
   return [...uniqueFiles.values()];
 }
 
-const OFFICIAL_CONTEXT_URL =
-  "https://www.mpmg.mp.br/portal/menu/comunicacao/noticias/acordo-do-procon-mpmg-com-o-itau-beneficia-consumidores-de-cartoes-de-diversas-redes-varejistas-parceiras-do-banco.shtml";
-const EXPLANATORY_VIDEO_URL =
-  "https://youtube.com/shorts/rzxDS0cbdlc?is=G23u_WrPjxUIQTug";
-const EXPLANATORY_VIDEO_EMBED_URL =
-  "https://www.youtube-nocookie.com/embed/rzxDS0cbdlc";
 const ITAU_INVOICE_CHANNELS_URL =
   "https://www.itau.com.br/atendimento-itau/para-voce/cartao-de-credito/onde-consigo-a-segunda-via-da-fatura-do-meu-cartao";
 const ITAU_PHONE_CHANNELS_URL =
@@ -893,46 +887,7 @@ if (stage) {
     const messages = [
       assistantMessage(`
         <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard e nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais dos 133 tipos hist&oacute;ricos de cart&otilde;es parceiros">133 tipos hist&oacute;ricos de cart&otilde;es de bandeiras parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
-      `),
-      assistantMessage(`
-        <p>Em 2026, o MPMG e o Idec divulgaram um acordo com o Ita&uacute; relacionado a cobran&ccedil;as de seguros ou servi&ccedil;os sem consentimento entre 2011 e 2025.</p>
-        <details class="charge-analysis-disclosure charge-analysis-transaction">
-          <summary>
-            <span>Instrumento de Transa&ccedil;&atilde;o</span>
-            <img class="charge-analysis-dropdown-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-          </summary>
-          <ul>
-            <li><strong>Data de celebra&ccedil;&atilde;o:</strong> 17/12/2025</li>
-            <li><strong>A&ccedil;&atilde;o Civil Coletiva n&ordm;:</strong> 5085307-63.2016.8.13.0024 <small>(5&ordf; Vara C&iacute;vel de Belo Horizonte/MG)</small></li>
-            <li><strong>Apela&ccedil;&atilde;o C&iacute;vel n&ordm;:</strong> 1.0000.17.021376-3/010 <small>(9&ordf; C&acirc;mara C&iacute;vel do TJMG)</small></li>
-          </ul>
-        </details>
-        <details class="charge-analysis-disclosure charge-analysis-context">
-          <summary>
-            <span>Memorando explicativo e v&iacute;deo</span>
-            <img class="charge-analysis-dropdown-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-          </summary>
-          <div class="charge-analysis-context-body">
-            <p><strong>Como interpretar este instrumento</strong></p>
-            <p>O acordo coletivo possui crit&eacute;rios de documentos e reclama&ccedil;&atilde;o pr&eacute;via e prev&ecirc; restitui&ccedil;&atilde;o simples. Ele n&atilde;o torna automaticamente indevida toda cobran&ccedil;a vinculada ao Ita&uacute;.</p>
-            <p>Eventuais pedidos de devolu&ccedil;&atilde;o em dobro, perdas e danos ou indeniza&ccedil;&atilde;o dependem das provas do caso e de revis&atilde;o jur&iacute;dica individual.</p>
-            <div class="charge-analysis-video">
-              <iframe
-                src="${EXPLANATORY_VIDEO_EMBED_URL}"
-                title="V&iacute;deo explicativo sobre o Instrumento de Transa&ccedil;&atilde;o"
-                loading="lazy"
-                referrerpolicy="strict-origin-when-cross-origin"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen
-              ></iframe>
-            </div>
-            <div class="charge-analysis-context-links">
-              <a href="${EXPLANATORY_VIDEO_URL}" target="_blank" rel="noreferrer">Abrir v&iacute;deo no YouTube</a>
-              <a href="${OFFICIAL_CONTEXT_URL}" target="_blank" rel="noreferrer">Consultar fonte oficial do MPMG</a>
-            </div>
-          </div>
-        </details>
-      `, "Contexto verificado"),
+      `, "Audita", "charge-analysis-intro-message"),
       assistantMessage(`<p>Para entender melhor o seu caso, vou fazer algumas perguntas r&aacute;pidas.</p>`),
       assistantMessage(`
         <p><strong>Qual destas op&ccedil;&otilde;es descreve melhor a sua situa&ccedil;&atilde;o?</strong></p>

@@ -347,19 +347,17 @@ test("the information path opens the searchable reference list before documents"
   );
 });
 
-test("charge analysis context exposes the explanatory memorandum and video", () => {
-  assert.match(chargeAnalysisJs, /Memorando explicativo e v&iacute;deo/);
-  assert.match(chargeAnalysisJs, /17\/12\/2025/);
-  assert.match(chargeAnalysisJs, /5085307-63\.2016\.8\.13\.0024/);
-  assert.match(chargeAnalysisJs, /youtube-nocookie\.com\/embed\/rzxDS0cbdlc/);
-  assert.match(chargeAnalysisJs, /youtube\.com\/shorts\/rzxDS0cbdlc/);
+test("charge analysis removes the agreement context from the triage opening", () => {
+  assert.match(chargeAnalysisJs, /charge-analysis-intro-message/);
+  assert.doesNotMatch(chargeAnalysisJs, /Em 2026, o MPMG e o Idec divulgaram um acordo/);
+  assert.doesNotMatch(chargeAnalysisJs, /Instrumento de Transa&ccedil;&atilde;o/);
+  assert.doesNotMatch(chargeAnalysisJs, /Memorando explicativo e v&iacute;deo/);
+  assert.doesNotMatch(chargeAnalysisJs, /youtube-nocookie\.com\/embed\/rzxDS0cbdlc/);
 });
 
-test("charge analysis keeps optional context collapsed by default", () => {
-  assert.match(chargeAnalysisJs, /<details class="charge-analysis-disclosure charge-analysis-transaction">/);
-  assert.match(chargeAnalysisJs, /<details class="charge-analysis-disclosure charge-analysis-context">/);
+test("charge analysis keeps the insurance context collapsed by default", () => {
   assert.match(chargeAnalysisJs, /<details class="charge-analysis-disclosure charge-analysis-insurance-details">/);
-  assert.doesNotMatch(chargeAnalysisJs, /<details class="[^"]*charge-analysis-(?:transaction|context|insurance-details)[^"]*" open>/);
+  assert.doesNotMatch(chargeAnalysisJs, /<details class="[^"]*charge-analysis-insurance-details[^"]*" open>/);
 });
 
 test("charge analysis separates complete, partial and no-document journeys", () => {
