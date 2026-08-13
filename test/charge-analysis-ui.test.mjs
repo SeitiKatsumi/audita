@@ -267,12 +267,12 @@ test("charge analysis reveals agent messages before moving to the selected path"
 test("charge analysis starts with the two current self-assessment paths", () => {
   assert.match(
     chargeAnalysisJs,
-    /Qual destas op&ccedil;&otilde;es descreve melhor a sua situa&ccedil;&atilde;o/,
+    /Voc&ecirc; possui ou possuiu algum cart&atilde;o dessas bandeiras/,
   );
   assert.match(chargeAnalysisJs, /data-charge-action="not-authorized"/);
   assert.match(chargeAnalysisJs, /data-charge-action="verify-statement"/);
-  assert.match(chargeAnalysisJs, /Acredito que tenho alguma cobran&ccedil;a indevida no meu cart&atilde;o ou conta Ita&uacute;/);
-  assert.match(chargeAnalysisJs, /N&atilde;o sei, gostaria de mais informa&ccedil;&otilde;es/);
+  assert.match(chargeAnalysisJs, /Sim, tenho um desses cart&otilde;es/);
+  assert.match(chargeAnalysisJs, /N&atilde;o sei, quais s&atilde;o todas as bandeiras/);
   assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="authorized"/);
   assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="lawyer"/);
   assert.match(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
@@ -280,15 +280,16 @@ test("charge analysis starts with the two current self-assessment paths", () => 
 });
 
 test("charge analysis introduction links the historical card scope to the searchable references", () => {
-  assert.match(chargeAnalysisJs, /133 tipos hist&oacute;ricos de cart&otilde;es de bandeiras parceiras/);
+  assert.match(chargeAnalysisJs, /133 bandeiras de cart&otilde;es de parceiras/);
   assert.match(chargeAnalysisJs, /como Casas Bahia e Magazine Luiza/);
   assert.match(chargeAnalysisJs, /data-charge-action="open-brand-references"/);
-  assert.match(chargeAnalysisJs, /Abrir 113 refer&ecirc;ncias nominais dos 133 tipos hist&oacute;ricos/);
+  assert.match(chargeAnalysisJs, /Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras/);
   assert.match(
     chargeAnalysisJs,
     /action === "open-brand-references"[\s\S]*?state\.screen = "brands";/,
   );
   assert.doesNotMatch(chargeAnalysisJs, /Conte&uacute;do atualizado em julho de 2026/);
+  assert.doesNotMatch(chargeAnalysisJs, /Para entender melhor o seu caso, vou fazer algumas perguntas r&aacute;pidas/);
   assert.match(stylesCss, /\.charge-analysis-inline-link[\s\S]*?text-underline-offset:\s*3px/);
 });
 

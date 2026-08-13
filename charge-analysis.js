@@ -877,21 +877,17 @@ if (stage) {
     const responseButtons = `
       <div class="charge-analysis-actions" aria-label="Respostas da primeira etapa">
         <button type="button" data-charge-action="not-authorized">
-          <strong>Acredito que tenho alguma cobran&ccedil;a indevida no meu cart&atilde;o ou conta Ita&uacute;</strong>
+          <strong>Sim, tenho um desses cart&otilde;es</strong>
         </button>
         <button type="button" data-charge-action="verify-statement">
-          <strong>N&atilde;o sei, gostaria de mais informa&ccedil;&otilde;es</strong>
+          <strong>N&atilde;o sei, quais s&atilde;o todas as bandeiras?</strong>
         </button>
       </div>
     `;
     const messages = [
       assistantMessage(`
-        <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard e nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais dos 133 tipos hist&oacute;ricos de cart&otilde;es parceiros">133 tipos hist&oacute;ricos de cart&otilde;es de bandeiras parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
-      `, "Audita", "charge-analysis-intro-message"),
-      assistantMessage(`<p>Para entender melhor o seu caso, vou fazer algumas perguntas r&aacute;pidas.</p>`),
-      assistantMessage(`
-        <p><strong>Qual destas op&ccedil;&otilde;es descreve melhor a sua situa&ccedil;&atilde;o?</strong></p>
-        <p class="charge-analysis-choice-hint">Se ainda n&atilde;o souber, a Audita pode mostrar mais informa&ccedil;&otilde;es e refer&ecirc;ncias para ajudar na triagem.</p>
+        <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard ou nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras de cart&otilde;es de parceiras">133 bandeiras de cart&otilde;es de parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
+        <p class="charge-analysis-intro-question"><strong>Voc&ecirc; possui ou possuiu algum cart&atilde;o dessas bandeiras?</strong></p>
         <details class="charge-analysis-disclosure charge-analysis-insurance-details">
           <summary>
             <span>Seguros e servi&ccedil;os considerados</span>
@@ -905,9 +901,9 @@ if (stage) {
             <p><strong>Seguro Prestamista:</strong> vinculado a contratos de empr&eacute;stimo pessoal, consignado ou financiamento de ve&iacute;culo.</p>
           </div>
         </details>
-        <p class="charge-analysis-choice-hint">Escolha uma op&ccedil;&atilde;o para continuar.</p>
+        <p class="charge-analysis-choice-hint">Se n&atilde;o tiver certeza, consulte todas as bandeiras antes de continuar.</p>
         ${responseButtons}
-      `, "Primeira pergunta", "question"),
+      `, "Audita", "charge-analysis-intro-message"),
     ];
 
     stage.innerHTML = `
@@ -2255,7 +2251,7 @@ if (stage) {
       render();
       return;
     } else if (action === "not-authorized") {
-      continueFromTriage("Acredito que tenho alguma cobrança indevida no meu cartão ou conta Itaú.", () => {
+      continueFromTriage("Sim, tenho um desses cartões.", () => {
         state.route = "consumer";
         state.authorizationAnswer = "denied";
         state.screen = "documents";
@@ -2269,7 +2265,7 @@ if (stage) {
       });
       return;
     } else if (action === "verify-statement") {
-      continueFromTriage("Não sei, gostaria de mais informações.", () => {
+      continueFromTriage("Não sei, quais são todas as bandeiras?", () => {
         state.route = "consumer";
         state.authorizationAnswer = "uncertain";
         state.screen = "brands";
