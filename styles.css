@@ -946,6 +946,8 @@ h2 {
 .home-module-icon img {
   width: 22px;
   height: 22px;
+  filter: brightness(0) saturate(100%) invert(82%) sepia(52%) saturate(1086%) hue-rotate(85deg)
+    brightness(103%) contrast(94%);
 }
 
 .home-module-copy {
@@ -970,6 +972,8 @@ h2 {
   width: 18px;
   height: 18px;
   opacity: 0.78;
+  filter: brightness(0) saturate(100%) invert(82%) sepia(52%) saturate(1086%) hue-rotate(85deg)
+    brightness(103%) contrast(94%);
   transition: transform 160ms ease;
 }
 
@@ -3080,6 +3084,7 @@ h2 {
 }
 
 .charge-paywall-result,
+.charge-paywall-value,
 .charge-paywall-benefits,
 .charge-paywall-explainer,
 .charge-paywall-plans > article {
@@ -3098,6 +3103,7 @@ h2 {
 }
 
 .charge-paywall-result h3,
+.charge-paywall-value h3,
 .charge-paywall-benefits h3,
 .charge-paywall-explainer h3 {
   margin: 4px 0 8px;
@@ -3105,6 +3111,7 @@ h2 {
 }
 
 .charge-paywall-result p,
+.charge-paywall-value p,
 .charge-paywall-benefits p,
 .charge-paywall-explainer li,
 .charge-paywall-plans p,
@@ -3113,9 +3120,278 @@ h2 {
   line-height: 1.55;
 }
 
+.charge-paywall-value,
 .charge-paywall-benefits,
 .charge-paywall-explainer {
   padding: 22px;
+}
+
+.charge-paywall-value {
+  border-color: rgba(53, 230, 161, 0.46);
+  background: #061c30;
+}
+
+.charge-paywall-value-heading {
+  max-width: none;
+}
+
+.charge-paywall-proof-journey {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 24px 0;
+  padding: 0;
+  border-top: 1px solid rgba(64, 147, 191, 0.28);
+  border-bottom: 1px solid rgba(64, 147, 191, 0.28);
+  list-style: none;
+}
+
+.charge-paywall-proof-journey li {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-content: start;
+  padding: 18px 14px;
+  border-right: 1px solid rgba(64, 147, 191, 0.22);
+}
+
+.charge-paywall-proof-journey li:last-child {
+  border-right: 0;
+}
+
+.charge-paywall-proof-journey li > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(53, 230, 161, 0.64);
+  border-radius: 50%;
+  color: #63f3af;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.charge-paywall-proof-journey strong {
+  align-self: center;
+  color: #eef8ff;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.charge-paywall-proof-journey p {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  color: #91adc2 !important;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.charge-paywall-reference {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) minmax(180px, 0.58fr) minmax(230px, 0.9fr);
+  overflow: hidden;
+  border: 1px solid rgba(64, 147, 191, 0.28);
+  border-radius: 6px;
+  background: #071a2c;
+}
+
+.charge-paywall-reference > div {
+  min-width: 0;
+  padding: 20px;
+  border-right: 1px solid rgba(64, 147, 191, 0.24);
+}
+
+.charge-paywall-reference > div:last-child {
+  border-right: 0;
+}
+
+.charge-paywall-reference h4 {
+  margin: 0 0 18px;
+  color: #eef8ff;
+  font-size: 15px;
+  letter-spacing: 0;
+}
+
+.charge-paywall-reference h4 small {
+  display: block;
+  margin-top: 3px;
+  color: #7898af;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.charge-paywall-reference-bars label {
+  display: block;
+  margin: 14px 0 7px;
+  color: #c8dbea;
+  font-size: 12px;
+}
+
+.charge-paywall-reference-bars meter {
+  display: block;
+  width: 100%;
+  height: 18px;
+  border: 0;
+  background: #102a40;
+}
+
+.charge-paywall-reference-bars meter::-webkit-meter-bar {
+  border: 0;
+  border-radius: 4px;
+  background: #102a40;
+}
+
+.charge-paywall-reference-bars meter::-webkit-meter-optimum-value {
+  border-radius: 4px;
+  background: #7792a6;
+}
+
+.charge-paywall-reference-bars meter.highlight::-webkit-meter-optimum-value {
+  background: #35e6a1;
+}
+
+.charge-paywall-reference-bars meter::-moz-meter-bar {
+  border-radius: 4px;
+  background: #7792a6;
+}
+
+.charge-paywall-reference-bars meter.highlight::-moz-meter-bar {
+  background: #35e6a1;
+}
+
+.charge-paywall-reference-callout {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.charge-paywall-reference-callout > span {
+  color: #a8c0d2;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.charge-paywall-reference-callout > strong {
+  margin-top: 8px;
+  color: #35e6a1;
+  font-size: clamp(42px, 5vw, 64px);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.charge-paywall-reference-callout > b {
+  margin-top: 5px;
+  color: #eef8ff;
+  font-size: 14px;
+}
+
+.charge-paywall-reference-callout > p {
+  margin: 14px 0 0;
+  color: #91adc2 !important;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.charge-paywall-reference-components h4 {
+  color: #63f3af;
+}
+
+.charge-paywall-reference-components ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.charge-paywall-reference-components li {
+  position: relative;
+  padding: 10px 0 10px 28px;
+  border-bottom: 1px solid rgba(64, 147, 191, 0.2);
+  color: #c8dbea;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.charge-paywall-reference-components li:last-child {
+  border-bottom: 0;
+}
+
+.charge-paywall-reference-components li::before {
+  position: absolute;
+  top: 15px;
+  left: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #35e6a1;
+  content: "";
+}
+
+.charge-paywall-value-disclaimer {
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(64, 147, 191, 0.24);
+  color: #91adc2 !important;
+  font-size: 12px;
+}
+
+.charge-paywall-value-disclaimer strong {
+  color: #c9dded;
+}
+
+.charge-paywall-value-disclaimer a {
+  color: #7fd8ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.charge-paywall-value-actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 14px 20px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.charge-paywall-value-cta {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #041c15;
+  text-decoration: none;
+}
+
+.charge-paywall-value-actions ul {
+  display: flex;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.charge-paywall-value-actions li {
+  position: relative;
+  padding-left: 17px;
+  color: #a8c0d2;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.charge-paywall-value-actions li::before {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #35e6a1;
+  border-radius: 50%;
+  content: "";
 }
 
 .charge-paywall-section-heading {
@@ -3126,48 +3402,6 @@ h2 {
   margin: 0;
 }
 
-.charge-paywall-journey {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 20px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.charge-paywall-journey li {
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
-  gap: 10px;
-  align-content: start;
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid rgba(64, 147, 191, 0.34);
-  border-radius: 6px;
-  background: #08243a;
-}
-
-.charge-paywall-journey li > span {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 1px solid #35e6a1;
-  border-radius: 50%;
-  color: #63f3af;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.charge-paywall-journey strong {
-  color: #eef8ff;
-  line-height: 1.3;
-}
-
-.charge-paywall-journey p {
-  margin: 6px 0 0;
-  font-size: 13px;
-}
 
 .charge-paywall-explainer ul,
 .charge-paywall-plans ul {
@@ -3260,9 +3494,33 @@ h2 {
 }
 
 @media (max-width: 720px) {
-  .charge-paywall-journey,
+  .charge-paywall-proof-journey,
+  .charge-paywall-reference,
+  .charge-paywall-value-actions,
   .charge-paywall-plans {
     grid-template-columns: 1fr;
+  }
+
+  .charge-paywall-proof-journey li {
+    border-right: 0;
+    border-bottom: 1px solid rgba(64, 147, 191, 0.22);
+  }
+
+  .charge-paywall-proof-journey li:last-child {
+    border-bottom: 0;
+  }
+
+  .charge-paywall-reference > div {
+    border-right: 0;
+    border-bottom: 1px solid rgba(64, 147, 191, 0.24);
+  }
+
+  .charge-paywall-reference > div:last-child {
+    border-bottom: 0;
+  }
+
+  .charge-paywall-value-actions ul {
+    justify-content: flex-start;
   }
 
   .charge-paywall-result {
@@ -3271,8 +3529,30 @@ h2 {
 }
 
 @media (min-width: 721px) and (max-width: 980px) {
-  .charge-paywall-journey {
+  .charge-paywall-proof-journey {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .charge-paywall-proof-journey li:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .charge-paywall-proof-journey li:last-child {
+    grid-column: 1 / -1;
+    border-top: 1px solid rgba(64, 147, 191, 0.22);
+  }
+
+  .charge-paywall-reference {
+    grid-template-columns: 1fr;
+  }
+
+  .charge-paywall-reference > div {
+    border-right: 0;
+    border-bottom: 1px solid rgba(64, 147, 191, 0.24);
+  }
+
+  .charge-paywall-reference > div:last-child {
+    border-bottom: 0;
   }
 }
 
@@ -11144,20 +11424,29 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 
 @media (min-width: 1081px) {
   .charge-analysis-shell {
+    width: 100%;
+    max-width: none;
     grid-template-rows: auto minmax(320px, 1fr);
+    margin-right: 0;
+    margin-left: 0;
   }
 
   .charge-analysis-workspace {
     display: grid;
     grid-template-columns: minmax(210px, 238px) minmax(0, 1fr);
-    align-items: start;
-    gap: 32px;
+    min-height: calc(100dvh - 100px);
+    align-items: stretch;
+    gap: clamp(32px, 3vw, 52px);
   }
 
   .charge-progress-rail {
     position: sticky;
     top: 24px;
     display: grid;
+    height: calc(100dvh - 100px);
+    min-height: 560px;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-self: start;
     min-width: 0;
     gap: 12px;
     padding: 16px;
@@ -11203,6 +11492,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
     display: grid;
     width: 100%;
     grid-template-columns: 1fr;
+    grid-template-rows: repeat(7, minmax(58px, 1fr));
     gap: 0;
     padding: 0;
     margin: 0;
@@ -11251,6 +11541,46 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   .charge-analysis-content .charge-analysis-conversation,
   .charge-analysis-content .charge-analysis-conversation.compact {
     padding-right: 0;
+  }
+
+  .charge-analysis-content .charge-analysis-message {
+    width: 100%;
+    max-width: none;
+  }
+
+  .charge-analysis-content .charge-analysis-message.user {
+    width: auto;
+    max-width: min(330px, 72%);
+  }
+
+  .charge-analysis-content .charge-analysis-bubble,
+  .charge-analysis-content .charge-analysis-message.question .charge-analysis-bubble {
+    width: 100%;
+    max-width: none;
+  }
+
+  .charge-analysis-content .charge-analysis-message.user .charge-analysis-bubble {
+    width: auto;
+  }
+
+  .charge-analysis-content .charge-analysis-actions {
+    max-width: none;
+  }
+
+  .charge-analysis-content .charge-brand-panel,
+  .charge-analysis-content .charge-upload-panel,
+  .charge-analysis-content .charge-estimate-panel,
+  .charge-analysis-content .charge-petition-note,
+  .charge-analysis-content .charge-analysis-processing,
+  .charge-analysis-content .charge-analysis-finish,
+  .charge-analysis-content .charge-result-heading,
+  .charge-analysis-content .charge-result-candidates,
+  .charge-analysis-content .charge-directed-search,
+  .charge-analysis-content .charge-calculation-items,
+  .charge-analysis-content .charge-audit-report,
+  .charge-analysis-content .charge-result-actions {
+    width: calc(100% - 62px);
+    max-width: none;
   }
 }
 

@@ -163,6 +163,7 @@ const ITAU_PHONE_CHANNELS_URL =
 const ITAU_OMBUDSMAN_URL =
   "https://www.itau.com.br/atendimento-itau/para-voce/ouvidoria";
 const JEC_LAW_URL = "https://www.planalto.gov.br/ccivil_03/leis/l9099.htm";
+const CDC_ARTICLE_42_URL = "https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm#art42";
 
 export const ITAU_DOCUMENT_REQUEST_TEMPLATE = `SOLICITAÇÃO DE DOCUMENTOS, EXTRATOS E COMPROVAÇÃO DE AUTORIZAÇÃO
 
@@ -1317,30 +1318,58 @@ if (stage) {
           </div>
         </section>
 
-        <section class="charge-paywall-benefits" aria-labelledby="chargePaywallBenefitsTitle">
-          <div class="charge-paywall-section-heading">
-            <p class="eyebrow">O que você libera agora</p>
-            <h3 id="chargePaywallBenefitsTitle">Da suspeita a um caso documentado</h3>
-            <p>Você acompanha cada etapa, confere a origem das informações e decide quais cobranças devem seguir para o cálculo.</p>
+        <section class="charge-paywall-value" aria-labelledby="chargePaywallValueTitle">
+          <div class="charge-paywall-section-heading charge-paywall-value-heading">
+            <p class="eyebrow">Por que seguir com a Audita</p>
+            <h3 id="chargePaywallValueTitle">Da cobran&ccedil;a suspeita a um caso documentado</h3>
+            <p>A Audita organiza as provas. Voc&ecirc; continua no controle.</p>
           </div>
-          <ol class="charge-paywall-journey">
-            <li>
-              <span aria-hidden="true">1</span>
-              <div><strong>Achados detalhados</strong><p>Descrição, data, valor, evidência e arquivo de origem de cada ocorrência localizada.</p></div>
-            </li>
-            <li>
-              <span aria-hidden="true">2</span>
-              <div><strong>Revisão sob seu controle</strong><p>Você informa o que reconhece, o que não reconhece e o que ainda precisa confirmar.</p></div>
-            </li>
-            <li>
-              <span aria-hidden="true">3</span>
-              <div><strong>Cálculo rastreável</strong><p>O cálculo considera somente valores encontrados nos anexos e marcados por você como não reconhecidos.</p></div>
-            </li>
-            <li>
-              <span aria-hidden="true">4</span>
-              <div><strong>Documentação organizada</strong><p>Relatório técnico em PDF, histórico da análise e orientação para os próximos passos.</p></div>
-            </li>
+
+          <ol class="charge-paywall-proof-journey" aria-label="Etapas liberadas pela Audita">
+            <li><span aria-hidden="true">1</span><strong>Cobran&ccedil;a localizada</strong><p>Identificamos lan&ccedil;amentos com comportamentos at&iacute;picos nos documentos enviados.</p></li>
+            <li><span aria-hidden="true">2</span><strong>Evid&ecirc;ncia no extrato</strong><p>Ligamos descri&ccedil;&atilde;o, data, valor e arquivo de origem de cada ocorr&ecirc;ncia.</p></li>
+            <li><span aria-hidden="true">3</span><strong>C&aacute;lculo rastre&aacute;vel</strong><p>Calculamos somente cobran&ccedil;as encontradas nos anexos e n&atilde;o reconhecidas por voc&ecirc;.</p></li>
+            <li><span aria-hidden="true">4</span><strong>Relat&oacute;rio t&eacute;cnico</strong><p>Consolidamos evid&ecirc;ncias e mem&oacute;ria de c&aacute;lculo em um documento revis&aacute;vel.</p></li>
+            <li><span aria-hidden="true">5</span><strong>Orienta&ccedil;&atilde;o para o JEC</strong><p>Apresentamos o passo a passo para o protocolo final, que permanece humano.</p></li>
           </ol>
+
+          <div class="charge-paywall-reference" role="group" aria-label="Compara&ccedil;&atilde;o ilustrativa entre o acordo extrajudicial e a pretens&atilde;o simulada no material de refer&ecirc;ncia">
+            <div class="charge-paywall-reference-bars">
+              <h4>Comparativo ilustrativo <small>material de refer&ecirc;ncia</small></h4>
+              <label for="chargeAgreementReference">Acordo extrajudicial</label>
+              <meter id="chargeAgreementReference" min="0" max="100" value="15" aria-label="Propor&ccedil;&atilde;o ilustrativa do acordo extrajudicial"></meter>
+              <label for="chargeClaimReference">Pretens&atilde;o simulada no exemplo</label>
+              <meter id="chargeClaimReference" class="highlight" min="0" max="100" value="100" aria-label="Propor&ccedil;&atilde;o ilustrativa da pretens&atilde;o simulada"></meter>
+            </div>
+
+            <div class="charge-paywall-reference-callout">
+              <span>Neste exemplo, a pretens&atilde;o simulada foi cerca de</span>
+              <strong>552%</strong>
+              <b>superior ao acordo</b>
+              <p>O potencial n&atilde;o vem apenas do estorno: outros componentes podem ser avaliados conforme as provas e a decis&atilde;o judicial.</p>
+            </div>
+
+            <div class="charge-paywall-reference-components">
+              <h4>Composi&ccedil;&atilde;o da pretens&atilde;o simulada</h4>
+              <ul>
+                <li>Repeti&ccedil;&atilde;o em dobro, se cab&iacute;vel</li>
+                <li>Corre&ccedil;&atilde;o monet&aacute;ria</li>
+                <li>Juros legais</li>
+                <li>Eventual indeniza&ccedil;&atilde;o, quando fundamentada</li>
+              </ul>
+            </div>
+          </div>
+
+          <p class="charge-paywall-value-disclaimer"><strong>Importante:</strong> percentual calculado a partir de um &uacute;nico cen&aacute;rio do material de refer&ecirc;ncia. O resultado de cada caso varia e n&atilde;o h&aacute; garantia de recebimento, devolu&ccedil;&atilde;o em dobro, indeniza&ccedil;&atilde;o ou &ecirc;xito judicial. A composi&ccedil;&atilde;o depende das provas, dos requisitos do <a href="${CDC_ARTICLE_42_URL}" target="_blank" rel="noreferrer">art. 42 do CDC</a> e da decis&atilde;o do Judici&aacute;rio.</p>
+
+          <div class="charge-paywall-value-actions">
+            <a class="primary-action charge-paywall-value-cta" href="#chargePaywallPlans">Continuar com a Audita</a>
+            <ul aria-label="Compromissos da Audita">
+              <li>Voc&ecirc; revisa cada cobran&ccedil;a</li>
+              <li>Sem promessa de resultado</li>
+              <li>Protocolo final feito pelo usu&aacute;rio</li>
+            </ul>
+          </div>
         </section>
 
         <section class="charge-paywall-explainer" aria-labelledby="chargePaywallInfoTitle">
@@ -1352,7 +1381,7 @@ if (stage) {
           </ul>
         </section>
 
-        <section class="charge-paywall-plans" aria-label="Planos Standard">
+        <section id="chargePaywallPlans" class="charge-paywall-plans" aria-label="Planos Standard">
           <article>
             <div><span>Standard mensal</span><strong>${escapeChargeHtml(monthly.headline)}<small>/mês</small></strong><p>${escapeChargeHtml(monthly.detail)}</p></div>
             <ul><li>Acesso imediato aos achados da análise</li><li>Revisão guiada e cálculo baseado nos anexos</li><li>Relatório técnico em PDF e próximos passos</li><li>Plataforma, chat e IA Audita</li></ul>

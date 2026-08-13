@@ -125,6 +125,14 @@ test("home exposes the two real product modules without mock indicators", () => 
   assert.doesNotMatch(homeMarkup, /home-hero-features|class="metrics"/);
   assert.match(stylesCss, /\.home-module-actions\s*\{/);
   assert.match(stylesCss, /\.home-module-action:hover/);
+  assert.match(
+    stylesCss,
+    /\.home-module-icon img\s*\{[\s\S]*?filter:\s*brightness\(0\)[\s\S]*?hue-rotate\(85deg\)/,
+  );
+  assert.match(
+    stylesCss,
+    /\.home-module-chevron\s*\{[\s\S]*?filter:\s*brightness\(0\)[\s\S]*?hue-rotate\(85deg\)/,
+  );
   assert.doesNotMatch(appJs, /metricCards|consultationsToday|connectedSources|criticalAlerts/);
 });
 
@@ -169,7 +177,14 @@ test("charge analysis uses one module-wide progress rail from authorization to t
   assert.match(stylesCss, /\.charge-module-progress\s*\{/);
   assert.match(stylesCss, /\.charge-progress-summary\s*\{/);
   assert.match(stylesCss, /@media \(min-width: 1081px\)[\s\S]*?\.charge-analysis-workspace\s*\{[\s\S]*?grid-template-columns: minmax\(210px, 238px\) minmax\(0, 1fr\)/);
-  assert.match(stylesCss, /\.charge-progress-rail\s*\{[\s\S]*?position: sticky/);
+  assert.match(
+    stylesCss,
+    /\.charge-progress-rail\s*\{[\s\S]*?position: sticky[\s\S]*?height: calc\(100dvh - 100px\)[\s\S]*?grid-template-rows: auto minmax\(0, 1fr\)/,
+  );
+  assert.match(
+    stylesCss,
+    /\.charge-progress-rail \.charge-module-progress\s*\{[\s\S]*?grid-template-rows: repeat\(7, minmax\(58px, 1fr\)\)/,
+  );
 });
 
 test("charge analysis exposes a searchable accessible FAQ dialog", () => {
@@ -269,6 +284,25 @@ test("the initial question aligns with the standard assistant message width", ()
   assert.match(
     stylesCss,
     /\.charge-analysis-message\.question \.charge-analysis-bubble\s*\{[\s\S]*?max-width:\s*590px/,
+  );
+});
+
+test("charge analysis uses the full available desktop workspace", () => {
+  assert.match(
+    stylesCss,
+    /@media \(min-width: 1081px\)[\s\S]*?\.charge-analysis-shell\s*\{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;/,
+  );
+  assert.match(
+    stylesCss,
+    /\.charge-analysis-content \.charge-analysis-message\s*\{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;/,
+  );
+  assert.match(
+    stylesCss,
+    /\.charge-analysis-content \.charge-analysis-bubble,[\s\S]*?max-width:\s*none;/,
+  );
+  assert.match(
+    stylesCss,
+    /\.charge-analysis-content \.charge-brand-panel,[\s\S]*?\.charge-analysis-content \.charge-result-actions\s*\{[\s\S]*?width:\s*calc\(100% - 62px\);/,
   );
 });
 
@@ -404,11 +438,39 @@ test("positive analysis is paywalled before descriptions, values and simulation"
   assert.match(chargeAnalysisJs, /Os detalhes, valores e a simulação permanecem protegidos/);
   assert.match(chargeAnalysisJs, /Standard mensal/);
   assert.match(chargeAnalysisJs, /Standard anual/);
-  assert.match(chargeAnalysisJs, /O que você libera agora/);
-  assert.match(chargeAnalysisJs, /Achados detalhados/);
-  assert.match(chargeAnalysisJs, /Revisão sob seu controle/);
-  assert.match(chargeAnalysisJs, /Cálculo rastreável/);
-  assert.match(chargeAnalysisJs, /Documentação organizada/);
+  assert.match(chargeAnalysisJs, /Por que seguir com a Audita/);
+  assert.match(chargeAnalysisJs, /Da cobran&ccedil;a suspeita a um caso documentado/);
+  assert.match(chargeAnalysisJs, /A Audita organiza as provas\. Voc&ecirc; continua no controle/);
+  assert.match(chargeAnalysisJs, /Cobran&ccedil;a localizada/);
+  assert.match(chargeAnalysisJs, /Evid&ecirc;ncia no extrato/);
+  assert.match(chargeAnalysisJs, /C&aacute;lculo rastre&aacute;vel/);
+  assert.match(chargeAnalysisJs, /Relat&oacute;rio t&eacute;cnico/);
+  assert.match(chargeAnalysisJs, /Orienta&ccedil;&atilde;o para o JEC/);
+  assert.match(chargeAnalysisJs, /Comparativo ilustrativo/);
+  assert.match(chargeAnalysisJs, /Acordo extrajudicial/);
+  assert.match(chargeAnalysisJs, /Pretens&atilde;o simulada no exemplo/);
+  assert.match(chargeAnalysisJs, /552%/);
+  assert.match(chargeAnalysisJs, /superior ao acordo/);
+  assert.match(chargeAnalysisJs, /Repeti&ccedil;&atilde;o em dobro, se cab&iacute;vel/);
+  assert.match(chargeAnalysisJs, /Eventual indeniza&ccedil;&atilde;o, quando fundamentada/);
+  assert.match(chargeAnalysisJs, /Continuar com a Audita/);
+  assert.match(chargeAnalysisJs, /Sem promessa de resultado/);
+  assert.match(chargeAnalysisJs, /Protocolo final feito pelo usu&aacute;rio/);
+  assert.match(chargeAnalysisJs, /art\. 42 do CDC/);
+  assert.match(chargeAnalysisJs, /charge-paywall-reference" role="group"/);
+  assert.match(chargeAnalysisJs, /percentual calculado a partir de um &uacute;nico cen&aacute;rio/);
+  assert.match(chargeAnalysisJs, /n&atilde;o h&aacute; garantia de recebimento/);
+  const paywallValueBlock = chargeAnalysisJs.match(/<section class="charge-paywall-value"[\s\S]*?<\/section>/)?.[0] || "";
+  assert.doesNotMatch(paywallValueBlock, /R\$|1x|\+1x/i);
+  assert.doesNotMatch(chargeAnalysisJs, /DevoluÃ§Ã£o em DOBRO automÃ¡tica|garantindo a reparaÃ§Ã£o integral|sem riscos financeiros/i);
+  assert.match(
+    stylesCss,
+    /@media \(max-width: 720px\)[\s\S]*?\.charge-paywall-proof-journey,[\s\S]*?\.charge-paywall-reference,[\s\S]*?grid-template-columns: 1fr/,
+  );
+  assert.match(
+    stylesCss,
+    /@media \(max-width: 720px\)[\s\S]*?\.charge-paywall-value-actions\s+ul\s*\{[\s\S]*?justify-content: flex-start/,
+  );
   assert.match(chargeAnalysisJs, /Acesso imediato aos achados da análise/);
   assert.match(chargeAnalysisJs, /Melhor custo-benefício/);
   assert.match(chargeAnalysisJs, /Suporte de advogado parceiro para o caso Itaú incluído/);
