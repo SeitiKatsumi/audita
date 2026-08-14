@@ -177,6 +177,10 @@ test("charge analysis keeps the module-wide steps horizontal from authorization 
   assert.match(stylesCss, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
   assert.match(stylesCss, /grid-template-rows: auto minmax\(0, 1fr\)/);
   assert.match(stylesCss, /\.charge-analysis-workspace > \.charge-module-progress\s*\{[\s\S]*?align-self: start/);
+  assert.match(
+    stylesCss,
+    /\.charge-analysis-workspace > \.charge-module-progress\s*\{[\s\S]*?border-bottom:\s*0;[\s\S]*?background:\s*transparent;/,
+  );
 });
 
 test("charge analysis exposes a searchable accessible FAQ dialog", () => {

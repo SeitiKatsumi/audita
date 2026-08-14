@@ -11514,8 +11514,8 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
     gap: 0;
     padding: 12px 0;
     margin: 0;
-    border-bottom: 1px solid rgba(73, 169, 255, 0.16);
-    background: rgba(3, 17, 31, 0.94);
+    border-bottom: 0;
+    background: transparent;
     transform: none;
   }
 
