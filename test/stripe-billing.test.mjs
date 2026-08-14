@@ -21,9 +21,12 @@ const AUTH = {
 function configuredEnv(overrides = {}) {
   return {
     AUDITA_BILLING_ENABLED: "true",
+    AUDITA_CREDITS_ENABLED: "true",
     APP_URL: "https://audita.example",
     STRIPE_SECRET_KEY: "sk_test_example",
     STRIPE_WEBHOOK_SECRET: "whsec_example",
+    STRIPE_API_VERSION: "2026-06-24.dahlia",
+    STRIPE_INTEGRATION_IDENTIFIER: "audita_checkout_kmqrvzdp",
     STRIPE_PRICE_STANDARD_MONTHLY: "price_standard_month",
     STRIPE_PRICE_STANDARD_ANNUAL: "price_standard_year",
     STRIPE_PRICE_CREDITS_25: "price_credits_25",
@@ -126,7 +129,35 @@ test("hosted subscription checkout uses the configured price and tenant metadata
     "price_standard_month",
   );
   assert.equal(checkout.body.get("metadata[audita_tenant_id]"), "tenant-1");
+  assert.equal(checkout.body.get("integration_identifier"), "audita_checkout_kmqrvzdp");
+  assert.equal(checkout.options.headers["stripe-version"], "2026-06-24.dahlia");
   assert.equal(checkout.options.headers["idempotency-key"], "audita-checkout-tenant-1-request-1");
+});
+
+test("credit pack checkout is blocked before creating a Stripe customer when credits are disabled", async () => {
+  let calls = 0;
+  const service = createStripeBillingService({
+    env: configuredEnv({ AUDITA_CREDITS_ENABLED: "false" }),
+    fetchImpl: async () => {
+      calls += 1;
+      throw new Error("must not call Stripe");
+    },
+    creditsService: {
+      getWallet: async () => ({ enabled: false, balance: 0 }),
+    },
+  });
+
+  const result = await service.createCheckoutSession(AUTH, {
+    kind: "credit_pack",
+    packId: "creditos-100",
+  });
+
+  assert.deepEqual(result, {
+    unavailable: true,
+    reason: "credits_not_enabled",
+    missing: ["AUDITA_CREDITS_ENABLED"],
+  });
+  assert.equal(calls, 0);
 });
 
 test("paid credit pack webhook grants credits once even when Stripe retries it", async () => {

@@ -1445,6 +1445,8 @@ const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) }
 const billingAccessService = createBillingAccessService({
   getDb: () => ({ pool, dbReady }),
   listFallbackUsers: () => [...fallbackUsers.values()],
+  isDemoModeEnabled: () =>
+    String(process.env.AUDITA_BILLING_DEMO_MODE || "").trim().toLowerCase() === "true",
 });
 const stripeBillingService = createStripeBillingService({
   getDb: () => ({ pool, dbReady }),

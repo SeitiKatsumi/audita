@@ -43,6 +43,22 @@ test("billing admin reports configured per-query credit costs", () => {
   assert.equal(monitoring.credits, 2);
 });
 
+test("billing admin recognizes restricted live Stripe keys", async () => {
+  const service = createBillingAdminService({
+    env: {
+      AUDITA_BILLING_ENABLED: "true",
+      APP_URL: "https://audita.example",
+      STRIPE_SECRET_KEY: "rk_live_example",
+      STRIPE_WEBHOOK_SECRET: "whsec_example",
+    },
+    getDb: () => ({ pool: null, dbReady: false }),
+  });
+
+  const dashboard = await service.getDashboard();
+
+  assert.equal(dashboard.configuration.stripeMode, "live");
+});
+
 test("billing admin calculates MRR from active monthly and annual subscriptions", async () => {
   const rowsByQuery = (sql) => {
     if (sql.includes("FROM audita_subscriptions")) {

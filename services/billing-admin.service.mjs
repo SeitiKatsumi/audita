@@ -283,11 +283,7 @@ export function createBillingAdminService({
         creditsEnabled: configuration.creditsEnabled,
         checkoutReady: configuration.checkoutReady,
         webhookReady: configuration.webhookReady,
-        stripeMode: text(env.STRIPE_SECRET_KEY).startsWith("sk_live_")
-          ? "live"
-          : text(env.STRIPE_SECRET_KEY)
-            ? "test"
-            : "not_configured",
+        stripeMode: configuration.stripeMode,
         configuredPlanPrices,
         expectedPlanPrices: 2,
         configuredCreditPacks,

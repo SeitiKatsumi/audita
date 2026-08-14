@@ -1,6 +1,7 @@
 # Modelo comercial da Audita
 
-Status: oferta Standard inicial aprovada para implementacao em demonstracao.
+Status: oferta Standard validada em Stripe Test Mode; producao aguarda a ativacao
+juridica e bancaria da conta Stripe da Audita.
 
 ## Decisao recomendada
 
@@ -26,9 +27,9 @@ passos. O anual inclui suporte de advogado parceiro para o caso Itau. Esse
 suporte nao representa automaticamente contratacao para representacao,
 protocolo, custas ou garantia de resultado.
 
-Enquanto a conta Stripe nao estiver pronta, `AUDITA_BILLING_DEMO_MODE=true`
-habilita somente uma demonstracao local/controlada. Essa demonstracao deve ser
-identificada na interface e nunca pode afirmar que houve cobranca real.
+O modo demonstrativo deve permanecer desligado quando a integracao Stripe for
+ativada. Assinaturas antigas com `provider=demo` nao concedem acesso quando
+`AUDITA_BILLING_DEMO_MODE=false`.
 
 ## Pacotes adicionais
 
@@ -112,6 +113,8 @@ bruta minima de 65% por operacao.
 - Banco PostgreSQL com as tabelas de billing.
 - Termos de uso, politica de privacidade e regra de cancelamento.
 - Validacao contabil e fiscal da emissao de nota.
+
+O procedimento tecnico e o mapa do catalogo estao em `docs/stripe-operacao.md`.
 
 ## Referencias
 

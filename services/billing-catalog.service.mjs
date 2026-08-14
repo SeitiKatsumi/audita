@@ -4,6 +4,27 @@ function envValue(env, name) {
   return String(env?.[name] || "").trim();
 }
 
+function isStripeSecretKey(value) {
+  return /^(?:sk|rk)_(?:test|live)_[A-Za-z0-9_]+$/.test(String(value || "").trim());
+}
+
+function isStripeWebhookSecret(value) {
+  return /^whsec_[A-Za-z0-9_]+$/.test(String(value || "").trim());
+}
+
+function isStripePriceId(value) {
+  return /^price_[A-Za-z0-9_]+$/.test(String(value || "").trim());
+}
+
+function isHttpUrl(value) {
+  try {
+    const url = new URL(String(value || "").trim());
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
 function money(cents) {
   return {
     currency: "BRL",
@@ -74,20 +95,28 @@ export function billingConfiguration(env = process.env) {
   const secretKey = envValue(env, "STRIPE_SECRET_KEY");
   const webhookSecret = envValue(env, "STRIPE_WEBHOOK_SECRET");
   const appUrl = envValue(env, "APP_URL");
+  const secretReady = isStripeSecretKey(secretKey);
+  const webhookSecretReady = isStripeWebhookSecret(webhookSecret);
+  const appUrlReady = isHttpUrl(appUrl);
 
   return {
     enabled: billingFlag,
     demoMode,
-    checkoutReady: Boolean(billingFlag && secretKey && appUrl),
-    webhookReady: Boolean(billingFlag && secretKey && webhookSecret),
+    checkoutReady: Boolean(billingFlag && secretReady && appUrlReady),
+    webhookReady: Boolean(billingFlag && secretReady && webhookSecretReady),
     creditsEnabled: creditsFlag,
     provider: "stripe",
     appUrl,
+    stripeMode: secretKey.startsWith("sk_live_") || secretKey.startsWith("rk_live_")
+      ? "live"
+      : secretReady
+        ? "test"
+        : "not_configured",
     missing: [
       !billingFlag ? "AUDITA_BILLING_ENABLED" : "",
-      !secretKey ? "STRIPE_SECRET_KEY" : "",
-      !webhookSecret ? "STRIPE_WEBHOOK_SECRET" : "",
-      !appUrl ? "APP_URL" : "",
+      !secretReady ? "STRIPE_SECRET_KEY" : "",
+      !webhookSecretReady ? "STRIPE_WEBHOOK_SECRET" : "",
+      !appUrlReady ? "APP_URL" : "",
     ].filter(Boolean),
   };
 }
@@ -100,7 +129,7 @@ function publicPrice(price) {
   };
 }
 
-function publicPlan(plan, env) {
+function publicPlan(plan, env, configuration) {
   const prices = {};
   const demoMode = envValue(env, "AUDITA_BILLING_DEMO_MODE").toLowerCase() === "true";
   for (const interval of ["monthly", "annual"]) {
@@ -108,11 +137,15 @@ function publicPlan(plan, env) {
     const stripePriceId = plan.priceEnv?.[interval]
       ? envValue(env, plan.priceEnv[interval])
       : "";
+    const stripeConfigured = isStripePriceId(stripePriceId);
     prices[interval] = price
       ? {
           ...publicPrice(price),
-          checkoutAvailable: plan.kind === "free" || demoMode || Boolean(stripePriceId),
-          stripeConfigured: Boolean(stripePriceId),
+          checkoutAvailable:
+            plan.kind === "free" ||
+            demoMode ||
+            Boolean(configuration.checkoutReady && stripeConfigured),
+          stripeConfigured,
         }
       : null;
   }
@@ -136,14 +169,18 @@ function publicPlan(plan, env) {
   };
 }
 
-function publicPack(pack, env) {
+function publicPack(pack, env, configuration) {
+  const stripeConfigured = isStripePriceId(envValue(env, pack.priceEnv));
   return {
     id: pack.id,
     name: pack.name,
     credits: pack.credits,
     price: publicPrice(pack.price),
     recommended: Boolean(pack.recommended),
-    checkoutAvailable: Boolean(envValue(env, pack.priceEnv)),
+    stripeConfigured,
+    checkoutAvailable: Boolean(
+      configuration.checkoutReady && configuration.creditsEnabled && stripeConfigured,
+    ),
   };
 }
 
@@ -166,8 +203,8 @@ export function getPublicBillingCatalog(env = process.env) {
       annualItauLegalSupportIncluded: true,
       legalRepresentationIncluded: false,
     },
-    plans: BILLING_PLANS.map((plan) => publicPlan(plan, env)),
-    creditPacks: CREDIT_PACKS.map((pack) => publicPack(pack, env)),
+    plans: BILLING_PLANS.map((plan) => publicPlan(plan, env, configuration)),
+    creditPacks: CREDIT_PACKS.map((pack) => publicPack(pack, env, configuration)),
   };
 }
 
@@ -181,7 +218,7 @@ export function resolveBillingSelection(input = {}, env = process.env) {
       return { invalid: true, reason: "invalid_subscription_selection" };
     }
     const priceId = envValue(env, plan.priceEnv[interval]);
-    if (!priceId) {
+    if (!isStripePriceId(priceId)) {
       return { unavailable: true, reason: "stripe_price_not_configured" };
     }
     return {
@@ -206,7 +243,7 @@ export function resolveBillingSelection(input = {}, env = process.env) {
       return { invalid: true, reason: "invalid_credit_pack_selection" };
     }
     const priceId = envValue(env, pack.priceEnv);
-    if (!priceId) {
+    if (!isStripePriceId(priceId)) {
       return { unavailable: true, reason: "stripe_price_not_configured" };
     }
     return {

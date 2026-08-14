@@ -26,10 +26,20 @@ function grantIsActive(grant, now = Date.now()) {
   return Number.isFinite(expiresAt) && expiresAt > now;
 }
 
+function subscriptionIsActive(subscription, { demoMode = false, now = Date.now() } = {}) {
+  if (!subscription || subscription.planId !== "standard") return false;
+  if (!ACTIVE_SUBSCRIPTION_STATUSES.has(text(subscription.status))) return false;
+  if (text(subscription.provider) === "demo" && !demoMode) return false;
+  if (!subscription.currentPeriodEnd) return true;
+  const currentPeriodEnd = new Date(subscription.currentPeriodEnd).getTime();
+  return Number.isFinite(currentPeriodEnd) && currentPeriodEnd > now;
+}
+
 export function createBillingAccessService({
   getDb,
   listFallbackUsers = () => [],
   now = () => Date.now(),
+  isDemoModeEnabled = () => false,
 } = {}) {
   const memoryGrants = new Map();
 
@@ -60,9 +70,10 @@ export function createBillingAccessService({
   }
 
   async function getEntitlement(authContext, subscription = null) {
-    const subscriptionActive =
-      subscription?.planId === "standard" &&
-      ACTIVE_SUBSCRIPTION_STATUSES.has(text(subscription.status));
+    const subscriptionActive = subscriptionIsActive(subscription, {
+      demoMode: Boolean(isDemoModeEnabled()),
+      now: now(),
+    });
     if (subscriptionActive) {
       return {
         entitled: true,

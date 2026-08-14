@@ -42,6 +42,53 @@ test("past due subscription does not grant protected analysis access", async () 
   assert.equal(access.entitled, false);
 });
 
+test("demo subscription does not survive after demo mode is disabled", async () => {
+  const service = createBillingAccessService({
+    now: () => Date.UTC(2026, 7, 14),
+    isDemoModeEnabled: () => false,
+  });
+  const access = await service.getEntitlement(MEMBER, {
+    provider: "demo",
+    planId: "standard",
+    interval: "monthly",
+    status: "active",
+    currentPeriodEnd: "2026-09-14T00:00:00.000Z",
+  });
+  assert.equal(access.entitled, false);
+  assert.equal(access.source, "none");
+});
+
+test("demo subscription grants access only while demo mode is enabled", async () => {
+  const service = createBillingAccessService({
+    now: () => Date.UTC(2026, 7, 14),
+    isDemoModeEnabled: () => true,
+  });
+  const access = await service.getEntitlement(MEMBER, {
+    provider: "demo",
+    planId: "standard",
+    interval: "monthly",
+    status: "active",
+    currentPeriodEnd: "2026-09-14T00:00:00.000Z",
+  });
+  assert.equal(access.entitled, true);
+  assert.equal(access.source, "subscription");
+});
+
+test("expired subscription does not grant protected analysis access", async () => {
+  const service = createBillingAccessService({
+    now: () => Date.UTC(2026, 7, 14),
+  });
+  const access = await service.getEntitlement(MEMBER, {
+    provider: "stripe",
+    planId: "standard",
+    interval: "monthly",
+    status: "active",
+    currentPeriodEnd: "2026-08-13T23:59:59.000Z",
+  });
+  assert.equal(access.entitled, false);
+  assert.equal(access.source, "none");
+});
+
 test("tenant owner can grant and revoke tester access for a member", async () => {
   const service = createBillingAccessService({ listFallbackUsers: fallbackUsers });
   const granted = await service.setTesterGrant(OWNER, "member-1", { action: "grant" });

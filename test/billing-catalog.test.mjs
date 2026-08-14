@@ -11,6 +11,7 @@ import {
 function configuredEnv(overrides = {}) {
   return {
     AUDITA_BILLING_ENABLED: "true",
+    AUDITA_CREDITS_ENABLED: "true",
     APP_URL: "https://audita.example",
     STRIPE_SECRET_KEY: "sk_test_example",
     STRIPE_WEBHOOK_SECRET: "whsec_example",
@@ -28,9 +29,33 @@ test("billing readiness depends on Stripe, not the optional credit wallet", () =
   assert.equal(ready.checkoutReady, true);
   assert.equal(ready.webhookReady, true);
 
+  const creditsDisabled = billingConfiguration(
+    configuredEnv({ AUDITA_CREDITS_ENABLED: "false" }),
+  );
+  assert.equal(creditsDisabled.checkoutReady, true);
+
   const missingSecret = billingConfiguration(configuredEnv({ STRIPE_SECRET_KEY: "" }));
   assert.equal(missingSecret.checkoutReady, false);
   assert.ok(missingSecret.missing.includes("STRIPE_SECRET_KEY"));
+});
+
+test("placeholder Stripe credentials never make billing ready", () => {
+  const configuration = billingConfiguration(
+    configuredEnv({
+      STRIPE_SECRET_KEY: "change-me",
+      STRIPE_WEBHOOK_SECRET: "change-me",
+      APP_URL: "not-a-url",
+    }),
+  );
+
+  assert.equal(configuration.checkoutReady, false);
+  assert.equal(configuration.webhookReady, false);
+  assert.equal(configuration.stripeMode, "not_configured");
+  assert.deepEqual(configuration.missing, [
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "APP_URL",
+  ]);
 });
 
 test("public catalog exposes the Standard monthly and annual offer", () => {
@@ -42,6 +67,7 @@ test("public catalog exposes the Standard monthly and annual offer", () => {
   assert.equal(standard.prices.monthly.cents, 19900);
   assert.equal(standard.prices.annual.cents, 118800);
   assert.equal(standard.prices.monthly.checkoutAvailable, true);
+  assert.equal(catalog.creditPacks[0].checkoutAvailable, true);
   assert.match(standard.annualBenefits[0], /advogado parceiro/);
   assert.equal(catalog.rules.annualItauLegalSupportIncluded, true);
   assert.equal(catalog.rules.legalRepresentationIncluded, false);
@@ -76,6 +102,15 @@ test("credit pack selection remains available for future paid tools", () => {
   );
   assert.equal(selection.priceId, "price_credits_100");
   assert.equal(selection.credits, 100);
+});
+
+test("credit packs stay visible but cannot be purchased while credits are disabled", () => {
+  const catalog = getPublicBillingCatalog(
+    configuredEnv({ AUDITA_CREDITS_ENABLED: "false" }),
+  );
+
+  assert.equal(catalog.creditPacks[0].stripeConfigured, true);
+  assert.equal(catalog.creditPacks[0].checkoutAvailable, false);
 });
 
 test("missing Standard price prevents real checkout", () => {

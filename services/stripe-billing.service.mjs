@@ -8,6 +8,8 @@ import {
 } from "./billing-catalog.service.mjs";
 
 const STRIPE_API_BASE_URL = "https://api.stripe.com";
+const STRIPE_API_VERSION = "2026-06-24.dahlia";
+const STRIPE_INTEGRATION_IDENTIFIER = "audita_checkout_kmqrvzdp";
 const WEBHOOK_TOLERANCE_SECONDS = 300;
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
 
@@ -241,6 +243,9 @@ export function createStripeBillingService({
       ...base,
       appUrl: normalizeAppUrl(base.appUrl),
       apiBaseUrl: text(env.STRIPE_API_BASE_URL) || STRIPE_API_BASE_URL,
+      apiVersion: text(env.STRIPE_API_VERSION) || STRIPE_API_VERSION,
+      integrationIdentifier:
+        text(env.STRIPE_INTEGRATION_IDENTIFIER) || STRIPE_INTEGRATION_IDENTIFIER,
       secretKey: text(env.STRIPE_SECRET_KEY),
       webhookSecret: text(env.STRIPE_WEBHOOK_SECRET),
     };
@@ -268,6 +273,7 @@ export function createStripeBillingService({
       headers: {
         authorization: `Bearer ${config.secretKey}`,
         "content-type": "application/x-www-form-urlencoded",
+        "stripe-version": config.apiVersion,
         ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
       body: flattenStripeParams(params).toString(),
@@ -621,6 +627,13 @@ export function createStripeBillingService({
     }
     const selection = resolveBillingSelection(input, env);
     if (selection.invalid || selection.unavailable) return selection;
+    if (selection.kind === "credit_pack" && !config.creditsEnabled) {
+      return {
+        unavailable: true,
+        reason: "credits_not_enabled",
+        missing: ["AUDITA_CREDITS_ENABLED"],
+      };
+    }
 
     const customer = await ensureCustomer(authContext);
     const requestId = text(input.requestId) || crypto.randomUUID();
@@ -642,6 +655,7 @@ export function createStripeBillingService({
       locale: "pt-BR",
       billing_address_collection: "required",
       allow_promotion_codes: true,
+      integration_identifier: config.integrationIdentifier,
       line_items: [{ price: selection.priceId, quantity: 1 }],
       metadata: commonMetadata,
       ...(selection.kind === "subscription"
