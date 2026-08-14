@@ -643,18 +643,63 @@ if (stage) {
     };
   }
 
-  function assistantAvatar() {
-    return `
-      <span class="charge-analysis-avatar" aria-hidden="true">
-        <img src="assets/audita-profile-assistant.png" alt="" />
-      </span>
-    `;
+  const assistantAvatarAsset = "assets/audita-profile-assistant.png";
+  const assistantAvatarPreload = new Image();
+  assistantAvatarPreload.src = assistantAvatarAsset;
+  let floatingAssistantAvatar = null;
+
+  function assistantAvatarAnchor() {
+    return '<span class="charge-analysis-avatar-anchor" aria-hidden="true"></span>';
+  }
+
+  function ensureFloatingAssistantAvatar() {
+    if (!floatingAssistantAvatar) {
+      floatingAssistantAvatar = document.createElement("span");
+      floatingAssistantAvatar.className = "charge-analysis-avatar charge-analysis-floating-avatar";
+      floatingAssistantAvatar.setAttribute("aria-hidden", "true");
+      floatingAssistantAvatar.innerHTML = `<img src="${assistantAvatarAsset}" alt="" loading="eager" decoding="async" />`;
+    }
+    if (!stage.contains(floatingAssistantAvatar)) stage.appendChild(floatingAssistantAvatar);
+    return floatingAssistantAvatar;
+  }
+
+  function moveAssistantAvatar(conversation, { immediate = false } = {}) {
+    const avatar = ensureFloatingAssistantAvatar();
+    const assistantMessages = conversation?.querySelectorAll(".charge-analysis-message.assistant");
+    const target = assistantMessages?.[assistantMessages.length - 1];
+    const anchor = target?.querySelector(".charge-analysis-avatar-anchor");
+    if (!anchor) {
+      avatar.classList.remove("is-ready");
+      return;
+    }
+
+    const positionAvatar = () => {
+      const stageRect = stage.getBoundingClientRect();
+      const anchorRect = anchor.getBoundingClientRect();
+      avatar.style.setProperty("--charge-avatar-x", `${Math.round(anchorRect.left - stageRect.left + stage.scrollLeft)}px`);
+      avatar.style.setProperty("--charge-avatar-y", `${Math.round(anchorRect.top - stageRect.top + stage.scrollTop)}px`);
+      avatar.classList.add("is-ready");
+    };
+
+    if (immediate || !avatar.classList.contains("is-ready")) {
+      avatar.classList.add("is-positioning");
+      positionAvatar();
+      avatar.getBoundingClientRect();
+      avatar.classList.remove("is-positioning");
+      return;
+    }
+    window.requestAnimationFrame(positionAvatar);
+  }
+
+  function syncFloatingAssistantAvatar({ immediate = false } = {}) {
+    const conversation = stage.querySelector(".charge-analysis-conversation");
+    moveAssistantAvatar(conversation, { immediate });
   }
 
   function assistantMessage(content, label = "Audita · Triagem guiada", className = "") {
     return `
       <div class="charge-analysis-message assistant ${className}">
-        ${assistantAvatar()}
+        ${assistantAvatarAnchor()}
         <div class="charge-analysis-bubble">
           <small>${escapeChargeHtml(label)}</small>
           ${content}
@@ -674,7 +719,7 @@ if (stage) {
   function typingMessage() {
     return `
       <div class="charge-analysis-message assistant charge-analysis-message-typing" role="status">
-        ${assistantAvatar()}
+        ${assistantAvatarAnchor()}
         <div class="charge-analysis-typing">Audita est&aacute; digitando&hellip;</div>
       </div>
     `;
@@ -704,16 +749,19 @@ if (stage) {
   async function revealTriageMessages(sequenceId, conversation, messages) {
     if (!conversation) return;
     conversation.insertAdjacentHTML("beforeend", messages[0]);
+    moveAssistantAvatar(conversation, { immediate: true });
 
     for (const message of messages.slice(1)) {
       await messageDelay(1000);
       if (sequenceId !== messageSequenceId) return;
       conversation.insertAdjacentHTML("beforeend", typingMessage());
+      moveAssistantAvatar(conversation);
       scrollLatestMessage(conversation);
       await messageDelay(typingDelayFor(message));
       if (sequenceId !== messageSequenceId) return;
       conversation.lastElementChild?.remove();
       conversation.insertAdjacentHTML("beforeend", message);
+      moveAssistantAvatar(conversation);
       scrollLatestMessage(conversation);
     }
   }
@@ -733,6 +781,7 @@ if (stage) {
     await messageDelay(900);
     if (sequenceId !== messageSequenceId) return;
     conversation?.insertAdjacentHTML("beforeend", typingMessage());
+    moveAssistantAvatar(conversation);
     scrollLatestMessage(conversation);
     await messageDelay(1500);
     if (sequenceId !== messageSequenceId) return;
@@ -2049,6 +2098,7 @@ if (stage) {
     else if (state.screen === "ended") renderEnded();
     else if (triageStarted) renderTriage();
     else stage.innerHTML = '<div class="charge-analysis-conversation" data-charge-conversation></div>';
+    syncFloatingAssistantAvatar();
     setError(state.error);
   }
 

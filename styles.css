@@ -10801,6 +10801,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 }
 
 .charge-analysis-stage {
+  position: relative;
   min-height: 0;
   border: 0;
   background: transparent;
@@ -10822,6 +10823,34 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   grid-template-columns: 42px minmax(0, 1fr);
   align-items: start;
   gap: 20px;
+}
+
+.charge-analysis-avatar-anchor {
+  display: block;
+  width: 42px;
+  height: 42px;
+}
+
+.charge-analysis-floating-avatar {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(var(--charge-avatar-x, 0), var(--charge-avatar-y, 0), 0);
+  transition:
+    transform 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease;
+  will-change: transform;
+}
+
+.charge-analysis-floating-avatar.is-ready {
+  opacity: 1;
+}
+
+.charge-analysis-floating-avatar.is-positioning {
+  transition: none;
 }
 
 .charge-analysis-message-typing {
@@ -11245,6 +11274,11 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
     gap: 10px;
   }
 
+  .charge-analysis-avatar-anchor {
+    width: 36px;
+    height: 36px;
+  }
+
   .charge-analysis-message.user {
     width: auto;
     max-width: 84%;
@@ -11289,8 +11323,10 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 
 @media (prefers-reduced-motion: reduce) {
   .charge-analysis-message,
-  .charge-analysis-typing {
+  .charge-analysis-typing,
+  .charge-analysis-floating-avatar {
     animation: none;
+    transition: none;
   }
 }
 

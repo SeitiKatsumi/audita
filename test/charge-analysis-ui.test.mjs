@@ -265,6 +265,18 @@ test("charge analysis reveals agent messages before moving to the selected path"
   assert.match(appJs, /new CustomEvent\("audita:pagechange"/);
 });
 
+test("charge analysis reuses one avatar and moves it to the latest assistant message", () => {
+  assert.match(chargeAnalysisJs, /let floatingAssistantAvatar = null/);
+  assert.match(chargeAnalysisJs, /function assistantAvatarAnchor\(\)/);
+  assert.match(chargeAnalysisJs, /function ensureFloatingAssistantAvatar\(\)/);
+  assert.match(chargeAnalysisJs, /function moveAssistantAvatar\(conversation/);
+  assert.match(chargeAnalysisJs, /querySelectorAll\("\.charge-analysis-message\.assistant"\)/);
+  assert.match(chargeAnalysisJs, /stage\.appendChild\(floatingAssistantAvatar\)/);
+  assert.match(chargeAnalysisJs, /moveAssistantAvatar\(conversation\);/);
+  assert.match(stylesCss, /\.charge-analysis-floating-avatar\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?transform 460ms/);
+  assert.match(stylesCss, /\.charge-analysis-floating-avatar\.is-positioning\s*\{[\s\S]*?transition:\s*none/);
+});
+
 test("charge analysis starts with the two current self-assessment paths", () => {
   assert.match(
     chargeAnalysisJs,
