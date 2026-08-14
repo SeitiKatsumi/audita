@@ -65,13 +65,14 @@ test("sidebar keeps charge analysis at the main level and uses the selected adap
   assert.match(stylesCss, /body\.sidebar-collapsed \.nav-label\s*\{[\s\S]*?position:\s*absolute/);
 });
 
-test("Audita AI uses the branded neural icon and standard sidebar colors", () => {
+test("Audita AI uses a generic AI icon and standard sidebar colors", () => {
   const aiLink = indexHtml.match(
     /<a class="nav-ai" href="\/chat"[\s\S]*?<\/a>/,
   )?.[0];
 
   assert.ok(aiLink);
-  assert.match(aiLink, /assets\/nav-icons\/audita-ai\.svg/);
+  assert.match(aiLink, /assets\/nav-icons\/sparkles\.svg/);
+  assert.doesNotMatch(aiLink, /assets\/nav-icons\/audita-ai\.svg/);
   assert.doesNotMatch(aiLink, /square-rounded-letter-a\.svg/);
   assert.doesNotMatch(stylesCss, /\.nav-list a\.nav-ai \.nav-icon/);
   assert.doesNotMatch(stylesCss, /\.nav-list a\.nav-ai\s*\{/);
