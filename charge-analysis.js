@@ -724,7 +724,10 @@ if (stage) {
     stage.querySelectorAll("[data-charge-action]").forEach((action) => {
       action.disabled = true;
     });
-    conversation?.querySelector(".charge-analysis-message.question")?.remove();
+    conversation?.querySelectorAll(".charge-analysis-actions").forEach((actions) => {
+      actions.hidden = true;
+      actions.setAttribute("aria-hidden", "true");
+    });
     conversation?.insertAdjacentHTML("beforeend", userMessage(reply));
     scrollLatestMessage(conversation);
     await messageDelay(900);

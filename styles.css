@@ -10822,6 +10822,9 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   grid-template-columns: 42px minmax(0, 1fr);
   align-items: start;
   gap: 20px;
+}
+
+.charge-analysis-message-typing {
   animation: charge-message-in 220ms ease-out both;
 }
 
@@ -11492,7 +11495,9 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   .charge-analysis-workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
     min-height: calc(100dvh - 100px);
+    align-content: start;
     gap: 22px;
   }
 
@@ -11503,7 +11508,9 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
     left: auto;
     display: grid;
     width: 100%;
+    min-height: 0;
     grid-template-columns: repeat(7, minmax(0, 1fr));
+    align-self: start;
     gap: 0;
     padding: 12px 0;
     margin: 0;
@@ -11558,6 +11565,12 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   .charge-analysis-content .charge-analysis-message {
     width: 100%;
     max-width: none;
+  }
+
+  .charge-analysis-content .charge-analysis-message.assistant {
+    width: min(70%, 980px);
+    max-width: none;
+    align-self: flex-start;
   }
 
   .charge-analysis-content .charge-analysis-message.user {

@@ -175,6 +175,8 @@ test("charge analysis keeps the module-wide steps horizontal from authorization 
   assert.match(stylesCss, /\.charge-module-progress\s*\{/);
   assert.match(stylesCss, /\.charge-analysis-workspace > \.charge-module-progress\s*\{/);
   assert.match(stylesCss, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
+  assert.match(stylesCss, /grid-template-rows: auto minmax\(0, 1fr\)/);
+  assert.match(stylesCss, /\.charge-analysis-workspace > \.charge-module-progress\s*\{[\s\S]*?align-self: start/);
 });
 
 test("charge analysis exposes a searchable accessible FAQ dialog", () => {
@@ -310,6 +312,25 @@ test("assistant messages use a visual speech-bubble tail", () => {
   );
 });
 
+test("charge analysis keeps previous messages stable while loading the next step", () => {
+  assert.match(
+    chargeAnalysisJs,
+    /querySelectorAll\("\.charge-analysis-actions"\)[\s\S]*?actions\.hidden = true;[\s\S]*?insertAdjacentHTML\("beforeend", userMessage\(reply\)\)/,
+  );
+  assert.doesNotMatch(
+    chargeAnalysisJs,
+    /querySelector\("\.charge-analysis-message\.question"\)\?\.remove\(\)/,
+  );
+  assert.match(
+    stylesCss,
+    /\.charge-analysis-message-typing\s*\{[\s\S]*?animation:\s*charge-message-in 220ms ease-out both;/,
+  );
+  assert.doesNotMatch(
+    stylesCss,
+    /\.charge-analysis-message\s*\{[^}]*animation:\s*charge-message-in/,
+  );
+});
+
 test("charge analysis uses the full available desktop workspace", () => {
   assert.match(
     stylesCss,
@@ -317,7 +338,7 @@ test("charge analysis uses the full available desktop workspace", () => {
   );
   assert.match(
     stylesCss,
-    /\.charge-analysis-content \.charge-analysis-message\s*\{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*none;/,
+    /\.charge-analysis-content \.charge-analysis-message\.assistant\s*\{[\s\S]*?width:\s*min\(70%, 980px\);[\s\S]*?align-self:\s*flex-start;/,
   );
   assert.match(
     stylesCss,
