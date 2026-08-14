@@ -155,33 +155,17 @@ test("charge analysis exposes a guided flow without an open chat input", () => {
   assert.doesNotMatch(moduleMarkup, /textarea|contenteditable|chatInput/);
 });
 
-test("charge analysis keeps the module-wide steps horizontal from authorization to tribunal", () => {
-  const progressMarkup = indexHtml.match(
-    /<ol class="charge-analysis-progress charge-module-progress"[\s\S]*?<\/ol>/,
-  )?.[0];
+test("charge analysis keeps progress internal without rendering the step rail", () => {
+  const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page"');
+  const moduleEnd = indexHtml.indexOf('<section class="assistant-workbench"', moduleStart);
+  const moduleMarkup = indexHtml.slice(moduleStart, moduleEnd);
 
-  assert.ok(progressMarkup);
-  assert.match(progressMarkup, /data-charge-progress="authorization"/);
-  assert.match(progressMarkup, /data-charge-progress="statements"/);
-  assert.match(progressMarkup, /data-charge-progress="analysis"/);
-  assert.match(progressMarkup, /data-charge-progress="result"/);
-  assert.match(progressMarkup, /data-charge-progress="recovery"/);
-  assert.match(progressMarkup, /data-charge-progress="report"/);
-  assert.match(progressMarkup, /data-charge-progress="tribunal"/);
+  assert.doesNotMatch(moduleMarkup, /chargeAnalysisProgress|data-charge-progress=/);
   assert.match(indexHtml, /class="charge-analysis-workspace"/);
   assert.match(indexHtml, /class="charge-analysis-content"/);
-  assert.doesNotMatch(indexHtml, /chargeAnalysisProgressPercent|chargeAnalysisProgressMeter|charge-progress-summary|charge-progress-rail/);
   assert.match(chargeAnalysisJs, /buildChargeProgressSnapshot\(state\)/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-recovery-progress/);
-  assert.match(stylesCss, /\.charge-module-progress\s*\{/);
-  assert.match(stylesCss, /\.charge-analysis-workspace > \.charge-module-progress\s*\{/);
-  assert.match(stylesCss, /grid-template-columns: repeat\(7, minmax\(0, 1fr\)\)/);
-  assert.match(stylesCss, /grid-template-rows: auto minmax\(0, 1fr\)/);
-  assert.match(stylesCss, /\.charge-analysis-workspace > \.charge-module-progress\s*\{[\s\S]*?align-self: start/);
-  assert.match(
-    stylesCss,
-    /\.charge-analysis-workspace > \.charge-module-progress\s*\{[\s\S]*?border-bottom:\s*0;[\s\S]*?background:\s*transparent;/,
-  );
+  assert.match(stylesCss, /grid-template-rows: minmax\(0, 1fr\)/);
 });
 
 test("charge analysis exposes a searchable accessible FAQ dialog", () => {

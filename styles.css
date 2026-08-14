@@ -11531,10 +11531,10 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   .charge-analysis-workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     min-height: calc(100dvh - 100px);
     align-content: start;
-    gap: 22px;
+    gap: 0;
   }
 
   .charge-analysis-workspace > .charge-module-progress {
