@@ -240,7 +240,7 @@ const JEC_PORTALS = Object.freeze({
     allowedHosts: ["tjdft.jus.br", "atalho.tjdft.jus.br"],
     checkpoint: "Cadastro no PJe, assinatura, envio por e-mail, agendamento ou atendimento humano.",
     requirements: [
-      "Valor da causa de até 20 salários mínimos para seguir sem advogado no fluxo de pequenas causas da Audita.",
+      "Valor da causa de até 20 salários mínimos para seguir sem advogado no fluxo de pequenas causas da IA AUDITA.",
       "Petição inicial revisada, assinada e salva em PDF.",
       "RG ou CNH, CPF, comprovante de endereço e documentos que comprovem a reclamação, em arquivos separados.",
       "E-mail pessoal previamente cadastrado no PJe para usar o peticionamento por e-mail.",
@@ -258,7 +258,7 @@ const JEC_PORTALS = Object.freeze({
       steps: [
         "Confirme que o valor da causa é de até 20 salários mínimos e que o caso pode seguir no Juizado Especial Cível sem advogado.",
         "Confirme a competência territorial. Em regra, use o local indicado para o seu domicílio, mas confira a orientação do TJDFT para o caso concreto.",
-        "Como a Audita já prepara o PDF, escolha a opção do NUPEVI para enviar uma petição pronta por e-mail.",
+        "Como a IA AUDITA já prepara o PDF, escolha a opção do NUPEVI para enviar uma petição pronta por e-mail.",
         "Cadastre previamente seu e-mail pessoal no PJe, caso ainda não tenha cadastro.",
         "Revise e assine a petição, com assinatura física digitalizada ou assinatura digital.",
         "Separe, em arquivos legíveis, RG ou CNH, CPF, comprovante de endereço e todas as provas da cobrança.",
@@ -518,7 +518,7 @@ const MANUAL_FILING_STEPS = Object.freeze({
 function genericManualFilingSteps(portal) {
   return [
     "Confirme que o valor da causa é de até 20 salários mínimos e que o pedido pode seguir como pequena causa sem advogado.",
-    `Acesse o canal oficial do ${portal.tribunal} pelo link indicado pela Audita.`,
+    `Acesse o canal oficial do ${portal.tribunal} pelo link indicado pela IA AUDITA.`,
     "Confirme a comarca, a unidade competente e o caminho do Juizado Especial Cível.",
     "Faça o login, cadastro, agendamento ou atendimento somente no ambiente oficial quando solicitado.",
     "Apresente os dados do consumidor, do Itaú e o relato conforme o Relatório Técnico revisado.",
@@ -591,7 +591,7 @@ export function getJecManualFilingGuide(uf, { city = "", caseValue = null } = {}
     smallClaims,
     finalActionHumanOnly: true,
     note:
-      "A Audita atua, por enquanto, somente com pequenas causas de até 20 salários mínimos. Ela prepara o Relatório Técnico em PDF e orienta o caminho; login, anexos, escolhas jurídicas e protocolo final são feitos pelo usuário.",
+      "A IA AUDITA atua, por enquanto, somente com pequenas causas de até 20 salários mínimos. Ela prepara o Relatório Técnico em PDF e orienta o caminho; login, anexos, escolhas jurídicas e protocolo final são feitos pelo usuário.",
   };
 }
 
@@ -635,8 +635,8 @@ export function evaluateJecSmallClaims(caseValue) {
       "Pequenas causas são tratadas no Juizado Especial Cível. Em causas de até 20 salários mínimos, a assistência por advogado é facultativa na primeira instância; recursos exigem advogado e podem envolver custas e honorários. Não existe garantia de risco zero.",
     contact: {
       available: false,
-      label: "Falar com o time Audita",
-      message: "Canal de atendimento em preparação. Em breve você poderá solicitar uma avaliação do time Audita por aqui.",
+      label: "Falar com o time IA AUDITA",
+      message: "Canal de atendimento em preparação. Em breve você poderá solicitar uma avaliação do time IA AUDITA por aqui.",
     },
   };
 }
@@ -841,14 +841,14 @@ function buildDocumentAvailabilityContext(caseData = {}, journey = "") {
   if (availability === "partial") {
     return "O(A) Autor(a) apresentou somente parte dos extratos/faturas. Os demais documentos do período permanecem em poder da instituição financeira e são necessários para completar a apuração.";
   }
-  return "O(A) Autor(a) não dispõe dos extratos/faturas necessários para quantificar a cobrança. Nenhum valor foi estimado pela Audita; a apuração depende da exibição dos documentos pela instituição financeira.";
+  return "O(A) Autor(a) não dispõe dos extratos/faturas necessários para quantificar a cobrança. Nenhum valor foi estimado pela IA AUDITA; a apuração depende da exibição dos documentos pela instituição financeira.";
 }
 
 function buildEvidenceContext(caseData = {}, journey = "") {
   const summary = buildEvidenceSummary(caseData);
   const availability = resolveDocumentAvailability(caseData, journey);
   if (summary) {
-    return `Nos documentos apresentados, a Audita localizou ${summary}. O(A) Autor(a) marcou esses lançamentos como não reconhecidos. A classificação jurídica e a regularidade da contratação permanecem sujeitas à prova e à revisão do caso concreto.`;
+    return `Nos documentos apresentados, a IA AUDITA localizou ${summary}. O(A) Autor(a) marcou esses lançamentos como não reconhecidos. A classificação jurídica e a regularidade da contratação permanecem sujeitas à prova e à revisão do caso concreto.`;
   }
   if (availability === "none") {
     const description = cleanText(
@@ -867,7 +867,7 @@ function buildContractConfirmationContext(caseData = {}) {
   if (!getDisputedCandidates(caseData).length) {
     return "A existência, o conteúdo e a forma de eventual contratação permanecem sujeitos à exibição do instrumento e dos registros de consentimento pela instituição financeira.";
   }
-  return "O(A) Autor(a) declarou não reconhecer a contratação correspondente aos lançamentos indicados e não localizou, entre os documentos submetidos à Audita, contrato ou registro de consentimento. Cabe à instituição financeira apresentar eventual prova de adesão, sem que a ausência do documento em poder do consumidor seja tratada isoladamente como prova definitiva.";
+  return "O(A) Autor(a) declarou não reconhecer a contratação correspondente aos lançamentos indicados e não localizou, entre os documentos submetidos à IA AUDITA, contrato ou registro de consentimento. Cabe à instituição financeira apresentar eventual prova de adesão, sem que a ausência do documento em poder do consumidor seja tratada isoladamente como prova definitiva.";
 }
 
 function buildPriorComplaintContext(caseData = {}) {
@@ -901,12 +901,12 @@ function buildTechnicalReportSection(caseData = {}, journey = "") {
     ? ` Os documentos de origem identificados são: ${files.join(", ")}.`
     : "";
   if (availability === "complete") {
-    return `Junta-se o Relatório Técnico de Auditoria da Audita, limitado aos lançamentos extraídos dos documentos apresentados e confirmados pelo consumidor como não reconhecidos.${attachmentText}`;
+    return `Junta-se o Relatório Técnico de Auditoria da IA AUDITA, limitado aos lançamentos extraídos dos documentos apresentados e confirmados pelo consumidor como não reconhecidos.${attachmentText}`;
   }
   if (availability === "partial") {
     return `Junta-se relatório técnico parcial, limitado aos lançamentos efetivamente localizados nos documentos apresentados. O relatório não presume cobranças nos períodos ausentes e deve ser complementado após a exibição dos documentos faltantes.${attachmentText}`;
   }
-  return "Sem extratos/faturas, não há relatório financeiro de valores apurados. O pedido de exibição documental busca obter a base necessária para futura análise, sem estimativa automática pela Audita.";
+  return "Sem extratos/faturas, não há relatório financeiro de valores apurados. O pedido de exibição documental busca obter a base necessária para futura análise, sem estimativa automática pela IA AUDITA.";
 }
 
 function hasCurrentChargeRisk(caseData = {}) {
@@ -1141,7 +1141,7 @@ export function prepareJecPetition({
         "Comprovante de endereço",
         ...(documentAvailability === "none"
           ? []
-          : ["Relatório Técnico da Audita", "Extratos/faturas de origem" ]),
+          : ["Relatório Técnico da IA AUDITA", "Extratos/faturas de origem" ]),
       ],
       documentaryCoverage: documentAvailability,
     },
@@ -1153,7 +1153,7 @@ export function prepareJecPetition({
     warnings: [
       "Rascunho baseado no modelo fornecido: revise fatos, competência territorial, pedidos e valor da causa.",
       `Fonte do texto-base: ${template.sourceFile}.`,
-      "Os valores jurídicos não são presumidos pela Audita; a sugestão usa somente lançamentos documentados e todos os valores devem ser revisados.",
+      "Os valores jurídicos não são presumidos pela IA AUDITA; a sugestão usa somente lançamentos documentados e todos os valores devem ser revisados.",
       ...(documentAvailability === "partial"
         ? ["A prova é parcial: o relatório e os valores abrangem somente os documentos enviados; o Modelo 2 pede a exibição do restante."]
         : []),
@@ -1162,7 +1162,7 @@ export function prepareJecPetition({
         : []),
       ...(smallClaimsEligibility.status === "above_limit"
         ? [
-            `O valor da causa ultrapassa o limite operacional de R$ ${formatPetitionMoney(smallClaimsEligibility.maximumCaseValueBrl)} para o fluxo sem advogado. A Audita não abrirá o portal de pequenas causas e exibirá o contato provisório do time.`,
+            `O valor da causa ultrapassa o limite operacional de R$ ${formatPetitionMoney(smallClaimsEligibility.maximumCaseValueBrl)} para o fluxo sem advogado. A IA AUDITA não abrirá o portal de pequenas causas e exibirá o contato provisório do time.`,
           ]
         : []),
       ...(templateId === "document_exhibition" && !normalizedClaimant.bankAgency

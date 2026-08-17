@@ -312,7 +312,7 @@ export function rewriteSteelViewerHtml(html, websocketUrl) {
     </script>
 </body>`,
     )
-    .replace(/<title>Steel Session Player<\/title>/i, "<title>Navegador Audita</title>");
+    .replace(/<title>Steel Session Player<\/title>/i, "<title>Navegador IA AUDITA</title>");
 }
 
 export function createChatBrowserService({

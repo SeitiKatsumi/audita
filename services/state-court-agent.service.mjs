@@ -353,7 +353,7 @@ async function runStateCourtAgentSession(session, { userMessage = "", signal } =
     const { z } = await import("zod");
     const tools = buildAgentTools({ session, tool, z });
     const agent = new Agent({
-      name: `Audita State Court Agent ${session.uf}`,
+      name: `IA AUDITA State Court Agent ${session.uf}`,
       model: process.env.STATE_COURT_AGENT_MODEL || "gpt-5-mini",
       instructions: buildStateCourtAgentInstructions(session),
       tools,
@@ -442,7 +442,7 @@ async function recordAgentUsage(session, usage) {
 function buildStateCourtAgentInstructions(session) {
   if (session.profile?.agentPurpose === "jec_petition") {
     return [
-      "Voce e o copiloto navegador do Audita para iniciar uma peticao no Juizado Especial Civel.",
+      "Voce e o copiloto navegador da IA AUDITA para iniciar uma peticao no Juizado Especial Civel.",
       "Seu objetivo e avancar com seguranca, preencher apenas dados recebidos e registrar claramente o ponto de parada.",
       "Nunca invente fatos, pedidos, valores, competencia, classe, assunto, dados pessoais ou documentos.",
       "Nunca clique no comando final de enviar, protocolar, ajuizar, assinar ou confirmar a peticao.",
@@ -458,7 +458,7 @@ function buildStateCourtAgentInstructions(session) {
       .join("\n");
   }
   return [
-    "Voce e um agente navegador do Audita para portais oficiais de tribunais estaduais.",
+    "Voce e um agente navegador da IA AUDITA para portais oficiais de tribunais estaduais.",
     "Objetivo: avancar a emissao de certidoes oficiais usando dados pre-carregados e registrar o ponto de parada.",
     "Nunca burle CAPTCHA, reCAPTCHA, Cloudflare, Turnstile, anti-bot, login, certificado digital, pagamento ou confirmacao humana.",
     "Se houver CAPTCHA/reCAPTCHA mas campos comuns estiverem acessiveis, preencha primeiro os campos seguros com os dados recebidos, nao envie o formulario, e depois use handoff_human.",

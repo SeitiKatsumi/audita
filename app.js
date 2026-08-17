@@ -884,11 +884,11 @@ const auditSourceLabels = {
 
 const pageMeta = {
   chat: {
-    title: "Audita IA",
+    title: "IA AUDITA",
     eyebrow: "Intelig\u00eancia jur\u00eddica conversacional",
   },
   home: {
-    title: "Audita",
+    title: "IA AUDITA",
     eyebrow: "Plataforma de certidões inteligentes",
   },
   consultas: {
@@ -1300,7 +1300,7 @@ function renderStateCourtAssistPanel(court = getSelectedStateCourt()) {
         </div>
         <div class="assisted-portal-placeholder">
           <strong>${escapeHtml(title)}</strong>
-          <span>Por segurança do tribunal, esta verificação não aparece dentro de iframe. Depois de confirmar, volte ao Audita e continue a consulta.</span>
+          <span>Por segurança do tribunal, esta verificação não aparece dentro de iframe. Depois de confirmar, volte à IA AUDITA e continue a consulta.</span>
         </div>
       </section>
     `
@@ -1309,7 +1309,7 @@ function renderStateCourtAssistPanel(court = getSelectedStateCourt()) {
         <div class="assisted-portal-head">
           <div>
             <strong>Validação após o preenchimento</strong>
-            <small>O Audita vai preencher o portal oficial depois que você criar a consulta. Se aparecer reCAPTCHA/captcha, uma sessão oficial já preenchida ficará aberta para confirmação.</small>
+            <small>A IA AUDITA vai preencher o portal oficial depois que você criar a consulta. Se aparecer reCAPTCHA/captcha, uma sessão oficial já preenchida ficará aberta para confirmação.</small>
           </div>
           <a class="audit-official-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer">Abrir em nova aba</a>
         </div>
@@ -1704,7 +1704,7 @@ function updateAuditSourceAvailability({ resetSelection = true } = {}) {
     if (label) {
       label.title = documentCompatible
         ? config.note
-        : `${config.note} O Audita pedirá o documento compatível quando necessário.`;
+        : `${config.note} A IA AUDITA pedirá o documento compatível quando necessário.`;
       label.querySelector(".audit-option-badge")?.remove();
     }
 
@@ -2273,7 +2273,7 @@ function renderCourtCertificateIntake(action) {
         </div>
         <div class="court-certificate-actions">
           <button type="submit">Consultar certidão</button>
-          <small>${escapeHtml(String(configuration.creditCost || 1))} crédito Audita por consulta concluída.</small>
+          <small>${escapeHtml(String(configuration.creditCost || 1))} crédito IA AUDITA por consulta concluída.</small>
         </div>
       </form>
     </article>
@@ -2350,7 +2350,7 @@ function renderChatActions(actions) {
           return `
             <article>
               <div>
-                <strong>${escapeHtml(action.title || "Continuar no Audita")}</strong>
+                <strong>${escapeHtml(action.title || "Continuar na IA AUDITA")}</strong>
                 <small>${escapeHtml(action.description || "Abra o modulo para continuar com seguranca.")}</small>
               </div>
               ${
@@ -2769,7 +2769,7 @@ function syncChatBrowserUi() {
   }
   if (chatBrowserLocation) {
     chatBrowserLocation.textContent =
-      chatBrowserHostname(session.url || session.portalUrl) || "Sessão segura da Audita";
+      chatBrowserHostname(session.url || session.portalUrl) || "Sessão segura da IA AUDITA";
   }
   if (chatBrowserControlStatus) {
     chatBrowserControlStatus.textContent = humanControl
@@ -3044,7 +3044,7 @@ function renderJecCourtMonitoring(caseData = {}, state = {}) {
       <div class="jec-next-option-heading">
         <div>
           <strong>Acompanhar o processo no TJ</strong>
-          <p>Depois que o tribunal gerar o número, consulte movimentações sem sair da Audita.</p>
+          <p>Depois que o tribunal gerar o número, consulte movimentações sem sair da IA AUDITA.</p>
         </div>
         <span class="jec-read-only-badge">Somente leitura</span>
       </div>
@@ -3105,12 +3105,12 @@ function renderJecManualFiling(caseData = {}, state = {}) {
       </div>
       <div class="jec-small-claims-explainer ${aboveLimit ? "is-blocked" : "is-eligible"}" role="note">
         <strong>${aboveLimit ? "Fora do limite de pequenas causas atendido" : "Pequenas causas"}</strong>
-        <p>O Juizado Especial Cível recebe as pequenas causas. A Audita orienta, por enquanto, somente casos de até 20 salários mínimos, que podem seguir sem advogado. Em 2026, o limite corresponde a ${escapeHtml(limitLabel)}.</p>
+        <p>O Juizado Especial Cível recebe as pequenas causas. A IA AUDITA orienta, por enquanto, somente casos de até 20 salários mínimos, que podem seguir sem advogado. Em 2026, o limite corresponde a ${escapeHtml(limitLabel)}.</p>
         ${eligibility.known ? `<span>Valor da causa nesta simulação: ${escapeHtml(caseValueLabel)}.</span>` : ""}
       </div>
       ${aboveLimit ? `
         <div class="jec-contact-placeholder">
-          <strong>Fale com o time Audita</strong>
+          <strong>Fale com o time IA AUDITA</strong>
           <p>Este caso ultrapassa 20 salários mínimos e exige atendimento profissional. O canal de contato ainda está em preparação.</p>
           <button class="secondary-action" type="button" disabled>Contato em breve</button>
         </div>
@@ -3130,8 +3130,8 @@ function renderJecManualFiling(caseData = {}, state = {}) {
           ${renderJecCourtMonitoring(caseData, state)}
           <section class="jec-next-option">
             <strong>Precisa de suporte profissional?</strong>
-            <p>A IA continua disponível para dúvidas. Se preferir, conheça também o atendimento opcional de um advogado da Audita.</p>
-            <button class="secondary-action" type="button" data-chat-prompt="Quero entender como funciona o suporte profissional de um advogado da Audita para revisar meu caso.">Conhecer suporte profissional</button>
+            <p>A IA continua disponível para dúvidas. Se preferir, conheça também o atendimento opcional de um advogado da IA AUDITA.</p>
+            <button class="secondary-action" type="button" data-chat-prompt="Quero entender como funciona o suporte profissional de um advogado da IA AUDITA para revisar meu caso.">Conhecer suporte profissional</button>
           </section>
         </div>
       `}
@@ -3285,7 +3285,7 @@ function renderJecPetitionPanel(caseData = {}) {
         }
         <details class="jec-petition-values" ${prepared ? "open" : ""}>
           <summary>Valores dos pedidos para revisão</summary>
-          <p>A Audita sugere uma estimativa inicial com base no que foi confirmado na conversa. Revise e edite os valores antes de gerar o rascunho.</p>
+          <p>A IA AUDITA sugere uma estimativa inicial com base no que foi confirmado na conversa. Revise e edite os valores antes de gerar o rascunho.</p>
           ${
             suggestion
               ? `
@@ -3509,7 +3509,7 @@ function renderItauCaseCard(caseData) {
             <details class="itau-review-details">
               <summary>Informar contexto adicional</summary>
               <form class="itau-review-form" data-itau-review-form="${escapeHtml(caseData.id)}">
-                <p>Use estes campos somente quando a Audita pedir o dado correspondente.</p>
+                <p>Use estes campos somente quando a IA AUDITA pedir o dado correspondente.</p>
                 <div class="itau-review-grid">
                   <label>
                     <span>A cobrança aparece em outros meses?</span>
@@ -3597,7 +3597,7 @@ function renderActiveJecFlow(thread) {
     <article class="chat-message-row assistant chat-jec-flow-row" data-jec-flow-case="${escapeHtml(active.caseData.id)}">
       <span class="chat-message-avatar"><img src="assets/audita-logo-original.png" alt="" /></span>
       <div class="chat-message-content">
-        <strong>Audita IA</strong>
+        <strong>IA AUDITA</strong>
         <div class="chat-message-body">Complete os dados seguros abaixo para gerar o Relatório Técnico em PDF. Depois você receberá o link e o passo a passo do tribunal.</div>
         ${renderJecPetitionPanel(active.caseData)}
       </div>
@@ -3703,7 +3703,7 @@ function renderChatMessages() {
               : ""
           }
           <div class="chat-message-content">
-            ${message.role === "assistant" ? "<strong>Audita IA</strong>" : ""}
+            ${message.role === "assistant" ? "<strong>IA AUDITA</strong>" : ""}
             <div class="chat-message-body">${formatChatText(message.content)}</div>
             ${message.attachment ? `<div class="chat-message-attachment">${escapeHtml(message.attachment.name)} <small>${escapeHtml(message.attachment.type || "arquivo")}</small></div>` : ""}
             ${renderItauCaseCard(message.itauCase)}
@@ -3731,7 +3731,7 @@ function renderChatMessages() {
         <article class="chat-message-row assistant chat-message-loading">
           <span class="chat-message-avatar"><img src="assets/audita-logo-original.png" alt="" /></span>
           <div class="chat-message-content">
-            <strong>Audita IA</strong>
+            <strong>IA AUDITA</strong>
             <div class="chat-thinking" aria-label="Analisando"><i></i><i></i><i></i></div>
           </div>
         </article>
@@ -4202,7 +4202,7 @@ function courtCertificateErrorMessage(code, billingVerificationRequired = false)
     invalid_birth_date: "Confira a data de nascimento.",
     invalid_certificate_type: "Selecione um tipo de certidão válido.",
     unsupported_uf: "Esta UF não está habilitada nesta integração.",
-    insufficient_credits: "Não há créditos Audita suficientes para esta consulta.",
+    insufficient_credits: "Não há créditos IA AUDITA suficientes para esta consulta.",
     direct_data_certificates_disabled: "A integração de certidões ainda não está habilitada.",
     direct_data_token_missing: "A credencial da Direct Data ainda não está configurada.",
     provider_authentication_failed: "A Direct Data recusou a credencial configurada.",
@@ -4348,7 +4348,7 @@ async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment)
     });
     const data = await response.json().catch(() => ({}));
     if (response.status === 401) {
-      showLogin("Entre para conversar com a Audita IA.");
+      showLogin("Entre para conversar com a IA AUDITA.");
       return;
     }
     if (!response.ok) {
@@ -5202,7 +5202,7 @@ function renderAuditEvidenceForm(audit, execution) {
       </label>
       <input name="generatedFileName" type="hidden" value="" />
       <input name="generatedContentBase64" type="hidden" value="" />
-      <button class="primary-action" type="button" data-evidence-submit>Trazer para o Audita</button>
+      <button class="primary-action" type="button" data-evidence-submit>Trazer para a IA AUDITA</button>
     </div>
   `;
   if (!isAssistedRemote) {
@@ -5389,7 +5389,7 @@ function renderAssistedPortalFrame(execution) {
         <div class="assisted-portal-head">
           <div>
             <strong>Navegador remoto assistido</strong>
-            <small>Portal oficial aberto pelo Audita. Conclua a validação humana quando aparecer.</small>
+            <small>Portal oficial aberto pela IA AUDITA. Conclua a validação humana quando aparecer.</small>
           </div>
           <div class="assisted-remote-actions">
             <button class="primary-action" type="button" data-assisted-action="submit">Enviar no portal</button>
@@ -5443,7 +5443,7 @@ function renderAssistedPortalFrame(execution) {
           assistedSession
             ? escapeHtml(sessionOpen === false
               ? "A sessão oficial não ficou aberta neste ambiente. Use o portal oficial ou reexecute com navegador assistido habilitado."
-              : "O portal foi preenchido em uma sessão oficial aberta. Resolva a validação nessa janela e traga o PDF/protocolo para o Audita.")
+              : "O portal foi preenchido em uma sessão oficial aberta. Resolva a validação nessa janela e traga o PDF/protocolo para a IA AUDITA.")
             : "Validação protegida tratada em janela oficial."
         }</small>
       </div>
@@ -6917,7 +6917,7 @@ function setLoginMode(mode) {
     loginEyebrow.textContent = isRegister ? "Cadastro seguro" : "Acesso seguro";
   }
   if (loginTitle) {
-    loginTitle.textContent = isRegister ? "Criar conta" : "Audita";
+    loginTitle.textContent = isRegister ? "Criar conta" : "IA AUDITA";
   }
   if (loginSubmitButton) {
     loginSubmitButton.textContent = isRegister ? "Cadastrar e entrar" : "Entrar";
@@ -6952,7 +6952,7 @@ function renderAgentSettings(settings) {
   agentProviderStatus.value = settings.status || "draft";
   agentSystemPrompt.value =
     settings.systemPrompt ||
-    "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.";
+    "Você é o Agente IA AUDITA. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.";
   agentSettingsStatus.textContent = settings.configured ? "Secret detectado" : "Aguardando secret";
 }
 
@@ -7382,10 +7382,10 @@ async function loadAppConfig() {
 
     const config = await response.json();
     environmentName.textContent = formatEnvironmentName(config.environment || "local");
-    environmentDetail.textContent = config.appUrl ? new URL(config.appUrl).hostname : "Ambiente Audita";
+    environmentDetail.textContent = config.appUrl ? new URL(config.appUrl).hostname : "Ambiente IA AUDITA";
   } catch {
     environmentName.textContent = "Local";
-    environmentDetail.textContent = "Ambiente Audita";
+    environmentDetail.textContent = "Ambiente IA AUDITA";
   }
 }
 
@@ -8472,7 +8472,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
     renderSellerAnalysisFailure({
       documento: formatJecCpf(cpf),
-      message: "Falha de comunicação com a API da Audita.",
+      message: "Falha de comunicação com a API da IA AUDITA.",
       detail: "A extração não permaneceu em execução silenciosamente.",
     });
   } finally {

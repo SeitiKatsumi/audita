@@ -326,7 +326,7 @@ const auditSources = [
     requiredFields: ["document", "uf"],
     optionalFields: ["name", "registrationNumber", "registryOffice"],
     summary: "Pesquisa de matrículas, confirmação qualificada e certidão digital pelo ecossistema oficial ONR/RI Digital.",
-    manualInstruction: "Conclua o pedido oficial no RI Digital e registre protocolo, relatório ou certidão no Audita. Não há scraping.",
+    manualInstruction: "Conclua o pedido oficial no RI Digital e registre protocolo, relatório ou certidão na IA AUDITA. Não há scraping.",
   },
   {
     id: "cnib",
@@ -1105,7 +1105,7 @@ async function bootstrapAdminUser() {
 
   const email = String(process.env.AUDITA_BOOTSTRAP_ADMIN_EMAIL || "").trim();
   const password = String(process.env.AUDITA_BOOTSTRAP_ADMIN_PASSWORD || "").trim();
-  const name = String(process.env.AUDITA_BOOTSTRAP_ADMIN_NAME || "Audita Admin").trim();
+  const name = String(process.env.AUDITA_BOOTSTRAP_ADMIN_NAME || "IA AUDITA Admin").trim();
 
   if (!email || !password) {
     return;
@@ -2605,7 +2605,7 @@ async function getAgentSettings(request) {
       model: "gpt-5-mini",
       apiKeySecretRef: "AUDITA_OPENAI_API_KEY",
       systemPrompt:
-        "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
+        "Você é o Agente IA AUDITA. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
       status: "draft",
       configured: Boolean(process.env.AUDITA_OPENAI_API_KEY),
     };
@@ -2636,7 +2636,7 @@ async function getAgentSettings(request) {
       model: "gpt-5-mini",
       apiKeySecretRef: "AUDITA_OPENAI_API_KEY",
       systemPrompt:
-        "Você é o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
+        "Você é o Agente IA AUDITA. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.",
       status: "draft",
       updatedAt: null,
     };
@@ -4856,7 +4856,7 @@ async function handleApi(request, response, pathname) {
       sendJson(response, timedOut ? 504 : 500, {
         error: timedOut ? "chat_timeout" : "chat_failed",
         message: timedOut
-          ? "A Audita demorou mais que o esperado para responder."
+          ? "A IA AUDITA demorou mais que o esperado para responder."
           : "Nao foi possivel concluir esta conversa.",
       });
     }

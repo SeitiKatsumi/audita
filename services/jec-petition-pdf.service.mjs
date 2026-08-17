@@ -194,7 +194,7 @@ export async function createJecPetitionPdf(
       headerTemplate: "<span></span>",
       footerTemplate: `
         <div style="width:100%;padding:0 22mm 6mm 30mm;font:8px Arial,sans-serif;color:#667085;display:flex;justify-content:space-between;">
-          <span>Relatório Técnico gerado pela Audita - revisar antes do protocolo</span>
+          <span>Relatório Técnico gerado pela IA AUDITA - revisar antes do protocolo</span>
           <span><span class="pageNumber"></span>/<span class="totalPages"></span></span>
         </div>
       `,

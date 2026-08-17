@@ -13,7 +13,7 @@ function slugPart(value) {
 }
 
 export function buildSelfServeTenantIdentity({ name, email, nonce }) {
-  const accountName = normalizedText(name) || "Cliente Audita";
+  const accountName = normalizedText(name) || "Cliente IA AUDITA";
   const emailPrefix = normalizedText(email).split("@")[0];
   const base = slugPart(accountName) || slugPart(emailPrefix) || "cliente";
   const suffix = slugPart(nonce).slice(0, 12) || "conta";

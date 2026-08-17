@@ -323,7 +323,7 @@ export function createOpenAIOfficialUsageService({
         costs: aggregateOpenAICosts(costPages),
         syncedAt: new Date(now()).toISOString(),
         source: "OpenAI Organization Usage and Costs APIs",
-        message: "Valores oficiais filtrados pelo projeto e pela chave de API da Audita.",
+        message: "Valores oficiais filtrados pelo projeto e pela chave de API da IA AUDITA.",
       };
       cache.set(cacheKey, { cachedAt: now(), value });
       return value;

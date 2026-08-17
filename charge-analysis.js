@@ -696,7 +696,7 @@ if (stage) {
     moveAssistantAvatar(conversation, { immediate });
   }
 
-  function assistantMessage(content, label = "Audita · Triagem guiada", className = "") {
+  function assistantMessage(content, label = "IA AUDITA · Triagem guiada", className = "") {
     return `
       <div class="charge-analysis-message assistant ${className}">
         ${assistantAvatarAnchor()}
@@ -720,7 +720,7 @@ if (stage) {
     return `
       <div class="charge-analysis-message assistant charge-analysis-message-typing" role="status">
         ${assistantAvatarAnchor()}
-        <div class="charge-analysis-typing">Audita est&aacute; digitando&hellip;</div>
+        <div class="charge-analysis-typing">IA AUDITA est&aacute; digitando&hellip;</div>
       </div>
     `;
   }
@@ -916,6 +916,12 @@ if (stage) {
     }
   }
 
+  function chargeAnalysisIntroMarkup() {
+    return `
+      <p>Ol&aacute;! Sou a IA AUDITA. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os (Prestamista, Cartão/Bolsa Protegida, Perda e Roubo, Proteção Financeira / Perda de Renda, Acidentes Pessoais / Vida, Tarifas e Pacotes de Terceiros). Válido para cartões Itaú, Itaucard e <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras de cart&otilde;es de parceiras">133 parceiras</button> (Casas Bahia, Magalu, Ponto, Marisa etc.).</p>
+    `;
+  }
+
   function renderTriage() {
     const sequenceId = ++messageSequenceId;
     const responseButtons = `
@@ -930,10 +936,10 @@ if (stage) {
     `;
     const messages = [
       assistantMessage(`
-        <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard ou nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras de cart&otilde;es de parceiras">133 bandeiras de cart&otilde;es de parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
+        ${chargeAnalysisIntroMarkup()}
         <p class="charge-analysis-intro-question"><strong>Voc&ecirc; possui ou possuiu algum cart&atilde;o dessas bandeiras?</strong></p>
         ${responseButtons}
-      `, "Audita", "charge-analysis-intro-message"),
+      `, "IA AUDITA", "charge-analysis-intro-message"),
     ];
 
     stage.innerHTML = `
@@ -1062,9 +1068,7 @@ if (stage) {
 
     return `
       <div class="charge-analysis-conversation compact" data-charge-conversation>
-        ${assistantMessage(`
-          <p>Ol&aacute;! Sou a Audita. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os n&atilde;o autorizados em cart&otilde;es Ita&uacute;, Itaucard ou nos <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir as refer&ecirc;ncias de bandeiras parceiras">133 bandeiras de cart&otilde;es de parceiras</button>, como Casas Bahia e Magazine Luiza.</p>
-        `, "Audita", "charge-analysis-intro-message")}
+        ${assistantMessage(chargeAnalysisIntroMarkup(), "IA AUDITA", "charge-analysis-intro-message")}
         ${userMessage(routeIdentityMessage())}
         ${assistantMessage(`
           <p><strong>Voc&ecirc; possui as faturas ou os extratos de todo o per&iacute;odo em que acredita ter recebido essa cobran&ccedil;a?</strong></p>
@@ -1082,7 +1086,7 @@ if (stage) {
           <p><strong>${documentPrompt}</strong></p>
           <p>${documentDetail}</p>
           <p>${routeCopy}</p>
-        `, "Audita &middot; An&aacute;lise", "question") : ""}
+        `, "IA AUDITA &middot; An&aacute;lise", "question") : ""}
       </div>
     `;
   }
@@ -1107,7 +1111,7 @@ if (stage) {
         ${userMessage("Não tenho nenhum extrato disponível.")}
         ${assistantMessage(`
           <p><strong>As faturas ou os extratos são necessários para continuar.</strong></p>
-          <p>A Audita não consegue substituir documentos por estimativas. Sem ao menos um documento, não há base para calcular valores, gerar relatório técnico ou preparar uma eventual medida jurídica.</p>
+          <p>A IA AUDITA não consegue substituir documentos por estimativas. Sem ao menos um documento, não há base para calcular valores, gerar relatório técnico ou preparar uma eventual medida jurídica.</p>
           <p>Solicite os documentos ao Itaú pelos canais oficiais e retorne quando receber ao menos parte do período.</p>
         `, "Documentos necessários")}
       </div>
@@ -1142,7 +1146,7 @@ if (stage) {
         <div class="charge-document-request">
           <label for="chargeDocumentRequestTemplate">Carta completa para copiar e preencher</label>
           <textarea id="chargeDocumentRequestTemplate" rows="18" readonly>${escapeChargeHtml(ITAU_DOCUMENT_REQUEST_TEMPLATE)}</textarea>
-          <p>Preencha apenas no canal oficial escolhido. A Audita não envia esta solicitação em seu nome.</p>
+          <p>Preencha apenas no canal oficial escolhido. A IA AUDITA não envia esta solicitação em seu nome.</p>
           <button type="button" class="secondary-action" data-charge-action="copy-document-request">Copiar carta</button>
           <span id="chargeDocumentRequestCopyStatus" role="status" aria-live="polite"></span>
         </div>
@@ -1290,18 +1294,18 @@ if (stage) {
           <div>
             <p class="eyebrow">Análise concluída</p>
             <h3>Sim, encontramos cobranças que podem ser indevidas nos seus extratos.</h3>
-            <p>A Audita já concluiu a triagem inicial. Ative o Standard para abrir os achados, revisar cada lançamento e transformar os documentos enviados em uma análise organizada. Os detalhes, valores e a simulação permanecem protegidos até a ativação do plano.</p>
+            <p>A IA AUDITA já concluiu a triagem inicial. Ative o Standard para abrir os achados, revisar cada lançamento e transformar os documentos enviados em uma análise organizada. Os detalhes, valores e a simulação permanecem protegidos até a ativação do plano.</p>
           </div>
         </section>
 
         <section class="charge-paywall-value" aria-labelledby="chargePaywallValueTitle">
           <div class="charge-paywall-section-heading charge-paywall-value-heading">
-            <p class="eyebrow">Por que seguir com a Audita</p>
+            <p class="eyebrow">Por que seguir com a IA AUDITA</p>
             <h3 id="chargePaywallValueTitle">Da cobran&ccedil;a suspeita a um caso documentado</h3>
-            <p>A Audita organiza as provas. Voc&ecirc; continua no controle.</p>
+            <p>A IA AUDITA organiza as provas. Voc&ecirc; continua no controle.</p>
           </div>
 
-          <ol class="charge-paywall-proof-journey" aria-label="Etapas liberadas pela Audita">
+          <ol class="charge-paywall-proof-journey" aria-label="Etapas liberadas pela IA AUDITA">
             <li><span aria-hidden="true">1</span><strong>Cobran&ccedil;a localizada</strong><p>Identificamos lan&ccedil;amentos com comportamentos at&iacute;picos nos documentos enviados.</p></li>
             <li><span aria-hidden="true">2</span><strong>Evid&ecirc;ncia no extrato</strong><p>Ligamos descri&ccedil;&atilde;o, data, valor e arquivo de origem de cada ocorr&ecirc;ncia.</p></li>
             <li><span aria-hidden="true">3</span><strong>C&aacute;lculo rastre&aacute;vel</strong><p>Calculamos somente cobran&ccedil;as encontradas nos anexos e n&atilde;o reconhecidas por voc&ecirc;.</p></li>
@@ -1339,8 +1343,8 @@ if (stage) {
           <p class="charge-paywall-value-disclaimer"><strong>Importante:</strong> percentual calculado a partir de um &uacute;nico cen&aacute;rio do material de refer&ecirc;ncia. O resultado de cada caso varia e n&atilde;o h&aacute; garantia de recebimento, devolu&ccedil;&atilde;o em dobro, indeniza&ccedil;&atilde;o ou &ecirc;xito judicial. A composi&ccedil;&atilde;o depende das provas, dos requisitos do <a href="${CDC_ARTICLE_42_URL}" target="_blank" rel="noreferrer">art. 42 do CDC</a> e da decis&atilde;o do Judici&aacute;rio.</p>
 
           <div class="charge-paywall-value-actions">
-            <a class="primary-action charge-paywall-value-cta" href="#chargePaywallPlans">Continuar com a Audita</a>
-            <ul aria-label="Compromissos da Audita">
+            <a class="primary-action charge-paywall-value-cta" href="#chargePaywallPlans">Continuar com a IA AUDITA</a>
+            <ul aria-label="Compromissos da IA AUDITA">
               <li>Voc&ecirc; revisa cada cobran&ccedil;a</li>
               <li>Sem promessa de resultado</li>
               <li>Protocolo final feito pelo usu&aacute;rio</li>
@@ -1360,7 +1364,7 @@ if (stage) {
         <section id="chargePaywallPlans" class="charge-paywall-plans" aria-label="Planos Standard">
           <article>
             <div><span>Standard mensal</span><strong>${escapeChargeHtml(monthly.headline)}<small>/mês</small></strong><p>${escapeChargeHtml(monthly.detail)}</p></div>
-            <ul><li>Acesso imediato aos achados da análise</li><li>Revisão guiada e cálculo baseado nos anexos</li><li>Relatório técnico em PDF e próximos passos</li><li>Plataforma, chat e IA Audita</li></ul>
+            <ul><li>Acesso imediato aos achados da análise</li><li>Revisão guiada e cálculo baseado nos anexos</li><li>Relatório técnico em PDF e próximos passos</li><li>Plataforma, chat e IA AUDITA</li></ul>
             <button type="button" class="secondary-action" data-charge-action="subscribe-standard" data-charge-interval="monthly" ${state.busy ? "disabled" : ""}>${demoMode ? "Ativar demonstração mensal" : "Assinar mensal"}</button>
           </article>
           <article class="recommended">
@@ -1496,7 +1500,7 @@ if (stage) {
       <section class="charge-directed-search" aria-label="Busca dirigida nos anexos">
         <div>
           <strong>Não encontrou a cobrança que suspeita?</strong>
-          <p>Informe apenas como ela aparece ou uma variação do nome. A Audita procurará nos documentos já enviados; você não informa valor nem data.</p>
+          <p>Informe apenas como ela aparece ou uma variação do nome. A IA AUDITA procurará nos documentos já enviados; você não informa valor nem data.</p>
         </div>
         ${
           search.open
@@ -1576,7 +1580,7 @@ if (stage) {
             : `
               <div class="charge-analysis-empty">
                 <strong>Nenhuma descrição conhecida foi localizada.</strong>
-                <p>Isso não certifica que os documentos estejam corretos. Você pode indicar um nome para a Audita procurar nos próprios anexos.</p>
+                <p>Isso não certifica que os documentos estejam corretos. Você pode indicar um nome para a IA AUDITA procurar nos próprios anexos.</p>
               </div>
             `
         }
@@ -1714,12 +1718,12 @@ if (stage) {
       <div class="charge-analysis-conversation charge-recovery-conversation">
         ${assistantMessage(`
           <p><strong>A análise terminou. Agora vamos organizar o caminho para buscar a restituição.</strong></p>
-          <p>A Audita não libera o dinheiro automaticamente. Ela ajuda você a reunir a prova, documentar o caso e chegar ao canal adequado com as informações organizadas.</p>
-        `, "Audita · Recuperação")}
+          <p>A IA AUDITA não libera o dinheiro automaticamente. Ela ajuda você a reunir a prova, documentar o caso e chegar ao canal adequado com as informações organizadas.</p>
+        `, "IA AUDITA · Recuperação")}
         ${assistantMessage(`
           <p><strong>Agora você pode preparar a documentação para avaliar o Juizado Especial Cível.</strong></p>
           <p>O Relatório Técnico de Auditoria reúne os dados da análise e organiza uma minuta para revisão. Depois do PDF, você escolhe o estado e recebe o passo a passo do tribunal. O protocolo final continua sendo feito por você.</p>
-        `, "Audita · Próxima etapa")}
+        `, "IA AUDITA · Próxima etapa")}
       </div>
       <div class="charge-recovery-actions">
         <button type="button" class="secondary-action" data-charge-action="back-to-result">Voltar à análise</button>
@@ -1823,7 +1827,7 @@ if (stage) {
         ${assistantMessage(`
           <p><strong>Agora vou montar o seu Relatório Técnico de Auditoria.</strong></p>
           <p>Confira seus dados pessoais e o endereço. Os valores calculados na análise serão incluídos automaticamente. O documento organiza a análise e a minuta, mas ainda deve ser revisado por você ou por um profissional antes do protocolo.</p>
-        `, "Audita · Relatório")}
+        `, "IA AUDITA · Relatório")}
       </div>
       ${recoveryReportFormMarkup()}
     `;
@@ -1875,8 +1879,8 @@ if (stage) {
       <section class="charge-recovery-guide" aria-label="Passo a passo do ${escapeChargeHtml(portal.tribunal || "tribunal")}">
         <header><div><p class="eyebrow">${escapeChargeHtml(portal.uf)}</p><h3>${escapeChargeHtml(portal.name || portal.tribunal)}</h3></div><span>${escapeChargeHtml(portal.tribunal || "")}</span></header>
         <div class="charge-small-claims-explainer ${aboveLimit ? "is-blocked" : "is-eligible"}" role="note">
-          <strong>${aboveLimit ? "Este caso ultrapassa o limite atendido pela Audita" : "O que são pequenas causas?"}</strong>
-          <p>Pequenas causas são tratadas no Juizado Especial Cível. A Audita orienta, por enquanto, somente casos de até 20 salários mínimos. Nessa faixa, o advogado é facultativo na primeira instância. Em 2026, esse limite corresponde a ${escapeChargeHtml(limitLabel)}.</p>
+          <strong>${aboveLimit ? "Este caso ultrapassa o limite atendido pela IA AUDITA" : "O que são pequenas causas?"}</strong>
+          <p>Pequenas causas são tratadas no Juizado Especial Cível. A IA AUDITA orienta, por enquanto, somente casos de até 20 salários mínimos. Nessa faixa, o advogado é facultativo na primeira instância. Em 2026, esse limite corresponde a ${escapeChargeHtml(limitLabel)}.</p>
           ${eligibility?.known ? `<span>Valor da causa nesta simulação: ${escapeChargeHtml(caseValueLabel)}.</span>` : ""}
           ${aboveLimit ? "" : `
             <details>
@@ -1894,8 +1898,8 @@ if (stage) {
         ${aboveLimit ? `
           <div class="charge-recovery-contact-placeholder">
             <strong>Este caso precisa de atendimento profissional</strong>
-            <p>Como o valor ultrapassa 20 salários mínimos, não vamos direcionar você ao protocolo de pequenas causas. O contato com o time Audita será disponibilizado em breve.</p>
-            <button type="button" class="secondary-action" disabled>Falar com o time Audita · em breve</button>
+            <p>Como o valor ultrapassa 20 salários mínimos, não vamos direcionar você ao protocolo de pequenas causas. O contato com o time IA AUDITA será disponibilizado em breve.</p>
+            <button type="button" class="secondary-action" disabled>Falar com o time IA AUDITA · em breve</button>
           </div>
         ` : `
           <ol>${steps.map((step) => `<li><span>${escapeChargeHtml(step)}</span></li>`).join("")}</ol>
@@ -1906,7 +1910,7 @@ if (stage) {
             <a class="primary-action" href="${escapeChargeHtml(portal.startUrl || portal.officialUrl || "#")}" target="_blank" rel="noreferrer">Abrir portal oficial</a>
             ${portal.officialUrl && portal.officialUrl !== portal.startUrl ? `<a class="secondary-action" href="${escapeChargeHtml(portal.officialUrl)}" target="_blank" rel="noreferrer">Ver orientações do tribunal</a>` : ""}
           </div>
-          <small>O login, a escolha da unidade, os anexos e o protocolo final são realizados pelo usuário. A Audita não envia o processo automaticamente.</small>
+          <small>O login, a escolha da unidade, os anexos e o protocolo final são realizados pelo usuário. A IA AUDITA não envia o processo automaticamente.</small>
         `}
       </section>
     `;
@@ -1918,8 +1922,8 @@ if (stage) {
       <div class="charge-analysis-conversation charge-recovery-conversation compact">
         ${assistantMessage(`
           <p><strong>Seu Relatório Técnico foi gerado.</strong></p>
-          <p>Agora selecione o estado onde pretende iniciar a pequena causa. A Audita mostrará o caminho oficial conhecido para o tribunal, mas você ainda deve confirmar a comarca e a competência territorial.</p>
-        `, "Audita · Tribunal")}
+          <p>Agora selecione o estado onde pretende iniciar a pequena causa. A IA AUDITA mostrará o caminho oficial conhecido para o tribunal, mas você ainda deve confirmar a comarca e a competência territorial.</p>
+        `, "IA AUDITA · Tribunal")}
       </div>
       <section class="charge-recovery-tribunal-picker">
         <label><span>Estado do tribunal</span><select id="chargeRecoveryGuideUf"><option value="">Selecione</option>${recoveryUfOptions(selectedUf)}</select></label>
@@ -2002,7 +2006,7 @@ if (stage) {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) {
         document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na Audita para preparar o Relatório Técnico.");
+        throw new Error("Entre na IA AUDITA para preparar o Relatório Técnico.");
       }
       if (!response.ok || !data.prepared) {
         throw new Error(recoveryApiError(data, "Não foi possível preparar o relatório agora."));
@@ -2037,7 +2041,7 @@ if (stage) {
       });
       if (response.status === 401) {
         document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na Audita para gerar o Relatório Técnico.");
+        throw new Error("Entre na IA AUDITA para gerar o Relatório Técnico.");
       }
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -2151,7 +2155,7 @@ if (stage) {
         if (response.status === 401) {
           state.screen = "upload";
           document.querySelector("#loginButton")?.click();
-          throw new Error("Entre na Audita para analisar os documentos.");
+          throw new Error("Entre na IA AUDITA para analisar os documentos.");
         }
         if (!response.ok) {
           const messages = {
@@ -2209,7 +2213,7 @@ if (stage) {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) {
         document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na Audita para continuar a análise.");
+        throw new Error("Entre na IA AUDITA para continuar a análise.");
       }
       if (!response.ok || !data.case) {
         throw new Error("A resposta não pôde ser sincronizada agora.");
@@ -2258,7 +2262,7 @@ if (stage) {
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) {
         document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na Audita para procurar nos documentos.");
+        throw new Error("Entre na IA AUDITA para procurar nos documentos.");
       }
       if (!response.ok || !Array.isArray(data.cases)) {
         throw new Error(data.message || "Não foi possível procurar nos documentos agora.");

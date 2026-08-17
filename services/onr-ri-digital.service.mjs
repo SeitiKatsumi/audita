@@ -270,13 +270,13 @@ export async function submitOnrRequest(input, { env = process.env, fetchImpl = g
   }
 
   if (!operation.apiImplemented) {
-    return officialRequestRequired(base, operation, "O contrato deste servico ainda precisa ser confirmado e habilitado pelo ONR para o convenio da Audita.");
+    return officialRequestRequired(base, operation, "O contrato deste servico ainda precisa ser confirmado e habilitado pelo ONR para o convenio da IA AUDITA.");
   }
 
   if (!canUseApi) {
     const detail = providerConfig.enabled
       ? `Credenciamento WSRIDIGITAL incompleto para ${operation.label}: ${operationRequirements.join(", ")}.`
-      : "A Audita ainda precisa concluir o convenio WSRIDIGITAL com o ONR.";
+      : "A IA AUDITA ainda precisa concluir o convenio WSRIDIGITAL com o ONR.";
     return officialRequestRequired(base, operation, detail);
   }
 
@@ -870,7 +870,7 @@ function officialRequestRequired(base, operation, reason) {
     status: "waiting_user_action",
     outcome: "pending",
     nextAction: "complete_official_request",
-    summary: `${reason} Enquanto isso, o pedido pode ser concluido diretamente no ${operation.label} oficial e o protocolo ou PDF registrado no Audita.`,
+    summary: `${reason} Enquanto isso, o pedido pode ser concluido diretamente no ${operation.label} oficial e o protocolo ou PDF registrado na IA AUDITA.`,
   };
 }
 

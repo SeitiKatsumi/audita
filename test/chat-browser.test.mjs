@@ -208,7 +208,7 @@ test("Steel viewer is rewritten to use the authenticated Audita websocket", () =
     })();</script></body>`,
     "wss://audita.example/api/chat-browser-sessions/cbs-1/cast",
   );
-  assert.match(output, /Navegador Audita/);
+  assert.match(output, /Navegador IA AUDITA/);
   assert.match(output, /wss:\/\/audita\.example\/api\/chat-browser-sessions\/cbs-1\/cast/);
   assert.doesNotMatch(output, /ws:\/\/steel:3000/);
   assert.match(output, /container\.clientWidth/);

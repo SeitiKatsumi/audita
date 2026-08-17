@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS audita_agent_settings (
   provider TEXT NOT NULL DEFAULT 'openai',
   model TEXT NOT NULL DEFAULT 'gpt-5-mini',
   api_key_secret_ref TEXT NOT NULL DEFAULT 'AUDITA_OPENAI_API_KEY',
-  system_prompt TEXT NOT NULL DEFAULT 'Voce e o Agente Audita. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.',
+  system_prompt TEXT NOT NULL DEFAULT 'Voce e o Agente IA AUDITA. Responda de forma clara, objetiva, humanizada e sempre cite a fonte dos dados consultados.',
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'testing', 'active', 'paused')),
   created_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

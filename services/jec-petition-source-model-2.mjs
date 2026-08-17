@@ -74,7 +74,7 @@ export const JEC_SOURCE_MODEL_2 = [
   "Ademais, cumpre registrar que a reparação integral por perdas e danos deve observar rigorosamente a atualização monetária e os juros moratórios incidentes sobre cada valor indevidamente subtraído, nos termos pacificados pelo Superior Tribunal de Justiça. Com efeito, a Súmula 43 do STJ estabelece expressamente que 'Incide correção monetária sobre dívida por ato ilícito a partir da data do efetivo prejuízo', fazendo com que cada parcela mensal cobrada indevidamente seja corrigida monetariamente desde a data de cada desconto mensal. No mesmo sentido, por se tratar de ilícito bancário decorrente de fraude e defeito na prestação do serviço (responsabilidade extracontratual), a Súmula 54 do STJ preceitua que 'Os juros moratórios fluem a partir do evento danoso, em caso de responsabilidade extracontratual', determinando a incidência de juros de mora de 1% ao mês sobre o montante também desde a data de cada desconto. Destarte, requer a aplicação estrita de ambos os enunciados sumulares para garantir a recomposição plena do patrimônio do Autor.\"",
   "VII. DA TUTELA DE URGÊNCIA (ART. 300 DO CPC)",
   "{{EMERGENCY_GROUNDS}}",
-  "DA PROVA DOCUMENTAL DISPONÍVEL E DO RELATÓRIO TÉCNICO DA AUDITA",
+  "DA PROVA DOCUMENTAL DISPONÍVEL E DO RELATÓRIO TÉCNICO DA IA AUDITA",
   "{{TECHNICAL_REPORT_SECTION}}",
   "VIII. DOS PEDIDOS",
   "Ante o exposto, requer a Vossa Excelência:",

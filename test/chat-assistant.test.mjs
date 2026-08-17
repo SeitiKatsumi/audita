@@ -135,7 +135,7 @@ test("chat instructions prohibit invented results and personal data collection",
   assert.match(instructions, /navegador interno e o protocolo automatico nao fazem parte/i);
   assert.match(instructions, /link oficial e o passo a passo manual/i);
   assert.match(instructions, /acompanhamento no TJ via Direct Data/i);
-  assert.match(instructions, /advogado da Audita/i);
+  assert.match(instructions, /advogado da IA AUDITA/i);
 });
 
 test("live JEC browser context exposes screen structure without field values", () => {

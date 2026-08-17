@@ -448,7 +448,7 @@ test("document-exhibition model never invents values when no statement was suppl
   assert.equal(prepared.knownAmountCount, 0);
   assert.ok(prepared.missingFields.includes("disputedCharge"));
   assert.ok(prepared.missingFields.includes("caseValue"));
-  assert.match(prepared.draft, /Nenhum valor foi estimado pela Audita/i);
+  assert.match(prepared.draft, /Nenhum valor foi estimado pela IA AUDITA/i);
   assert.doesNotMatch(prepared.draft, /R\$\s+3\.420,00/);
   assert.doesNotMatch(prepared.draft, /R\$\s+6\.840,00/);
   assert.doesNotMatch(prepared.draft, /R\$\s+10\.000,00/);

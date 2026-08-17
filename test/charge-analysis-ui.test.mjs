@@ -238,7 +238,7 @@ test("charge progress is evidence-based and never treats document generation as 
 
 test("charge analysis reveals agent messages before moving to the selected path", () => {
   assert.match(chargeAnalysisJs, /revealTriageMessages/);
-  assert.match(chargeAnalysisJs, /Audita est&aacute; digitando/);
+  assert.match(chargeAnalysisJs, /IA AUDITA est&aacute; digitando/);
   assert.match(chargeAnalysisJs, /continueFromTriage/);
   assert.match(chargeAnalysisJs, /prefers-reduced-motion: reduce/);
   assert.match(chargeAnalysisJs, /function typingDelayFor\(message\)/);
@@ -286,10 +286,20 @@ test("charge analysis keeps identification, attachments and analysis in one cont
 });
 
 test("charge analysis introduction links the historical card scope to the searchable references", () => {
-  assert.match(chargeAnalysisJs, /133 bandeiras de cart&otilde;es de parceiras/);
-  assert.match(chargeAnalysisJs, /como Casas Bahia e Magazine Luiza/);
+  assert.match(chargeAnalysisJs, /function chargeAnalysisIntroMarkup\(\)/);
+  assert.equal(
+    (chargeAnalysisJs.match(/Vou conduzir uma verifica&ccedil;&atilde;o inicial/g) || []).length,
+    1,
+  );
+  assert.match(chargeAnalysisJs, /133 parceiras/);
+  assert.match(chargeAnalysisJs, /Casas Bahia, Magalu, Ponto, Marisa/);
   assert.match(chargeAnalysisJs, /data-charge-action="open-brand-references"/);
   assert.match(chargeAnalysisJs, /Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras/);
+  assert.match(chargeAnalysisJs, /\$\{chargeAnalysisIntroMarkup\(\)\}/);
+  assert.match(
+    chargeAnalysisJs,
+    /assistantMessage\(chargeAnalysisIntroMarkup\(\), "IA AUDITA", "charge-analysis-intro-message"\)/,
+  );
   assert.match(
     chargeAnalysisJs,
     /action === "open-brand-references"[\s\S]*?state\.screen = "brands";/,
@@ -406,7 +416,7 @@ test("charge analysis separates complete, partial and no-document journeys", () 
 });
 
 test("the no-document path requests evidence without calculation or legal handoff", () => {
-  assert.match(chargeAnalysisJs, /A Audita não consegue substituir documentos por estimativas/);
+  assert.match(chargeAnalysisJs, /A IA AUDITA não consegue substituir documentos por estimativas/);
   assert.match(chargeAnalysisJs, /Sem ao menos um documento, não há base para calcular valores, gerar relatório técnico ou preparar uma eventual medida jurídica/);
   assert.match(chargeAnalysisJs, /data-charge-action="copy-document-request"/);
   assert.match(chargeAnalysisJs, /Carta copiada\./);
@@ -481,9 +491,9 @@ test("positive analysis is paywalled before descriptions, values and simulation"
   assert.match(chargeAnalysisJs, /Os detalhes, valores e a simulação permanecem protegidos/);
   assert.match(chargeAnalysisJs, /Standard mensal/);
   assert.match(chargeAnalysisJs, /Standard anual/);
-  assert.match(chargeAnalysisJs, /Por que seguir com a Audita/);
+  assert.match(chargeAnalysisJs, /Por que seguir com a IA AUDITA/);
   assert.match(chargeAnalysisJs, /Da cobran&ccedil;a suspeita a um caso documentado/);
-  assert.match(chargeAnalysisJs, /A Audita organiza as provas\. Voc&ecirc; continua no controle/);
+  assert.match(chargeAnalysisJs, /A IA AUDITA organiza as provas\. Voc&ecirc; continua no controle/);
   assert.match(chargeAnalysisJs, /Cobran&ccedil;a localizada/);
   assert.match(chargeAnalysisJs, /Evid&ecirc;ncia no extrato/);
   assert.match(chargeAnalysisJs, /C&aacute;lculo rastre&aacute;vel/);
@@ -496,7 +506,7 @@ test("positive analysis is paywalled before descriptions, values and simulation"
   assert.match(chargeAnalysisJs, /superior ao acordo/);
   assert.match(chargeAnalysisJs, /Repeti&ccedil;&atilde;o em dobro, se cab&iacute;vel/);
   assert.match(chargeAnalysisJs, /Eventual indeniza&ccedil;&atilde;o, quando fundamentada/);
-  assert.match(chargeAnalysisJs, /Continuar com a Audita/);
+  assert.match(chargeAnalysisJs, /Continuar com a IA AUDITA/);
   assert.match(chargeAnalysisJs, /Sem promessa de resultado/);
   assert.match(chargeAnalysisJs, /Protocolo final feito pelo usu&aacute;rio/);
   assert.match(chargeAnalysisJs, /art\. 42 do CDC/);
@@ -645,7 +655,7 @@ test("tribunal guide explains small claims and redirects cases above 20 minimum 
   assert.match(chargeAnalysisJs, /Entenda advogado, custos e recursos/);
   assert.match(chargeAnalysisJs, /não existe garantia de “risco zero”/);
   assert.match(chargeAnalysisJs, /Lei 9\.099\/1995/);
-  assert.match(chargeAnalysisJs, /Falar com o time Audita · em breve/);
+  assert.match(chargeAnalysisJs, /Falar com o time IA AUDITA · em breve/);
   assert.match(chargeAnalysisJs, /eligibility\?\.status === "above_limit"/);
   assert.match(chargeAnalysisJs, />Abrir portal oficial<\/a>/);
   assert.match(appJs, /Pequenas causas/);

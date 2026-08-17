@@ -723,7 +723,7 @@ async function collectGenericAssistedStateCourt({ input, profile, stateCourtName
     if (loaded && filledCount === 0 && !captchaOrLoginDetected) {
       return manualRequiredResult(
         fonte,
-        `${stateCourtName} carregou, mas o Audita ainda nao reconhece campos suficientes para automacao assistida confiavel.`,
+        `${stateCourtName} carregou, mas a IA AUDITA ainda nao reconhece campos suficientes para automacao assistida confiavel.`,
         {
           ...baseData,
           automationStatus: "needs_mapping",
@@ -753,7 +753,7 @@ async function collectGenericAssistedStateCourt({ input, profile, stateCourtName
 
     return waitingUserActionResult(
       fonte,
-      `${stateCourtName} esta em automacao assistida. O Audita preenche os campos reconhecidos e pausa na validacao oficial quando o portal exigir.`,
+      `${stateCourtName} esta em automacao assistida. A IA AUDITA preenche os campos reconhecidos e pausa na validacao oficial quando o portal exigir.`,
       {
         ...baseData,
         automationStatus: "active",
@@ -779,7 +779,7 @@ async function collectGenericAssistedStateCourt({ input, profile, stateCourtName
           ? `${stateCourtName} carregado e preenchido em modo assistido. Campos preenchidos: ${filledCount}.`
           : `${stateCourtName} nao carregou completamente no teste automatico.`,
         proximoPasso: keepBrowserOpen
-          ? "Resolver reCAPTCHA, captcha, login ou confirmacao na janela oficial ja preenchida; depois anexar/confirmar a certidao no Audita."
+          ? "Resolver reCAPTCHA, captcha, login ou confirmacao na janela oficial ja preenchida; depois anexar/confirmar a certidao na IA AUDITA."
           : "Resolver reCAPTCHA, captcha, login ou confirmacao oficial no portal; depois anexar/confirmar a certidao para fechar a consulta.",
       },
     );
@@ -853,7 +853,7 @@ async function collectMaTjmaStateCourt({ input, profile, stateCourtName, stateCo
     const protectionDetected = results.some((result) => result.requiresCaptcha || result.blockedByProtection || result.requiresConfirmation);
     return waitingUserActionResult(
       fonte,
-      "TJMA/JurisConsult foi aberto no formulario oficial de Certidao Estadual. O Audita preenche os campos reconhecidos e pausa no CAPTCHA oficial.",
+      "TJMA/JurisConsult foi aberto no formulario oficial de Certidao Estadual. A IA AUDITA preenche os campos reconhecidos e pausa no CAPTCHA oficial.",
       {
         ...baseData,
         automationStatus: "active",
@@ -878,7 +878,7 @@ async function collectMaTjmaStateCourt({ input, profile, stateCourtName, stateCo
         resumo: `TJMA em modo assistido. Campos preenchidos: ${filledCount}.`,
         proximoPasso: keepBrowserOpen
           ? "Resolver o CAPTCHA oficial no navegador assistido e concluir a emissao/consulta no JurisConsult."
-          : "Resolver o CAPTCHA oficial no JurisConsult e anexar o protocolo/PDF ou resultado textual ao Audita.",
+          : "Resolver o CAPTCHA oficial no JurisConsult e anexar o protocolo/PDF ou resultado textual à IA AUDITA.",
       },
     );
   } finally {
@@ -1509,7 +1509,7 @@ async function collectEsajStateCourt({ input, profile, stateCourtName, stateCour
         certidoes: results,
         captchaLab: buildCaptchaLabReport({ profile, results, sessionOpen: keepBrowserOpen, sessionId }),
         proximoPasso: keepBrowserOpen
-          ? "Resolver a validação oficial na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo no Audita."
+          ? "Resolver a validação oficial na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo na IA AUDITA."
           : "Resolver a validação oficial no portal para permitir o envio e o download.",
       },
     );
@@ -3448,7 +3448,7 @@ async function collectMtTjmtStateCourt({ input, profile, stateCourtName, stateCo
         totalCertidoes: results.length,
         captchaLab: buildCaptchaLabReport({ profile, results, sessionOpen: keepBrowserOpen, sessionId }),
         proximoPasso: keepBrowserOpen
-          ? "Resolver a validação/confirmar a emissão na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo no Audita."
+          ? "Resolver a validação/confirmar a emissão na janela oficial já preenchida. Depois baixe/anexe o PDF ou protocolo na IA AUDITA."
           : "Resolver a validação/confirmar a emissão no portal oficial.",
       },
     );
@@ -5290,7 +5290,7 @@ async function fillApTjapCertificate({ context, input, profile, certificateType 
         blockedByProtection: true,
         assistedWindowOpen: keepPageOpen,
         errorMessage: "TJAP/Tucujuris exibiu proteção Cloudflare/Azion antes do formulário.",
-        resumo: "Abra a janela oficial, resolva a verificação e execute novamente para o Audita preencher os campos.",
+        resumo: "Abra a janela oficial, resolva a verificação e execute novamente para a IA AUDITA preencher os campos.",
       };
     }
 

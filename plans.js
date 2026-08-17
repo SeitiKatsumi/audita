@@ -151,7 +151,7 @@ function planButton(plan) {
   const isCurrent = plan.id === currentPlanId();
   if (plan.kind === "contact") {
     return `
-      <a class="plan-action" href="mailto:elevenmindbusiness@gmail.com?subject=Audita%20Enterprise">
+      <a class="plan-action" href="mailto:elevenmindbusiness@gmail.com?subject=IA%20AUDITA%20Enterprise">
         Falar com o comercial
       </a>
     `;

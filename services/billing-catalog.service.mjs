@@ -36,7 +36,7 @@ export const BILLING_PLANS = Object.freeze([
   {
     id: "standard",
     name: "Standard",
-    audience: "Para pessoas que querem usar a Audita",
+    audience: "Para pessoas que querem usar a IA AUDITA",
     description: "Acesso \u00e0 plataforma, \u00e0 IA e \u00e0s ferramentas inclu\u00eddas no plano.",
     kind: "subscription",
     recommended: true,
@@ -51,8 +51,8 @@ export const BILLING_PLANS = Object.freeze([
       annual: "STRIPE_PRICE_STANDARD_ANNUAL",
     },
     features: [
-      "Uso da plataforma Audita",
-      "Chat com a IA Audita",
+      "Uso da plataforma IA AUDITA",
+      "Chat com a IA AUDITA",
       "An\u00e1lise de documentos e cobran\u00e7as Ita\u00fa",
       "Simula\u00e7\u00e3o, relat\u00f3rio e orienta\u00e7\u00e3o de pr\u00f3ximos passos",
       "Ferramentas inclu\u00eddas conforme disponibilidade",

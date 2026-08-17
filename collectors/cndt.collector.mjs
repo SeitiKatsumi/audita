@@ -96,7 +96,7 @@ async function inspectCndtFlow({ context, input }) {
     });
 
     if (captchaDetected) {
-      return unavailableResult(fonte, "CNDT/TST exige captcha/reCAPTCHA no fluxo oficial; o Audita nao burla essa validacao.", {
+      return unavailableResult(fonte, "CNDT/TST exige captcha/reCAPTCHA no fluxo oficial; a IA AUDITA nao burla essa validacao.", {
         officialUrl: OFFICIAL_URL,
         captchaRequired: true,
         documentFilled: true,
