@@ -1,5 +1,6 @@
 const CHAT_PATH = "/chat";
 const PLANS_PATH = "/planos";
+const SUPER_ADMIN_PATH = "/super-admin";
 
 export function resolveUiRoute(pathname) {
   const path = String(pathname || "/");
@@ -29,6 +30,20 @@ export function resolveUiRoute(pathname) {
     return {
       type: "file",
       path: "/plans.html",
+    };
+  }
+
+  if (path === `${SUPER_ADMIN_PATH}/`) {
+    return {
+      type: "redirect",
+      location: SUPER_ADMIN_PATH,
+    };
+  }
+
+  if (path === SUPER_ADMIN_PATH) {
+    return {
+      type: "file",
+      path: "/super-admin.html",
     };
   }
 

@@ -1019,6 +1019,11 @@ function setActivePage(page) {
   }));
 }
 
+function finishAppBoot() {
+  document.documentElement.classList.remove("app-booting");
+  document.querySelector("#appBoot")?.setAttribute("aria-hidden", "true");
+}
+
 function moveEcosystemModules() {
   const ecosystemPanel = document.querySelector("#integracoes");
   const parent = ecosystemPanel?.parentElement;
@@ -3147,6 +3152,7 @@ function renderJecPetitionPanel(caseData = {}) {
   const smallClaimsAboveLimit =
     prepared?.smallClaimsEligibility?.status === "above_limit";
   const suggestion = state.suggestion || null;
+  const testimony = state.testimony || { original: "", refined: "", reviewed: false };
   const missingFields = Array.isArray(prepared?.missingFields) ? prepared.missingFields : [];
   const historicalDocumentsAvailable =
     claimant.historicalDocumentsAvailable ||
@@ -3342,6 +3348,25 @@ function renderJecPetitionPanel(caseData = {}) {
                 <summary>Revisar rascunho</summary>
                 <pre>${escapeHtml(prepared.draft || "")}</pre>
               </details>
+              <section class="jec-testimony-section">
+                <strong>Relato pessoal do consumidor</strong>
+                <p>Conte o que foi cobrado, quando percebeu, desde quando ocorre e por que não reconhece a contratação. A IA apenas organizará o texto.</p>
+                <label>
+                  <span>Seu depoimento</span>
+                  <textarea name="originalTestimony" required minlength="40" maxlength="5000" rows="6">${escapeHtml(testimony.original || "")}</textarea>
+                </label>
+                ${testimony.refined ? `
+                  <label>
+                    <span>Versão ajustada que entrará no documento</span>
+                    <textarea name="refinedTestimony" required minlength="40" maxlength="5000" rows="6">${escapeHtml(testimony.refined)}</textarea>
+                  </label>
+                  <label class="jec-confirmation">
+                    <input name="testimonyReviewed" type="checkbox" ${testimony.reviewed ? "checked" : ""} />
+                    <span>Revisei o depoimento e confirmo que ele corresponde aos fatos relatados.</span>
+                  </label>
+                ` : ""}
+                <button class="secondary-action" type="submit" data-jec-action="testimony">${testimony.refined ? "Ajustar novamente com IA" : "Ajustar texto com IA"}</button>
+              </section>
               <label class="jec-confirmation">
                 <input name="reviewConfirmed" type="checkbox" />
                 <span>Revisei o rascunho e os dados acima.</span>
@@ -3367,7 +3392,7 @@ function renderJecPetitionPanel(caseData = {}) {
           ${
             prepared?.ready
               ? `
-                <button class="secondary-action" type="submit" data-jec-action="pdf">Gerar Relatório Técnico em PDF</button>
+                ${testimony.refined ? `<button class="secondary-action" type="submit" data-jec-action="pdf">Gerar Relatório Técnico em PDF</button>` : ""}
                 ${smallClaimsAboveLimit ? "" : `<button class="secondary-action" type="submit" data-jec-action="browser">Abrir navegador assistido</button>`}
               `
               : ""
@@ -3879,17 +3904,24 @@ async function submitJecPetitionForm(form, action) {
   if (!found?.message?.itauCase) return;
   const claimant = readJecClaimant(form);
   const previous = jecCaseStates.get(caseId) || {};
+  const testimony = {
+    original: String(form.elements.originalTestimony?.value || previous.testimony?.original || "").normalize("NFC").trim().slice(0, 5000),
+    refined: String(form.elements.refinedTestimony?.value || previous.testimony?.refined || "").normalize("NFC").trim().slice(0, 5000),
+    reviewed: Boolean(form.elements.testimonyReviewed?.checked),
+  };
   const submitButton = form.querySelector(`[data-jec-action="${CSS.escape(action)}"]`);
   if (submitButton) {
     submitButton.disabled = true;
     submitButton.textContent =
       action === "pdf"
         ? "Gerando PDF..."
+        : action === "testimony"
+          ? "Ajustando texto..."
         : action === "browser"
           ? "Abrindo navegador..."
           : "Preparando...";
   }
-  jecCaseStates.set(caseId, { ...previous, claimant, error: "" });
+  jecCaseStates.set(caseId, { ...previous, claimant, testimony, error: "" });
 
   try {
     let profileStored = previous.profileStored || false;
@@ -3903,11 +3935,54 @@ async function submitJecPetitionForm(form, action) {
     }
     const payload = {
       caseId,
-      caseData: found.message.itauCase,
+      caseData: {
+        ...found.message.itauCase,
+        answers: {
+          ...(found.message.itauCase.answers || {}),
+          ...(testimony.refined
+            ? {
+                consumerTestimony: {
+                  original: testimony.original,
+                  refined: testimony.refined,
+                  reviewed: testimony.reviewed,
+                },
+              }
+            : {}),
+        },
+      },
       claimant,
       uf: claimant.uf,
       city: claimant.city,
     };
+    if (action === "testimony") {
+      const response = await fetch("/api/jec/testimony/refine", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ testimony: testimony.original }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        showLogin("Entre para ajustar o seu depoimento.");
+        return;
+      }
+      if (!response.ok || !data.testimony?.refined) {
+        throw new Error(data.message || "Não foi possível ajustar o depoimento agora.");
+      }
+      jecCaseStates.set(caseId, {
+        ...previous,
+        claimant,
+        profileStored,
+        prepared: previous.prepared,
+        testimony: {
+          original: data.testimony.original || testimony.original,
+          refined: data.testimony.refined,
+          reviewed: false,
+        },
+        error: "",
+      });
+      renderChatWorkspace();
+      return;
+    }
     if (action === "browser") {
       const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
       const transmissionAuthorized = Boolean(
@@ -3939,6 +4014,7 @@ async function submitJecPetitionForm(form, action) {
         claimant,
         profileStored,
         prepared: previous.prepared,
+        testimony,
         portal: data.portal || previous.portal,
         session: data.session,
         agent: data.agent || null,
@@ -3950,8 +4026,8 @@ async function submitJecPetitionForm(form, action) {
     }
     if (action === "pdf") {
       const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
-      if (!reviewConfirmed) {
-        throw new Error("Confirme a revisão do rascunho antes de gerar o PDF.");
+      if (!reviewConfirmed || !testimony.reviewed || testimony.refined.length < 40) {
+        throw new Error("Revise e confirme o rascunho e o depoimento antes de gerar o PDF.");
       }
       const response = await fetch("/api/jec/petitions/pdf", {
         method: "POST",
@@ -3959,6 +4035,7 @@ async function submitJecPetitionForm(form, action) {
         body: JSON.stringify({
           ...payload,
           reviewConfirmed,
+          testimonyReviewed: true,
         }),
       });
       if (response.status === 401) {
@@ -3989,6 +4066,7 @@ async function submitJecPetitionForm(form, action) {
         claimant,
         profileStored,
         prepared: previous.prepared,
+        testimony,
         pdfDownloadedAt: new Date().toISOString(),
         error: "",
       });
@@ -4015,6 +4093,7 @@ async function submitJecPetitionForm(form, action) {
       claimant,
       profileStored,
       prepared: data.prepared,
+      testimony,
       portal: data.prepared?.portal,
       error: "",
     });
@@ -4023,6 +4102,7 @@ async function submitJecPetitionForm(form, action) {
     jecCaseStates.set(caseId, {
       ...previous,
       claimant,
+      testimony,
       error: error instanceof Error ? error.message : "Falha ao preparar o fluxo JEC.",
     });
     renderChatWorkspace();
@@ -4032,6 +4112,8 @@ async function submitJecPetitionForm(form, action) {
       submitButton.textContent =
         action === "pdf"
           ? "Gerar Relatório Técnico em PDF"
+          : action === "testimony"
+            ? testimony.refined ? "Ajustar novamente com IA" : "Ajustar texto com IA"
           : action === "browser"
             ? "Abrir navegador assistido"
             : "Preparar rascunho";
@@ -8989,6 +9071,7 @@ setInterval(rotateRisk, 1400);
 drawSignal();
 
 moveEcosystemModules();
+setActivePage(getActivePage());
 await loadStateCourtCatalog();
 populateStateCourtSelect();
 const savedAuditDraft = readAuditFormDraft();
@@ -9002,7 +9085,6 @@ if (savedAuditDraft.stateCourtUf) {
 }
 syncStateCourtSelection(stateCourtUf || tjdftCourtUf);
 restoreAuditFormDraft();
-setActivePage(getActivePage());
 updateAuditSourceAvailability();
 setAuditWizardStep(1);
 await loadAppConfig();
@@ -9014,6 +9096,7 @@ configureApiUsageAdmin(authState);
 await loadCurrentUserProfile();
 if (authState.authRequired && !authState.user) {
   showLogin();
+  finishAppBoot();
 } else {
   if (authState.user) {
     logoutButton.classList.remove("hidden");
@@ -9021,6 +9104,7 @@ if (authState.authRequired && !authState.user) {
   } else {
     loginButton?.classList.remove("hidden");
   }
+  finishAppBoot();
   await loadDashboard();
   await loadAudits();
   const resumeAuditId = getResumeAuditId();

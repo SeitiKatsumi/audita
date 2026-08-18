@@ -159,6 +159,49 @@ test("petition draft uses the supplied audited-values model", () => {
   assert.match(profile.agentInstructions, /Confirmar ajuizamento/i);
 });
 
+test("reviewed consumer testimony individualizes both petition PDF models", () => {
+  const testimony =
+    "Percebi a cobrança de Seguro Alfa ao conferir minha fatura de julho. Não solicitei nem autorizei esse serviço e passei a revisar as faturas anteriores.";
+  const withTestimony = {
+    ...sampleCase,
+    answers: {
+      ...sampleCase.answers,
+      consumerTestimony: {
+        original: "texto original do consumidor",
+        refined: testimony,
+        reviewed: true,
+      },
+    },
+  };
+  const model1 = prepareJecPetition({
+    caseData: withTestimony,
+    uf: "SP",
+    city: "São Paulo",
+    claimant: completeClaimant,
+  });
+  const model2 = prepareJecPetition({
+    caseData: {
+      ...withTestimony,
+      answers: {
+        ...withTestimony.answers,
+        documentAvailability: "partial",
+      },
+    },
+    uf: "SP",
+    city: "São Paulo",
+    claimant: completeClaimant,
+  });
+
+  assert.equal(model1.template.sourceModel, 1);
+  assert.equal(model2.template.sourceModel, 2);
+  for (const prepared of [model1, model2]) {
+    assert.match(prepared.draft, /RELATO PESSOAL DO\(A\) CONSUMIDOR\(A\)/);
+    assert.match(prepared.draft, /Percebi a cobrança de Seguro Alfa/);
+    assert.doesNotMatch(prepared.draft, /texto original do consumidor/);
+    assert.doesNotMatch(prepared.draft, /CONSUMER_TESTIMONY_SECTION/);
+  }
+});
+
 test("AI claim suggestion uses only evidenced disputed amounts", () => {
   const suggestion = suggestJecClaimValues({ caseData: sampleCase });
 

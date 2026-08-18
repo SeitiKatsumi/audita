@@ -273,6 +273,11 @@ test("charge analysis starts with the two current self-assessment paths", () => 
   assert.match(chargeAnalysisJs, /N&atilde;o sei, quais s&atilde;o todas as bandeiras/);
   assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="authorized"/);
   assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="lawyer"/);
+  assert.match(
+    chargeAnalysisJs,
+    /class="secondary charge-option-disabled" data-charge-status="coming-soon" disabled/,
+  );
+  assert.match(chargeAnalysisJs, /Sou advogado\(a\)[\s\S]*?Em breve/);
   assert.doesNotMatch(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
   assert.doesNotMatch(chargeAnalysisJs, /Seguro Prestamista/);
 });
@@ -491,39 +496,12 @@ test("positive analysis is paywalled before descriptions, values and simulation"
   assert.match(chargeAnalysisJs, /Os detalhes, valores e a simulação permanecem protegidos/);
   assert.match(chargeAnalysisJs, /Standard mensal/);
   assert.match(chargeAnalysisJs, /Standard anual/);
-  assert.match(chargeAnalysisJs, /Por que seguir com a IA AUDITA/);
-  assert.match(chargeAnalysisJs, /Da cobran&ccedil;a suspeita a um caso documentado/);
-  assert.match(chargeAnalysisJs, /A IA AUDITA organiza as provas\. Voc&ecirc; continua no controle/);
-  assert.match(chargeAnalysisJs, /Cobran&ccedil;a localizada/);
-  assert.match(chargeAnalysisJs, /Evid&ecirc;ncia no extrato/);
-  assert.match(chargeAnalysisJs, /C&aacute;lculo rastre&aacute;vel/);
-  assert.match(chargeAnalysisJs, /Relat&oacute;rio t&eacute;cnico/);
-  assert.match(chargeAnalysisJs, /Orienta&ccedil;&atilde;o para o JEC/);
-  assert.match(chargeAnalysisJs, /Comparativo ilustrativo/);
-  assert.match(chargeAnalysisJs, /Acordo extrajudicial/);
-  assert.match(chargeAnalysisJs, /Pretens&atilde;o simulada no exemplo/);
-  assert.match(chargeAnalysisJs, /552%/);
-  assert.match(chargeAnalysisJs, /superior ao acordo/);
-  assert.match(chargeAnalysisJs, /Repeti&ccedil;&atilde;o em dobro, se cab&iacute;vel/);
-  assert.match(chargeAnalysisJs, /Eventual indeniza&ccedil;&atilde;o, quando fundamentada/);
-  assert.match(chargeAnalysisJs, /Continuar com a IA AUDITA/);
-  assert.match(chargeAnalysisJs, /Sem promessa de resultado/);
-  assert.match(chargeAnalysisJs, /Protocolo final feito pelo usu&aacute;rio/);
-  assert.match(chargeAnalysisJs, /art\. 42 do CDC/);
-  assert.match(chargeAnalysisJs, /charge-paywall-reference" role="group"/);
-  assert.match(chargeAnalysisJs, /percentual calculado a partir de um &uacute;nico cen&aacute;rio/);
-  assert.match(chargeAnalysisJs, /n&atilde;o h&aacute; garantia de recebimento/);
-  const paywallValueBlock = chargeAnalysisJs.match(/<section class="charge-paywall-value"[\s\S]*?<\/section>/)?.[0] || "";
-  assert.doesNotMatch(paywallValueBlock, /R\$|1x|\+1x/i);
+  assert.doesNotMatch(chargeAnalysisJs, /Por que seguir com a IA AUDITA/);
+  assert.doesNotMatch(chargeAnalysisJs, /Comparativo ilustrativo/);
+  assert.doesNotMatch(chargeAnalysisJs, /552%/);
+  assert.doesNotMatch(chargeAnalysisJs, /Transparência antes de contratar/);
+  assert.doesNotMatch(chargeAnalysisJs, /charge-paywall-reference" role="group"/);
   assert.doesNotMatch(chargeAnalysisJs, /DevoluÃ§Ã£o em DOBRO automÃ¡tica|garantindo a reparaÃ§Ã£o integral|sem riscos financeiros/i);
-  assert.match(
-    stylesCss,
-    /@media \(max-width: 720px\)[\s\S]*?\.charge-paywall-proof-journey,[\s\S]*?\.charge-paywall-reference,[\s\S]*?grid-template-columns: 1fr/,
-  );
-  assert.match(
-    stylesCss,
-    /@media \(max-width: 720px\)[\s\S]*?\.charge-paywall-value-actions\s+ul\s*\{[\s\S]*?justify-content: flex-start/,
-  );
   assert.match(chargeAnalysisJs, /Acesso imediato aos achados da análise/);
   assert.match(chargeAnalysisJs, /Melhor custo-benefício/);
   assert.match(chargeAnalysisJs, /Suporte de advogado parceiro para o caso Itaú incluído/);
@@ -625,13 +603,52 @@ test("guided results continue through recovery without redirecting to chat", () 
   assert.doesNotMatch(chargeAnalysisJs, /Consumidor\.gov\.br ou no Procon/);
   assert.match(chargeAnalysisJs, /function renderRecoveryIntro\(\)/);
   assert.match(chargeAnalysisJs, /function renderRecoveryReport\(\)/);
+  assert.match(chargeAnalysisJs, /function renderRecoveryTestimony\(\)/);
   assert.match(chargeAnalysisJs, /function renderRecoveryGuide\(\)/);
+  assert.match(chargeAnalysisJs, /\/api\/jec\/testimony\/refine/);
   assert.match(chargeAnalysisJs, /\/api\/jec\/petitions\/prepare/);
   assert.match(chargeAnalysisJs, /\/api\/jec\/petitions\/pdf/);
   assert.match(chargeAnalysisJs, /id="chargeRecoveryGuideUf"/);
   assert.doesNotMatch(chargeAnalysisJs, /audita:open-jec/);
   assert.doesNotMatch(appJs, /function openGuidedChargeJec\(event\)/);
   assert.doesNotMatch(appJs, /window\.history\.pushState\(\{\}, "", "\/chat"\)/);
+});
+
+test("app hides the one-page shell until the initial route is ready", () => {
+  assert.match(indexHtml, /<html lang="pt-BR" class="app-booting">/);
+  assert.match(indexHtml, /class="app-boot" id="appBoot" role="status"/);
+  assert.match(indexHtml, /Preparando seu ambiente/);
+  assert.match(stylesCss, /html\.app-booting \.shell,[\s\S]*?visibility:\s*hidden/);
+  assert.match(stylesCss, /html:not\(\.app-booting\) \.app-boot/);
+  assert.match(appJs, /function finishAppBoot\(\)/);
+  assert.ok(
+    appJs.lastIndexOf("setActivePage(getActivePage());") <
+      appJs.lastIndexOf("await loadStateCourtCatalog();"),
+  );
+  assert.ok(
+    appJs.lastIndexOf("finishAppBoot();") >
+      appJs.lastIndexOf("const authState = await loadAuthState();"),
+  );
+  assert.match(indexHtml, /styles\.css\?v=20260818-app-boot-1/);
+  assert.match(indexHtml, /app\.js\?v=20260818-app-boot-1/);
+});
+
+test("recovery requires an AI-adjusted and user-reviewed testimony before the PDF", () => {
+  assert.match(chargeAnalysisJs, /Continuar para o depoimento/);
+  assert.match(chargeAnalysisJs, /id="chargeRecoveryTestimonyForm"/);
+  assert.match(chargeAnalysisJs, /name="originalTestimony" required minlength="40" maxlength="5000"/);
+  assert.match(chargeAnalysisJs, /name="refinedTestimony" required minlength="40" maxlength="5000"/);
+  assert.match(chargeAnalysisJs, /name="testimonyReviewed"/);
+  assert.match(chargeAnalysisJs, /testimonyReviewed: true/);
+  assert.match(chargeAnalysisJs, /consumerTestimony/);
+  assert.doesNotMatch(chargeAnalysisJs, /data-recovery-submit="pdf"/);
+  assert.match(stylesCss, /\.charge-testimony-field textarea/);
+  assert.match(stylesCss, /\.charge-testimony-confirmation/);
+  assert.match(appJs, /name="originalTestimony" required minlength="40" maxlength="5000"/);
+  assert.match(appJs, /data-jec-action="testimony"/);
+  assert.match(appJs, /\/api\/jec\/testimony\/refine/);
+  assert.match(appJs, /testimonyReviewed: true/);
+  assert.match(stylesCss, /\.jec-testimony-section textarea/);
 });
 
 test("recovery report reuses calculated values without asking for another review", () => {

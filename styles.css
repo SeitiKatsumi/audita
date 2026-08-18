@@ -24,6 +24,92 @@
   box-sizing: border-box;
 }
 
+.app-boot {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 48px auto;
+  place-content: center;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 24px;
+  color: var(--text);
+  background: #06111f;
+  transition: opacity 180ms ease, visibility 180ms ease;
+}
+
+.app-boot img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.app-boot > div {
+  display: grid;
+  gap: 3px;
+}
+
+.app-boot strong {
+  font-size: 0.94rem;
+  letter-spacing: 0;
+}
+
+.app-boot span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.app-boot i {
+  position: relative;
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  background: rgba(143, 215, 255, 0.14);
+}
+
+.app-boot i::after {
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  content: "";
+  background: var(--lime-strong);
+  animation: app-boot-progress 1s ease-in-out infinite;
+}
+
+html.app-booting .shell,
+html.app-booting .login-screen {
+  visibility: hidden;
+}
+
+html:not(.app-booting) .app-boot {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes app-boot-progress {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-boot,
+  .app-boot i::after {
+    transition: none;
+    animation: none;
+  }
+
+  .app-boot i::after {
+    width: 72%;
+  }
+}
+
 html {
   overflow-x: hidden;
   scroll-behavior: smooth;
@@ -9846,6 +9932,126 @@ body[data-active-page="chat"] .workspace {
   box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
 }
 
+.jec-testimony-section {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  margin-top: 16px;
+  border: 1px solid rgba(105, 165, 204, 0.22);
+  border-radius: 8px;
+  background: rgba(5, 27, 45, 0.52);
+}
+
+.jec-testimony-section > strong {
+  color: #eef8fc;
+}
+
+.jec-testimony-section > p {
+  margin: 0;
+  color: #91aebe;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.jec-testimony-section > label:not(.jec-confirmation) {
+  display: grid;
+  gap: 7px;
+  color: #dcecf4;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.jec-testimony-section textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid rgba(105, 165, 204, 0.34);
+  border-radius: 6px;
+  outline: none;
+  color: #edf8fc;
+  background: rgba(3, 19, 32, 0.72);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.55;
+}
+
+.jec-testimony-section textarea:focus {
+  border-color: rgba(49, 247, 143, 0.65);
+  box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
+}
+
+.charge-testimony-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.charge-testimony-prompts span {
+  padding: 6px 9px;
+  border: 1px solid rgba(105, 165, 204, 0.22);
+  border-radius: 6px;
+  color: #a9c8da;
+  background: rgba(105, 165, 204, 0.07);
+  font-size: 0.7rem;
+}
+
+.charge-testimony-field {
+  display: grid;
+  gap: 8px;
+  color: #dcecf4;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.charge-testimony-field textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 14px;
+  resize: vertical;
+  border: 1px solid rgba(105, 165, 204, 0.34);
+  border-radius: 6px;
+  outline: none;
+  color: #edf8fc;
+  background: rgba(3, 19, 32, 0.72);
+  font: inherit;
+  font-size: 0.83rem;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.charge-testimony-field textarea:focus {
+  border-color: rgba(49, 247, 143, 0.65);
+  box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
+}
+
+.charge-testimony-field small {
+  color: #829dad;
+  font-size: 0.68rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.charge-testimony-confirmation {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin-top: 18px;
+  color: #b9ced9;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.charge-testimony-confirmation input {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: #31f78f;
+}
+
 .charge-recovery-section-title {
   display: flex;
   align-items: baseline;
@@ -11080,8 +11286,8 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
 }
 
-.charge-analysis-actions button:hover,
-.charge-analysis-actions button:focus-visible {
+.charge-analysis-actions button:hover:not(:disabled),
+.charge-analysis-actions button:focus-visible:not(:disabled) {
   border-color: rgba(49, 247, 143, 0.58);
   color: #f2fff7;
   background: rgba(49, 247, 143, 0.07);
@@ -11091,6 +11297,27 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 .charge-analysis-actions button:disabled {
   cursor: wait;
   opacity: 0.52;
+}
+
+.charge-analysis-actions .charge-option-disabled:disabled {
+  justify-content: space-between;
+  gap: 12px;
+  border-color: rgba(116, 181, 223, 0.2);
+  color: #8fa7b8;
+  cursor: not-allowed;
+  background: rgba(4, 24, 41, 0.18);
+  opacity: 0.72;
+}
+
+.charge-option-status {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  border: 1px solid rgba(116, 181, 223, 0.22);
+  border-radius: 999px;
+  color: #9db6c8;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .charge-analysis-actions button strong {

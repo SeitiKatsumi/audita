@@ -977,6 +977,13 @@ function buildOptionalClaimText(claimant) {
 
 function buildDraft({ caseData, claimant, templateId, generatedAt }) {
   const optionalClaims = buildOptionalClaimText(claimant);
+  const optionalTestimony = "__AUDITA_OPTIONAL_CONSUMER_TESTIMONY__";
+  const consumerTestimony = cleanText(
+    caseData?.answers?.consumerTestimony?.refined ||
+      caseData?.answers?.consumerTestimony?.reviewed ||
+      caseData?.answers?.consumerTestimony,
+    5_000,
+  );
   const journey = resolveJourney(caseData, claimant);
   return renderJecPetitionTemplate(templateId, {
     ACTION_TITLE: buildActionTitle(templateId, claimant),
@@ -993,6 +1000,9 @@ function buildDraft({ caseData, claimant, templateId, generatedAt }) {
     PHONE: formatProfilePhone(claimant.phone),
     EVIDENCE_SUMMARY: buildEvidenceSummary(caseData),
     EVIDENCE_CONTEXT: buildEvidenceContext(caseData, journey),
+    CONSUMER_TESTIMONY_SECTION: consumerTestimony
+      ? `RELATO PESSOAL DO(A) CONSUMIDOR(A)\n\n${consumerTestimony}`
+      : optionalTestimony,
     BANK_RELATIONSHIP_CONTEXT: buildBankRelationshipContext(claimant),
     DOCUMENT_AVAILABILITY_CONTEXT: buildDocumentAvailabilityContext(
       caseData,
@@ -1016,6 +1026,7 @@ function buildDraft({ caseData, claimant, templateId, generatedAt }) {
     DATE: formatPetitionDate(generatedAt),
   })
     .replaceAll(optionalClaims.omitted, "")
+    .replaceAll(optionalTestimony, "")
     .replace(/\n{3,}/g, "\n\n");
 }
 

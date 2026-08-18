@@ -157,7 +157,6 @@ const ITAU_PHONE_CHANNELS_URL =
 const ITAU_OMBUDSMAN_URL =
   "https://www.itau.com.br/atendimento-itau/para-voce/ouvidoria";
 const JEC_LAW_URL = "https://www.planalto.gov.br/ccivil_03/leis/l9099.htm";
-const CDC_ARTICLE_42_URL = "https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm#art42";
 
 export const ITAU_DOCUMENT_REQUEST_TEMPLATE = `SOLICITAÇÃO DE DOCUMENTOS, EXTRATOS E COMPROVAÇÃO DE AUTORIZAÇÃO
 
@@ -314,6 +313,7 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   const calculationOpened = ["result", "recovery"].includes(screen) && reviewComplete;
   const recoveryStarted = Boolean(recovery.handoff);
   const documentPrepared = Boolean(recovery.prepared?.ready);
+  const testimonyReviewed = Boolean(recovery.testimony?.reviewed);
   const documentGenerated = Boolean(recovery.pdfGeneratedAt);
 
   let percent = 0;
@@ -325,6 +325,7 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   if (calculationOpened) percent = 65;
   if (recoveryStarted) percent = 72;
   if (documentPrepared) percent = 80;
+  if (testimonyReviewed) percent = 86;
   if (documentGenerated) percent = 90;
 
   if (documentAvailability === "none") {
@@ -343,6 +344,8 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   } else if (screen === "recovery") {
     activeStep = recovery.phase === "guide"
       ? "tribunal"
+      : recovery.phase === "testimony"
+        ? "report"
       : recovery.phase === "report"
         ? "report"
         : "recovery";
@@ -370,10 +373,12 @@ export function buildChargeProgressSnapshot(flowState = {}) {
     message = "Cálculo documental concluído. Falta iniciar e revisar a preparação dos documentos.";
   } else if (recoveryStarted && !documentPrepared) {
     message = "Preparação iniciada. Complete e revise os dados necessários para gerar o documento.";
-  } else if (documentPrepared && !documentGenerated) {
-    message = "Documento preparado. Falta revisar o conteúdo e gerar o PDF.";
   } else if (documentGenerated) {
     message = "Documento gerado. O protocolo final continua pendente e deve ser concluído por uma pessoa.";
+  } else if (documentPrepared && !testimonyReviewed) {
+    message = "Documento preparado. Falta incluir e revisar o seu depoimento pessoal.";
+  } else if (testimonyReviewed && !documentGenerated) {
+    message = "Depoimento revisado. Falta gerar o PDF.";
   }
 
   if (documentAvailability === "partial" && selectedFileCount > 0) {
@@ -617,6 +622,11 @@ if (stage) {
       handoff: null,
       claimant: {},
       prepared: null,
+      testimony: {
+        original: "",
+        refined: "",
+        reviewed: false,
+      },
       portals: [],
       guideUf: "",
       loading: false,
@@ -634,6 +644,11 @@ if (stage) {
       handoff: null,
       claimant: {},
       prepared: null,
+      testimony: {
+        original: "",
+        refined: "",
+        reviewed: false,
+      },
       portals: [],
       guideUf: "",
       loading: false,
@@ -931,6 +946,10 @@ if (stage) {
         </button>
         <button type="button" data-charge-action="verify-statement">
           <strong>N&atilde;o sei, quais s&atilde;o todas as bandeiras?</strong>
+        </button>
+        <button type="button" class="secondary charge-option-disabled" data-charge-status="coming-soon" disabled aria-disabled="true" title="Disponível em breve" aria-label="Sou advogado ou advogada — disponível em breve">
+          <strong>Sou advogado(a)</strong>
+          <span class="charge-option-status">Em breve</span>
         </button>
       </div>
     `;
@@ -1296,69 +1315,6 @@ if (stage) {
             <h3>Sim, encontramos cobranças que podem ser indevidas nos seus extratos.</h3>
             <p>A IA AUDITA já concluiu a triagem inicial. Ative o Standard para abrir os achados, revisar cada lançamento e transformar os documentos enviados em uma análise organizada. Os detalhes, valores e a simulação permanecem protegidos até a ativação do plano.</p>
           </div>
-        </section>
-
-        <section class="charge-paywall-value" aria-labelledby="chargePaywallValueTitle">
-          <div class="charge-paywall-section-heading charge-paywall-value-heading">
-            <p class="eyebrow">Por que seguir com a IA AUDITA</p>
-            <h3 id="chargePaywallValueTitle">Da cobran&ccedil;a suspeita a um caso documentado</h3>
-            <p>A IA AUDITA organiza as provas. Voc&ecirc; continua no controle.</p>
-          </div>
-
-          <ol class="charge-paywall-proof-journey" aria-label="Etapas liberadas pela IA AUDITA">
-            <li><span aria-hidden="true">1</span><strong>Cobran&ccedil;a localizada</strong><p>Identificamos lan&ccedil;amentos com comportamentos at&iacute;picos nos documentos enviados.</p></li>
-            <li><span aria-hidden="true">2</span><strong>Evid&ecirc;ncia no extrato</strong><p>Ligamos descri&ccedil;&atilde;o, data, valor e arquivo de origem de cada ocorr&ecirc;ncia.</p></li>
-            <li><span aria-hidden="true">3</span><strong>C&aacute;lculo rastre&aacute;vel</strong><p>Calculamos somente cobran&ccedil;as encontradas nos anexos e n&atilde;o reconhecidas por voc&ecirc;.</p></li>
-            <li><span aria-hidden="true">4</span><strong>Relat&oacute;rio t&eacute;cnico</strong><p>Consolidamos evid&ecirc;ncias e mem&oacute;ria de c&aacute;lculo em um documento revis&aacute;vel.</p></li>
-            <li><span aria-hidden="true">5</span><strong>Orienta&ccedil;&atilde;o para o JEC</strong><p>Apresentamos o passo a passo para o protocolo final, que permanece humano.</p></li>
-          </ol>
-
-          <div class="charge-paywall-reference" role="group" aria-label="Compara&ccedil;&atilde;o ilustrativa entre o acordo extrajudicial e a pretens&atilde;o simulada no material de refer&ecirc;ncia">
-            <div class="charge-paywall-reference-bars">
-              <h4>Comparativo ilustrativo <small>material de refer&ecirc;ncia</small></h4>
-              <label for="chargeAgreementReference">Acordo extrajudicial</label>
-              <meter id="chargeAgreementReference" min="0" max="100" value="15" aria-label="Propor&ccedil;&atilde;o ilustrativa do acordo extrajudicial"></meter>
-              <label for="chargeClaimReference">Pretens&atilde;o simulada no exemplo</label>
-              <meter id="chargeClaimReference" class="highlight" min="0" max="100" value="100" aria-label="Propor&ccedil;&atilde;o ilustrativa da pretens&atilde;o simulada"></meter>
-            </div>
-
-            <div class="charge-paywall-reference-callout">
-              <span>Neste exemplo, a pretens&atilde;o simulada foi cerca de</span>
-              <strong>552%</strong>
-              <b>superior ao acordo</b>
-              <p>O potencial n&atilde;o vem apenas do estorno: outros componentes podem ser avaliados conforme as provas e a decis&atilde;o judicial.</p>
-            </div>
-
-            <div class="charge-paywall-reference-components">
-              <h4>Composi&ccedil;&atilde;o da pretens&atilde;o simulada</h4>
-              <ul>
-                <li>Repeti&ccedil;&atilde;o em dobro, se cab&iacute;vel</li>
-                <li>Corre&ccedil;&atilde;o monet&aacute;ria</li>
-                <li>Juros legais</li>
-                <li>Eventual indeniza&ccedil;&atilde;o, quando fundamentada</li>
-              </ul>
-            </div>
-          </div>
-
-          <p class="charge-paywall-value-disclaimer"><strong>Importante:</strong> percentual calculado a partir de um &uacute;nico cen&aacute;rio do material de refer&ecirc;ncia. O resultado de cada caso varia e n&atilde;o h&aacute; garantia de recebimento, devolu&ccedil;&atilde;o em dobro, indeniza&ccedil;&atilde;o ou &ecirc;xito judicial. A composi&ccedil;&atilde;o depende das provas, dos requisitos do <a href="${CDC_ARTICLE_42_URL}" target="_blank" rel="noreferrer">art. 42 do CDC</a> e da decis&atilde;o do Judici&aacute;rio.</p>
-
-          <div class="charge-paywall-value-actions">
-            <a class="primary-action charge-paywall-value-cta" href="#chargePaywallPlans">Continuar com a IA AUDITA</a>
-            <ul aria-label="Compromissos da IA AUDITA">
-              <li>Voc&ecirc; revisa cada cobran&ccedil;a</li>
-              <li>Sem promessa de resultado</li>
-              <li>Protocolo final feito pelo usu&aacute;rio</li>
-            </ul>
-          </div>
-        </section>
-
-        <section class="charge-paywall-explainer" aria-labelledby="chargePaywallInfoTitle">
-          <div><p class="eyebrow">Transparência antes de contratar</p><h3 id="chargePaywallInfoTitle">Você continua no controle</h3></div>
-          <ul>
-            <li>Documentos parciais produzem uma análise limitada ao período enviado; não estimamos meses ausentes.</li>
-            <li>Devolução em dobro, indenização e êxito judicial não são automáticos e dependem das provas e da avaliação jurídica.</li>
-            <li>Consultas pagas de terceiros, custas, protocolo e representação jurídica não estão incluídos, salvo quando informados expressamente.</li>
-          </ul>
         </section>
 
         <section id="chargePaywallPlans" class="charge-paywall-plans" aria-label="Planos Standard">
@@ -1815,7 +1771,7 @@ if (stage) {
         <div class="charge-recovery-form-actions">
           <button type="button" class="secondary-action" data-charge-action="back-to-recovery-intro">Voltar</button>
           <button type="submit" class="secondary-action" data-recovery-submit="prepare" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Processando..." : reportButtonLabel}</button>
-          ${prepared?.ready ? `<button type="submit" class="primary-action" data-recovery-submit="pdf" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Gerando..." : "Gerar Relatório Técnico em PDF"}</button>` : ""}
+          ${prepared?.ready ? `<button type="button" class="primary-action" data-charge-action="open-recovery-testimony" ${state.recovery.busy ? "disabled" : ""}>Continuar para o depoimento</button>` : ""}
         </div>
       </form>
     `;
@@ -1830,6 +1786,63 @@ if (stage) {
         `, "IA AUDITA · Relatório")}
       </div>
       ${recoveryReportFormMarkup()}
+    `;
+  }
+
+  function recoveryTestimonyMarkup() {
+    const testimony = state.recovery.testimony || {};
+    const hasRefinedText = Boolean(testimony.refined);
+    return `
+      <form class="charge-recovery-form charge-recovery-testimony" id="chargeRecoveryTestimonyForm" aria-busy="${state.recovery.busy}">
+        ${state.recovery.error ? `<p class="charge-recovery-form-error" role="alert">${escapeChargeHtml(state.recovery.error)}</p>` : ""}
+        <div class="charge-recovery-form-heading">
+          <div>
+            <p class="eyebrow">Relato pessoal</p>
+            <h3>Conte o que aconteceu com suas palavras</h3>
+          </div>
+          <span>Etapa obrigatória</span>
+        </div>
+        <p class="charge-recovery-form-intro">Descreva somente fatos que você conhece. A IA vai organizar a redação, sem criar informações, e você poderá revisar tudo antes do PDF.</p>
+        <div class="charge-testimony-prompts" aria-label="Pontos que podem ajudar no relato">
+          <span>O que foi cobrado</span>
+          <span>Quando você percebeu</span>
+          <span>Desde quando ocorre</span>
+          <span>Por que não reconhece a contratação</span>
+        </div>
+        <label class="charge-testimony-field">
+          <span>Seu depoimento</span>
+          <textarea name="originalTestimony" required minlength="40" maxlength="5000" rows="8" placeholder="Ex.: Percebi na minha fatura uma cobrança mensal identificada como...">${escapeChargeHtml(testimony.original || "")}</textarea>
+          <small>Não inclua senhas, dados do cartão ou informações que não queira inserir no documento.</small>
+        </label>
+        ${hasRefinedText ? `
+          <div class="charge-recovery-section-title"><strong>Texto ajustado pela IA</strong><span>Edite qualquer trecho que não corresponda exatamente ao seu relato.</span></div>
+          <label class="charge-testimony-field">
+            <span>Versão que entrará no documento</span>
+            <textarea name="refinedTestimony" required minlength="40" maxlength="5000" rows="8">${escapeChargeHtml(testimony.refined)}</textarea>
+          </label>
+          <label class="charge-testimony-confirmation">
+            <input type="checkbox" name="testimonyReviewed" ${testimony.reviewed ? "checked" : ""} />
+            <span>Revisei o texto e confirmo que ele corresponde aos fatos que relatei.</span>
+          </label>
+        ` : ""}
+        <div class="charge-recovery-form-actions">
+          <button type="button" class="secondary-action" data-charge-action="back-to-recovery-report">Voltar</button>
+          <button type="submit" class="${hasRefinedText ? "secondary-action" : "primary-action"}" data-testimony-submit="refine" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Ajustando..." : hasRefinedText ? "Ajustar novamente" : "Ajustar texto com IA"}</button>
+          ${hasRefinedText ? `<button type="submit" class="primary-action" data-testimony-submit="pdf" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Gerando..." : "Gerar Relatório Técnico em PDF"}</button>` : ""}
+        </div>
+      </form>
+    `;
+  }
+
+  function renderRecoveryTestimony() {
+    stage.innerHTML = `
+      <div class="charge-analysis-conversation charge-recovery-conversation compact">
+        ${assistantMessage(`
+          <p><strong>Agora quero registrar a sua versão dos fatos.</strong></p>
+          <p>Esse relato torna o documento individual. Escreva do seu jeito; eu vou apenas melhorar a clareza e a organização, sem acrescentar informações.</p>
+        `, "IA AUDITA · Depoimento")}
+      </div>
+      ${recoveryTestimonyMarkup()}
     `;
   }
 
@@ -1940,6 +1953,7 @@ if (stage) {
 
   function renderRecovery() {
     if (state.recovery.phase === "guide") renderRecoveryGuide();
+    else if (state.recovery.phase === "testimony") renderRecoveryTestimony();
     else if (state.recovery.phase === "report") renderRecoveryReport();
     else renderRecoveryIntro();
   }
@@ -1972,8 +1986,24 @@ if (stage) {
   }
 
   function recoveryPayload(claimant = state.recovery.claimant) {
+    const caseData = state.recovery.handoff?.caseData || {};
+    const reviewedTestimony = String(state.recovery.testimony?.refined || "").trim();
     return {
-      caseData: state.recovery.handoff?.caseData || {},
+      caseData: {
+        ...caseData,
+        answers: {
+          ...(caseData.answers || {}),
+          ...(reviewedTestimony
+            ? {
+                consumerTestimony: {
+                  original: String(state.recovery.testimony?.original || "").trim(),
+                  refined: reviewedTestimony,
+                  reviewed: true,
+                },
+              }
+            : {}),
+        },
+      },
       claimant,
       uf: claimant?.uf || "",
       city: claimant?.city || "",
@@ -1987,6 +2017,51 @@ if (stage) {
         .join(", ")}.`;
     }
     return data.message || fallback;
+  }
+
+  function readRecoveryTestimony(form) {
+    const data = new FormData(form);
+    return {
+      original: String(data.get("originalTestimony") || "").normalize("NFC").trim().slice(0, 5000),
+      refined: String(data.get("refinedTestimony") || "").normalize("NFC").trim().slice(0, 5000),
+      reviewed: data.get("testimonyReviewed") === "on",
+    };
+  }
+
+  async function refineRecoveryTestimony(form) {
+    if (state.recovery.busy) return;
+    const testimony = readRecoveryTestimony(form);
+    state.recovery.testimony = { ...testimony, reviewed: false };
+    state.recovery.busy = true;
+    state.recovery.error = "";
+    render();
+
+    try {
+      const response = await fetch("/api/jec/testimony/refine", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ testimony: testimony.original }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        document.querySelector("#loginButton")?.click();
+        throw new Error("Entre na IA AUDITA para ajustar o seu depoimento.");
+      }
+      if (!response.ok || !data.testimony?.refined) {
+        throw new Error(recoveryApiError(data, "Não foi possível ajustar o depoimento agora."));
+      }
+      state.recovery.testimony = {
+        original: data.testimony.original || testimony.original,
+        refined: data.testimony.refined,
+        reviewed: false,
+      };
+    } catch (error) {
+      state.recovery.error = error?.message || "Falha ao ajustar o depoimento.";
+    } finally {
+      state.recovery.busy = false;
+      state.recovery.phase = "testimony";
+      render();
+    }
   }
 
   async function prepareRecoveryReport(form) {
@@ -2025,7 +2100,11 @@ if (stage) {
   }
 
   async function downloadRecoveryReport(claimant = state.recovery.claimant) {
-    if (state.recovery.busy || !state.recovery.prepared?.ready) return;
+    if (
+      state.recovery.busy ||
+      !state.recovery.prepared?.ready ||
+      !state.recovery.testimony?.reviewed
+    ) return;
     state.recovery.busy = true;
     state.recovery.error = "";
     render();
@@ -2037,6 +2116,7 @@ if (stage) {
         body: JSON.stringify({
           ...recoveryPayload(claimant),
           reviewConfirmed: true,
+          testimonyReviewed: true,
         }),
       });
       if (response.status === 401) {
@@ -2065,7 +2145,7 @@ if (stage) {
       state.recovery.phase = "guide";
     } catch (error) {
       state.recovery.error = error?.message || "Falha ao gerar o Relatório Técnico.";
-      state.recovery.phase = "report";
+      state.recovery.phase = "testimony";
     } finally {
       state.recovery.busy = false;
       render();
@@ -2432,6 +2512,11 @@ if (stage) {
       state.screen = "result";
     } else if (action === "open-recovery-report") {
       state.recovery.phase = "report";
+    } else if (action === "open-recovery-testimony") {
+      const form = button.closest("form");
+      if (form) state.recovery.claimant = readRecoveryClaimant(form);
+      state.recovery.error = "";
+      state.recovery.phase = "testimony";
     } else if (action === "back-to-recovery-intro") {
       state.recovery.phase = "intro";
     } else if (action === "back-to-recovery-report") {
@@ -2489,13 +2574,25 @@ if (stage) {
 
     if (event.target.id === "chargeRecoveryForm") {
       event.preventDefault();
-      const action = event.submitter?.dataset.recoverySubmit || "prepare";
+      void prepareRecoveryReport(event.target);
+      return;
+    }
+
+    if (event.target.id === "chargeRecoveryTestimonyForm") {
+      event.preventDefault();
+      const action = event.submitter?.dataset.testimonySubmit || "refine";
       if (action === "pdf") {
-        const claimant = readRecoveryClaimant(event.target);
-        state.recovery.claimant = claimant;
-        void downloadRecoveryReport(claimant);
+        const testimony = readRecoveryTestimony(event.target);
+        if (!testimony.reviewed || testimony.refined.length < 40) {
+          state.recovery.error = "Revise o texto e confirme que ele corresponde aos fatos relatados.";
+          state.recovery.testimony = testimony;
+          renderRecoveryTestimony();
+          return;
+        }
+        state.recovery.testimony = testimony;
+        void downloadRecoveryReport();
       } else {
-        void prepareRecoveryReport(event.target);
+        void refineRecoveryTestimony(event.target);
       }
       return;
     }

@@ -23,6 +23,7 @@ import {
 } from "./services/stripe-billing.service.mjs";
 import { createBillingAdminService } from "./services/billing-admin.service.mjs";
 import { createBillingAccessService } from "./services/billing-access.service.mjs";
+import { createSuperAdminService } from "./services/super-admin.service.mjs";
 import { createDirectDataCourtService } from "./services/direct-data-court.service.mjs";
 import { createDirectDataCertificatesService } from "./services/direct-data-certificates.service.mjs";
 import {
@@ -58,6 +59,11 @@ import {
   prepareJecPetition,
 } from "./services/jec-petition.service.mjs";
 import { createJecPetitionPdf } from "./services/jec-petition-pdf.service.mjs";
+import {
+  createJecTestimonyService,
+  JecTestimonyError,
+  normalizeJecTestimony,
+} from "./services/jec-testimony.service.mjs";
 import {
   decryptUserProfile,
   encryptUserProfile,
@@ -1135,7 +1141,26 @@ async function ensureBootstrapUserForLogin(email, password) {
   }
 
   if (email === bootstrapEmail && password === bootstrapPassword) {
-    await bootstrapAdminUser();
+    if (pool && dbReady) {
+      await bootstrapAdminUser();
+      return;
+    }
+    await loadFallbackAuth();
+    const existing = getFallbackUserByEmail(email);
+    if (existing) {
+      existing.role = "super_admin";
+      existing.status = "active";
+      existing.name = String(process.env.AUDITA_BOOTSTRAP_ADMIN_NAME || "Audita Super Admin").trim();
+      existing.password_hash = hashPassword(password);
+    } else {
+      createFallbackUser({
+        email,
+        password,
+        name: String(process.env.AUDITA_BOOTSTRAP_ADMIN_NAME || "Audita Super Admin").trim(),
+        role: "super_admin",
+      });
+    }
+    await saveFallbackAuth();
   }
 }
 
@@ -1458,6 +1483,18 @@ const billingAdminService = createBillingAdminService({
   accessService: billingAccessService,
   getSubscription: (tenantId) => stripeBillingService.getSubscription(tenantId),
 });
+const superAdminService = createSuperAdminService({
+  getDb: () => ({ pool, dbReady }),
+  billingAdminService,
+  updateFallbackUser: (userId, changes) => {
+    const user = fallbackUsers.get(Number(userId)) || fallbackUsers.get(userId);
+    if (!user || user.role === "super_admin") return null;
+    if (changes.status) user.status = changes.status;
+    if (changes.role) user.role = changes.role;
+    saveFallbackAuth().catch(() => {});
+    return publicUser(user);
+  },
+});
 const directDataCourtService = createDirectDataCourtService({
   creditsService,
   recordApiUsage: (usageContext, event) =>
@@ -1480,6 +1517,7 @@ const propertyAssetsService = createPropertyAssetsService({
 });
 const itauRefundService = createItauRefundService();
 const chatBrowserService = createChatBrowserService();
+const jecTestimonyService = createJecTestimonyService();
 
 async function getDashboard(request) {
   if (!pool || !dbReady) {
@@ -3213,6 +3251,108 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/super-admin/dashboard" && request.method === "GET") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (!authContext.user) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (authContext.user.role !== "super_admin") {
+        sendJson(response, 403, { error: "super_admin_required" });
+        return true;
+      }
+      sendJson(response, 200, await superAdminService.getDashboard(authContext));
+    } catch (error) {
+      sendJson(response, 500, {
+        error: "super_admin_dashboard_failed",
+        message: error instanceof Error ? error.message : "Nao foi possivel carregar o painel.",
+      });
+    }
+    return true;
+  }
+
+  const superAdminUserMatch = pathname.match(/^\/api\/super-admin\/users\/([^/]+)$/);
+  if (superAdminUserMatch && request.method === "PATCH") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (!authContext.user) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const result = await superAdminService.updateUser(
+        authContext,
+        decodeURIComponent(superAdminUserMatch[1]),
+        await readJsonBody(request),
+      );
+      if (result.forbidden) sendJson(response, 403, { error: "super_admin_required" });
+      else if (result.invalid) sendJson(response, 400, { error: result.reason });
+      else if (result.notFound) sendJson(response, 404, { error: "user_not_found" });
+      else sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 500, { error: "super_admin_user_update_failed", message: error.message });
+    }
+    return true;
+  }
+
+  const superAdminAccessMatch = pathname.match(/^\/api\/super-admin\/users\/([^/]+)\/access$/);
+  if (superAdminAccessMatch && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (!authContext.user) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (authContext.user.role !== "super_admin") {
+        sendJson(response, 403, { error: "super_admin_required" });
+        return true;
+      }
+      const result = await billingAccessService.setTesterGrant(
+        authContext,
+        decodeURIComponent(superAdminAccessMatch[1]),
+        await readJsonBody(request),
+      );
+      if (result.invalid) sendJson(response, 400, { error: result.reason });
+      else if (result.notFound) sendJson(response, 404, { error: "user_not_found" });
+      else if (result.forbidden) sendJson(response, 403, { error: "super_admin_required" });
+      else sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 500, { error: "super_admin_access_update_failed", message: error.message });
+    }
+    return true;
+  }
+
+  const superAdminSubscriptionMatch = pathname.match(/^\/api\/super-admin\/subscriptions\/([^/]+)$/);
+  if (superAdminSubscriptionMatch && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (!authContext.user) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (authContext.user.role !== "super_admin") {
+        sendJson(response, 403, { error: "super_admin_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      const result = await stripeBillingService.setCancellationAtPeriodEnd(
+        decodeURIComponent(superAdminSubscriptionMatch[1]),
+        body.action,
+      );
+      if (result.invalid) sendJson(response, 400, { error: result.reason });
+      else if (result.notFound) sendJson(response, 404, { error: result.reason });
+      else if (result.unavailable) sendJson(response, 409, { error: result.reason });
+      else sendJson(response, 200, result);
+    } catch (error) {
+      const statusCode = error instanceof StripeBillingError ? error.statusCode : 500;
+      sendJson(response, statusCode, {
+        error: error instanceof StripeBillingError ? error.code : "subscription_update_failed",
+        message: error instanceof Error ? error.message : "Nao foi possivel atualizar a assinatura.",
+      });
+    }
+    return true;
+  }
+
   const billingUserAccessMatch = pathname.match(/^\/api\/admin\/billing\/users\/([^/]+)\/access$/);
   if (billingUserAccessMatch && request.method === "POST") {
     try {
@@ -3758,6 +3898,33 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/jec/testimony/refine" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = await readJsonBody(request);
+      const result = await jecTestimonyService.refine(body.testimony);
+      sendJson(response, 200, {
+        testimony: {
+          original: result.original,
+          refined: result.refined,
+        },
+      });
+    } catch (error) {
+      const knownError = error instanceof JecTestimonyError;
+      sendJson(response, knownError ? error.statusCode : 502, {
+        error: knownError ? error.code : "jec_testimony_refine_failed",
+        message: knownError
+          ? error.message
+          : "Não foi possível ajustar o depoimento agora. Tente novamente.",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/jec/petitions/prepare" && request.method === "POST") {
     try {
       const authContext = await getTenantIdForRequest(request);
@@ -3766,6 +3933,7 @@ async function handleApi(request, response, pathname) {
         return true;
       }
       const body = await readJsonBody(request);
+      const reviewedTestimony = body.caseData?.answers?.consumerTestimony;
       let caseData = body.caseData || {};
       if (body.caseId) {
         const stored = itauRefundService.getCase(body.caseId, {
@@ -3776,7 +3944,15 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 403, { error: "itau_case_forbidden" });
           return true;
         }
-        if (stored.case) caseData = stored.case;
+        if (stored.case) {
+          caseData = {
+            ...stored.case,
+            answers: {
+              ...(stored.case.answers || {}),
+              ...(reviewedTestimony ? { consumerTestimony: reviewedTestimony } : {}),
+            },
+          };
+        }
       }
       const prepared = prepareJecPetition({
         caseData,
@@ -3813,6 +3989,17 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 400, { error: "jec_review_required" });
         return true;
       }
+      const reviewedTestimony = body.caseData?.answers?.consumerTestimony;
+      const testimonyText = normalizeJecTestimony(
+        reviewedTestimony?.refined || reviewedTestimony?.reviewed || "",
+      );
+      if (body.testimonyReviewed !== true || testimonyText.length < 40) {
+        sendJson(response, 400, {
+          error: "jec_testimony_review_required",
+          message: "Revise e confirme o seu depoimento antes de gerar o PDF.",
+        });
+        return true;
+      }
       let caseData = body.caseData || {};
       if (body.caseId) {
         const stored = itauRefundService.getCase(body.caseId, {
@@ -3823,7 +4010,15 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 403, { error: "itau_case_forbidden" });
           return true;
         }
-        if (stored.case) caseData = stored.case;
+        if (stored.case) {
+          caseData = {
+            ...stored.case,
+            answers: {
+              ...(stored.case.answers || {}),
+              consumerTestimony: reviewedTestimony,
+            },
+          };
+        }
       }
       const prepared = prepareJecPetition({
         caseData,
@@ -4418,6 +4613,8 @@ async function handleApi(request, response, pathname) {
       const email = String(body.email || "").trim().toLowerCase();
       const password = String(body.password || "");
 
+      await ensureBootstrapUserForLogin(email, password);
+
       if (!pool || !dbReady) {
         await loadFallbackAuth();
         const user = getFallbackUserByEmail(email);
@@ -4430,7 +4627,6 @@ async function handleApi(request, response, pathname) {
         return true;
       }
 
-      await ensureBootstrapUserForLogin(email, password);
       const result = await pool.query(
         `SELECT id, password_hash
          FROM audita_users

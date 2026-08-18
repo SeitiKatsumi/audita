@@ -40,6 +40,17 @@ test("serves the commercial plans page from a stable route", () => {
   });
 });
 
+test("serves the dedicated super admin page from a stable route", () => {
+  assert.deepEqual(resolveUiRoute("/super-admin/"), {
+    type: "redirect",
+    location: "/super-admin",
+  });
+  assert.deepEqual(resolveUiRoute("/super-admin"), {
+    type: "file",
+    path: "/super-admin.html",
+  });
+});
+
 test("preserves API-independent static asset routes", () => {
   assert.deepEqual(resolveUiRoute("/app.js"), {
     type: "file",
@@ -57,6 +68,9 @@ test("production image includes every root-level UI asset", () => {
     "plans.html",
     "plans.css",
     "plans.js",
+    "super-admin.html",
+    "super-admin.css",
+    "super-admin.js",
   ]) {
     assert.match(dockerfile, new RegExp(`\\b${file.replace(".", "\\.")}\\b`));
   }

@@ -926,6 +926,25 @@ export function createStripeBillingService({
     }
   }
 
+  async function setCancellationAtPeriodEnd(tenantId, action) {
+    const normalizedAction = text(action);
+    if (!["cancel", "resume"].includes(normalizedAction)) {
+      return { invalid: true, reason: "invalid_subscription_action" };
+    }
+    const current = await loadSubscription(tenantId);
+    if (!current?.id) return { notFound: true, reason: "subscription_not_found" };
+    if (current.provider !== "stripe") {
+      return { unavailable: true, reason: "subscription_not_managed_by_stripe" };
+    }
+    const object = await stripeRequest(
+      `/v1/subscriptions/${encodeURIComponent(current.id)}`,
+      { cancel_at_period_end: normalizedAction === "cancel" ? "true" : "false" },
+      { idempotencyKey: `super-admin-${normalizedAction}-${current.id}-${Math.floor(now() / 60000)}` },
+    );
+    await processSubscriptionChanged(object, false);
+    return { subscription: await loadSubscription(tenantId) };
+  }
+
   return {
     accessState,
     billingState,
@@ -935,5 +954,6 @@ export function createStripeBillingService({
     createDemoSubscription,
     getSubscription: loadSubscription,
     handleWebhook,
+    setCancellationAtPeriodEnd,
   };
 }

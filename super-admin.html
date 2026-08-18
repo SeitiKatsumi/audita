@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Audita — Super Admin</title>
+    <link rel="stylesheet" href="/super-admin.css?v=1" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="login-view" id="loginView">
+        <div class="brand-mark"><img src="/assets/audita-logo-white.svg" alt="Audita" /></div>
+        <div class="login-copy">
+          <span class="kicker">Área restrita</span>
+          <h1>Controle central,<br />sem ruído.</h1>
+          <p>Acesso exclusivo para administração global da plataforma.</p>
+        </div>
+        <form class="login-card" id="loginForm">
+          <div><span class="step">01</span><h2>Super Admin</h2></div>
+          <label>E-mail<input id="loginEmail" name="email" type="email" autocomplete="username" required /></label>
+          <label>Senha<input id="loginPassword" name="password" type="password" autocomplete="current-password" required /></label>
+          <p class="error hidden" id="loginError" role="alert"></p>
+          <button type="submit">Entrar no painel <span>→</span></button>
+          <a href="/">Voltar para a Audita</a>
+        </form>
+      </section>
+
+      <section class="dashboard hidden" id="dashboardView">
+        <aside>
+          <img src="/assets/audita-logo-white.svg" alt="Audita" />
+          <div class="rail-label">SUPER<br />ADMIN</div>
+          <nav>
+            <button class="active" data-tab="overview">Visão geral</button>
+            <button data-tab="users">Usuários</button>
+            <button data-tab="subscriptions">Assinaturas</button>
+          </nav>
+          <button class="logout" id="logoutButton">Sair</button>
+        </aside>
+        <div class="workspace">
+          <header>
+            <div><span class="kicker">Operação global</span><h1 id="pageTitle">Visão geral</h1></div>
+            <div class="identity"><span id="adminName">Super Admin</span><small id="adminEmail"></small></div>
+          </header>
+          <p class="error hidden" id="dashboardError" role="alert"></p>
+
+          <section class="panel active" data-panel="overview">
+            <div class="metrics">
+              <article><small>MRR estimado</small><strong id="metricMrr">—</strong><span>receita recorrente mensal</span></article>
+              <article><small>Assinaturas ativas</small><strong id="metricActive">—</strong><span id="metricPastDue">—</span></article>
+              <article><small>Usuários</small><strong id="metricUsers">—</strong><span>em todas as organizações</span></article>
+              <article class="accent"><small>Créditos em carteira</small><strong id="metricCredits">—</strong><span>saldo total da plataforma</span></article>
+            </div>
+            <article class="table-card compact"><div class="card-heading"><div><span class="index">ÚLTIMOS EVENTOS</span><h2>Atividade de cobrança</h2></div><button class="refresh" data-refresh>Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>Evento</th><th>Organização</th><th>Status</th><th>Data</th></tr></thead><tbody id="eventRows"></tbody></table></div></article>
+          </section>
+
+          <section class="panel" data-panel="users">
+            <article class="table-card"><div class="card-heading"><div><span class="index">DIRETÓRIO GLOBAL</span><h2>Usuários</h2></div><input id="userSearch" type="search" placeholder="Buscar nome, e-mail ou organização" /></div><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Organização</th><th>Papel</th><th>Acesso</th><th>Status</th><th></th></tr></thead><tbody id="userRows"></tbody></table></div></article>
+          </section>
+
+          <section class="panel" data-panel="subscriptions">
+            <article class="table-card"><div class="card-heading"><div><span class="index">STRIPE</span><h2>Assinaturas</h2></div><select id="subscriptionFilter"><option value="">Todos os status</option><option value="active">Ativas</option><option value="trialing">Em teste</option><option value="past_due">Em atraso</option><option value="canceled">Canceladas</option></select></div><div class="table-wrap"><table><thead><tr><th>Organização</th><th>Plano</th><th>Status</th><th>Renovação</th><th>Créditos</th><th></th></tr></thead><tbody id="subscriptionRows"></tbody></table></div></article>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/super-admin.js?v=1"></script>
+  </body>
+</html>

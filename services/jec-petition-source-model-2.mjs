@@ -35,6 +35,7 @@ export const JEC_SOURCE_MODEL_2 = [
   "{{BANK_RELATIONSHIP_CONTEXT}}",
   "{{DOCUMENT_AVAILABILITY_CONTEXT}}",
   "{{EVIDENCE_CONTEXT}}",
+  "{{CONSUMER_TESTIMONY_SECTION}}",
   "Diante da indisponibilidade dos extratos bancários de todo o período ou parte dele, os quais se encontram exclusivamente em poder da instituição financeira, o Autor encontra-se impossibilitado de apresentar o cálculo discriminado mês a mês desde a origem das cobranças ilícitas.",
   "A conduta do Réu configura clara violação ao dever de informação, caracterizando a venda casada e prestação de serviço não solicitado, conduta amplamente combatida e objeto da Ação Civil Pública nº 5085307-63.2016.8.13.0024 (TJMG).",
   "{{CONTRACT_CONFIRMATION_CONTEXT}}",

@@ -35,6 +35,7 @@ export const JEC_SOURCE_MODEL_1 = [
   "1 O(A) Autor(a) é titular de conta e/ou cartão de crédito gerido pela instituição financeira Ré. Ocorre que o Banco Réu, agindo em flagrante descumprimento dos deveres de informação e transparência, sonegou e não enviou regularly ao(à) Autor(a) os extratos analíticos e detalhados contendo a discriminação de todas as cobranças efetuadas em sua conta/fatura.",
   "2 Ocorre que, apesar da conduta da Ré em omitir e não disponibilizar os extratos consolidados, o(a) Autor(a) obteve o histórico de suas movimentações bancárias e realizou uma auditoria técnica profunda por meio da plataforma IA AUDITA.",
   "O levantamento auditado revelou {{EVIDENCE_SUMMARY}}, entre os lançamentos que o(a) Autor(a) declarou não reconhecer como produtos ou serviços por ele(a) solicitados ou autorizados.",
+  "{{CONSUMER_TESTIMONY_SECTION}}",
   "4 A prática configura nítida venda casada e prestação de serviço não solicitado, conduta amplamente combatida e que foi inclusive objeto de Ação Civil Pública promovida pelo Procon-MPMG e IDEC (Processo nº 5085307-63.2016.8.13.0024 – TJMG), em que o Itaú celebrou acordo reconhecendo a abusividade de cobranças de seguros sem a expressa anuência do cliente.",
   "{{CONTRACT_CONFIRMATION_CONTEXT}}",
   "A retenção ilícita do capital do(a) Autor(a) ao longo do tempo causou-lhe desfalque financeiro e privação de rentabilidade (Custo de Oportunidade), ensejando a devolução em dobro acrescida de reparação por lucros cessantes.",
