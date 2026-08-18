@@ -159,6 +159,68 @@ test("petition draft uses the supplied audited-values model", () => {
   assert.match(profile.agentInstructions, /Confirmar ajuizamento/i);
 });
 
+test("DF uses the claimant district in the specific TJDFT heading for both PDF models", () => {
+  const dfClaimant = {
+    ...completeClaimant,
+    city: "Brasília",
+    uf: "DF",
+    district: "Águas Claras",
+  };
+  const model1 = prepareJecPetition({
+    caseData: sampleCase,
+    uf: "DF",
+    city: "Brasília",
+    claimant: dfClaimant,
+  });
+  const model2 = prepareJecPetition({
+    caseData: {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        documentAvailability: "partial",
+      },
+    },
+    uf: "DF",
+    city: "Brasília",
+    claimant: dfClaimant,
+  });
+
+  for (const prepared of [model1, model2]) {
+    assert.equal(prepared.ready, true);
+    assert.match(
+      prepared.draft,
+      /^EXCELENTÍSSIMO\(A\) SENHOR\(A\) DOUTOR\(A\) JUIZ\(A\) DE DIREITO DO ___º JUIZADO ESPECIAL CÍVEL DA CIRCUNSCRIÇÃO JUDICIÁRIA DE ÁGUAS CLARAS DO TRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS/,
+    );
+    assert.doesNotMatch(prepared.draft, /JUIZADO ESPECIAL CÍVEL DA COMARCA DE BRASÍLIA\/DF/);
+  }
+  assert.equal(model1.template.sourceModel, 1);
+  assert.equal(model2.template.sourceModel, 2);
+});
+
+test("non-DF headings remain unchanged and DF requires a district", () => {
+  const sp = prepareJecPetition({
+    caseData: sampleCase,
+    uf: "SP",
+    city: "São Paulo",
+    claimant: completeClaimant,
+  });
+  const dfWithoutDistrict = prepareJecPetition({
+    caseData: sampleCase,
+    uf: "DF",
+    city: "Brasília",
+    claimant: { ...completeClaimant, city: "Brasília", uf: "DF" },
+  });
+
+  assert.match(
+    sp.draft,
+    /^EXCELENTÍSSIMO\(A\) SENHOR\(A\) DOUTOR\(A\) JUIZ\(A\) DE DIREITO DO JUIZADO ESPECIAL CÍVEL DA COMARCA DE São Paulo\/SP/,
+  );
+  assert.doesNotMatch(sp.draft, /TRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL/);
+  assert.equal(dfWithoutDistrict.ready, false);
+  assert.ok(dfWithoutDistrict.missingFields.includes("district"));
+  assert.match(dfWithoutDistrict.draft, /\[PENDENTE: COURT_ADDRESS\]/);
+});
+
 test("reviewed consumer testimony individualizes both petition PDF models", () => {
   const testimony =
     "Percebi a cobrança de Seguro Alfa ao conferir minha fatura de julho. Não solicitei nem autorizei esse serviço e passei a revisar as faturas anteriores.";
@@ -432,7 +494,7 @@ test("petition above the small-claims limit keeps the PDF but blocks portal auto
     caseData: sampleCase,
     uf: "DF",
     city: "Brasília",
-    claimant: { ...completeClaimant, uf: "DF", city: "Brasília", caseValue: "40.000,00" },
+    claimant: { ...completeClaimant, uf: "DF", city: "Brasília", district: "Asa Sul", caseValue: "40.000,00" },
   });
 
   assert.equal(prepared.ready, true);

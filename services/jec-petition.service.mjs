@@ -975,6 +975,22 @@ function buildOptionalClaimText(claimant) {
   };
 }
 
+function buildCourtAddress(claimant = {}) {
+  const cityUf = claimant.city && claimant.uf
+    ? `${claimant.city}/${claimant.uf}`
+    : "";
+  if (claimant.uf !== "DF") {
+    return cityUf
+      ? `EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUIZADO ESPECIAL CÍVEL DA COMARCA DE ${cityUf}`
+      : "";
+  }
+
+  const district = cleanText(claimant.district, 80).toLocaleUpperCase("pt-BR");
+  return district
+    ? `EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO ___º JUIZADO ESPECIAL CÍVEL DA CIRCUNSCRIÇÃO JUDICIÁRIA DE ${district} DO TRIBUNAL DE JUSTIÇA DO DISTRITO FEDERAL E DOS TERRITÓRIOS`
+    : "";
+}
+
 function buildDraft({ caseData, claimant, templateId, generatedAt }) {
   const optionalClaims = buildOptionalClaimText(claimant);
   const optionalTestimony = "__AUDITA_OPTIONAL_CONSUMER_TESTIMONY__";
@@ -987,6 +1003,7 @@ function buildDraft({ caseData, claimant, templateId, generatedAt }) {
   const journey = resolveJourney(caseData, claimant);
   return renderJecPetitionTemplate(templateId, {
     ACTION_TITLE: buildActionTitle(templateId, claimant),
+    COURT_ADDRESS: buildCourtAddress(claimant),
     CITY_UF:
       claimant.city && claimant.uf ? `${claimant.city}/${claimant.uf}` : "",
     FULL_NAME: claimant.fullName,
@@ -1073,6 +1090,9 @@ export function prepareJecPetition({
   if (!cleanText(claimant.profession, 120)) missingFields.push("profession");
   if (!normalizedCity) missingFields.push("city");
   if (!normalizedUf) missingFields.push("uf");
+  if (normalizedUf === "DF" && !cleanText(claimant.district, 80)) {
+    missingFields.push("district");
+  }
   if (!normalizedAddress) missingFields.push("address");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanText(claimant.email, 160))) {
     missingFields.push("email");

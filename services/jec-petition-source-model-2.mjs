@@ -1,7 +1,7 @@
 // Generated from the approved DOCX source model. Do not edit legal prose here without reviewing the source document.
 
 export const JEC_SOURCE_MODEL_2 = [
-  "EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DO JUIZADO ESPECIAL CÍVEL DA COMARCA DE {{CITY_UF}}",
+  "{{COURT_ADDRESS}}",
   "{{FULL_NAME}}, {{NATIONALITY}}, {{MARITAL_STATUS}}, {{PROFESSION}}, portador(a) do RG nº {{RG}} e inscrito(a) no CPF sob o nº {{DOCUMENT}}, residente e domiciliado(a) na {{ADDRESS}}, e-mail: {{EMAIL}}, telefone: {{PHONE}}, com base na capacidade postulatória própria conferida pelo art. 9º da Lei nº 9.099/95 (sem necessidade de advogado), vem, respeitosamente, à presença de Vossa Excelência, propor a presente:",
   "{{ACTION_TITLE}}",
   "em face de ITAÚ UNIBANCO S.A., pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 60.701.190/0001-04, com sede na Praça Alfredo Egydio de Souza Aranha, nº 100, Jabaquara, São Paulo/SP, CEP 04344-902, pelas razões de fato e de direito a seguir expostas:",
