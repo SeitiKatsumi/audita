@@ -1331,6 +1331,9 @@ if (stage) {
   }
 
   function tierRangeLabel(tier) {
+    if (tier?.id === "itau-cobrancas-faixa-1") return "R$ 5 mil e R$ 10 mil";
+    if (tier?.id === "itau-cobrancas-faixa-2") return "R$ 10 mil e R$ 20 mil";
+    if (tier?.id === "itau-cobrancas-faixa-3") return "R$ 20 mil e R$ 32 mil";
     const minimum = Number(tier.minimumClaimCents || 0) / 100;
     const maximum = Number(tier.maximumClaimCents || 0) / 100;
     return minimum > 0
@@ -1342,6 +1345,9 @@ if (stage) {
     const calculation = currentCalculation();
     const tiers = itauServiceTiers();
     const selectedTier = selectedItauServiceTier(calculation);
+    const claimCents = Math.round(Number(calculation.estimatedMaterialClaim || 0) * 100);
+    const minimumClaimCents = Math.min(...tiers.map((tier) => Number(tier.minimumClaimCents || 0)));
+    const belowMinimum = Number.isFinite(minimumClaimCents) && claimCents < minimumClaimCents;
     const checkoutReady = Boolean(selectedTier?.checkoutAvailable);
     stage.innerHTML = `
       <div class="charge-paywall">
@@ -1349,36 +1355,29 @@ if (stage) {
           <span class="charge-analysis-mark" aria-hidden="true"><img src="assets/audita-logo-original.png" alt="" /></span>
           <div>
             <p class="eyebrow">Simulação preliminar concluída</p>
-            <h3>Sua simulação documental indica ${formatChargeCurrency(calculation.estimatedMaterialClaim)} em pedido material preliminar.</h3>
-            <p>Você já revisou as ocorrências e o valor foi calculado somente com lançamentos dos seus anexos marcados como não reconhecidos. Contrate este caso para liberar a memória de cálculo, o relatório técnico e os próximos passos.</p>
+            <h3>${selectedTier ? `Você pode ter entre ${escapeChargeHtml(tierRangeLabel(selectedTier))} para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
+            <p>${selectedTier ? "Contrate este caso para continuar com o relatório técnico e os próximos passos." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
           </div>
         </section>
 
-        <div class="charge-paywall-section-heading">
-          <p class="eyebrow">Contratação única por caso</p>
-          <h3>O valor do serviço acompanha a faixa da sua simulação</h3>
-          <p>Não é assinatura: você paga uma única vez para continuar este caso.</p>
-        </div>
-        <section id="chargePaywallPlans" class="charge-paywall-plans charge-paywall-tiers" aria-label="Faixas do serviço de cobranças indevidas">
-          ${tiers.map((tier) => {
-            const selected = tier.id === selectedTier?.id;
-            return `
-              <article class="${selected ? "recommended selected" : ""}">
+        ${selectedTier ? `
+          <div class="charge-paywall-section-heading">
+            <p class="eyebrow">Contratação única por caso</p>
+            <h3>Continue seu caso com a IA AUDITA</h3>
+            <p>Não é assinatura: você paga uma única vez para continuar este caso.</p>
+          </div>
+          <section id="chargePaywallPlans" class="charge-paywall-plans charge-paywall-tiers" aria-label="Oferta do serviço de cobranças indevidas">
+              <article class="recommended selected">
                 <div>
-                  <span>${escapeChargeHtml(tier.name)} ${selected ? "<em>Sua faixa</em>" : ""}</span>
-                  <p>${escapeChargeHtml(tierRangeLabel(tier))} em valor simulado</p>
-                  <small class="charge-tier-full-price">De ${escapeChargeHtml(formatChargeCurrency(Number(tier.fullPrice?.cents || 0) / 100))}</small>
-                  <strong>${escapeChargeHtml(formatChargeCurrency(Number(tier.price?.cents || 0) / 100))}</strong>
-                  <b>${escapeChargeHtml(String(tier.discountPercent))}% de desconto · pagamento único</b>
+                  <span>${escapeChargeHtml(selectedTier.name)} <em>Sua faixa</em></span>
+                  <p>Simulação entre ${escapeChargeHtml(tierRangeLabel(selectedTier))}</p>
+                  <small class="charge-tier-full-price">De ${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.fullPrice?.cents || 0) / 100))}</small>
+                  <strong>${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.price?.cents || 0) / 100))}</strong>
+                  <b>${escapeChargeHtml(String(selectedTier.discountPercent))}% de desconto · pagamento único</b>
                 </div>
-                ${selected
-                  ? `<button type="button" class="primary-action" data-charge-action="purchase-itau-service" ${state.busy || !checkoutReady ? "disabled" : ""}>${state.busy ? "Abrindo checkout..." : "Contratar e continuar"}</button>`
-                  : `<span class="charge-tier-range-note">Aplicada automaticamente conforme a simulação.</span>`}
+                <button type="button" class="primary-action" data-charge-action="purchase-itau-service" ${state.busy || !checkoutReady ? "disabled" : ""}>${state.busy ? "Abrindo checkout..." : "Contratar e continuar"}</button>
               </article>
-            `;
-          }).join("")}
-        </section>
-        ${!selectedTier ? `<p class="charge-paywall-demo" role="note">O valor simulado está fora das faixas atendidas automaticamente. O contato com o time IA AUDITA será disponibilizado em breve.</p>` : ""}
+          </section>` : ""}
         ${selectedTier && !checkoutReady ? `<p class="charge-paywall-demo" role="note">A contratação está temporariamente indisponível. Tente novamente mais tarde.</p>` : ""}
         <p class="charge-paywall-legal-note">A simulação é preliminar e não garante restituição, indenização ou êxito judicial. Custas, consultas de terceiros e representação jurídica não estão incluídas, salvo informação expressa.</p>
         <div class="charge-result-actions"><button type="button" class="secondary-action" data-charge-action="new-document">Voltar aos documentos</button></div>
@@ -1810,8 +1809,12 @@ if (stage) {
   }
 
   function renderResult() {
-    const caseData = state.caseData || {};
     const calculation = currentCalculation();
+    const tiers = itauServiceTiers();
+    const selectedTier = selectedItauServiceTier(calculation);
+    const claimCents = Math.round(Number(calculation.estimatedMaterialClaim || 0) * 100);
+    const minimumClaimCents = Math.min(...tiers.map((tier) => Number(tier.minimumClaimCents || 0)));
+    const belowMinimum = Number.isFinite(minimumClaimCents) && claimCents < minimumClaimCents;
     const isPartialHistory = state.documentAvailability === "partial";
     const reportFooter = isPartialHistory
       ? "Esta apuração é parcial e limitada aos documentos enviados. Ela não comprova integralmente períodos ausentes e não contém estimativas."
@@ -1820,85 +1823,22 @@ if (stage) {
     stage.innerHTML = `
       <div class="charge-result-heading">
         <div>
-          <p class="eyebrow">Cálculo documental</p>
-          <h3>${calculation.itemCount ? "Cobranças não reconhecidas confirmadas" : "Nenhuma cobrança confirmada para cálculo"}</h3>
-          <p>Somente ocorrências encontradas nos anexos e marcadas por você como “Não reconheço” aparecem nesta etapa.</p>
+          <p class="eyebrow">Simulação concluída</p>
+          <h3>${selectedTier ? `Você pode ter entre ${escapeChargeHtml(tierRangeLabel(selectedTier))} para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
+          <p>${selectedTier ? "A faixa considera somente cobranças encontradas nos anexos e confirmadas por você como não reconhecidas." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
         </div>
-        <span>${calculation.itemCount} ${calculation.itemCount === 1 ? "item" : "itens"}</span>
       </div>
 
-      ${
-        calculation.itemCount
-          ? `<section class="charge-calculation-items" aria-label="Itens usados no cálculo">
-              ${calculation.items.map((candidate) => `
-                <article>
-                  <div>
-                    <strong>${escapeChargeHtml(candidate.label || candidate.description || "Cobrança")}</strong>
-                    <small>${escapeChargeHtml(candidate.date || "Data não identificada")} · ${escapeChargeHtml(candidate.sourceFileName || "Arquivo de origem não informado")}</small>
-                    <small>${candidate.origin === "directed_search" ? "Localizada após busca dirigida pelo usuário; a origem não representa conclusão jurídica da IA." : "Detectada automaticamente e confirmada pelo usuário."}</small>
-                  </div>
-                  <b>${formatChargeCurrency(candidate.amount)}</b>
-                </article>
-              `).join("")}
-            </section>`
-          : `<div class="charge-analysis-empty"><strong>Nenhum valor será calculado.</strong><p>Volte à revisão para marcar uma ocorrência documentada como não reconhecida ou procure outra descrição nos anexos.</p></div>`
-      }
-
-      <section class="charge-audit-report" aria-label="Cálculo documental preliminar">
-        <header>
-          <div>
-            <p class="eyebrow">Base documental confirmada</p>
-            <h3>Apuração limitada à prova enviada</h3>
-          </div>
-          <span>Sem estimativas</span>
-        </header>
-        <div class="charge-audit-table-wrap">
-          <table>
-            <thead>
-              <tr><th>Rubrica</th><th>Base da apuração</th><th>Valor / status</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <th>Valores não reconhecidos</th>
-                <td>${calculation.itemCount} lançamento(s) documentado(s) e confirmado(s)</td>
-                <td>${formatChargeCurrency(calculation.principal)}</td>
-              </tr>
-              <tr>
-                <th>Cenário matemático em dobro</th>
-                <td>Art. 42 do CDC, condicionado à análise jurídica e ao caso concreto</td>
-                <td>${calculation.itemCount ? formatChargeCurrency(calculation.hypotheticalDouble) : "Sem base"}</td>
-              </tr>
-              <tr>
-                <th>Correção monetária</th>
-                <td>IPCA mensal desde cada lançamento documentado</td>
-                <td>${calculation.correctionAvailable ? formatChargeCurrency(calculation.monetaryAdjustment) : "Índice ou data incompleta"}</td>
-              </tr>
-              <tr>
-                <th>Juros preliminares</th>
-                <td>Simulação simples de 1% ao mês desde cada débito; critério sujeito à revisão jurídica</td>
-                <td>${calculation.missingDateCount ? "Data incompleta" : formatChargeCurrency(calculation.estimatedInterest)}</td>
-              </tr>
-              <tr>
-                <th>Perdas e danos / dano moral</th>
-                <td>Não é presumido nem arbitrado pela triagem automática</td>
-                <td>Não incluído</td>
-              </tr>
-              <tr class="total">
-                <th colspan="2">Pedido material preliminar</th>
-                <td>${calculation.itemCount ? formatChargeCurrency(calculation.estimatedMaterialClaim) : "Sem base"}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <section class="charge-audit-report" aria-label="Resumo da simulação">
         <footer>
-          <p>${reportFooter} A correção usa o IPCA disponível; os juros de 1% ao mês são um cenário preliminar para revisão. O dobro, os juros, eventual dano moral e o êxito dependem do enquadramento jurídico e da decisão judicial.</p>
+          <p>${reportFooter} O valor exato e a memória de cálculo permanecem no relatório técnico para revisão. A faixa não garante restituição, indenização ou êxito judicial.</p>
           ${state.calculationWarning ? `<p>${escapeChargeHtml(state.calculationWarning)}</p>` : ""}
         </footer>
       </section>
 
       <div class="charge-result-actions">
         <button type="button" class="secondary-action" data-charge-action="back-to-review">Voltar à revisão</button>
-        ${documentationActionMarkup()}
+        ${selectedTier ? documentationActionMarkup() : ""}
       </div>
     `;
   }

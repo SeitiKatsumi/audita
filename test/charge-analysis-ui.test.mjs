@@ -482,7 +482,7 @@ test("review and documentary calculation are separate sequential stages", () => 
   assert.match(chargeAnalysisJs, /function renderReview\(\)/);
   assert.match(chargeAnalysisJs, /data-charge-action="confirm-review"/);
   assert.match(chargeAnalysisJs, /Confirmar revisão e calcular/);
-  assert.match(chargeAnalysisJs, /Somente ocorrências encontradas nos anexos/);
+  assert.match(chargeAnalysisJs, /A faixa considera somente cobranças encontradas nos anexos/);
   assert.doesNotMatch(chargeAnalysisJs, /id="chargeEstimateForm"/);
   assert.doesNotMatch(chargeAnalysisJs, /Complemento estimado aos documentos parciais/);
 });
@@ -491,8 +491,9 @@ test("review and preliminary simulation happen before the one-time service offer
   assert.match(chargeAnalysisJs, /state\.screen = "review"/);
   assert.match(chargeAnalysisJs, /void openCalculation\(\)/);
   assert.match(chargeAnalysisJs, /state\.screen = state\.access\?\.entitled \|\| !calculation\.itemCount \? "result" : "paywall"/);
-  assert.match(chargeAnalysisJs, /Sua simulação documental indica \$\{formatChargeCurrency\(calculation\.estimatedMaterialClaim\)\}/);
-  assert.match(chargeAnalysisJs, /Contrate este caso para liberar a memória de cálculo/);
+  assert.match(chargeAnalysisJs, /Você pode ter entre \$\{escapeChargeHtml\(tierRangeLabel\(selectedTier\)\)\} para receber/);
+  assert.match(chargeAnalysisJs, /No momento, atendemos casos a partir de R\$ 4\.999,99/);
+  assert.doesNotMatch(chargeAnalysisJs, /Sua simulação documental indica \$\{formatChargeCurrency\(calculation\.estimatedMaterialClaim\)\}/);
   assert.match(chargeAnalysisJs, /Contratação única por caso/);
   assert.match(chargeAnalysisJs, /data-charge-action="purchase-itau-service"/);
   assert.doesNotMatch(chargeAnalysisJs, /Standard mensal/);
@@ -502,7 +503,8 @@ test("review and preliminary simulation happen before the one-time service offer
   assert.doesNotMatch(chargeAnalysisJs, /Transparência antes de contratar/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-paywall-reference" role="group"/);
   assert.doesNotMatch(chargeAnalysisJs, /DevoluÃ§Ã£o em DOBRO automÃ¡tica|garantindo a reparaÃ§Ã£o integral|sem riscos financeiros/i);
-  assert.match(chargeAnalysisJs, /O valor do serviço acompanha a faixa da sua simulação/);
+  assert.match(chargeAnalysisJs, /Continue seu caso com a IA AUDITA/);
+  assert.doesNotMatch(chargeAnalysisJs, /charge-audit-table-wrap/);
   assert.match(chargeAnalysisJs, /Não é assinatura: você paga uma única vez para continuar este caso/);
   assert.match(chargeAnalysisJs, /Contratar e continuar/);
   assert.match(chargeAnalysisJs, /\/api\/itau-refund\/checkout/);
