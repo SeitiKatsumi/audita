@@ -88,6 +88,39 @@ export const CREDIT_PACKS = Object.freeze([
   },
 ]);
 
+export const ITAU_CHARGE_SERVICE_TIERS = Object.freeze([
+  {
+    id: "itau-cobrancas-faixa-1",
+    name: "Faixa 1",
+    minimumClaimCents: 0,
+    maximumClaimCents: 1000000,
+    discountPercent: 50,
+    fullPrice: money(39800),
+    price: money(19900),
+    priceEnv: "STRIPE_PRICE_ITAU_CHARGE_TIER_1",
+  },
+  {
+    id: "itau-cobrancas-faixa-2",
+    name: "Faixa 2",
+    minimumClaimCents: 1000001,
+    maximumClaimCents: 2000000,
+    discountPercent: 40,
+    fullPrice: money(66500),
+    price: money(39900),
+    priceEnv: "STRIPE_PRICE_ITAU_CHARGE_TIER_2",
+  },
+  {
+    id: "itau-cobrancas-faixa-3",
+    name: "Faixa 3",
+    minimumClaimCents: 2000001,
+    maximumClaimCents: 3242000,
+    discountPercent: 30,
+    fullPrice: money(85571),
+    price: money(59900),
+    priceEnv: "STRIPE_PRICE_ITAU_CHARGE_TIER_3",
+  },
+]);
+
 export function billingConfiguration(env = process.env) {
   const billingFlag = envValue(env, "AUDITA_BILLING_ENABLED").toLowerCase() === "true";
   const demoMode = envValue(env, "AUDITA_BILLING_DEMO_MODE").toLowerCase() === "true";
@@ -184,6 +217,29 @@ function publicPack(pack, env, configuration) {
   };
 }
 
+function publicItauTier(tier, env, configuration) {
+  const stripeConfigured = isStripePriceId(envValue(env, tier.priceEnv));
+  return {
+    id: tier.id,
+    name: tier.name,
+    minimumClaimCents: tier.minimumClaimCents,
+    maximumClaimCents: tier.maximumClaimCents,
+    discountPercent: tier.discountPercent,
+    fullPrice: publicPrice(tier.fullPrice),
+    price: publicPrice(tier.price),
+    stripeConfigured,
+    checkoutAvailable: Boolean(configuration.checkoutReady && stripeConfigured),
+  };
+}
+
+export function resolveItauChargeServiceTier(claimAmountCents) {
+  const amount = Number(claimAmountCents);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return ITAU_CHARGE_SERVICE_TIERS.find(
+    (tier) => amount >= tier.minimumClaimCents && amount <= tier.maximumClaimCents,
+  ) || null;
+}
+
 export function getPublicBillingCatalog(env = process.env) {
   const configuration = billingConfiguration(env);
   return {
@@ -205,6 +261,14 @@ export function getPublicBillingCatalog(env = process.env) {
     },
     plans: BILLING_PLANS.map((plan) => publicPlan(plan, env, configuration)),
     creditPacks: CREDIT_PACKS.map((pack) => publicPack(pack, env, configuration)),
+    itauChargeService: {
+      kind: "itau_charge_service",
+      name: "Análise de cobranças indevidas Itaú",
+      billingType: "one_time",
+      tiers: ITAU_CHARGE_SERVICE_TIERS.map((tier) =>
+        publicItauTier(tier, env, configuration),
+      ),
+    },
   };
 }
 
@@ -255,6 +319,27 @@ export function resolveBillingSelection(input = {}, env = process.env) {
     };
   }
 
+  if (kind === "itau_charge_service") {
+    const tierId = String(input.tierId || "").trim();
+    const tier = ITAU_CHARGE_SERVICE_TIERS.find((candidate) => candidate.id === tierId);
+    if (!tier) return { invalid: true, reason: "invalid_itau_service_tier" };
+    const priceId = envValue(env, tier.priceEnv);
+    if (!isStripePriceId(priceId)) {
+      return { unavailable: true, reason: "stripe_price_not_configured" };
+    }
+    return {
+      kind,
+      id: tier.id,
+      priceId,
+      credits: 0,
+      amount: tier.price,
+      fullPrice: tier.fullPrice,
+      discountPercent: tier.discountPercent,
+      minimumClaimCents: tier.minimumClaimCents,
+      maximumClaimCents: tier.maximumClaimCents,
+    };
+  }
+
   return { invalid: true, reason: "invalid_purchase_kind" };
 }
 
@@ -277,6 +362,16 @@ export function resolveBillingProductFromPrice(priceId, env = process.env) {
   for (const pack of CREDIT_PACKS) {
     if (envValue(env, pack.priceEnv) === normalizedPriceId) {
       return resolveBillingSelection({ kind: "credit_pack", packId: pack.id }, env);
+    }
+  }
+
+
+  for (const tier of ITAU_CHARGE_SERVICE_TIERS) {
+    if (envValue(env, tier.priceEnv) === normalizedPriceId) {
+      return resolveBillingSelection(
+        { kind: "itau_charge_service", tierId: tier.id },
+        env,
+      );
     }
   }
 

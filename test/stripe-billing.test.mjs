@@ -29,6 +29,9 @@ function configuredEnv(overrides = {}) {
     STRIPE_INTEGRATION_IDENTIFIER: "audita_checkout_kmqrvzdp",
     STRIPE_PRICE_STANDARD_MONTHLY: "price_standard_month",
     STRIPE_PRICE_STANDARD_ANNUAL: "price_standard_year",
+    STRIPE_PRICE_ITAU_CHARGE_TIER_1: "price_itau_tier_1",
+    STRIPE_PRICE_ITAU_CHARGE_TIER_2: "price_itau_tier_2",
+    STRIPE_PRICE_ITAU_CHARGE_TIER_3: "price_itau_tier_3",
     STRIPE_PRICE_CREDITS_25: "price_credits_25",
     STRIPE_PRICE_CREDITS_100: "price_credits_100",
     STRIPE_PRICE_CREDITS_500: "price_credits_500",
@@ -132,6 +135,88 @@ test("hosted subscription checkout uses the configured price and tenant metadata
   assert.equal(checkout.body.get("integration_identifier"), "audita_checkout_kmqrvzdp");
   assert.equal(checkout.options.headers["stripe-version"], "2026-06-24.dahlia");
   assert.equal(checkout.options.headers["idempotency-key"], "audita-checkout-tenant-1-request-1");
+});
+
+test("Itaú checkout is a case-bound one-time payment available to members", async () => {
+  const calls = [];
+  const member = { ...AUTH, user: { ...AUTH.user, role: "member" } };
+  const service = createStripeBillingService({
+    env: configuredEnv(),
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options, body: new URLSearchParams(options.body) });
+      if (url.endsWith("/v1/customers")) return response({ id: "cus_itau" });
+      return response({ id: "cs_itau", url: "https://checkout.stripe.com/c/pay/cs_itau" });
+    },
+  });
+
+  const result = await service.createCheckoutSession(member, {
+    kind: "itau_charge_service",
+    tierId: "itau-cobrancas-faixa-2",
+    caseIds: ["case-1", "case-2"],
+    claimAmountCents: 1500000,
+    requestId: "itau-request-1",
+  });
+
+  const checkout = calls[1];
+  assert.equal(result.kind, "itau_charge_service");
+  assert.equal(checkout.body.get("mode"), "payment");
+  assert.equal(checkout.body.get("line_items[0][price]"), "price_itau_tier_2");
+  assert.equal(checkout.body.get("metadata[itau_tier_id]"), "itau-cobrancas-faixa-2");
+  assert.equal(checkout.body.get("metadata[itau_claim_cents]"), "1500000");
+  assert.equal(checkout.body.get("metadata[itau_case_ids_1]"), '["case-1","case-2"]');
+  assert.equal(checkout.body.has("allow_promotion_codes"), false);
+  assert.match(checkout.body.get("success_url"), /itau_checkout=success/);
+});
+
+test("paid Itaú checkout grants only the purchased cases", async () => {
+  const now = 1_800_000_000_000;
+  const member = { ...AUTH, user: { ...AUTH.user, role: "member" } };
+  const event = {
+    id: "evt_itau_1",
+    type: "checkout.session.completed",
+    created: Math.floor(now / 1000),
+    data: {
+      object: {
+        id: "cs_itau_1",
+        customer: "cus_itau_1",
+        client_reference_id: "tenant-1",
+        payment_status: "paid",
+        metadata: {
+          audita_tenant_id: "tenant-1",
+          purchase_kind: "itau_charge_service",
+          itau_tier_id: "itau-cobrancas-faixa-1",
+          itau_claim_cents: "900000",
+          itau_case_ids_1: '["case-paid"]',
+        },
+      },
+    },
+  };
+  const payload = JSON.stringify(event);
+  const signature = stripeSignature(payload, "whsec_example", Math.floor(now / 1000));
+  const service = createStripeBillingService({ env: configuredEnv(), now: () => now });
+
+  const webhook = await service.handleWebhook(payload, signature);
+  const purchased = await service.itauCaseAccessState(member, ["case-paid"]);
+  const other = await service.itauCaseAccessState(member, ["case-other"]);
+
+  assert.equal(webhook.status, "processed");
+  assert.equal(purchased.entitled, true);
+  assert.equal(purchased.source, "itau_charge_service");
+  assert.equal(other.entitled, false);
+});
+
+test("Standard subscription does not replace the Itaú case purchase", async () => {
+  const service = createStripeBillingService({
+    env: configuredEnv(),
+    accessService: {
+      getEntitlement: async () => ({ entitled: true, source: "subscription" }),
+    },
+  });
+
+  assert.deepEqual(await service.itauCaseAccessState(AUTH, ["case-unpaid"]), {
+    entitled: false,
+    source: "none",
+  });
 });
 
 test("credit pack checkout is blocked before creating a Stripe customer when credits are disabled", async () => {

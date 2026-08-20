@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   billingConfiguration,
   getPublicBillingCatalog,
+  resolveItauChargeServiceTier,
   resolveBillingProductFromPrice,
   resolveBillingSelection,
 } from "../services/billing-catalog.service.mjs";
@@ -17,6 +18,9 @@ function configuredEnv(overrides = {}) {
     STRIPE_WEBHOOK_SECRET: "whsec_example",
     STRIPE_PRICE_STANDARD_MONTHLY: "price_standard_month",
     STRIPE_PRICE_STANDARD_ANNUAL: "price_standard_year",
+    STRIPE_PRICE_ITAU_CHARGE_TIER_1: "price_itau_tier_1",
+    STRIPE_PRICE_ITAU_CHARGE_TIER_2: "price_itau_tier_2",
+    STRIPE_PRICE_ITAU_CHARGE_TIER_3: "price_itau_tier_3",
     STRIPE_PRICE_CREDITS_25: "price_credits_25",
     STRIPE_PRICE_CREDITS_100: "price_credits_100",
     STRIPE_PRICE_CREDITS_500: "price_credits_500",
@@ -131,4 +135,45 @@ test("configured price maps back to Standard", () => {
   );
   assert.equal(product.id, "standard");
   assert.equal(product.interval, "annual");
+});
+
+test("Itaú service catalog exposes three one-time promotional tiers", () => {
+  const offer = getPublicBillingCatalog(configuredEnv()).itauChargeService;
+
+  assert.equal(offer.billingType, "one_time");
+  assert.deepEqual(
+    offer.tiers.map((tier) => [
+      tier.minimumClaimCents,
+      tier.maximumClaimCents,
+      tier.fullPrice.cents,
+      tier.price.cents,
+      tier.discountPercent,
+      tier.checkoutAvailable,
+    ]),
+    [
+      [0, 1000000, 39800, 19900, 50, true],
+      [1000001, 2000000, 66500, 39900, 40, true],
+      [2000001, 3242000, 85571, 59900, 30, true],
+    ],
+  );
+});
+
+test("Itaú service tier is selected from the authoritative claim amount", () => {
+  assert.equal(resolveItauChargeServiceTier(1)?.id, "itau-cobrancas-faixa-1");
+  assert.equal(resolveItauChargeServiceTier(1000000)?.id, "itau-cobrancas-faixa-1");
+  assert.equal(resolveItauChargeServiceTier(1000001)?.id, "itau-cobrancas-faixa-2");
+  assert.equal(resolveItauChargeServiceTier(2000001)?.id, "itau-cobrancas-faixa-3");
+  assert.equal(resolveItauChargeServiceTier(3242001), null);
+});
+
+test("Itaú service checkout resolves a one-time Stripe price", () => {
+  const selection = resolveBillingSelection(
+    { kind: "itau_charge_service", tierId: "itau-cobrancas-faixa-2" },
+    configuredEnv(),
+  );
+
+  assert.equal(selection.kind, "itau_charge_service");
+  assert.equal(selection.priceId, "price_itau_tier_2");
+  assert.equal(selection.amount.cents, 39900);
+  assert.equal(selection.credits, 0);
 });

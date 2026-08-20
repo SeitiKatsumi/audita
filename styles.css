@@ -3501,6 +3501,10 @@ h2 {
   gap: 16px;
 }
 
+.charge-paywall-plans.charge-paywall-tiers {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .charge-paywall-plans > article {
   display: flex;
   flex-direction: column;
@@ -3530,6 +3534,26 @@ h2 {
   font-style: normal;
   line-height: 1.2;
   vertical-align: 2px;
+}
+
+.charge-tier-full-price {
+  display: block;
+  margin-top: 14px;
+  color: #89a6ba;
+  font-size: 13px;
+  text-decoration: line-through;
+}
+
+.charge-paywall-tiers article > div > b,
+.charge-tier-range-note {
+  display: block;
+  color: #bfefff;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.charge-tier-range-note {
+  margin-top: auto;
 }
 
 .charge-paywall-plans strong {
@@ -3611,6 +3635,12 @@ h2 {
 
   .charge-paywall-result {
     flex-direction: column;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1080px) {
+  .charge-paywall-plans.charge-paywall-tiers {
+    grid-template-columns: 1fr;
   }
 }
 

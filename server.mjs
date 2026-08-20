@@ -23,6 +23,7 @@ import {
 } from "./services/stripe-billing.service.mjs";
 import { createBillingAdminService } from "./services/billing-admin.service.mjs";
 import { createBillingAccessService } from "./services/billing-access.service.mjs";
+import { resolveItauChargeServiceTier } from "./services/billing-catalog.service.mjs";
 import { createSuperAdminService } from "./services/super-admin.service.mjs";
 import { createDirectDataCourtService } from "./services/direct-data-court.service.mjs";
 import { createDirectDataCertificatesService } from "./services/direct-data-certificates.service.mjs";
@@ -38,6 +39,7 @@ import {
   createItauRefundService,
   updateItauCaseSnapshot,
 } from "./services/itau-refund.service.mjs";
+import { buildChargeCalculationSnapshot } from "./charge-calculation.js";
 import {
   closeAssistedSession,
   getAssistedSessionView,
@@ -1421,6 +1423,21 @@ function lockedItauCase(caseData = {}) {
 
 function itauCaseHasFindings(caseData = {}) {
   return Array.isArray(caseData.candidates) && caseData.candidates.length > 0;
+}
+
+let itauCheckoutIpcaCache = { expiresAt: 0, rates: [] };
+
+async function loadItauCheckoutIpcaRates() {
+  if (itauCheckoutIpcaCache.expiresAt > Date.now()) return itauCheckoutIpcaCache.rates;
+  const response = await fetch(
+    "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/2011",
+    { signal: AbortSignal.timeout(10000) },
+  );
+  if (!response.ok) throw new Error("ipca_unavailable");
+  const rates = await response.json();
+  if (!Array.isArray(rates) || !rates.length) throw new Error("ipca_unavailable");
+  itauCheckoutIpcaCache = { expiresAt: Date.now() + 6 * 60 * 60 * 1000, rates };
+  return rates;
 }
 
 async function createSession(response, request, userId) {
@@ -3185,6 +3202,88 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/itau-refund/checkout" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const input = await readJsonBody(request);
+      const caseIds = [...new Set(
+        (Array.isArray(input.caseIds) ? input.caseIds : []).map(String).filter(Boolean),
+      )].slice(0, 20);
+      if (!caseIds.length) {
+        sendJson(response, 400, { error: "itau_case_required" });
+        return true;
+      }
+      const cases = [];
+      for (const caseId of caseIds) {
+        const found = itauRefundService.getCase(caseId, {
+          tenantId: authContext.tenantId,
+          userId: authContext.user?.id || null,
+        });
+        if (found.notFound) {
+          sendJson(response, 404, { error: "itau_case_not_found" });
+          return true;
+        }
+        if (found.forbidden) {
+          sendJson(response, 403, { error: "itau_case_forbidden" });
+          return true;
+        }
+        cases.push(found.case);
+      }
+      const candidates = cases.flatMap((caseData) => caseData.candidates || []);
+      if (!candidates.length || candidates.some((candidate) => !candidate.answer || candidate.answer === "pending")) {
+        sendJson(response, 400, { error: "itau_case_review_required" });
+        return true;
+      }
+      const calculation = buildChargeCalculationSnapshot(
+        { candidates },
+        { ipcaRates: await loadItauCheckoutIpcaRates() },
+      );
+      if (!calculation.itemCount || !calculation.correctionAvailable) {
+        sendJson(response, 503, { error: "itau_calculation_unavailable" });
+        return true;
+      }
+      const claimAmountCents = Math.round(calculation.estimatedMaterialClaim * 100);
+      const tier = resolveItauChargeServiceTier(claimAmountCents);
+      if (!tier) {
+        sendJson(response, 422, {
+          error: "itau_claim_outside_supported_range",
+          claimAmountCents,
+        });
+        return true;
+      }
+      const result = await stripeBillingService.createCheckoutSession(authContext, {
+        kind: "itau_charge_service",
+        tierId: tier.id,
+        caseIds,
+        claimAmountCents,
+        requestId: String(input.requestId || ""),
+      });
+      if (result.invalid) {
+        sendJson(response, 400, { error: result.reason });
+        return true;
+      }
+      if (result.unavailable) {
+        sendJson(response, 503, { error: result.reason, missing: result.missing || [] });
+        return true;
+      }
+      sendJson(response, 201, result);
+    } catch (error) {
+      const statusCode = error instanceof StripeBillingError ? error.statusCode : 500;
+      sendJson(response, statusCode, {
+        error: error instanceof StripeBillingError ? error.code : "itau_checkout_failed",
+        message:
+          error instanceof StripeBillingError
+            ? error.message
+            : "Não foi possível iniciar a contratação agora.",
+      });
+    }
+    return true;
+  }
+
   if (pathname === "/api/billing/portal" && request.method === "POST") {
     try {
       const authContext = await getTenantIdForRequest(request);
@@ -4278,7 +4377,7 @@ async function handleApi(request, response, pathname) {
       "cache-control": "no-store",
       "x-frame-options": "SAMEORIGIN",
       "content-security-policy":
-        "default-src 'self' data: blob:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:; frame-ancestors 'self';",
+        "default-src 'self' data: blob:; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' https: data: blob:; connect-src 'self' https://api.bcb.gov.br ws: wss:; font-src 'self' data:; frame-ancestors 'self';",
       "referrer-policy": "no-referrer",
     });
     response.end(viewer.html);
@@ -4914,13 +5013,17 @@ async function handleApi(request, response, pathname) {
           ],
         );
       }
-      const access = await stripeBillingService.accessState(authContext);
+      const access = await stripeBillingService.itauCaseAccessState(
+        authContext,
+        [result.case.id],
+      );
       const locked = itauCaseHasFindings(result.case) && !access.entitled;
       sendJson(response, 200, {
-        case: locked ? lockedItauCase(result.case) : result.case,
+        case: result.case,
         finding: {
           positive: itauCaseHasFindings(result.case),
-          detailsAvailable: !locked,
+          detailsAvailable: true,
+          subscriptionRequired: locked,
         },
         access,
         billing: stripeBillingService.catalog(),
@@ -4942,14 +5045,6 @@ async function handleApi(request, response, pathname) {
       const authContext = await getTenantIdForRequest(request);
       if (authContext.unauthorized) {
         sendJson(response, 401, { error: "authentication_required" });
-        return true;
-      }
-      const access = await stripeBillingService.accessState(authContext);
-      if (!access.entitled) {
-        sendJson(response, 402, {
-          error: "subscription_required",
-          access,
-        });
         return true;
       }
       const input = await readJsonBody(request);
@@ -5005,8 +5100,14 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 403, { error: "itau_case_forbidden" });
         return true;
       }
-      const access = await stripeBillingService.accessState(authContext);
-      if (itauCaseHasFindings(current.case) && !access.entitled) {
+      const access = await stripeBillingService.itauCaseAccessState(authContext, [caseId]);
+      const input = request.method === "POST" ? await readJsonBody(request) : null;
+      const reviewOnly =
+        input &&
+        Object.keys(input).length === 1 &&
+        input.candidateAnswers &&
+        typeof input.candidateAnswers === "object";
+      if (itauCaseHasFindings(current.case) && !access.entitled && !reviewOnly) {
         sendJson(response, 402, {
           error: "subscription_required",
           case: lockedItauCase(current.case),
@@ -5016,7 +5117,7 @@ async function handleApi(request, response, pathname) {
       }
       const result =
         request.method === "POST"
-          ? itauRefundService.updateCase(caseId, await readJsonBody(request), auth)
+          ? itauRefundService.updateCase(caseId, input, auth)
           : current;
       sendJson(response, 200, result);
     } catch {

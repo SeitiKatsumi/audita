@@ -23,6 +23,7 @@ const chargeAnalysisJs = readFileSync(
   new URL("../charge-analysis.js", import.meta.url),
   "utf8",
 );
+const serverJs = readFileSync(new URL("../server.mjs", import.meta.url), "utf8");
 
 test("charge analysis module is available from the dashboard sidebar", () => {
   assert.match(indexHtml, /href="#analise-cobrancas"/);
@@ -287,7 +288,7 @@ test("charge analysis keeps identification, attachments and analysis in one cont
   assert.match(chargeAnalysisJs, /stage\.innerHTML = earlyJourneyMarkup\(\{ documentChoice: true \}\)/);
   assert.match(chargeAnalysisJs, /\$\{earlyJourneyMarkup\(\{ documentSelected: true \}\)\}/);
   assert.match(chargeAnalysisJs, /function renderReview\(\)/);
-  assert.match(chargeAnalysisJs, /state\.screen = lockedPositiveResult \? "paywall" : "review"/);
+  assert.match(chargeAnalysisJs, /state\.screen = "review"/);
 });
 
 test("charge analysis introduction links the historical card scope to the searchable references", () => {
@@ -490,47 +491,62 @@ test("review and documentary calculation are separate sequential stages", () => 
   assert.doesNotMatch(chargeAnalysisJs, /Complemento estimado aos documentos parciais/);
 });
 
-test("positive analysis is paywalled before descriptions, values and simulation", () => {
-  assert.match(chargeAnalysisJs, /state\.screen = lockedPositiveResult \? "paywall" : "review"/);
-  assert.match(chargeAnalysisJs, /Sim, encontramos cobranças que podem ser indevidas nos seus extratos/);
-  assert.match(chargeAnalysisJs, /Os detalhes, valores e a simulação permanecem protegidos/);
-  assert.match(chargeAnalysisJs, /Standard mensal/);
-  assert.match(chargeAnalysisJs, /Standard anual/);
-  assert.doesNotMatch(chargeAnalysisJs, /Por que seguir com a IA AUDITA/);
+test("review and preliminary simulation happen before the one-time service offer", () => {
+  assert.match(chargeAnalysisJs, /state\.screen = "review"/);
+  assert.match(chargeAnalysisJs, /void openCalculation\(\)/);
+  assert.match(chargeAnalysisJs, /state\.screen = state\.access\?\.entitled \|\| !calculation\.itemCount \? "result" : "paywall"/);
+  assert.match(chargeAnalysisJs, /Sua simulação documental indica \$\{formatChargeCurrency\(calculation\.estimatedMaterialClaim\)\}/);
+  assert.match(chargeAnalysisJs, /Contrate este caso para liberar a memória de cálculo/);
+  assert.match(chargeAnalysisJs, /Contratação única por caso/);
+  assert.match(chargeAnalysisJs, /data-charge-action="purchase-itau-service"/);
+  assert.doesNotMatch(chargeAnalysisJs, /Standard mensal/);
+  assert.doesNotMatch(chargeAnalysisJs, /Standard anual/);
   assert.doesNotMatch(chargeAnalysisJs, /Comparativo ilustrativo/);
   assert.doesNotMatch(chargeAnalysisJs, /552%/);
   assert.doesNotMatch(chargeAnalysisJs, /Transparência antes de contratar/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-paywall-reference" role="group"/);
   assert.doesNotMatch(chargeAnalysisJs, /DevoluÃ§Ã£o em DOBRO automÃ¡tica|garantindo a reparaÃ§Ã£o integral|sem riscos financeiros/i);
-  assert.match(chargeAnalysisJs, /Acesso imediato aos achados da análise/);
-  assert.match(chargeAnalysisJs, /Melhor custo-benefício/);
-  assert.match(chargeAnalysisJs, /Suporte de advogado parceiro para o caso Itaú incluído/);
-  assert.match(chargeAnalysisJs, /Ambiente demonstrativo: nenhum valor será cobrado/);
-  assert.match(chargeAnalysisJs, /\/api\/billing\/demo-subscription/);
-  assert.match(chargeAnalysisJs, /unlockAnalyzedCases/);
+  assert.match(chargeAnalysisJs, /O valor do serviço acompanha a faixa da sua simulação/);
+  assert.match(chargeAnalysisJs, /Não é assinatura: você paga uma única vez para continuar este caso/);
+  assert.match(chargeAnalysisJs, /Contratar e continuar/);
+  assert.match(chargeAnalysisJs, /\/api\/itau-refund\/checkout/);
+  assert.match(chargeAnalysisJs, /audita:itau-checkout-cases/);
+  assert.match(chargeAnalysisJs, /itau_checkout/);
+  assert.match(serverJs, /resolveItauChargeServiceTier/);
+  assert.match(serverJs, /stripeBillingService\.createCheckoutSession\(authContext/);
+  assert.match(serverJs, /case: result\.case/);
+  assert.match(serverJs, /subscriptionRequired: locked/);
+  assert.match(serverJs, /const reviewOnly =/);
+  assert.match(serverJs, /connect-src 'self' https:\/\/api\.bcb\.gov\.br/);
 });
 
 test("calculation uses only confirmed non-recognized documentary occurrences", () => {
-  assert.deepEqual(
-    buildChargeCalculationSnapshot({
+  const calculation = buildChargeCalculationSnapshot(
+    {
       candidates: [
-        { id: "auto", amount: 39.9, answer: "not_recognized", origin: "auto_detected", sourceFileName: "julho.pdf" },
-        { id: "directed", amount: 34.9, answer: "not_recognized", origin: "directed_search", sourceFileName: "agosto.pdf" },
+        { id: "auto", amount: 100, date: "2026-01-15", answer: "not_recognized", origin: "auto_detected", sourceFileName: "janeiro.pdf" },
+        { id: "directed", amount: 50, date: "2026-02-15", answer: "not_recognized", origin: "directed_search", sourceFileName: "fevereiro.pdf" },
         { id: "known", amount: 12, answer: "recognized", sourceFileName: "julho.pdf" },
         { id: "pending", amount: 10, answer: "pending", sourceFileName: "agosto.pdf" },
       ],
-    }),
+    },
     {
-      items: [
-        { id: "auto", amount: 39.9, answer: "not_recognized", origin: "auto_detected", sourceFileName: "julho.pdf" },
-        { id: "directed", amount: 34.9, answer: "not_recognized", origin: "directed_search", sourceFileName: "agosto.pdf" },
+      asOf: "2026-03-15",
+      ipcaRates: [
+        { data: "01/01/2026", valor: "1.00" },
+        { data: "01/02/2026", valor: "2.00" },
+        { data: "01/03/2026", valor: "3.00" },
       ],
-      itemCount: 2,
-      principal: 74.8,
-      hypotheticalDouble: 149.6,
-      excludedWithoutAmount: 0,
     },
   );
+  assert.equal(calculation.itemCount, 2);
+  assert.equal(calculation.principal, 150);
+  assert.equal(calculation.hypotheticalDouble, 300);
+  assert.equal(calculation.monetaryAdjustment, 8.64);
+  assert.equal(calculation.estimatedInterest, 2.4);
+  assert.equal(calculation.estimatedMaterialClaim, 311.04);
+  assert.equal(calculation.correctionAvailable, true);
+  assert.equal(calculation.excludedWithoutAmount, 0);
 });
 
 test("false negatives can only be recovered by searching existing attachments", () => {

@@ -40,12 +40,27 @@ function normalizeAppUrl(value) {
 }
 
 function safeMetadata(metadata = {}) {
+  const caseIds = [metadata.itau_case_ids_1, metadata.itau_case_ids_2]
+    .flatMap((value) => {
+      try {
+        const parsed = JSON.parse(text(value, "[]"));
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })
+    .map(text)
+    .filter(Boolean)
+    .slice(0, 20);
   return {
     purchaseKind: text(metadata.purchase_kind ?? metadata.purchaseKind),
     planId: text(metadata.plan_id ?? metadata.planId),
     interval: text(metadata.interval),
     creditPackId: text(metadata.credit_pack_id ?? metadata.creditPackId),
     credits: Math.max(0, integer(metadata.credits)),
+    itauTierId: text(metadata.itau_tier_id ?? metadata.itauTierId),
+    itauClaimCents: Math.max(0, integer(metadata.itau_claim_cents ?? metadata.itauClaimCents)),
+    caseIds,
   };
 }
 
@@ -561,6 +576,42 @@ export function createStripeBillingService({
       : { entitled: Boolean(subscription?.active), source: subscription?.active ? "subscription" : "none" };
   }
 
+  async function itauCaseAccessState(authContext, caseIds = []) {
+    const globalAccess = await accessState(authContext);
+    if (globalAccess.entitled && globalAccess.source === "tester") return globalAccess;
+    const requested = [...new Set(caseIds.map(text).filter(Boolean))].slice(0, 20);
+    if (!requested.length) return { entitled: false, source: "none" };
+    const { pool, ready } = db();
+    let purchased = [];
+    if (!ready) {
+      purchased = [...memoryEvents.values()]
+        .filter(
+          (event) =>
+            event.status === "processed" &&
+            event.tenantId === text(authContext.tenantId) &&
+            event.metadata?.purchaseKind === "itau_charge_service",
+        )
+        .flatMap((event) => event.metadata.caseIds || []);
+    } else {
+      const result = await pool.query(
+        `SELECT metadata
+         FROM audita_billing_events
+         WHERE tenant_id = $1
+           AND status = 'processed'
+           AND event_type = 'checkout.session.completed'
+           AND metadata->>'purchaseKind' = 'itau_charge_service'`,
+        [authContext.tenantId],
+      );
+      purchased = result.rows.flatMap((row) =>
+        Array.isArray(row.metadata?.caseIds) ? row.metadata.caseIds : [],
+      );
+    }
+    const purchasedSet = new Set(purchased.map(text));
+    return requested.every((caseId) => purchasedSet.has(caseId))
+      ? { entitled: true, source: "itau_charge_service", caseIds: requested }
+      : { entitled: false, source: "none" };
+  }
+
   async function createDemoSubscription(authContext, input = {}) {
     if (!authContext?.tenantId || !authContext?.user) return { unauthorized: true };
     const config = configuration();
@@ -614,7 +665,11 @@ export function createStripeBillingService({
     if (!authContext?.tenantId || !authContext?.user) {
       return { unauthorized: true };
     }
-    if (!["super_admin", "owner", "admin"].includes(authContext.user.role)) {
+    const requestedKind = text(input.kind, "subscription");
+    if (
+      requestedKind !== "itau_charge_service" &&
+      !["super_admin", "owner", "admin"].includes(authContext.user.role)
+    ) {
       return { forbidden: true };
     }
     const config = configuration();
@@ -637,6 +692,11 @@ export function createStripeBillingService({
 
     const customer = await ensureCustomer(authContext);
     const requestId = text(input.requestId) || crypto.randomUUID();
+    const caseIds = [...new Set((Array.isArray(input.caseIds) ? input.caseIds : []).map(text).filter(Boolean))]
+      .slice(0, 20);
+    if (selection.kind === "itau_charge_service" && !caseIds.length) {
+      return { invalid: true, reason: "itau_case_required" };
+    }
     const commonMetadata = {
       audita_tenant_id: text(authContext.tenantId),
       audita_user_id: text(authContext.user.id),
@@ -645,19 +705,31 @@ export function createStripeBillingService({
       credit_pack_id: selection.kind === "credit_pack" ? selection.id : "",
       interval: selection.interval || "",
       credits: String(selection.credits),
+      itau_tier_id: selection.kind === "itau_charge_service" ? selection.id : "",
+      itau_claim_cents:
+        selection.kind === "itau_charge_service" ? String(Math.max(0, integer(input.claimAmountCents))) : "",
+      itau_case_ids_1:
+        selection.kind === "itau_charge_service" ? JSON.stringify(caseIds.slice(0, 10)) : "",
+      itau_case_ids_2:
+        selection.kind === "itau_charge_service" ? JSON.stringify(caseIds.slice(10, 20)) : "",
     };
+    const isItauService = selection.kind === "itau_charge_service";
     const params = {
       mode: selection.kind === "subscription" ? "subscription" : "payment",
       customer: customer.id,
       client_reference_id: text(authContext.tenantId),
-      success_url: `${config.appUrl}/planos?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${config.appUrl}/planos?checkout=cancelled`,
+      success_url: isItauService
+        ? `${config.appUrl}/?itau_checkout=success&session_id={CHECKOUT_SESSION_ID}#analise-cobrancas`
+        : `${config.appUrl}/planos?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: isItauService
+        ? `${config.appUrl}/?itau_checkout=cancelled#analise-cobrancas`
+        : `${config.appUrl}/planos?checkout=cancelled`,
       locale: "pt-BR",
       billing_address_collection: "required",
-      allow_promotion_codes: true,
       integration_identifier: config.integrationIdentifier,
       line_items: [{ price: selection.priceId, quantity: 1 }],
       metadata: commonMetadata,
+      ...(isItauService ? {} : { allow_promotion_codes: true }),
       ...(selection.kind === "subscription"
         ? {
             subscription_data: {
@@ -720,6 +792,21 @@ export function createStripeBillingService({
       });
     }
     const metadata = safeMetadata(metadataFromObject(object));
+    if (metadata.purchaseKind === "itau_charge_service") {
+      if (!["paid", "no_payment_required"].includes(text(object.payment_status))) {
+        return { ignored: true, tenantId, reason: "payment_not_completed" };
+      }
+      return {
+        tenantId,
+        purchase: {
+          purchaseKind: metadata.purchaseKind,
+          productId: metadata.itauTierId,
+          claimCents: metadata.itauClaimCents,
+          caseIds: metadata.caseIds,
+          stripeCheckoutSessionId: text(object.id),
+        },
+      };
+    }
     if (metadata.purchaseKind === "credit_pack") {
       if (!["paid", "no_payment_required"].includes(text(object.payment_status))) {
         return { ignored: true, tenantId, reason: "payment_not_completed" };
@@ -911,6 +998,7 @@ export function createStripeBillingService({
         metadata: {
           reason: result.reason || "",
           grantState: result.grant?.state || "",
+          ...(result.purchase || {}),
         },
       });
       return {
@@ -947,6 +1035,7 @@ export function createStripeBillingService({
 
   return {
     accessState,
+    itauCaseAccessState,
     billingState,
     catalog: () => getPublicBillingCatalog(env),
     createCheckoutSession,
