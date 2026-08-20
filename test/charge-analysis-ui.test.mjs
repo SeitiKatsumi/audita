@@ -263,7 +263,7 @@ test("charge analysis reuses one avatar and moves it to the latest assistant mes
   assert.match(stylesCss, /\.charge-analysis-floating-avatar\.is-positioning\s*\{[\s\S]*?transition:\s*none/);
 });
 
-test("charge analysis starts with the two current self-assessment paths", () => {
+test("charge analysis starts with the two self-assessment paths and the lawyer kit", () => {
   assert.match(
     chargeAnalysisJs,
     /Voc&ecirc; possui ou possuiu algum cart&atilde;o dessas bandeiras/,
@@ -273,12 +273,8 @@ test("charge analysis starts with the two current self-assessment paths", () => 
   assert.match(chargeAnalysisJs, /Sim, tenho um desses cart&otilde;es/);
   assert.match(chargeAnalysisJs, /N&atilde;o sei, quais s&atilde;o todas as bandeiras/);
   assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="authorized"/);
-  assert.doesNotMatch(chargeAnalysisJs, /<button[^>]+data-charge-action="lawyer"/);
-  assert.match(
-    chargeAnalysisJs,
-    /class="secondary charge-option-disabled" data-charge-status="coming-soon" disabled/,
-  );
-  assert.match(chargeAnalysisJs, /Sou advogado\(a\)[\s\S]*?Em breve/);
+  assert.match(chargeAnalysisJs, /<button[^>]+data-charge-action="lawyer"/);
+  assert.match(chargeAnalysisJs, /Sou advogado\(a\)/);
   assert.doesNotMatch(chargeAnalysisJs, /Seguro Perda e Roubo \/ Cart&atilde;o Protegido/);
   assert.doesNotMatch(chargeAnalysisJs, /Seguro Prestamista/);
 });
@@ -518,6 +514,21 @@ test("review and preliminary simulation happen before the one-time service offer
   assert.match(serverJs, /subscriptionRequired: locked/);
   assert.match(serverJs, /const reviewOnly =/);
   assert.match(serverJs, /connect-src 'self' https:\/\/api\.bcb\.gov\.br/);
+});
+
+test("lawyer route sells a protected one-time document kit", () => {
+  assert.match(chargeAnalysisJs, /data-charge-action="lawyer"/);
+  assert.match(chargeAnalysisJs, /Kit profissional Itaú/);
+  assert.match(chargeAnalysisJs, /Processo completo/);
+  assert.match(serverJs, /fileName: "processo-completo\.pdf"/);
+  assert.doesNotMatch(chargeAnalysisJs, /Acordo integral/);
+  assert.match(chargeAnalysisJs, /19999/);
+  assert.match(chargeAnalysisJs, /\/api\/itau-lawyer-kit\/checkout/);
+  assert.match(serverJs, /\/api\/itau-lawyer-kit\/documents/);
+  assert.match(serverJs, /itauLawyerKitAccessState/);
+  assert.match(serverJs, /private-documents/);
+  assert.match(serverJs, /itau_lawyer_kit_purchase_required/);
+  assert.doesNotMatch(chargeAnalysisJs, /Sou advogado ou advogada — disponível em breve/);
 });
 
 test("calculation uses only confirmed non-recognized documentary occurrences", () => {

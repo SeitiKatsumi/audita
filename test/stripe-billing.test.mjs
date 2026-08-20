@@ -32,6 +32,7 @@ function configuredEnv(overrides = {}) {
     STRIPE_PRICE_ITAU_CHARGE_TIER_1: "price_itau_tier_1",
     STRIPE_PRICE_ITAU_CHARGE_TIER_2: "price_itau_tier_2",
     STRIPE_PRICE_ITAU_CHARGE_TIER_3: "price_itau_tier_3",
+    STRIPE_PRICE_ITAU_LAWYER_KIT: "price_itau_lawyer_kit",
     STRIPE_PRICE_CREDITS_25: "price_credits_25",
     STRIPE_PRICE_CREDITS_100: "price_credits_100",
     STRIPE_PRICE_CREDITS_500: "price_credits_500",
@@ -203,6 +204,57 @@ test("paid Itaú checkout grants only the purchased cases", async () => {
   assert.equal(purchased.entitled, true);
   assert.equal(purchased.source, "itau_charge_service");
   assert.equal(other.entitled, false);
+});
+
+test("paid lawyer kit checkout grants permanent tenant access", async () => {
+  const calls = [];
+  const now = 1_800_000_000_000;
+  const member = { ...AUTH, user: { ...AUTH.user, role: "member" } };
+  const service = createStripeBillingService({
+    env: configuredEnv(),
+    now: () => now,
+    fetchImpl: async (url, options) => {
+      calls.push({ url, body: new URLSearchParams(options.body) });
+      if (url.endsWith("/v1/customers")) return response({ id: "cus_lawyer" });
+      return response({ id: "cs_lawyer", url: "https://checkout.stripe.com/c/pay/cs_lawyer" });
+    },
+  });
+
+  const checkout = await service.createCheckoutSession(member, {
+    kind: "itau_lawyer_kit",
+    requestId: "lawyer-kit-1",
+  });
+  assert.equal(checkout.kind, "itau_lawyer_kit");
+  assert.equal(calls[1].body.get("mode"), "payment");
+  assert.equal(calls[1].body.get("line_items[0][price]"), "price_itau_lawyer_kit");
+  assert.match(calls[1].body.get("success_url"), /lawyer_kit_checkout=success/);
+
+  const event = {
+    id: "evt_lawyer_1",
+    type: "checkout.session.completed",
+    created: Math.floor(now / 1000),
+    data: {
+      object: {
+        id: "cs_lawyer",
+        customer: "cus_lawyer",
+        client_reference_id: "tenant-1",
+        payment_status: "paid",
+        metadata: {
+          audita_tenant_id: "tenant-1",
+          purchase_kind: "itau_lawyer_kit",
+          itau_lawyer_kit_id: "itau-kit-advocacia",
+        },
+      },
+    },
+  };
+  const payload = JSON.stringify(event);
+  const signature = stripeSignature(payload, "whsec_example", Math.floor(now / 1000));
+  await service.handleWebhook(payload, signature);
+
+  assert.deepEqual(await service.itauLawyerKitAccessState(member), {
+    entitled: true,
+    source: "itau_lawyer_kit",
+  });
 });
 
 test("Standard subscription does not replace the Itaú case purchase", async () => {

@@ -18,6 +18,7 @@ COPY data ./data
 COPY db ./db
 COPY collectors ./collectors
 COPY services ./services
+COPY private-documents ./private-documents
 
 EXPOSE 8080
 

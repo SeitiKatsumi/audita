@@ -3638,6 +3638,86 @@ h2 {
   }
 }
 
+.charge-lawyer-kit {
+  width: min(920px, calc(100% - 72px));
+  margin: 0 0 56px 72px;
+  padding: 24px;
+  border: 1px solid rgba(49, 247, 143, 0.28);
+  border-radius: 8px;
+  background: rgba(7, 35, 57, 0.8);
+}
+
+.charge-lawyer-kit-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(116, 181, 223, 0.2);
+}
+
+.charge-lawyer-kit-heading h3,
+.charge-lawyer-kit-heading p {
+  margin: 0;
+}
+
+.charge-lawyer-kit-heading > strong {
+  color: #62f59d;
+  font-size: 1.8rem;
+  white-space: nowrap;
+}
+
+.charge-lawyer-kit-documents {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.charge-lawyer-kit-documents li {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid rgba(116, 181, 223, 0.16);
+}
+
+.charge-lawyer-kit-documents li div {
+  display: grid;
+  gap: 4px;
+}
+
+.charge-lawyer-kit-documents small,
+.charge-lawyer-kit-note {
+  color: #a9bdcb;
+}
+
+.charge-lawyer-kit-documents li > span {
+  padding: 5px 9px;
+  border: 1px solid rgba(49, 247, 143, 0.28);
+  border-radius: 999px;
+  color: #62f59d;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.charge-lawyer-kit-documents li > span.pending {
+  border-color: rgba(116, 181, 223, 0.22);
+  color: #9db6c8;
+}
+
+.charge-lawyer-kit-note {
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.charge-lawyer-kit-success {
+  color: #62f59d;
+  font-weight: 700;
+}
+
 @media (min-width: 721px) and (max-width: 1080px) {
   .charge-paywall-plans.charge-paywall-tiers {
     grid-template-columns: 1fr;
@@ -11467,6 +11547,11 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
     margin-right: 0;
     margin-left: 52px;
   }
+
+  .charge-lawyer-kit {
+    width: calc(100% - 52px);
+    margin-left: 52px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -11575,6 +11660,23 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
     width: 100%;
     margin-right: 0;
     margin-left: 0;
+  }
+
+  .charge-lawyer-kit {
+    width: 100%;
+    margin-right: 0;
+    margin-left: 0;
+    padding: 18px;
+  }
+
+  .charge-lawyer-kit-heading,
+  .charge-lawyer-kit-documents li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .charge-lawyer-kit-documents li {
+    padding: 14px 0;
   }
 }
 

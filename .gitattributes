@@ -1,0 +1,1 @@
+private-documents/itau-lawyer-kit/*.pdf filter=lfs diff=lfs merge=lfs -text

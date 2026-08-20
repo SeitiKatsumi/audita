@@ -604,6 +604,13 @@ if (stage) {
     ipcaRates: [],
     calculationAsOf: "",
     calculationWarning: "",
+    lawyerKit: {
+      loading: false,
+      access: { entitled: false, source: "none" },
+      documents: [],
+      checkoutStatus: "",
+      error: "",
+    },
     directedSearch: {
       open: false,
       query: "",
@@ -943,9 +950,8 @@ if (stage) {
         <button type="button" data-charge-action="verify-statement">
           <strong>N&atilde;o sei, quais s&atilde;o todas as bandeiras?</strong>
         </button>
-        <button type="button" class="secondary charge-option-disabled" data-charge-status="coming-soon" disabled aria-disabled="true" title="Disponível em breve" aria-label="Sou advogado ou advogada — disponível em breve">
+        <button type="button" data-charge-action="lawyer">
           <strong>Sou advogado(a)</strong>
-          <span class="charge-option-status">Em breve</span>
         </button>
       </div>
     `;
@@ -1411,6 +1417,143 @@ if (stage) {
       state.busy = false;
       render();
     }
+  }
+
+  function renderLawyerKit() {
+    const product = state.billingCatalog?.itauLawyerKit;
+    const documents = state.lawyerKit.documents.length
+      ? state.lawyerKit.documents
+      : [
+          { title: "Processo completo", available: true },
+          { title: "Sentença", available: true },
+          { title: "Homologação do acordo", available: true },
+          { title: "Decisão de suspensão por 24 meses", available: true },
+        ];
+    const entitled = Boolean(state.lawyerKit.access?.entitled);
+    const price = Number(product?.price?.cents || 19999) / 100;
+    stage.innerHTML = `
+      <div class="charge-analysis-conversation compact">
+        ${userMessage("Sou advogado(a).")}
+        ${assistantMessage(`
+          <p><strong>Kit profissional do caso Itaú</strong></p>
+          <p>Acesse as peças judiciais reunidas para estudo do processo nº 5085307-63.2016.8.13.0024.</p>
+        `, "IA AUDITA")}
+      </div>
+      <section class="charge-lawyer-kit" aria-labelledby="chargeLawyerKitTitle">
+        <div class="charge-lawyer-kit-heading">
+          <div>
+            <p class="eyebrow">Pagamento único</p>
+            <h3 id="chargeLawyerKitTitle">Kit profissional Itaú</h3>
+            <p>Material documental para consulta e apoio à análise jurídica.</p>
+          </div>
+          <strong>${formatChargeCurrency(price)}</strong>
+        </div>
+        <ul class="charge-lawyer-kit-documents">
+          ${documents.map((document) => `
+            <li>
+              <div>
+                <strong>${escapeChargeHtml(document.title)}</strong>
+                <small>${document.available ? "Documento incluído" : "Arquivo pendente de inclusão"}</small>
+              </div>
+              ${entitled && document.downloadUrl
+                ? `<a class="secondary-action" href="${escapeChargeHtml(document.downloadUrl)}">Baixar PDF</a>`
+                : `<span class="${document.available ? "ready" : "pending"}">${document.available ? "Incluído" : "Em breve"}</span>`}
+            </li>
+          `).join("")}
+        </ul>
+        <p class="charge-lawyer-kit-note">O processo completo foi otimizado para carregamento progressivo sem reduzir a resolução. O material não substitui a conferência das peças no processo oficial.</p>
+        ${state.lawyerKit.checkoutStatus === "success" && entitled
+          ? `<p class="charge-lawyer-kit-success" role="status">Pagamento confirmado. Seus documentos estão liberados.</p>`
+          : ""}
+        ${state.lawyerKit.checkoutStatus === "cancelled"
+          ? `<p class="charge-paywall-demo" role="status">Compra cancelada. Nenhum pagamento foi concluído.</p>`
+          : ""}
+        ${state.lawyerKit.error
+          ? `<p class="charge-analysis-error" role="alert">${escapeChargeHtml(state.lawyerKit.error)}</p>`
+          : ""}
+        <div class="charge-result-actions">
+          <button type="button" class="secondary-action" data-charge-action="back-triage">Voltar</button>
+          ${entitled
+            ? ""
+            : `<button type="button" class="primary-action" data-charge-action="purchase-lawyer-kit" ${state.lawyerKit.loading || !product?.checkoutAvailable ? "disabled" : ""}>${state.lawyerKit.loading ? "Carregando..." : "Comprar kit"}</button>`}
+        </div>
+        ${!entitled && product && !product.checkoutAvailable
+          ? `<p class="charge-paywall-demo" role="note">O checkout está temporariamente indisponível.</p>`
+          : ""}
+      </section>
+    `;
+  }
+
+  async function loadLawyerKit() {
+    state.lawyerKit.loading = true;
+    state.lawyerKit.error = "";
+    renderLawyerKit();
+    try {
+      const [catalogResponse, kitResponse] = await Promise.all([
+        fetch("/api/billing/plans", { headers: { accept: "application/json" } }),
+        fetch("/api/itau-lawyer-kit", { headers: { accept: "application/json" } }),
+      ]);
+      const catalog = await catalogResponse.json().catch(() => ({}));
+      const kit = await kitResponse.json().catch(() => ({}));
+      if (!catalogResponse.ok || !kitResponse.ok) {
+        throw new Error("Não foi possível carregar o kit agora.");
+      }
+      state.billingCatalog = catalog;
+      state.lawyerKit.access = kit.access || { entitled: false, source: "none" };
+      state.lawyerKit.documents = Array.isArray(kit.documents) ? kit.documents : [];
+    } catch (error) {
+      state.lawyerKit.error = error?.message || "Não foi possível carregar o kit agora.";
+    } finally {
+      state.lawyerKit.loading = false;
+      renderLawyerKit();
+    }
+  }
+
+  async function purchaseLawyerKit() {
+    if (state.lawyerKit.loading) return;
+    state.lawyerKit.loading = true;
+    state.lawyerKit.error = "";
+    renderLawyerKit();
+    try {
+      const response = await fetch("/api/itau-lawyer-kit/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ requestId: crypto.randomUUID() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.status === 401) {
+        document.querySelector("#loginButton")?.click();
+        throw new Error("Entre na IA AUDITA para comprar o kit.");
+      }
+      if (!response.ok || !data.url) {
+        throw new Error(data.message || "A compra ainda não está disponível.");
+      }
+      window.location.assign(data.url);
+    } catch (error) {
+      state.lawyerKit.error = error?.message || "Não foi possível iniciar a compra.";
+      state.lawyerKit.loading = false;
+      renderLawyerKit();
+    }
+  }
+
+  function clearLawyerKitCheckoutQuery() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("lawyer_kit_checkout");
+    url.searchParams.delete("session_id");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  async function resumeLawyerKitCheckout() {
+    const checkoutStatus = new URLSearchParams(window.location.search).get("lawyer_kit_checkout");
+    if (!checkoutStatus) return false;
+    triageStarted = true;
+    state.route = "lawyer";
+    state.authorizationAnswer = "professional";
+    state.screen = "lawyer-kit";
+    state.lawyerKit.checkoutStatus = checkoutStatus;
+    clearLawyerKitCheckoutQuery();
+    await loadLawyerKit();
+    return true;
   }
 
   function clearItauCheckoutQuery() {
@@ -2297,6 +2440,7 @@ if (stage) {
     else if (state.screen === "upload") renderUpload();
     else if (state.screen === "analyzing") renderAnalyzing();
     else if (state.screen === "paywall") renderPaywall();
+    else if (state.screen === "lawyer-kit") renderLawyerKit();
     else if (state.screen === "review") renderReview();
     else if (state.screen === "result") renderResult();
     else if (state.screen === "recovery") renderRecovery();
@@ -2517,7 +2661,8 @@ if (stage) {
       continueFromTriage("Sou advogado(a).", () => {
         state.route = "lawyer";
         state.authorizationAnswer = "professional";
-        state.screen = "documents";
+        state.screen = "lawyer-kit";
+        void loadLawyerKit();
       });
       return;
     } else if (action === "back-triage" || action === "restart") {
@@ -2605,6 +2750,9 @@ if (stage) {
       state.screen = "documents";
     } else if (action === "purchase-itau-service") {
       void purchaseItauService();
+      return;
+    } else if (action === "purchase-lawyer-kit") {
+      void purchaseLawyerKit();
       return;
     } else if (action === "start-recovery") {
       startRecoveryFlow();
@@ -2758,7 +2906,9 @@ if (stage) {
   });
 
   window.queueMicrotask(async () => {
-    if (!(await resumeItauCheckout())) startTriageWhenOpened();
+    if (!(await resumeItauCheckout()) && !(await resumeLawyerKitCheckout())) {
+      startTriageWhenOpened();
+    }
   });
   render();
 }

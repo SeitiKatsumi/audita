@@ -80,6 +80,33 @@ import {
 } from "./services/tenant-onboarding.service.mjs";
 
 const root = resolve(".");
+const itauLawyerKitRoot = join(root, "private-documents", "itau-lawyer-kit");
+const itauLawyerKitDocuments = Object.freeze([
+  {
+    slug: "processo-completo",
+    title: "Processo completo",
+    fileName: "processo-completo.pdf",
+    downloadName: "ia-audita-processo-completo-itau.pdf",
+  },
+  {
+    slug: "processo-sentenca",
+    title: "Sentença",
+    fileName: "processo-sentenca.pdf",
+    downloadName: "ia-audita-sentenca-itau.pdf",
+  },
+  {
+    slug: "homologacao-acordo",
+    title: "Homologação do acordo",
+    fileName: "homologacao-acordo.pdf",
+    downloadName: "ia-audita-homologacao-acordo-itau.pdf",
+  },
+  {
+    slug: "suspensao-24-meses",
+    title: "Decisão de suspensão por 24 meses",
+    fileName: "suspensao-24-meses.pdf",
+    downloadName: "ia-audita-decisao-suspensao-24-meses.pdf",
+  },
+]);
 loadLocalEnvFiles();
 const port = Number(process.env.PORT || 8080);
 const host = process.env.HOST || "0.0.0.0";
@@ -3202,6 +3229,99 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (pathname === "/api/itau-lawyer-kit" && request.method === "GET") {
+    const authContext = await getTenantIdForRequest(request);
+    const access = authContext.unauthorized
+      ? { entitled: false, source: "none" }
+      : await stripeBillingService.itauLawyerKitAccessState(authContext);
+    sendJson(response, 200, {
+      access,
+      documents: itauLawyerKitDocuments.map((document) => ({
+        slug: document.slug,
+        title: document.title,
+        available: Boolean(document.fileName),
+        downloadUrl:
+          access.entitled && document.fileName
+            ? `/api/itau-lawyer-kit/documents/${document.slug}`
+            : null,
+      })),
+    });
+    return true;
+  }
+
+  if (pathname === "/api/itau-lawyer-kit/checkout" && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const input = await readJsonBody(request);
+      const result = await stripeBillingService.createCheckoutSession(authContext, {
+        kind: "itau_lawyer_kit",
+        requestId: String(input.requestId || ""),
+      });
+      if (result.invalid) {
+        sendJson(response, 400, { error: result.reason });
+        return true;
+      }
+      if (result.unavailable) {
+        sendJson(response, 503, {
+          error: result.reason,
+          missing: result.missing || [],
+        });
+        return true;
+      }
+      sendJson(response, 201, result);
+    } catch (error) {
+      const statusCode = error instanceof StripeBillingError ? error.statusCode : 500;
+      sendJson(response, statusCode, {
+        error: error instanceof StripeBillingError ? error.code : "itau_lawyer_kit_checkout_failed",
+        message:
+          error instanceof StripeBillingError
+            ? error.message
+            : "Não foi possível iniciar a compra do kit agora.",
+      });
+    }
+    return true;
+  }
+
+  const lawyerKitDocumentMatch = pathname.match(
+    /^\/api\/itau-lawyer-kit\/documents\/([a-z0-9-]+)$/,
+  );
+  if (lawyerKitDocumentMatch && request.method === "GET") {
+    const authContext = await getTenantIdForRequest(request);
+    if (authContext.unauthorized) {
+      sendJson(response, 401, { error: "authentication_required" });
+      return true;
+    }
+    const access = await stripeBillingService.itauLawyerKitAccessState(authContext);
+    if (!access.entitled) {
+      sendJson(response, 403, { error: "itau_lawyer_kit_purchase_required" });
+      return true;
+    }
+    const document = itauLawyerKitDocuments.find(
+      (candidate) => candidate.slug === lawyerKitDocumentMatch[1],
+    );
+    if (!document?.fileName) {
+      sendJson(response, 404, { error: "itau_lawyer_kit_document_not_available" });
+      return true;
+    }
+    const filePath = join(itauLawyerKitRoot, document.fileName);
+    if (!existsSync(filePath)) {
+      sendJson(response, 503, { error: "itau_lawyer_kit_document_missing" });
+      return true;
+    }
+    response.writeHead(200, {
+      "content-type": "application/pdf",
+      "content-disposition": `attachment; filename="${document.downloadName}"`,
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+    });
+    createReadStream(filePath).pipe(response);
+    return true;
+  }
+
   if (pathname === "/api/itau-refund/checkout" && request.method === "POST") {
     try {
       const authContext = await getTenantIdForRequest(request);
@@ -5418,6 +5538,16 @@ const server = http.createServer(async (request, response) => {
   }
 
   const requestedPath = uiRoute.path;
+  if (
+    String(requestedPath)
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "")
+      .startsWith("private-documents/")
+  ) {
+    response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    response.end("Not found");
+    return;
+  }
   const filePath = resolve(join(root, requestedPath));
 
   if (!filePath.startsWith(root) || !existsSync(filePath)) {

@@ -121,6 +121,13 @@ export const ITAU_CHARGE_SERVICE_TIERS = Object.freeze([
   },
 ]);
 
+export const ITAU_LAWYER_KIT = Object.freeze({
+  id: "itau-kit-advocacia",
+  name: "Kit profissional Itaú",
+  price: money(19999),
+  priceEnv: "STRIPE_PRICE_ITAU_LAWYER_KIT",
+});
+
 export function billingConfiguration(env = process.env) {
   const billingFlag = envValue(env, "AUDITA_BILLING_ENABLED").toLowerCase() === "true";
   const demoMode = envValue(env, "AUDITA_BILLING_DEMO_MODE").toLowerCase() === "true";
@@ -232,6 +239,18 @@ function publicItauTier(tier, env, configuration) {
   };
 }
 
+function publicItauLawyerKit(env, configuration) {
+  const stripeConfigured = isStripePriceId(envValue(env, ITAU_LAWYER_KIT.priceEnv));
+  return {
+    id: ITAU_LAWYER_KIT.id,
+    name: ITAU_LAWYER_KIT.name,
+    billingType: "one_time",
+    price: publicPrice(ITAU_LAWYER_KIT.price),
+    stripeConfigured,
+    checkoutAvailable: Boolean(configuration.checkoutReady && stripeConfigured),
+  };
+}
+
 export function resolveItauChargeServiceTier(claimAmountCents) {
   const amount = Number(claimAmountCents);
   if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -269,6 +288,7 @@ export function getPublicBillingCatalog(env = process.env) {
         publicItauTier(tier, env, configuration),
       ),
     },
+    itauLawyerKit: publicItauLawyerKit(env, configuration),
   };
 }
 
@@ -340,6 +360,20 @@ export function resolveBillingSelection(input = {}, env = process.env) {
     };
   }
 
+  if (kind === "itau_lawyer_kit") {
+    const priceId = envValue(env, ITAU_LAWYER_KIT.priceEnv);
+    if (!isStripePriceId(priceId)) {
+      return { unavailable: true, reason: "stripe_price_not_configured" };
+    }
+    return {
+      kind,
+      id: ITAU_LAWYER_KIT.id,
+      priceId,
+      credits: 0,
+      amount: ITAU_LAWYER_KIT.price,
+    };
+  }
+
   return { invalid: true, reason: "invalid_purchase_kind" };
 }
 
@@ -373,6 +407,10 @@ export function resolveBillingProductFromPrice(priceId, env = process.env) {
         env,
       );
     }
+  }
+
+  if (envValue(env, ITAU_LAWYER_KIT.priceEnv) === normalizedPriceId) {
+    return resolveBillingSelection({ kind: "itau_lawyer_kit" }, env);
   }
 
   return null;

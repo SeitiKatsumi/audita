@@ -21,6 +21,7 @@ function configuredEnv(overrides = {}) {
     STRIPE_PRICE_ITAU_CHARGE_TIER_1: "price_itau_tier_1",
     STRIPE_PRICE_ITAU_CHARGE_TIER_2: "price_itau_tier_2",
     STRIPE_PRICE_ITAU_CHARGE_TIER_3: "price_itau_tier_3",
+    STRIPE_PRICE_ITAU_LAWYER_KIT: "price_itau_lawyer_kit",
     STRIPE_PRICE_CREDITS_25: "price_credits_25",
     STRIPE_PRICE_CREDITS_100: "price_credits_100",
     STRIPE_PRICE_CREDITS_500: "price_credits_500",
@@ -176,4 +177,19 @@ test("Itaú service checkout resolves a one-time Stripe price", () => {
   assert.equal(selection.priceId, "price_itau_tier_2");
   assert.equal(selection.amount.cents, 39900);
   assert.equal(selection.credits, 0);
+});
+
+test("Itaú lawyer kit is a single R$ 199,99 purchase", () => {
+  const offer = getPublicBillingCatalog(configuredEnv()).itauLawyerKit;
+  const selection = resolveBillingSelection(
+    { kind: "itau_lawyer_kit" },
+    configuredEnv(),
+  );
+
+  assert.equal(offer.billingType, "one_time");
+  assert.equal(offer.price.cents, 19999);
+  assert.equal(offer.checkoutAvailable, true);
+  assert.equal(selection.kind, "itau_lawyer_kit");
+  assert.equal(selection.priceId, "price_itau_lawyer_kit");
+  assert.equal(selection.amount.cents, 19999);
 });
