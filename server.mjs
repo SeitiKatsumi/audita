@@ -3245,6 +3245,7 @@ async function handleApi(request, response, pathname) {
       documents: itauLawyerKitDocuments.map((document) => ({
         slug: document.slug,
         title: document.title,
+        included: true,
         available: Boolean(document.fileName),
         downloadUrl:
           access.entitled && document.fileName

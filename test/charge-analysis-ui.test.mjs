@@ -524,7 +524,9 @@ test("lawyer route sells a protected one-time document kit", () => {
   assert.match(chargeAnalysisJs, /Processo completo/);
   assert.match(serverJs, /fileName: "processo-completo\.pdf"/);
   assert.doesNotMatch(chargeAnalysisJs, /Acordo integral/);
-  assert.match(chargeAnalysisJs, /19999/);
+  assert.match(chargeAnalysisJs, /39999/);
+  assert.match(chargeAnalysisJs, /document\.included === false/);
+  assert.match(serverJs, /included: true/);
   assert.match(chargeAnalysisJs, /\/api\/itau-lawyer-kit\/checkout/);
   assert.match(serverJs, /\/api\/itau-lawyer-kit\/documents/);
   assert.match(serverJs, /itauLawyerKitAccessState/);

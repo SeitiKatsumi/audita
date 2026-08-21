@@ -124,7 +124,7 @@ export const ITAU_CHARGE_SERVICE_TIERS = Object.freeze([
 export const ITAU_LAWYER_KIT = Object.freeze({
   id: "itau-kit-advocacia",
   name: "Kit profissional Itaú",
-  price: money(19999),
+  price: money(39999),
   priceEnv: "STRIPE_PRICE_ITAU_LAWYER_KIT",
 });
 

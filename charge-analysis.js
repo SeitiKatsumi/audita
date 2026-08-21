@@ -1429,7 +1429,7 @@ if (stage) {
           { title: "Decisão de suspensão por 24 meses", available: true },
         ];
     const entitled = Boolean(state.lawyerKit.access?.entitled);
-    const price = Number(product?.price?.cents || 19999) / 100;
+    const price = Number(product?.price?.cents || 39999) / 100;
     stage.innerHTML = `
       <div class="charge-analysis-conversation compact">
         ${userMessage("Sou advogado(a).")}
@@ -1452,11 +1452,11 @@ if (stage) {
             <li>
               <div>
                 <strong>${escapeChargeHtml(document.title)}</strong>
-                <small>${document.available ? "Documento incluído" : "Arquivo pendente de inclusão"}</small>
+                <small>${document.included === false ? "Não incluído" : "Documento incluído"}</small>
               </div>
               ${entitled && document.downloadUrl
                 ? `<a class="secondary-action" href="${escapeChargeHtml(document.downloadUrl)}">Baixar PDF</a>`
-                : `<span class="${document.available ? "ready" : "pending"}">${document.available ? "Incluído" : "Em breve"}</span>`}
+                : `<span class="${document.included === false ? "pending" : "ready"}">${document.included === false ? "Não incluído" : "Incluído"}</span>`}
             </li>
           `).join("")}
         </ul>
