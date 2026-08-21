@@ -96,15 +96,21 @@ const itauLawyerKitDocuments = Object.freeze([
   },
   {
     slug: "homologacao-acordo",
-    title: "Homologação do acordo",
+    title: "Decisão de homologação do acordo",
     fileName: "homologacao-acordo.pdf",
     downloadName: "ia-audita-homologacao-acordo-itau.pdf",
   },
   {
     slug: "suspensao-24-meses",
-    title: "Decisão de suspensão por 24 meses",
+    title: "Despacho de suspensão do processo por 24 meses",
     fileName: "suspensao-24-meses.pdf",
     downloadName: "ia-audita-decisao-suspensao-24-meses.pdf",
+  },
+  {
+    slug: "jurisprudencia-acordo-voto",
+    title: "Jurisprudência / Acordo / Voto",
+    fileName: "",
+    downloadName: "",
   },
 ]);
 loadLocalEnvFiles();
