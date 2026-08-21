@@ -450,6 +450,16 @@ test("charge analysis accepts and manages multiple documents in every upload jou
   assert.deepEqual(mergeChargeAnalysisFiles([first], [duplicate, second]), [first, second]);
 });
 
+test("document analysis starts without a confirmation checkbox and shows progress", () => {
+  assert.doesNotMatch(chargeAnalysisJs, /chargeAnalysisConsent|charge-upload-consent/);
+  assert.doesNotMatch(chargeAnalysisJs, /titularidade ou autorização para processar/);
+  assert.doesNotMatch(chargeAnalysisJs, /Selecione e autorize o processamento/);
+  assert.doesNotMatch(chargeAnalysisJs, /Confirme que possui autoriza/);
+  assert.match(chargeAnalysisJs, /aria-busy="true"/);
+  assert.match(chargeAnalysisJs, /Estamos analisando seus extratos/);
+  assert.match(stylesCss, /\.charge-analysis-loader[\s\S]*?animation:\s*charge-analysis-spin 800ms linear infinite/);
+});
+
 test("charge analysis keeps the 113 supplied brand references as triage data", () => {
   assert.equal(CHARGE_ANALYSIS_BRANDS.length, 113);
   assert.equal(new Set(CHARGE_ANALYSIS_BRANDS).size, 113);

@@ -343,7 +343,7 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   if (documentAvailability === "none") {
     message = "Faltam faturas ou extratos. Sem documentos, a análise e a preparação jurídica não avançam.";
   } else if (documentChoiceComplete && selectedFileCount === 0) {
-    message = "Selecione e autorize o processamento dos documentos para continuar.";
+    message = "Selecione os documentos para continuar.";
   } else if (screen === "paywall") {
     message = "A análise localizou cobranças a revisar. Assine o Standard para acessar os detalhes e a simulação.";
   } else if (selectedFileCount > 0 && !analysisComplete) {
@@ -596,7 +596,6 @@ if (stage) {
     documentAvailability: "",
     selectedFile: null,
     selectedFiles: [],
-    consent: false,
     caseData: null,
     caseBatches: [],
     access: null,
@@ -1082,7 +1081,7 @@ if (stage) {
       ? "Os documentos ser&atilde;o analisados individualmente e reunidos em uma &uacute;nica vis&atilde;o, preservando a origem de cada lan&ccedil;amento."
       : "A triagem considerar&aacute; somente os arquivos enviados. Documentos parciais n&atilde;o comprovam integralmente o per&iacute;odo e n&atilde;o ser&atilde;o apresentados como hist&oacute;rico completo.";
     const routeCopy = state.route === "lawyer"
-      ? "Voc&ecirc; est&aacute; auditando para um cliente. Confirme que possui autoriza&ccedil;&atilde;o para processar o documento."
+      ? "Os documentos do cliente ser&atilde;o processados somente para esta an&aacute;lise."
       : state.selectedBrand
         ? `Marca informada: ${escapeChargeHtml(state.selectedBrand)}.`
         : "A pr&oacute;pria fatura ser&aacute; usada para confirmar o emissor e os lan&ccedil;amentos.";
@@ -1251,16 +1250,11 @@ if (stage) {
             : ""
         }
 
-        <label class="charge-upload-consent">
-          <input id="chargeAnalysisConsent" type="checkbox" ${state.consent ? "checked" : ""} />
-          <span>Confirmo que sou titular do documento ou possuo autorização para realizar esta análise.</span>
-        </label>
-
         <p class="charge-upload-privacy">Os arquivos são processados para esta análise e não ficam armazenados por este módulo. Dados sensíveis são mascarados antes da leitura automatizada quando aplicável.</p>
 
         <div class="charge-upload-actions">
           <button type="button" class="secondary-action" data-charge-action="back-documents">Voltar</button>
-          <button type="submit" class="primary-action" ${!fileName || !state.consent ? "disabled" : ""}>
+          <button type="submit" class="primary-action" ${!fileName ? "disabled" : ""}>
             ${files.length > 1 ? `Analisar ${files.length} documentos` : "Analisar documento"}
           </button>
         </div>
@@ -1272,13 +1266,11 @@ if (stage) {
     const files = state.selectedFiles.length ? state.selectedFiles : [state.selectedFile].filter(Boolean);
     stage.innerHTML = `
       ${earlyJourneyMarkup({ documentSelected: true })}
-      <div class="charge-analysis-processing" role="status">
-        <span class="charge-analysis-mark" aria-hidden="true">
-          <img src="assets/audita-logo-original.png" alt="" />
-        </span>
-        <p class="eyebrow">Leitura em andamento</p>
-        <h3>${files.length > 1 ? `Analisando ${files.length} documentos` : `Analisando ${escapeChargeHtml(files[0]?.name || "o documento")}`}</h3>
-        <p>Estamos procurando lançamentos que merecem confirmação e organizando a base documental. Nenhuma conclusão jurídica será presumida.</p>
+      <div class="charge-analysis-processing" role="status" aria-live="polite" aria-busy="true">
+        <span class="charge-analysis-loader" aria-hidden="true"></span>
+        <p class="eyebrow">Análise em andamento</p>
+        <h3>Estamos analisando seus extratos</h3>
+        <p>${files.length > 1 ? `${files.length} documentos estão sendo processados.` : `${escapeChargeHtml(files[0]?.name || "O documento")} está sendo processado.`} Isso pode levar alguns instantes.</p>
       </div>
     `;
   }
@@ -2417,7 +2409,7 @@ if (stage) {
       : state.selectedFile
         ? [state.selectedFile]
         : [];
-    if (!files.length || !state.consent || state.busy) return;
+    if (!files.length || state.busy) return;
     state.busy = true;
     state.error = "";
     state.screen = "analyzing";
@@ -2614,7 +2606,6 @@ if (stage) {
       state.documentAvailability = "";
       state.selectedFile = null;
       state.selectedFiles = [];
-      state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
       resetDirectedSearch();
@@ -2653,7 +2644,6 @@ if (stage) {
     } else if (action === "resume-document-upload") {
       state.selectedFile = null;
       state.selectedFiles = [];
-      state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
       resetDirectedSearch();
@@ -2663,7 +2653,6 @@ if (stage) {
     } else if (action === "back-documents") {
       state.selectedFile = null;
       state.selectedFiles = [];
-      state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
       resetDirectedSearch();
@@ -2681,7 +2670,6 @@ if (stage) {
     } else if (action === "new-document") {
       state.selectedFile = null;
       state.selectedFiles = [];
-      state.consent = false;
       state.caseData = null;
       state.caseBatches = [];
       resetDirectedSearch();
@@ -2761,10 +2749,6 @@ if (stage) {
       state.selectedFile = state.selectedFiles[0] || null;
       renderUpload();
     }
-    if (event.target.id === "chargeAnalysisConsent") {
-      state.consent = event.target.checked;
-      renderUpload();
-    }
     if (event.target.id === "chargeRecoveryGuideUf") {
       state.recovery.guideUf = event.target.value;
       renderRecoveryGuide();
@@ -2807,10 +2791,6 @@ if (stage) {
     event.preventDefault();
     if (!state.selectedFiles.length && !state.selectedFile) {
       setError("Selecione pelo menos um documento para continuar.");
-      return;
-    }
-    if (!state.consent) {
-      setError("Confirme a titularidade ou autorização para processar o documento.");
       return;
     }
     analyzeDocuments();
