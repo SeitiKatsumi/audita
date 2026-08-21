@@ -3373,7 +3373,7 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 503, { error: "itau_calculation_unavailable" });
         return true;
       }
-      const claimAmountCents = Math.round(calculation.estimatedMaterialClaim * 100);
+      const claimAmountCents = Math.round(calculation.estimatedClaimValue * 100);
       const tier = resolveItauChargeServiceTier(claimAmountCents);
       if (!tier) {
         sendJson(response, 422, {
@@ -4132,11 +4132,16 @@ async function handleApi(request, response, pathname) {
         return true;
       }
       const body = await readJsonBody(request);
-      const result = await jecTestimonyService.refine(body.testimony);
+      const result = Array.isArray(body.turns)
+        ? await jecTestimonyService.continueConversation(body.turns)
+        : await jecTestimonyService.refine(body.testimony);
       sendJson(response, 200, {
         testimony: {
-          original: result.original,
-          refined: result.refined,
+          status: result.status || "complete",
+          original: result.original || "",
+          refined: result.refined || "",
+          question: result.question || "",
+          turns: result.turns || [],
         },
       });
     } catch (error) {

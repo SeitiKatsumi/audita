@@ -13,6 +13,7 @@ import {
   mergeChargeAnalysisFiles,
 } from "../charge-analysis.js";
 import { ITAU_FAQ_ITEMS, ITAU_FAQ_LEGAL_NOTICE } from "../itau-faq.js";
+import { resolveItauChargeServiceTier } from "../services/billing-catalog.service.mjs";
 
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const plansHtml = readFileSync(new URL("../plans.html", import.meta.url), "utf8");
@@ -572,8 +573,27 @@ test("calculation uses only confirmed non-recognized documentary occurrences", (
   assert.equal(calculation.monetaryAdjustment, 8.64);
   assert.equal(calculation.estimatedInterest, 2.4);
   assert.equal(calculation.estimatedMaterialClaim, 311.04);
+  assert.equal(calculation.moralDamagesAmount, 2_000);
+  assert.equal(calculation.estimatedClaimValue, 2_311.04);
   assert.equal(calculation.correctionAvailable, true);
   assert.equal(calculation.excludedWithoutAmount, 0);
+});
+
+test("minimum service tier uses the full simulation including default moral damages", () => {
+  const calculation = buildChargeCalculationSnapshot(
+    { candidates: [{ amount: 1_500, date: "2026-03-15", answer: "not_recognized" }] },
+    { asOf: "2026-03-15", ipcaRates: [{ data: "01/03/2026", valor: "0" }] },
+  );
+
+  assert.equal(calculation.estimatedMaterialClaim, 3_000);
+  assert.equal(calculation.moralDamagesAmount, 2_000);
+  assert.equal(calculation.estimatedClaimValue, 5_000);
+  assert.equal(
+    resolveItauChargeServiceTier(Math.round(calculation.estimatedClaimValue * 100))?.id,
+    "itau-cobrancas-faixa-1",
+  );
+  assert.match(chargeAnalysisJs, /calculation\?\.estimatedClaimValue/);
+  assert.match(serverJs, /calculation\.estimatedClaimValue \* 100/);
 });
 
 test("automatic catalog flow has no manual candidate insertion or confirmation", () => {
@@ -675,16 +695,20 @@ test("app hides the one-page shell until the initial route is ready", () => {
   assert.match(indexHtml, /app\.js\?v=20260818-app-boot-1/);
 });
 
-test("recovery requires an AI-adjusted and user-reviewed testimony before the PDF", () => {
+test("recovery collects testimony in up to three AI questions before user review and PDF", () => {
   assert.match(chargeAnalysisJs, /Continuar para o depoimento/);
   assert.match(chargeAnalysisJs, /id="chargeRecoveryTestimonyForm"/);
-  assert.match(chargeAnalysisJs, /name="originalTestimony" required minlength="40" maxlength="5000"/);
+  assert.match(chargeAnalysisJs, /name="testimonyAnswer" required minlength="2" maxlength="2000"/);
+  assert.match(chargeAnalysisJs, /Pergunta \$\{questionNumber\} de até 3/);
+  assert.match(chargeAnalysisJs, /function continueRecoveryTestimony\(form\)/);
+  assert.match(chargeAnalysisJs, /body: JSON\.stringify\(\{ turns \}\)/);
   assert.match(chargeAnalysisJs, /name="refinedTestimony" required minlength="40" maxlength="5000"/);
   assert.match(chargeAnalysisJs, /name="testimonyReviewed"/);
   assert.match(chargeAnalysisJs, /testimonyReviewed: true/);
   assert.match(chargeAnalysisJs, /consumerTestimony/);
   assert.doesNotMatch(chargeAnalysisJs, /data-recovery-submit="pdf"/);
   assert.match(stylesCss, /\.charge-testimony-field textarea/);
+  assert.match(stylesCss, /\.charge-testimony-dialogue/);
   assert.match(stylesCss, /\.charge-testimony-confirmation/);
   assert.match(appJs, /name="originalTestimony" required minlength="40" maxlength="5000"/);
   assert.match(appJs, /data-jec-action="testimony"/);

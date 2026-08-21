@@ -444,8 +444,11 @@ export function buildChargeJecHandoff({
     audit.totalDisputed > 0
       ? audit.hypotheticalDouble
       : 0;
-  const suggestedCaseValue = Number(calculation?.estimatedMaterialClaim) > 0
-    ? Number(calculation.estimatedMaterialClaim)
+  const suggestedMoralDamages = Number(calculation?.moralDamagesAmount) > 0
+    ? Number(calculation.moralDamagesAmount)
+    : 0;
+  const suggestedCaseValue = Number(calculation?.estimatedClaimValue) > 0
+    ? Number(calculation.estimatedClaimValue)
     : suggestedDouble;
   const normalizedId = String(handoffId || caseData?.id || "estimate")
     .replace(/[^a-zA-Z0-9_-]/g, "-")
@@ -492,7 +495,7 @@ export function buildChargeJecHandoff({
       values: {
         doubleRefundAmount: formatChargeAmountInput(suggestedDouble),
         lostProfitsAmount: "",
-        moralDamagesAmount: "",
+        moralDamagesAmount: formatChargeAmountInput(suggestedMoralDamages),
         caseValue: formatChargeAmountInput(suggestedCaseValue),
       },
       notes: [
@@ -582,6 +585,19 @@ if (stage) {
   });
   faqDialog?.addEventListener("close", () => faqButton?.focus());
 
+  const RECOVERY_TESTIMONY_FIRST_QUESTION =
+    "Para começar, conte com suas palavras o que aconteceu e como você percebeu essa cobrança.";
+
+  function emptyRecoveryTestimony() {
+    return {
+      turns: [],
+      currentQuestion: RECOVERY_TESTIMONY_FIRST_QUESTION,
+      original: "",
+      refined: "",
+      reviewed: false,
+    };
+  }
+
   const state = {
     screen: "triage",
     route: "consumer",
@@ -618,11 +634,7 @@ if (stage) {
       handoff: null,
       claimant: {},
       prepared: null,
-      testimony: {
-        original: "",
-        refined: "",
-        reviewed: false,
-      },
+      testimony: emptyRecoveryTestimony(),
       portals: [],
       guideUf: "",
       loading: false,
@@ -640,11 +652,7 @@ if (stage) {
       handoff: null,
       claimant: {},
       prepared: null,
-      testimony: {
-        original: "",
-        refined: "",
-        reviewed: false,
-      },
+      testimony: emptyRecoveryTestimony(),
       portals: [],
       guideUf: "",
       loading: false,
@@ -1312,7 +1320,7 @@ if (stage) {
   }
 
   function selectedItauServiceTier(calculation) {
-    const claimCents = Math.round(Number(calculation?.estimatedMaterialClaim || 0) * 100);
+    const claimCents = Math.round(Number(calculation?.estimatedClaimValue || 0) * 100);
     return itauServiceTiers().find(
       (tier) => claimCents >= tier.minimumClaimCents && claimCents <= tier.maximumClaimCents,
     ) || null;
@@ -1333,7 +1341,7 @@ if (stage) {
     const calculation = currentCalculation();
     const tiers = itauServiceTiers();
     const selectedTier = selectedItauServiceTier(calculation);
-    const claimCents = Math.round(Number(calculation.estimatedMaterialClaim || 0) * 100);
+    const claimCents = Math.round(Number(calculation.estimatedClaimValue || 0) * 100);
     const minimumClaimCents = Math.min(...tiers.map((tier) => Number(tier.minimumClaimCents || 0)));
     const belowMinimum = Number.isFinite(minimumClaimCents) && claimCents < minimumClaimCents;
     const checkoutReady = Boolean(selectedTier?.checkoutAvailable);
@@ -1676,7 +1684,7 @@ if (stage) {
     const calculation = currentCalculation();
     const tiers = itauServiceTiers();
     const selectedTier = selectedItauServiceTier(calculation);
-    const claimCents = Math.round(Number(calculation.estimatedMaterialClaim || 0) * 100);
+    const claimCents = Math.round(Number(calculation.estimatedClaimValue || 0) * 100);
     const minimumClaimCents = Math.min(...tiers.map((tier) => Number(tier.minimumClaimCents || 0)));
     const belowMinimum = Number.isFinite(minimumClaimCents) && claimCents < minimumClaimCents;
     const isPartialHistory = state.documentAvailability === "partial";
@@ -1689,7 +1697,7 @@ if (stage) {
         <div>
           <p class="eyebrow">Simulação concluída</p>
           <h3>${selectedTier ? `Você pode ter entre ${escapeChargeHtml(tierRangeLabel(selectedTier))} para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
-          <p>${selectedTier ? "A faixa considera somente cobranças encontradas nos anexos e compatíveis com as cinco famílias analisadas." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
+          <p>${selectedTier ? "A faixa considera repetição em dobro, correção, juros e danos morais sugeridos para revisão." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
         </div>
       </div>
 
@@ -1859,31 +1867,38 @@ if (stage) {
 
   function recoveryTestimonyMarkup() {
     const testimony = state.recovery.testimony || {};
+    const turns = Array.isArray(testimony.turns) ? testimony.turns : [];
     const hasRefinedText = Boolean(testimony.refined);
+    const questionNumber = Math.min(turns.length + 1, 3);
+    const transcript = turns
+      .map((turn) => `${assistantMessage(`<p>${escapeChargeHtml(turn.question)}</p>`, "IA AUDITA · Depoimento")}${userMessage(turn.answer)}`)
+      .join("");
     return `
       <form class="charge-recovery-form charge-recovery-testimony" id="chargeRecoveryTestimonyForm" aria-busy="${state.recovery.busy}">
         ${state.recovery.error ? `<p class="charge-recovery-form-error" role="alert">${escapeChargeHtml(state.recovery.error)}</p>` : ""}
         <div class="charge-recovery-form-heading">
           <div>
             <p class="eyebrow">Relato pessoal</p>
-            <h3>Conte o que aconteceu com suas palavras</h3>
+            <h3>Converse com a IA AUDITA sobre o que aconteceu</h3>
           </div>
-          <span>Etapa obrigatória</span>
+          <span>${hasRefinedText ? "Síntese pronta" : `Pergunta ${questionNumber} de até 3`}</span>
         </div>
-        <p class="charge-recovery-form-intro">Descreva somente fatos que você conhece. A IA vai organizar a redação, sem criar informações, e você poderá revisar tudo antes do PDF.</p>
-        <div class="charge-testimony-prompts" aria-label="Pontos que podem ajudar no relato">
-          <span>O que foi cobrado</span>
-          <span>Quando você percebeu</span>
-          <span>Desde quando ocorre</span>
-          <span>Por que não reconhece a contratação</span>
+        <p class="charge-recovery-form-intro">Conte somente o que você sabe. A IA fará no máximo duas perguntas complementares e não repetirá informações já respondidas.</p>
+        <div class="charge-analysis-conversation charge-testimony-dialogue" aria-label="Conversa para coleta do depoimento">
+          ${transcript}
+          ${hasRefinedText
+            ? assistantMessage("<p><strong>Organizei o seu relato.</strong> Revise a versão abaixo antes de gerar o PDF.</p>", "IA AUDITA · Depoimento")
+            : assistantMessage(`<p><strong>${escapeChargeHtml(testimony.currentQuestion || RECOVERY_TESTIMONY_FIRST_QUESTION)}</strong></p>`, "IA AUDITA · Depoimento")}
+          ${state.recovery.busy ? typingMessage() : ""}
         </div>
-        <label class="charge-testimony-field">
-          <span>Seu depoimento</span>
-          <textarea name="originalTestimony" required minlength="40" maxlength="5000" rows="8" placeholder="Ex.: Percebi na minha fatura uma cobrança mensal identificada como...">${escapeChargeHtml(testimony.original || "")}</textarea>
-          <small>Não inclua senhas, dados do cartão ou informações que não queira inserir no documento.</small>
-        </label>
+        ${!hasRefinedText ? `
+          <label class="charge-testimony-field charge-testimony-answer">
+            <span>Sua resposta</span>
+            <textarea name="testimonyAnswer" required minlength="2" maxlength="2000" rows="4" placeholder="Responda com suas palavras"></textarea>
+            <small>Não inclua senhas, número do cartão ou outros dados bancários.</small>
+          </label>
+        ` : ""}
         ${hasRefinedText ? `
-          <div class="charge-recovery-section-title"><strong>Texto ajustado pela IA</strong><span>Edite qualquer trecho que não corresponda exatamente ao seu relato.</span></div>
           <label class="charge-testimony-field">
             <span>Versão que entrará no documento</span>
             <textarea name="refinedTestimony" required minlength="40" maxlength="5000" rows="8">${escapeChargeHtml(testimony.refined)}</textarea>
@@ -1895,7 +1910,7 @@ if (stage) {
         ` : ""}
         <div class="charge-recovery-form-actions">
           <button type="button" class="secondary-action" data-charge-action="back-to-recovery-report">Voltar</button>
-          <button type="submit" class="${hasRefinedText ? "secondary-action" : "primary-action"}" data-testimony-submit="refine" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Ajustando..." : hasRefinedText ? "Ajustar novamente" : "Ajustar texto com IA"}</button>
+          ${!hasRefinedText ? `<button type="submit" class="primary-action" data-testimony-submit="continue" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Analisando relato..." : "Responder"}</button>` : ""}
           ${hasRefinedText ? `<button type="submit" class="primary-action" data-testimony-submit="pdf" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Gerando..." : "Gerar Relatório Técnico em PDF"}</button>` : ""}
         </div>
       </form>
@@ -1903,15 +1918,7 @@ if (stage) {
   }
 
   function renderRecoveryTestimony() {
-    stage.innerHTML = `
-      <div class="charge-analysis-conversation charge-recovery-conversation compact">
-        ${assistantMessage(`
-          <p><strong>Agora quero registrar a sua versão dos fatos.</strong></p>
-          <p>Esse relato torna o documento individual. Escreva do seu jeito; eu vou apenas melhorar a clareza e a organização, sem acrescentar informações.</p>
-        `, "IA AUDITA · Depoimento")}
-      </div>
-      ${recoveryTestimonyMarkup()}
-    `;
+    stage.innerHTML = recoveryTestimonyMarkup();
   }
 
   function selectedRecoveryPortal() {
@@ -2090,16 +2097,30 @@ if (stage) {
   function readRecoveryTestimony(form) {
     const data = new FormData(form);
     return {
-      original: String(data.get("originalTestimony") || "").normalize("NFC").trim().slice(0, 5000),
+      ...(state.recovery.testimony || emptyRecoveryTestimony()),
       refined: String(data.get("refinedTestimony") || "").normalize("NFC").trim().slice(0, 5000),
       reviewed: data.get("testimonyReviewed") === "on",
     };
   }
 
-  async function refineRecoveryTestimony(form) {
+  async function continueRecoveryTestimony(form) {
     if (state.recovery.busy) return;
-    const testimony = readRecoveryTestimony(form);
-    state.recovery.testimony = { ...testimony, reviewed: false };
+    const data = new FormData(form);
+    const answer = String(data.get("testimonyAnswer") || "").normalize("NFC").trim().slice(0, 2000);
+    if (answer.length < 2) {
+      state.recovery.error = "Responda à pergunta para continuar.";
+      renderRecoveryTestimony();
+      return;
+    }
+    const testimony = state.recovery.testimony || emptyRecoveryTestimony();
+    const turns = [
+      ...(Array.isArray(testimony.turns) ? testimony.turns : []),
+      {
+        question: testimony.currentQuestion || RECOVERY_TESTIMONY_FIRST_QUESTION,
+        answer,
+      },
+    ];
+    state.recovery.testimony = { ...testimony, turns, reviewed: false };
     state.recovery.busy = true;
     state.recovery.error = "";
     render();
@@ -2108,23 +2129,34 @@ if (stage) {
       const response = await fetch("/api/jec/testimony/refine", {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ testimony: testimony.original }),
+        body: JSON.stringify({ turns }),
       });
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) {
         document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na IA AUDITA para ajustar o seu depoimento.");
+        throw new Error("Entre na IA AUDITA para continuar o seu depoimento.");
       }
-      if (!response.ok || !data.testimony?.refined) {
-        throw new Error(recoveryApiError(data, "Não foi possível ajustar o depoimento agora."));
+      if (!response.ok || !data.testimony?.status) {
+        throw new Error(recoveryApiError(data, "Não foi possível continuar o depoimento agora."));
       }
-      state.recovery.testimony = {
-        original: data.testimony.original || testimony.original,
-        refined: data.testimony.refined,
-        reviewed: false,
-      };
+      const responseTurns = Array.isArray(data.testimony.turns) ? data.testimony.turns : turns;
+      state.recovery.testimony = data.testimony.status === "complete"
+        ? {
+            turns: responseTurns,
+            currentQuestion: "",
+            original: data.testimony.original || responseTurns.map((turn) => turn.answer).join("\n\n"),
+            refined: data.testimony.refined || "",
+            reviewed: false,
+          }
+        : {
+            ...testimony,
+            turns: responseTurns,
+            currentQuestion: data.testimony.question || "",
+            reviewed: false,
+          };
     } catch (error) {
-      state.recovery.error = error?.message || "Falha ao ajustar o depoimento.";
+      state.recovery.testimony = testimony;
+      state.recovery.error = error?.message || "Falha ao continuar o depoimento.";
     } finally {
       state.recovery.busy = false;
       state.recovery.phase = "testimony";
@@ -2519,7 +2551,7 @@ if (stage) {
 
     if (event.target.id === "chargeRecoveryTestimonyForm") {
       event.preventDefault();
-      const action = event.submitter?.dataset.testimonySubmit || "refine";
+      const action = event.submitter?.dataset.testimonySubmit || "continue";
       if (action === "pdf") {
         const testimony = readRecoveryTestimony(event.target);
         if (!testimony.reviewed || testimony.refined.length < 40) {
@@ -2531,7 +2563,7 @@ if (stage) {
         state.recovery.testimony = testimony;
         void downloadRecoveryReport();
       } else {
-        void refineRecoveryTestimony(event.target);
+        void continueRecoveryTestimony(event.target);
       }
       return;
     }

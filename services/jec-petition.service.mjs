@@ -1017,9 +1017,7 @@ function buildDraft({ caseData, claimant, templateId, generatedAt }) {
     PHONE: formatProfilePhone(claimant.phone),
     EVIDENCE_SUMMARY: buildEvidenceSummary(caseData),
     EVIDENCE_CONTEXT: buildEvidenceContext(caseData, journey),
-    CONSUMER_TESTIMONY_SECTION: consumerTestimony
-      ? `RELATO PESSOAL DO(A) CONSUMIDOR(A)\n\n${consumerTestimony}`
-      : optionalTestimony,
+    CONSUMER_TESTIMONY_SECTION: consumerTestimony || optionalTestimony,
     BANK_RELATIONSHIP_CONTEXT: buildBankRelationshipContext(claimant),
     DOCUMENT_AVAILABILITY_CONTEXT: buildDocumentAvailabilityContext(
       caseData,

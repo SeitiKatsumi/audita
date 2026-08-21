@@ -257,8 +257,12 @@ test("reviewed consumer testimony individualizes both petition PDF models", () =
   assert.equal(model1.template.sourceModel, 1);
   assert.equal(model2.template.sourceModel, 2);
   for (const prepared of [model1, model2]) {
-    assert.match(prepared.draft, /RELATO PESSOAL DO\(A\) CONSUMIDOR\(A\)/);
+    assert.match(prepared.draft, /I\. DOS FATOS/);
     assert.match(prepared.draft, /Percebi a cobrança de Seguro Alfa/);
+    assert.ok(
+      prepared.draft.indexOf(testimony) < prepared.draft.indexOf("II. DA NECESSIDADE DA AÇÃO INDIVIDUAL"),
+      "o depoimento deve abrir os fatos antes da fundamentação jurídica",
+    );
     assert.doesNotMatch(prepared.draft, /texto original do consumidor/);
     assert.doesNotMatch(prepared.draft, /CONSUMER_TESTIMONY_SECTION/);
   }

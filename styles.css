@@ -10141,6 +10141,19 @@ body[data-active-page="chat"] .workspace {
   box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
 }
 
+.charge-testimony-dialogue {
+  gap: 14px;
+  padding: 18px 0 24px;
+}
+
+.charge-testimony-answer {
+  margin-top: 4px;
+}
+
+.charge-testimony-answer textarea {
+  min-height: 112px;
+}
+
 .charge-testimony-field small {
   color: #829dad;
   font-size: 0.68rem;

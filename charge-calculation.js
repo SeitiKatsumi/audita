@@ -1,5 +1,6 @@
 const MONTH_MS = 2629800000;
 const INTEREST_RATE_MONTHLY = 0.01;
+const DEFAULT_MORAL_DAMAGES = 2_000;
 
 function parseChargeDate(value) {
   const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -86,6 +87,8 @@ export function buildChargeCalculationSnapshot(caseData = {}, options = {}) {
   const estimatedInterest = calculatedItems.reduce((total, candidate) => total + candidate.interest, 0);
   const hypotheticalDouble = principal * 2;
   const estimatedMaterialClaim = hypotheticalDouble + monetaryAdjustment + estimatedInterest;
+  const moralDamagesAmount = DEFAULT_MORAL_DAMAGES;
+  const estimatedClaimValue = estimatedMaterialClaim + moralDamagesAmount;
   return {
     items: calculatedItems,
     itemCount: calculatedItems.length,
@@ -94,6 +97,8 @@ export function buildChargeCalculationSnapshot(caseData = {}, options = {}) {
     monetaryAdjustment: Number(monetaryAdjustment.toFixed(2)),
     estimatedInterest: Number(estimatedInterest.toFixed(2)),
     estimatedMaterialClaim: Number(estimatedMaterialClaim.toFixed(2)),
+    moralDamagesAmount,
+    estimatedClaimValue: Number(estimatedClaimValue.toFixed(2)),
     calculationAsOf: asOf.toISOString().slice(0, 10),
     correctionAvailable: calculatedItems.length > 0 && calculatedItems.every((item) => item.correctionAvailable),
     missingDateCount: calculatedItems.filter((item) => !parseChargeDate(item.date)).length,
