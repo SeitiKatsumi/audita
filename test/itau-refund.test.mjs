@@ -10,21 +10,35 @@ import {
   updateItauCaseSnapshot,
 } from "../services/itau-refund.service.mjs";
 
-test("detects known insurance charges without classifying them as improper", () => {
+test("detects every recurring catalog charge with normalized matching", () => {
   const candidates = detectItauCandidateCharges(
-    "Fatura Itau 14/09/2024 Seguro Fatura Protegida R$ 18,90 Pagamento recebido",
+    [
+      "14/09/2024 PROTEÇÃO FINANCEIRA / PERDA DE RENDA R$ 18,90",
+      "14/10/2024 protecao financeira / perda de renda R$ 18,90",
+    ].join(" "),
   );
 
-  assert.equal(candidates.length, 1);
-  assert.equal(candidates[0].label, "Seguro Fatura Protegida");
+  assert.equal(candidates.length, 2);
+  assert.equal(candidates[0].label, "Protecao Financeira / Perda de Renda");
   assert.equal(candidates[0].amount, 18.9);
-  assert.equal(candidates[0].answer, "pending");
+  assert.equal(candidates[0].answer, "not_recognized");
+  assert.equal(candidates[1].date, "2024-10-14");
 });
 
 test("does not flag an ordinary card purchase", () => {
   const candidates = detectItauCandidateCharges(
     "05/04/2025 SUPERMERCADO CENTRAL R$ 214,70 06/04/2025 POSTO AVENIDA R$ 180,00",
   );
+
+  assert.deepEqual(candidates, []);
+});
+
+test("does not flag generic subscriptions or simulated recurring charges", () => {
+  const candidates = detectItauCandidateCharges([
+    "18/07/2026 StreamPlay Assinatura mensal R$ 34,90",
+    "25/07/2026 Lancamento recorrente simulado R$ 10,95",
+    "26/07/2026 Pacote mensal de servicos bancarios R$ 12,00",
+  ].join(" "));
 
   assert.deepEqual(candidates, []);
 });
@@ -208,8 +222,8 @@ test("service keeps only normalized findings and supports an authenticated revie
       billing_period: "07/2025",
       candidate_charges: [
         {
-          label: "Seguro Compra Segura",
-          description: "SEGURO COMPRA SEGURA",
+          label: "Protecao Financeira",
+          description: "PROTECAO FINANCEIRA / PERDA DE RENDA",
           category: "seguro",
           date: "2025-07-10",
           amount: 12.5,
@@ -257,7 +271,7 @@ test("service keeps only normalized findings and supports an authenticated revie
   );
 });
 
-test("directed search recovers a missed charge from attached document evidence", async () => {
+test("directed search rejects descriptions outside the closed catalog", async () => {
   const service = createItauRefundService({
     aiAnalyzer: async () => ({
       document_readable: true,
@@ -290,15 +304,11 @@ test("directed search recovers a missed charge from attached document evidence",
     "StreamPlay",
     { tenantId: "tenant-a", userId: "user-a" },
   );
-  assert.equal(result.matches.length, 1);
-  assert.equal(result.cases[0].candidates.length, 1);
-  assert.equal(result.cases[0].candidates[0].origin, "directed_search");
-  assert.equal(result.cases[0].candidates[0].answer, "pending");
-  assert.equal(result.cases[0].candidates[0].amount, 34.9);
-  assert.equal(result.cases[0].candidates[0].date, "2026-07-18");
+  assert.equal(result.matches.length, 0);
+  assert.equal(result.cases.length, 0);
 });
 
-test("directed search keeps automatic candidates and adds only evidenced matches", async () => {
+test("AI findings outside the closed catalog are discarded", async () => {
   const service = createItauRefundService({
     aiAnalyzer: async () => ({
       document_readable: true,
@@ -333,13 +343,7 @@ test("directed search keeps automatic candidates and adds only evidenced matches
     fileName: "julho.txt",
     mimeType: "text/plain",
   });
-  const result = service.searchCases([analyzed.case.id], "StreamPlay");
-
-  assert.equal(result.cases[0].candidates.length, 2);
-  assert.deepEqual(
-    result.cases[0].candidates.map((candidate) => candidate.origin).sort(),
-    ["auto_detected", "directed_search"],
-  );
+  assert.equal(analyzed.case.candidates.length, 0);
 });
 
 test("directed search without document evidence creates no candidate", async () => {
@@ -362,7 +366,7 @@ test("directed search without document evidence creates no candidate", async () 
   const result = service.searchCases([analyzed.case.id], "StreamPlay");
 
   assert.equal(result.matches.length, 0);
-  assert.equal(result.cases[0].candidates.length, 0);
+  assert.equal(result.cases.length, 0);
 });
 
 test("reconciles the same charge found by AI and local rules without duplication", async () => {
@@ -373,8 +377,8 @@ test("reconciles the same charge found by AI and local rules without duplication
       billing_period: "07/2025",
       candidate_charges: [
         {
-          label: "SEGURO FATURA PROTEGIDA",
-          description: "Seguro Fatura Protegida",
+          label: "PROTECAO FINANCEIRA",
+          description: "Protecao Financeira / Perda de Renda",
           category: "seguro",
           date: "2025-07-12",
           amount: 18.9,
@@ -389,7 +393,7 @@ test("reconciles the same charge found by AI and local rules without duplication
   });
 
   const analyzed = await service.analyze({
-    buffer: Buffer.from("11/07/2025 SEGURO FATURA PROTEGIDA R$ 18,90"),
+    buffer: Buffer.from("11/07/2025 PROTECAO FINANCEIRA / PERDA DE RENDA R$ 18,90"),
     fileName: "fatura.txt",
     mimeType: "text/plain",
   });
@@ -429,7 +433,7 @@ test("reconciles an AI label with extra insurance wording against the catalog", 
   });
 
   assert.equal(analyzed.case.candidates.length, 1);
-  assert.equal(analyzed.case.candidates[0].label, "Cartao Protegido");
+  assert.equal(analyzed.case.candidates[0].label, "Cartao/Bolsa Protegida, Perda e Roubo");
   assert.equal(analyzed.case.candidates[0].amount, 18.9);
 });
 

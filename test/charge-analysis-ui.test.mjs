@@ -283,8 +283,9 @@ test("charge analysis keeps identification, attachments and analysis in one cont
   assert.match(chargeAnalysisJs, /function earlyJourneyMarkup\(/);
   assert.match(chargeAnalysisJs, /stage\.innerHTML = earlyJourneyMarkup\(\{ documentChoice: true \}\)/);
   assert.match(chargeAnalysisJs, /\$\{earlyJourneyMarkup\(\{ documentSelected: true \}\)\}/);
-  assert.match(chargeAnalysisJs, /function renderReview\(\)/);
-  assert.match(chargeAnalysisJs, /state\.screen = "review"/);
+  assert.match(chargeAnalysisJs, /await openCalculation\(\)/);
+  assert.doesNotMatch(chargeAnalysisJs, /function renderReview\(\)/);
+  assert.doesNotMatch(chargeAnalysisJs, /state\.screen = "review"/);
 });
 
 test("charge analysis introduction links the historical card scope to the searchable references", () => {
@@ -487,19 +488,20 @@ test("preliminary audit calculates only evidenced and user-disputed amounts", ()
   );
 });
 
-test("review and documentary calculation are separate sequential stages", () => {
-  assert.match(chargeAnalysisJs, /state\.screen = "review"/);
-  assert.match(chargeAnalysisJs, /function renderReview\(\)/);
-  assert.match(chargeAnalysisJs, /data-charge-action="confirm-review"/);
-  assert.match(chargeAnalysisJs, /Confirmar revisão e calcular/);
-  assert.match(chargeAnalysisJs, /A faixa considera somente cobranças encontradas nos anexos/);
+test("closed catalog analysis proceeds directly to documentary calculation", () => {
+  assert.doesNotMatch(chargeAnalysisJs, /state\.screen = "review"/);
+  assert.doesNotMatch(chargeAnalysisJs, /function renderReview\(\)/);
+  assert.doesNotMatch(chargeAnalysisJs, /data-charge-action="confirm-review"/);
+  assert.doesNotMatch(chargeAnalysisJs, /answer-candidate|data-charge-answer|Você reconhece esta contratação/);
+  assert.match(chargeAnalysisJs, /await openCalculation\(\)/);
+  assert.match(chargeAnalysisJs, /compatíveis com as cinco famílias analisadas/);
   assert.doesNotMatch(chargeAnalysisJs, /id="chargeEstimateForm"/);
   assert.doesNotMatch(chargeAnalysisJs, /Complemento estimado aos documentos parciais/);
 });
 
-test("review and preliminary simulation happen before the one-time service offer", () => {
-  assert.match(chargeAnalysisJs, /state\.screen = "review"/);
-  assert.match(chargeAnalysisJs, /void openCalculation\(\)/);
+test("automatic analysis and preliminary simulation happen before the one-time service offer", () => {
+  assert.doesNotMatch(chargeAnalysisJs, /state\.screen = "review"/);
+  assert.match(chargeAnalysisJs, /await openCalculation\(\)/);
   assert.match(chargeAnalysisJs, /state\.screen = state\.access\?\.entitled \|\| !calculation\.itemCount \? "result" : "paywall"/);
   assert.match(chargeAnalysisJs, /Você pode ter entre \$\{escapeChargeHtml\(tierRangeLabel\(selectedTier\)\)\} para receber/);
   assert.match(chargeAnalysisJs, /No momento, atendemos casos a partir de R\$ 4\.999,99/);
@@ -574,13 +576,12 @@ test("calculation uses only confirmed non-recognized documentary occurrences", (
   assert.equal(calculation.excludedWithoutAmount, 0);
 });
 
-test("false negatives can only be recovered by searching existing attachments", () => {
-  assert.match(chargeAnalysisJs, /Indicar uma cobrança para procurar nos meus anexos/);
-  assert.match(chargeAnalysisJs, /\/api\/itau-refund\/cases\/search/);
-  assert.match(chargeAnalysisJs, /não localizada nos documentos enviados/);
-  assert.match(chargeAnalysisJs, /caseIds: state\.caseBatches\.map/);
+test("automatic catalog flow has no manual candidate insertion or confirmation", () => {
+  assert.doesNotMatch(chargeAnalysisJs, /Indicar uma cobrança para procurar nos meus anexos/);
+  assert.doesNotMatch(chargeAnalysisJs, /\/api\/itau-refund\/cases\/search/);
   assert.doesNotMatch(chargeAnalysisJs, /Adicionar cobrança que não apareceu/);
   assert.doesNotMatch(chargeAnalysisJs, /name="(?:amount|date)"/);
+  assert.doesNotMatch(chargeAnalysisJs, /answer-candidate|confirm-review/);
 });
 
 test("guided documentary journey hands evidenced charges to JEC model 1", () => {

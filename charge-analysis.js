@@ -349,13 +349,9 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   } else if (selectedFileCount > 0 && !analysisComplete) {
     message = "Documentos selecionados. Falta concluir a análise dos anexos.";
   } else if (analysisComplete && !audit.candidateCount) {
-    message = "Análise concluída, mas nenhuma ocorrência foi localizada. Refine a busca ou envie mais documentos.";
-  } else if (analysisComplete && audit.pendingCount > 0) {
-    message = `Falta revisar ${audit.pendingCount} ${audit.pendingCount === 1 ? "ocorrência" : "ocorrências"}.`;
-  } else if (reviewComplete && !calculationOpened) {
-    message = "Revisão concluída. Confirme para abrir o cálculo documental.";
+    message = "Análise concluída, mas nenhuma ocorrência do catálogo foi localizada. Envie mais documentos para ampliar o período analisado.";
   } else if (calculationOpened && !calculation.itemCount) {
-    message = "Revisão concluída, mas nenhuma cobrança não reconhecida foi confirmada para cálculo.";
+    message = "Análise concluída, mas nenhuma cobrança compatível com o catálogo pôde ser calculada.";
   } else if (calculationOpened && !recoveryStarted) {
     message = "Cálculo documental concluído. Falta iniciar e revisar a preparação dos documentos.";
   } else if (recoveryStarted && !documentPrepared) {
@@ -468,9 +464,9 @@ export function buildChargeJecHandoff({
       !hasRequiredDocuments
         ? "Anexe ao menos uma fatura ou extrato antes de preparar a documentação jurídica."
         : disputedCount === 0
-        ? "Confirme ao menos uma cobrança não reconhecida antes de preparar a documentação."
+        ? "Nenhuma cobrança compatível com o catálogo foi localizada nos documentos."
         : pendingCount > 0
-          ? "Revise todos os lançamentos encontrados antes de preparar a documentação."
+          ? "Existem lançamentos sem classificação automática."
           : "",
     caseData: {
       ...caseData,
@@ -502,7 +498,7 @@ export function buildChargeJecHandoff({
       notes: [
         !hasRequiredDocuments
           ? "Nenhum cálculo ou encaminhamento jurídico deve ser preparado sem ao menos uma fatura ou extrato."
-          : "A apuração usa somente cobranças documentadas e marcadas como não reconhecidas.",
+          : "A apuração usa somente cobranças documentadas compatíveis com as cinco famílias configuradas.",
       ],
       disclaimer:
         "A repetição em dobro, os danos e o valor da causa dependem de revisão jurídica e decisão judicial.",
@@ -1298,7 +1294,7 @@ if (stage) {
     state.busy = true;
     state.error = "";
     state.calculationWarning = "";
-    renderReview();
+    renderAnalyzing();
     try {
       await loadCalculationIndices();
     } catch (error) {
@@ -1637,93 +1633,6 @@ if (stage) {
     return true;
   }
 
-  function candidateMarkup(candidate, caseId) {
-    const answer = String(candidate.answer || "pending");
-    const date = String(candidate.date || "");
-    const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(date)
-      ? new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`))
-      : "Data não identificada";
-    const directed = candidate.origin === "directed_search";
-    return `
-      <article class="charge-result-candidate ${directed ? "directed" : "automatic"}">
-        <div>
-          <span class="charge-candidate-origin">${directed ? "Localizada por busca dirigida" : "Detectada automaticamente"}</span>
-          <strong>${escapeChargeHtml(candidate.label || candidate.description || "Cobrança a revisar")}</strong>
-          <small>${escapeChargeHtml(dateLabel)} · ${escapeChargeHtml(candidate.category || "lançamento")}</small>
-          <small class="charge-candidate-evidence">Evidência: ${escapeChargeHtml(candidate.evidence || candidate.reason || "Descrição compatível encontrada no documento.")}</small>
-        </div>
-        <b>${candidate.amount == null ? "Valor não identificado" : formatChargeCurrency(candidate.amount)}</b>
-        <div class="charge-result-answer" role="group" aria-label="Você reconhece esta contratação?">
-          <small>Você reconhece esta contratação?</small>
-          ${[
-            ["recognized", "Reconheço"],
-            ["not_recognized", "Não reconheço"],
-            ["unknown", "Não sei"],
-          ]
-            .map(
-              ([value, label]) => `
-                <button
-                  type="button"
-                  class="${answer === value ? "active" : ""} ${value === "not_recognized" && answer === value ? "danger" : ""}"
-                  data-charge-action="answer-candidate"
-                  data-charge-case="${escapeChargeHtml(candidate.sourceCaseId || caseId)}"
-                  data-charge-candidate="${escapeChargeHtml(candidate.id)}"
-                  data-charge-answer="${value}"
-                  ${state.busy ? "disabled" : ""}
-                >${label}</button>
-              `,
-            )
-            .join("")}
-        </div>
-      </article>
-    `;
-  }
-
-  function candidateGroupsMarkup(candidates = [], caseId = "") {
-    const groups = new Map();
-    for (const candidate of candidates) {
-      const source = candidate.sourceFileName || "Documento sem nome";
-      if (!groups.has(source)) groups.set(source, []);
-      groups.get(source).push(candidate);
-    }
-    return [...groups.entries()]
-      .map(([source, items]) => `
-        <section class="charge-review-file" aria-label="Lançamentos de ${escapeChargeHtml(source)}">
-          <header>
-            <div><small>Arquivo de origem</small><strong>${escapeChargeHtml(source)}</strong></div>
-            <span>${items.length} ${items.length === 1 ? "ocorrência" : "ocorrências"}</span>
-          </header>
-          ${items.map((candidate) => candidateMarkup(candidate, caseId)).join("")}
-        </section>
-      `)
-      .join("");
-  }
-
-  function directedSearchMarkup() {
-    const search = state.directedSearch;
-    return `
-      <section class="charge-directed-search" aria-label="Busca dirigida nos anexos">
-        <div>
-          <strong>Não encontrou a cobrança que suspeita?</strong>
-          <p>Informe apenas como ela aparece ou uma variação do nome. A IA AUDITA procurará nos documentos já enviados; você não informa valor nem data.</p>
-        </div>
-        ${
-          search.open
-            ? `<form id="chargeDirectedSearchForm">
-                <label for="chargeDirectedSearchQuery">Nome ou descrição da cobrança</label>
-                <div>
-                  <input id="chargeDirectedSearchQuery" name="query" maxlength="120" minlength="3" value="${escapeChargeHtml(search.query)}" placeholder="Ex.: StreamPlay, proteção horizonte" required />
-                  <button type="submit" class="primary-action" ${search.busy ? "disabled" : ""}>${search.busy ? "Procurando..." : "Procurar nos anexos"}</button>
-                </div>
-              </form>`
-            : `<button type="button" class="secondary-action" data-charge-action="open-directed-search">Indicar uma cobrança para procurar nos meus anexos</button>`
-        }
-        ${search.message ? `<p class="charge-directed-search-message" role="status">${escapeChargeHtml(search.message)}</p>` : ""}
-        ${search.error ? `<p class="charge-directed-search-error" role="alert">${escapeChargeHtml(search.error)}</p>` : ""}
-      </section>
-    `;
-  }
-
   function aggregateChargeCases(cases = []) {
     const validCases = cases.filter(Boolean);
     const candidates = validCases.flatMap((caseData) =>
@@ -1763,43 +1672,6 @@ if (stage) {
     };
   }
 
-  function renderReview() {
-    const caseData = state.caseData || {};
-    const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
-    const audit = buildChargeAuditSnapshot(caseData);
-
-    stage.innerHTML = `
-      <div class="charge-result-heading">
-        <div>
-          <p class="eyebrow">Revisão dos documentos</p>
-          <h3>Confirme cada ocorrência localizada</h3>
-          <p>Revise descrição, data, valor, evidência e arquivo de origem. O cálculo só será aberto depois desta confirmação.</p>
-        </div>
-        <span>${audit.pendingCount} pendente${audit.pendingCount === 1 ? "" : "s"}</span>
-      </div>
-
-      <section class="charge-result-candidates" aria-label="Lançamentos encontrados">
-        ${
-          candidates.length
-            ? candidateGroupsMarkup(candidates, caseData.id)
-            : `
-              <div class="charge-analysis-empty">
-                <strong>Nenhuma descrição conhecida foi localizada.</strong>
-                <p>Isso não certifica que os documentos estejam corretos. Você pode indicar um nome para a IA AUDITA procurar nos próprios anexos.</p>
-              </div>
-            `
-        }
-      </section>
-
-      ${directedSearchMarkup()}
-
-      <div class="charge-result-actions">
-        <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
-        <button type="button" class="primary-action" data-charge-action="confirm-review" ${!candidates.length || audit.pendingCount ? "disabled" : ""}>Confirmar revisão e calcular</button>
-      </div>
-    `;
-  }
-
   function renderResult() {
     const calculation = currentCalculation();
     const tiers = itauServiceTiers();
@@ -1810,14 +1682,14 @@ if (stage) {
     const isPartialHistory = state.documentAvailability === "partial";
     const reportFooter = isPartialHistory
       ? "Esta apuração é parcial e limitada aos documentos enviados. Ela não comprova integralmente períodos ausentes e não contém estimativas."
-      : "Esta apuração usa somente os lançamentos presentes nos documentos enviados e confirmados como não reconhecidos.";
+      : "Esta apuração usa somente os lançamentos presentes nos documentos enviados e compatíveis com as cinco famílias analisadas.";
 
     stage.innerHTML = `
       <div class="charge-result-heading">
         <div>
           <p class="eyebrow">Simulação concluída</p>
           <h3>${selectedTier ? `Você pode ter entre ${escapeChargeHtml(tierRangeLabel(selectedTier))} para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
-          <p>${selectedTier ? "A faixa considera somente cobranças encontradas nos anexos e confirmadas por você como não reconhecidas." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
+          <p>${selectedTier ? "A faixa considera somente cobranças encontradas nos anexos e compatíveis com as cinco famílias analisadas." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
         </div>
       </div>
 
@@ -1829,7 +1701,7 @@ if (stage) {
       </section>
 
       <div class="charge-result-actions">
-        <button type="button" class="secondary-action" data-charge-action="back-to-review">Voltar à revisão</button>
+        <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
         ${selectedTier ? documentationActionMarkup() : ""}
       </div>
     `;
@@ -2373,7 +2245,6 @@ if (stage) {
     else if (state.screen === "analyzing") renderAnalyzing();
     else if (state.screen === "paywall") renderPaywall();
     else if (state.screen === "lawyer-kit") renderLawyerKit();
-    else if (state.screen === "review") renderReview();
     else if (state.screen === "result") renderResult();
     else if (state.screen === "recovery") renderRecovery();
     else if (state.screen === "ended") renderEnded();
@@ -2448,110 +2319,14 @@ if (stage) {
       state.caseBatches = analyzedCases;
       state.caseData = aggregateChargeCases(analyzedCases);
       resetDirectedSearch();
-      state.screen = "review";
+      state.busy = false;
+      await openCalculation();
     } catch (error) {
       state.screen = "upload";
       state.error = error?.message || "Falha ao analisar o documento.";
     } finally {
       state.busy = false;
       render();
-    }
-  }
-
-  async function updateCandidate(button) {
-    const sourceCaseId = button.dataset.chargeCase;
-    const sourceCase = state.caseBatches.find((item) => item.id === sourceCaseId);
-    const candidate = sourceCase?.candidates?.find(
-      (item) => item.id === button.dataset.chargeCandidate,
-    ) || state.caseData?.candidates?.find((item) => item.id === button.dataset.chargeCandidate);
-    if (!candidate || state.busy) return;
-
-    candidate.answer = button.dataset.chargeAnswer;
-    state.busy = true;
-    state.error = "";
-    render();
-    try {
-      const response = await fetch(
-        `/api/itau-refund/cases/${encodeURIComponent(sourceCaseId || state.caseData.id)}`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json" },
-          body: JSON.stringify({
-            candidateAnswers: Object.fromEntries(
-              (sourceCase?.candidates || state.caseData.candidates).map((item) => [item.id, item.answer]),
-            ),
-          }),
-        },
-      );
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na IA AUDITA para continuar a análise.");
-      }
-      if (!response.ok || !data.case) {
-        throw new Error("A resposta não pôde ser sincronizada agora.");
-      }
-      if (sourceCase) {
-        const index = state.caseBatches.findIndex((item) => item.id === data.case.id);
-        if (index >= 0) state.caseBatches[index] = data.case;
-        state.caseData = aggregateChargeCases(state.caseBatches);
-      } else {
-        state.caseBatches = [data.case];
-        state.caseData = aggregateChargeCases(state.caseBatches);
-      }
-    } catch (error) {
-      state.error = error?.message || "Falha ao atualizar a análise.";
-    } finally {
-      state.busy = false;
-      render();
-    }
-  }
-
-  async function searchDirectedCharge(form) {
-    if (state.directedSearch.busy) return;
-    const query = String(new FormData(form).get("query") || "").replace(/\s+/g, " ").trim();
-    if (query.length < 3) {
-      state.directedSearch.error = "Informe ao menos 3 caracteres para procurar nos anexos.";
-      renderReview();
-      return;
-    }
-    state.directedSearch = {
-      ...state.directedSearch,
-      query,
-      busy: true,
-      message: "",
-      error: "",
-    };
-    renderReview();
-    try {
-      const response = await fetch("/api/itau-refund/cases/search", {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({
-          caseIds: state.caseBatches.map((item) => item.id),
-          query,
-        }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na IA AUDITA para procurar nos documentos.");
-      }
-      if (!response.ok || !Array.isArray(data.cases)) {
-        throw new Error(data.message || "Não foi possível procurar nos documentos agora.");
-      }
-      state.caseBatches = data.cases;
-      state.caseData = aggregateChargeCases(data.cases);
-      const count = Array.isArray(data.matches) ? data.matches.length : 0;
-      state.directedSearch.message = count
-        ? `${count} ${count === 1 ? "ocorrência localizada" : "ocorrências localizadas"} nos documentos enviados. Revise abaixo antes de confirmar.`
-        : `“${query}” não localizada nos documentos enviados. Refine a descrição ou anexe mais extratos.`;
-      state.directedSearch.error = "";
-    } catch (error) {
-      state.directedSearch.error = error?.message || "Falha ao procurar nos documentos.";
-    } finally {
-      state.directedSearch.busy = false;
-      renderReview();
     }
   }
 
@@ -2685,23 +2460,6 @@ if (stage) {
     } else if (action === "start-recovery") {
       startRecoveryFlow();
       return;
-    } else if (action === "open-directed-search") {
-      state.directedSearch.open = true;
-      state.directedSearch.message = "";
-      state.directedSearch.error = "";
-      renderReview();
-      return;
-    } else if (action === "confirm-review") {
-      const audit = buildChargeAuditSnapshot(state.caseData || {});
-      if (!audit.candidateCount || audit.pendingCount) {
-        state.error = "Revise todas as ocorrências antes de abrir o cálculo.";
-        render();
-        return;
-      }
-      void openCalculation();
-      return;
-    } else if (action === "back-to-review") {
-      state.screen = "review";
     } else if (action === "back-to-result") {
       state.screen = "result";
     } else if (action === "open-recovery-report") {
@@ -2717,9 +2475,6 @@ if (stage) {
       state.recovery.phase = "report";
     } else if (action === "download-report-again") {
       void downloadRecoveryReport();
-      return;
-    } else if (action === "answer-candidate") {
-      updateCandidate(button);
       return;
     }
 
@@ -2756,12 +2511,6 @@ if (stage) {
   });
 
   stage.addEventListener("submit", (event) => {
-    if (event.target.id === "chargeDirectedSearchForm") {
-      event.preventDefault();
-      void searchDirectedCharge(event.target);
-      return;
-    }
-
     if (event.target.id === "chargeRecoveryForm") {
       event.preventDefault();
       void prepareRecoveryReport(event.target);
