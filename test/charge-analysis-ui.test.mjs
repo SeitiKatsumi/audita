@@ -508,7 +508,7 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.match(chargeAnalysisJs, /No momento, atendemos casos a partir de R\$ 4\.999,99/);
   assert.doesNotMatch(chargeAnalysisJs, /Sua simulação documental indica \$\{formatChargeCurrency\(calculation\.estimatedMaterialClaim\)\}/);
   assert.match(chargeAnalysisJs, /Contratação única por caso/);
-  assert.match(chargeAnalysisJs, /data-charge-action="purchase-itau-service"/);
+  assert.match(chargeAnalysisJs, /data-charge-action="continue-itau-service"/);
   assert.doesNotMatch(chargeAnalysisJs, /Standard mensal/);
   assert.doesNotMatch(chargeAnalysisJs, /Standard anual/);
   assert.doesNotMatch(chargeAnalysisJs, /Comparativo ilustrativo/);
@@ -519,7 +519,8 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.match(chargeAnalysisJs, /Continue seu caso com a IA AUDITA/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-audit-table-wrap/);
   assert.match(chargeAnalysisJs, /Não é assinatura: você paga uma única vez para continuar este caso/);
-  assert.match(chargeAnalysisJs, /Contratar e continuar/);
+  assert.match(chargeAnalysisJs, />Continuar<\/button>/);
+  assert.match(chargeAnalysisJs, /action === "continue-itau-service"[\s\S]*state\.screen = "result"/);
   assert.match(chargeAnalysisJs, /\/api\/itau-refund\/checkout/);
   assert.match(chargeAnalysisJs, /audita:itau-checkout-cases/);
   assert.match(chargeAnalysisJs, /itau_checkout/);

@@ -1344,7 +1344,6 @@ if (stage) {
     const claimCents = Math.round(Number(calculation.estimatedClaimValue || 0) * 100);
     const minimumClaimCents = Math.min(...tiers.map((tier) => Number(tier.minimumClaimCents || 0)));
     const belowMinimum = Number.isFinite(minimumClaimCents) && claimCents < minimumClaimCents;
-    const checkoutReady = Boolean(selectedTier?.checkoutAvailable);
     stage.innerHTML = `
       <div class="charge-paywall">
         <section class="charge-paywall-result" role="status">
@@ -1371,10 +1370,10 @@ if (stage) {
                   <strong>${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.price?.cents || 0) / 100))}</strong>
                   <b>${escapeChargeHtml(String(selectedTier.discountPercent))}% de desconto · pagamento único</b>
                 </div>
-                <button type="button" class="primary-action" data-charge-action="purchase-itau-service" ${state.busy || !checkoutReady ? "disabled" : ""}>${state.busy ? "Abrindo checkout..." : "Contratar e continuar"}</button>
+                <button type="button" class="primary-action" data-charge-action="continue-itau-service" ${state.busy ? "disabled" : ""}>Continuar</button>
               </article>
           </section>` : ""}
-        ${selectedTier && !checkoutReady ? `<p class="charge-paywall-demo" role="note">A contratação está temporariamente indisponível. Tente novamente mais tarde.</p>` : ""}
+        ${selectedTier ? `<p class="charge-paywall-demo" role="note">Fluxo liberado temporariamente para validação.</p>` : ""}
         <p class="charge-paywall-legal-note">A simulação é preliminar e não garante restituição, indenização ou êxito judicial. Custas, consultas de terceiros e representação jurídica não estão incluídas, salvo informação expressa.</p>
         <div class="charge-result-actions"><button type="button" class="secondary-action" data-charge-action="new-document">Voltar aos documentos</button></div>
       </div>
@@ -1422,7 +1421,7 @@ if (stage) {
           { title: "Processo completo", available: true },
           { title: "Sentença", available: true },
           { title: "Homologação do acordo", available: true },
-          { title: "Decisão de suspensão por 24 meses", available: true },
+          { title: "Decisão de suspensão do processo", available: true },
         ];
     const entitled = Boolean(state.lawyerKit.access?.entitled);
     const price = Number(product?.price?.cents || 39999) / 100;
@@ -2483,9 +2482,8 @@ if (stage) {
       resetRecovery();
       state.documentAvailability = "";
       state.screen = "documents";
-    } else if (action === "purchase-itau-service") {
-      void purchaseItauService();
-      return;
+    } else if (action === "continue-itau-service") {
+      state.screen = "result";
     } else if (action === "purchase-lawyer-kit") {
       void purchaseLawyerKit();
       return;

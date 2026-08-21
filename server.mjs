@@ -102,13 +102,13 @@ const itauLawyerKitDocuments = Object.freeze([
   },
   {
     slug: "suspensao-24-meses",
-    title: "Despacho de suspensão do processo por 24 meses",
+    title: "Decisão de suspensão do processo",
     fileName: "suspensao-24-meses.pdf",
     downloadName: "ia-audita-decisao-suspensao-24-meses.pdf",
   },
   {
     slug: "jurisprudencia-acordo-voto",
-    title: "Jurisprudência / Acordo / Voto",
+    title: "Jurisprudências e Apelações",
     fileName: "",
     downloadName: "",
   },
