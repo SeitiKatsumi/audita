@@ -585,8 +585,29 @@ if (stage) {
   });
   faqDialog?.addEventListener("close", () => faqButton?.focus());
 
-  const RECOVERY_TESTIMONY_FIRST_QUESTION =
-    "Para começar, conte com suas palavras o que aconteceu e como você percebeu essa cobrança.";
+  const RECOVERY_TESTIMONY_TOPICS = Object.freeze([
+    {
+      title: "Identificação",
+      summary: "Como descobriu a cobrança e quando isso aconteceu.",
+      question: "Como você descobriu a cobrança e quando isso aconteceu? Se a descoberta foi confirmada pelo Relatório Técnico de Auditoria Financeira, informe a data exata ou o mês e o ano.",
+    },
+    {
+      title: "Descrição do lançamento",
+      summary: "Nome exato, valores, quantidade e documentos relacionados.",
+      question: "Qual é o nome exato do lançamento como aparece na fatura ou no extrato, qual era o valor unitário ou total acumulado e quantas cobranças você identificou? Os documentos já enviados serão associados automaticamente ao relato.",
+    },
+    {
+      title: "Origem e contratação",
+      summary: "Origem da cobrança e existência de autorização.",
+      question: "Você contratou ou autorizou esses lançamentos? Conte o que sabe sobre a origem da cobrança.",
+    },
+    {
+      title: "Tentativa de solução",
+      summary: "Atendimento ao banco, resposta e protocolo, se houver.",
+      question: "Você reclamou ou buscou atendimento no banco? Se sim, informe o canal, a data, a resposta e o protocolo; se não tiver ou não lembrar, diga isso.",
+    },
+  ]);
+  const RECOVERY_TESTIMONY_FIRST_QUESTION = RECOVERY_TESTIMONY_TOPICS[0].question;
 
   function emptyRecoveryTestimony() {
     return {
@@ -1327,7 +1348,7 @@ if (stage) {
   }
 
   function tierRangeLabel(tier) {
-    if (tier?.id === "itau-cobrancas-faixa-1") return "R$ 5 mil e R$ 10 mil";
+    if (tier?.id === "itau-cobrancas-faixa-1") return "R$ 2.999 e R$ 10 mil";
     if (tier?.id === "itau-cobrancas-faixa-2") return "R$ 10 mil e R$ 20 mil";
     if (tier?.id === "itau-cobrancas-faixa-3") return "R$ 20 mil e R$ 32 mil";
     const minimum = Number(tier.minimumClaimCents || 0) / 100;
@@ -1351,7 +1372,7 @@ if (stage) {
           <div>
             <p class="eyebrow">Simulação preliminar concluída</p>
             <h3>${selectedTier ? `Você pode ter entre ${escapeChargeHtml(tierRangeLabel(selectedTier))} para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
-            <p>${selectedTier ? "Contrate este caso para continuar com o relatório técnico e os próximos passos." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
+            ${selectedTier ? "" : `<p>${belowMinimum ? `No momento, atendemos casos a partir de ${escapeChargeHtml(formatChargeCurrency(minimumClaimCents / 100))}.` : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>`}
           </div>
         </section>
 
@@ -1362,15 +1383,28 @@ if (stage) {
             <p>Não é assinatura: você paga uma única vez para continuar este caso.</p>
           </div>
           <section id="chargePaywallPlans" class="charge-paywall-plans charge-paywall-tiers" aria-label="Oferta do serviço de cobranças indevidas">
-              <article class="recommended selected">
-                <div>
-                  <span>${escapeChargeHtml(selectedTier.name)} <em>Sua faixa</em></span>
-                  <p>Simulação entre ${escapeChargeHtml(tierRangeLabel(selectedTier))}</p>
+              <article class="charge-tier-card recommended selected">
+                <div class="charge-tier-content">
+                  <header class="charge-tier-heading">
+                    <h3>${escapeChargeHtml(selectedTier.name)}</h3>
+                    <em>Sua faixa</em>
+                  </header>
+                  <p class="charge-tier-description">Como o relatório gerou um provável valor a receber <strong>ATUALIZADO</strong> entre ${escapeChargeHtml(tierRangeLabel(selectedTier))}, o valor para adesão será:</p>
+                  <p class="charge-tier-exclusive-offer">OFERTA EXCLUSIVA DE PRIMEIRA COMPRA · POR TEMPO LIMITADO</p>
                   <small class="charge-tier-full-price">De ${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.fullPrice?.cents || 0) / 100))}</small>
-                  <strong>${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.price?.cents || 0) / 100))}</strong>
-                  <b>${escapeChargeHtml(String(selectedTier.discountPercent))}% de desconto · pagamento único</b>
+                  <b class="charge-tier-discount">${escapeChargeHtml(String(selectedTier.discountPercent))}% DE DESCONTO NA PRIMEIRA COMPRA</b>
+                  <strong class="charge-tier-price">${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.price?.cents || 0) / 100))}</strong>
+                  <b class="charge-tier-installments">em 10x no cartão sem juros!</b>
+                  <ul class="charge-tier-inclusions" aria-label="Itens incluídos na contratação">
+                    <li>
+                      <strong>Relatório Técnico de Auditoria Financeira</strong>
+                      <span>Atualiza mês a mês e levanta todas as parcelas debitadas, apura <b>juros, correção monetária, repetição do indébito e perdas e danos</b>, gerando os valores finais atualizados que servirão de base para a ação judicial.</span>
+                    </li>
+                    <li>Elaboração, assinatura e protocolo da petição</li>
+                    <li>Acompanhamento jurídico completo da ação até a Câmara Recursal</li>
+                  </ul>
                 </div>
-                <button type="button" class="primary-action" data-charge-action="continue-itau-service" ${state.busy ? "disabled" : ""}>Continuar</button>
+                <button type="button" class="primary-action" data-charge-action="continue-itau-service" ${state.busy ? "disabled" : ""}>Comprar agora</button>
               </article>
           </section>` : ""}
         ${selectedTier ? `<p class="charge-paywall-demo" role="note">Fluxo liberado temporariamente para validação.</p>` : ""}
@@ -1696,7 +1730,7 @@ if (stage) {
         <div>
           <p class="eyebrow">Simulação concluída</p>
           <h3>${selectedTier ? `Você pode ter entre ${escapeChargeHtml(tierRangeLabel(selectedTier))} para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
-          <p>${selectedTier ? "A faixa considera repetição em dobro, correção, juros e danos morais sugeridos para revisão." : belowMinimum ? "No momento, atendemos casos a partir de R$ 4.999,99." : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
+          <p>${selectedTier ? "A faixa considera repetição em dobro, correção, juros e danos morais sugeridos para revisão." : belowMinimum ? `No momento, atendemos casos a partir de ${escapeChargeHtml(formatChargeCurrency(minimumClaimCents / 100))}.` : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
         </div>
       </div>
 
@@ -1868,9 +1902,10 @@ if (stage) {
     const testimony = state.recovery.testimony || {};
     const turns = Array.isArray(testimony.turns) ? testimony.turns : [];
     const hasRefinedText = Boolean(testimony.refined);
-    const questionNumber = Math.min(turns.length + 1, 3);
+    const questionNumber = Math.min(turns.length + 1, RECOVERY_TESTIMONY_TOPICS.length);
+    const activeTopic = RECOVERY_TESTIMONY_TOPICS[questionNumber - 1];
     const transcript = turns
-      .map((turn) => `${assistantMessage(`<p>${escapeChargeHtml(turn.question)}</p>`, "IA AUDITA · Depoimento")}${userMessage(turn.answer)}`)
+      .map((turn, index) => `${assistantMessage(`<p>${escapeChargeHtml(turn.question)}</p>`, `IA AUDITA · ${RECOVERY_TESTIMONY_TOPICS[index]?.title || "Relato"}`)}${userMessage(turn.answer)}`)
       .join("");
     return `
       <form class="charge-recovery-form charge-recovery-testimony" id="chargeRecoveryTestimonyForm" aria-busy="${state.recovery.busy}">
@@ -1878,16 +1913,27 @@ if (stage) {
         <div class="charge-recovery-form-heading">
           <div>
             <p class="eyebrow">Relato pessoal</p>
-            <h3>Converse com a IA AUDITA sobre o que aconteceu</h3>
+            <h3>Conte os fatos em quatro tópicos</h3>
           </div>
-          <span>${hasRefinedText ? "Síntese pronta" : `Pergunta ${questionNumber} de até 3`}</span>
+          <span>${hasRefinedText ? "Síntese pronta" : `Tópico ${questionNumber} de ${RECOVERY_TESTIMONY_TOPICS.length}`}</span>
         </div>
-        <p class="charge-recovery-form-intro">Conte somente o que você sabe. A IA fará no máximo duas perguntas complementares e não repetirá informações já respondidas.</p>
+        <p class="charge-recovery-form-intro">Responda somente o que souber. Os documentos já enviados serão associados automaticamente e a tentativa de solução não é requisito para avançar.</p>
+        <ol class="charge-testimony-topics" aria-label="Tópicos do relato pessoal">
+          ${RECOVERY_TESTIMONY_TOPICS.map((topic, index) => `
+            <li class="${hasRefinedText || index < turns.length ? "is-complete" : index === questionNumber - 1 ? "is-active" : ""}">
+              <span>${index + 1}</span>
+              <div>
+                <strong>${escapeChargeHtml(topic.title)}</strong>
+                <small>${escapeChargeHtml(topic.summary)}</small>
+              </div>
+            </li>
+          `).join("")}
+        </ol>
         <div class="charge-analysis-conversation charge-testimony-dialogue" aria-label="Conversa para coleta do depoimento">
           ${transcript}
           ${hasRefinedText
             ? assistantMessage("<p><strong>Organizei o seu relato.</strong> Revise a versão abaixo antes de gerar o PDF.</p>", "IA AUDITA · Depoimento")
-            : assistantMessage(`<p><strong>${escapeChargeHtml(testimony.currentQuestion || RECOVERY_TESTIMONY_FIRST_QUESTION)}</strong></p>`, "IA AUDITA · Depoimento")}
+            : assistantMessage(`<p><strong>${escapeChargeHtml(testimony.currentQuestion || RECOVERY_TESTIMONY_FIRST_QUESTION)}</strong></p>`, `IA AUDITA · ${activeTopic?.title || "Relato"}`)}
           ${state.recovery.busy ? typingMessage() : ""}
         </div>
         ${!hasRefinedText ? `
@@ -2154,7 +2200,7 @@ if (stage) {
             reviewed: false,
           };
     } catch (error) {
-      state.recovery.testimony = testimony;
+      state.recovery.testimony = { ...testimony, turns };
       state.recovery.error = error?.message || "Falha ao continuar o depoimento.";
     } finally {
       state.recovery.busy = false;

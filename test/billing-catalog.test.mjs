@@ -152,16 +152,16 @@ test("Itaú service catalog exposes three one-time promotional tiers", () => {
       tier.checkoutAvailable,
     ]),
     [
-      [499999, 1000000, 39800, 19900, 50, true],
-      [1000001, 2000000, 66500, 39900, 40, true],
+      [299900, 1000000, 39800, 19900, 50, true],
+      [1000001, 2000000, 79999, 39999, 50, true],
       [2000001, 3200000, 85571, 59900, 30, true],
     ],
   );
 });
 
 test("Itaú service tier is selected from the authoritative claim amount", () => {
-  assert.equal(resolveItauChargeServiceTier(499998), null);
-  assert.equal(resolveItauChargeServiceTier(499999)?.id, "itau-cobrancas-faixa-1");
+  assert.equal(resolveItauChargeServiceTier(299899), null);
+  assert.equal(resolveItauChargeServiceTier(299900)?.id, "itau-cobrancas-faixa-1");
   assert.equal(resolveItauChargeServiceTier(1000000)?.id, "itau-cobrancas-faixa-1");
   assert.equal(resolveItauChargeServiceTier(1000001)?.id, "itau-cobrancas-faixa-2");
   assert.equal(resolveItauChargeServiceTier(2000001)?.id, "itau-cobrancas-faixa-3");
@@ -177,7 +177,7 @@ test("Itaú service checkout resolves a one-time Stripe price", () => {
 
   assert.equal(selection.kind, "itau_charge_service");
   assert.equal(selection.priceId, "price_itau_tier_2");
-  assert.equal(selection.amount.cents, 39900);
+  assert.equal(selection.amount.cents, 39999);
   assert.equal(selection.credits, 0);
 });
 

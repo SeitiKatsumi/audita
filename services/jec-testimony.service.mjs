@@ -3,7 +3,13 @@ import OpenAI from "openai";
 const DEFAULT_MODEL = "gpt-5-mini";
 const MIN_TESTIMONY_LENGTH = 40;
 const MAX_TESTIMONY_LENGTH = 5_000;
-const MAX_TESTIMONY_QUESTIONS = 3;
+const TESTIMONY_QUESTIONS = Object.freeze([
+  "Como você descobriu a cobrança e quando isso aconteceu? Se a descoberta foi confirmada pelo Relatório Técnico de Auditoria Financeira, informe a data exata ou o mês e o ano.",
+  "Qual é o nome exato do lançamento como aparece na fatura ou no extrato, qual era o valor unitário ou total acumulado e quantas cobranças você identificou? Os documentos já enviados serão associados automaticamente ao relato.",
+  "Você contratou ou autorizou esses lançamentos? Conte o que sabe sobre a origem da cobrança.",
+  "Você reclamou ou buscou atendimento no banco? Se sim, informe o canal, a data, a resposta e o protocolo; se não tiver ou não lembrar, diga isso.",
+]);
+const MAX_TESTIMONY_QUESTIONS = TESTIMONY_QUESTIONS.length;
 
 export class JecTestimonyError extends Error {
   constructor(code, message, statusCode = 400) {
@@ -46,7 +52,8 @@ function refinementInstructions() {
   return [
     "Você revisa o relato pessoal de um consumidor brasileiro para inclusão em um Relatório Técnico de Auditoria.",
     "Reescreva em primeira pessoa, com linguagem clara, formal e natural, preservando a individualidade do relato.",
-    "Organize os fatos em ordem cronológica quando o texto permitir.",
+    "Organize os fatos em ordem cronológica e cubra, quando informados: identificação da descoberta e data; descrição, valores e quantidade dos lançamentos; origem e autorização; tentativa de solução e protocolo.",
+    "A tentativa de solução é informação opcional. Não trate reclamação prévia ou protocolo como requisito.",
     "Não invente, complete ou presuma datas, valores, produtos, períodos, protocolos, contatos, danos, sentimentos ou consequências.",
     "Não acrescente fundamentos jurídicos, pedidos, acusações ou conclusões que não estejam no relato.",
     "Não transforme dúvida em certeza e não afirme ausência de contratação se o consumidor não tiver dito isso.",
@@ -55,31 +62,17 @@ function refinementInstructions() {
   ].join("\n");
 }
 
-function conversationInstructions(questionCount) {
+function conversationInstructions() {
   return [
-    "Você conduz uma entrevista curta para registrar o relato pessoal de um consumidor brasileiro.",
-    `Esta é a pergunta ${questionCount} de no máximo ${MAX_TESTIMONY_QUESTIONS}.`,
-    "Analise somente as respostas do consumidor e não repita perguntas já respondidas.",
-    "Verifique se o relato informa, quando o consumidor souber: desde quando se lembra da cobrança, qual serviço aparece, quanto pagava por mês e se afirma que nunca contratou ou autorizou o serviço.",
-    "Se faltar informação importante e ainda houver pergunta disponível, faça UMA pergunta curta apenas sobre o que falta. Não peça senha, número de cartão, dado bancário ou fato já informado.",
-    "Se os fatos essenciais estiverem presentes, ou se esta for a terceira pergunta, conclua e redija o relato em primeira pessoa, com linguagem clara, formal, natural e em ordem cronológica.",
+    "Você organiza o relato pessoal de um consumidor brasileiro após uma entrevista dividida em quatro tópicos.",
+    "Use as respostas nesta ordem: 1. identificação da descoberta e data; 2. descrição, valores, quantidade e documentos dos lançamentos; 3. origem e autorização; 4. tentativa de solução e protocolo, se houver.",
+    "Redija o relato em primeira pessoa, com linguagem clara, formal, natural e em ordem cronológica.",
+    "A tentativa de solução é informação opcional. Não trate reclamação prévia ou protocolo como requisito.",
     "Não invente, complete ou presuma datas, valores, produtos, períodos, protocolos, danos, sentimentos ou consequências.",
     "Não acrescente fundamentos jurídicos, pedidos, acusações ou conclusões. Não transforme dúvida em certeza.",
-    "Em follow_up, preencha question e deixe refined vazio. Em complete, preencha refined e deixe question vazio.",
+    "Não peça nem inclua senha, número de cartão ou dado bancário.",
+    "Entregue apenas o relato revisado, sem título, notas, listas, markdown ou explicações.",
   ].join("\n");
-}
-
-function conversationSchema() {
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      status: { type: "string", enum: ["follow_up", "complete"] },
-      question: { type: "string" },
-      refined: { type: "string" },
-    },
-    required: ["status", "question", "refined"],
-  };
 }
 
 function normalizeConversationTurns(turns) {
@@ -103,6 +96,14 @@ export function createJecTestimonyService({ env = process.env, clientFactory } =
         );
       }
 
+      if (normalizedTurns.length < MAX_TESTIMONY_QUESTIONS) {
+        return {
+          status: "follow_up",
+          question: TESTIMONY_QUESTIONS[normalizedTurns.length],
+          turns: normalizedTurns,
+        };
+      }
+
       const { apiKey, secretRef, model } = resolveOpenAI(env);
       if (!apiKey && !clientFactory) {
         throw new JecTestimonyError(
@@ -119,35 +120,14 @@ export function createJecTestimonyService({ env = process.env, clientFactory } =
         model,
         max_output_tokens: 1_000,
         reasoning: { effort: "low" },
-        instructions: conversationInstructions(normalizedTurns.length),
+        instructions: conversationInstructions(),
         input: normalizedTurns
           .map((turn, index) => `Pergunta ${index + 1}: ${turn.question}\nResposta: ${turn.answer}`)
           .join("\n\n"),
-        text: {
-          verbosity: "low",
-          format: {
-            type: "json_schema",
-            name: "jec_testimony_conversation",
-            strict: true,
-            schema: conversationSchema(),
-          },
-        },
+        text: { verbosity: "low" },
       });
-      const parsed = JSON.parse(response.output_text || "{}");
-      const question = normalizeJecTestimony(parsed.question, 300);
-      const refined = normalizeJecTestimony(parsed.refined);
-      const mustComplete = normalizedTurns.length >= MAX_TESTIMONY_QUESTIONS;
-
-      if (!mustComplete && parsed.status === "follow_up" && question) {
-        return {
-          status: "follow_up",
-          question,
-          turns: normalizedTurns,
-          model,
-          secretRef,
-        };
-      }
-      if (parsed.status !== "complete" || refined.length < MIN_TESTIMONY_LENGTH) {
+      const refined = normalizeJecTestimony(response.output_text);
+      if (refined.length < MIN_TESTIMONY_LENGTH) {
         throw new JecTestimonyError(
           "jec_testimony_ai_invalid_output",
           "A IA não conseguiu organizar o depoimento. Tente novamente com mais detalhes.",

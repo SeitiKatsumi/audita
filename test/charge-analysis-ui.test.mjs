@@ -505,7 +505,8 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.match(chargeAnalysisJs, /await openCalculation\(\)/);
   assert.match(chargeAnalysisJs, /state\.screen = state\.access\?\.entitled \|\| !calculation\.itemCount \? "result" : "paywall"/);
   assert.match(chargeAnalysisJs, /Você pode ter entre \$\{escapeChargeHtml\(tierRangeLabel\(selectedTier\)\)\} para receber/);
-  assert.match(chargeAnalysisJs, /No momento, atendemos casos a partir de R\$ 4\.999,99/);
+  assert.match(chargeAnalysisJs, /No momento, atendemos casos a partir de \$\{escapeChargeHtml\(formatChargeCurrency\(minimumClaimCents \/ 100\)\)\}/);
+  assert.match(chargeAnalysisJs, /R\$ 2\.999 e R\$ 10 mil/);
   assert.doesNotMatch(chargeAnalysisJs, /Sua simulação documental indica \$\{formatChargeCurrency\(calculation\.estimatedMaterialClaim\)\}/);
   assert.match(chargeAnalysisJs, /Contratação única por caso/);
   assert.match(chargeAnalysisJs, /data-charge-action="continue-itau-service"/);
@@ -519,7 +520,16 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.match(chargeAnalysisJs, /Continue seu caso com a IA AUDITA/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-audit-table-wrap/);
   assert.match(chargeAnalysisJs, /Não é assinatura: você paga uma única vez para continuar este caso/);
-  assert.match(chargeAnalysisJs, />Continuar<\/button>/);
+  assert.match(chargeAnalysisJs, />Comprar agora<\/button>/);
+  assert.match(chargeAnalysisJs, /Relatório Técnico de Auditoria Financeira/);
+  assert.match(chargeAnalysisJs, /Atualiza mês a mês e levanta todas as parcelas debitadas/);
+  assert.match(chargeAnalysisJs, /juros, correção monetária, repetição do indébito e perdas e danos/);
+  assert.match(chargeAnalysisJs, /Elaboração, assinatura e protocolo da petição/);
+  assert.match(chargeAnalysisJs, /Acompanhamento jurídico completo da ação até a Câmara Recursal/);
+  assert.match(chargeAnalysisJs, /OFERTA EXCLUSIVA DE PRIMEIRA COMPRA · POR TEMPO LIMITADO/);
+  assert.match(chargeAnalysisJs, /% DE DESCONTO NA PRIMEIRA COMPRA/);
+  assert.match(chargeAnalysisJs, /em 10x no cartão sem juros!/);
+  assert.doesNotMatch(chargeAnalysisJs, /Não é apenas pedir o estorno/);
   assert.match(chargeAnalysisJs, /action === "continue-itau-service"[\s\S]*state\.screen = "result"/);
   assert.match(chargeAnalysisJs, /\/api\/itau-refund\/checkout/);
   assert.match(chargeAnalysisJs, /audita:itau-checkout-cases/);
@@ -696,11 +706,16 @@ test("app hides the one-page shell until the initial route is ready", () => {
   assert.match(indexHtml, /app\.js\?v=20260818-app-boot-1/);
 });
 
-test("recovery collects testimony in up to three AI questions before user review and PDF", () => {
+test("recovery collects testimony in four guided topics before user review and PDF", () => {
   assert.match(chargeAnalysisJs, /Continuar para o depoimento/);
   assert.match(chargeAnalysisJs, /id="chargeRecoveryTestimonyForm"/);
   assert.match(chargeAnalysisJs, /name="testimonyAnswer" required minlength="2" maxlength="2000"/);
-  assert.match(chargeAnalysisJs, /Pergunta \$\{questionNumber\} de até 3/);
+  assert.match(chargeAnalysisJs, /Tópico \$\{questionNumber\} de \$\{RECOVERY_TESTIMONY_TOPICS\.length\}/);
+  assert.match(chargeAnalysisJs, /Identificação/);
+  assert.match(chargeAnalysisJs, /Descrição do lançamento/);
+  assert.match(chargeAnalysisJs, /Origem e contratação/);
+  assert.match(chargeAnalysisJs, /Tentativa de solução/);
+  assert.match(chargeAnalysisJs, /a tentativa de solução não é requisito para avançar/);
   assert.match(chargeAnalysisJs, /function continueRecoveryTestimony\(form\)/);
   assert.match(chargeAnalysisJs, /body: JSON\.stringify\(\{ turns \}\)/);
   assert.match(chargeAnalysisJs, /name="refinedTestimony" required minlength="40" maxlength="5000"/);
@@ -710,6 +725,7 @@ test("recovery collects testimony in up to three AI questions before user review
   assert.doesNotMatch(chargeAnalysisJs, /data-recovery-submit="pdf"/);
   assert.match(stylesCss, /\.charge-testimony-field textarea/);
   assert.match(stylesCss, /\.charge-testimony-dialogue/);
+  assert.match(stylesCss, /\.charge-testimony-topics/);
   assert.match(stylesCss, /\.charge-testimony-confirmation/);
   assert.match(appJs, /name="originalTestimony" required minlength="40" maxlength="5000"/);
   assert.match(appJs, /data-jec-action="testimony"/);

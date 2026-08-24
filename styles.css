@@ -3502,7 +3502,8 @@ h2 {
 }
 
 .charge-paywall-plans.charge-paywall-tiers {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 680px);
+  justify-content: center;
 }
 
 .charge-paywall-plans > article {
@@ -3517,54 +3518,130 @@ h2 {
   box-shadow: inset 0 3px 0 #35e6a1;
 }
 
-.charge-paywall-plans article > div > span {
-  display: block;
+.charge-tier-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.charge-tier-heading h3 {
+  margin: 0;
   color: #63f3af;
+  font-size: 28px;
   font-weight: 700;
 }
 
-.charge-paywall-plans article > div > span em {
+.charge-tier-heading em {
   display: inline-block;
-  margin-left: 6px;
-  padding: 3px 7px;
-  border: 1px solid rgba(99, 243, 175, 0.44);
+  padding: 5px 14px;
   border-radius: 999px;
-  color: #baffd7;
-  font-size: 11px;
+  color: #d9f3ff;
+  background: #17516b;
+  font-size: 14px;
   font-style: normal;
   line-height: 1.2;
-  vertical-align: 2px;
+}
+
+.charge-tier-description {
+  margin: 18px 0 0;
+  font-size: 16px;
+}
+
+.charge-tier-exclusive-offer {
+  margin: 24px 0 0;
+  padding: 12px 16px;
+  border: 1px solid #35e6a1;
+  border-radius: 10px;
+  color: #35e6a1 !important;
+  background: rgba(53, 230, 161, 0.1);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .charge-tier-full-price {
   display: block;
-  margin-top: 14px;
-  color: #89a6ba;
-  font-size: 13px;
+  width: fit-content;
+  margin-top: 20px;
+  color: #ff6e75;
+  font-size: 24px;
+  font-weight: 700;
   text-decoration: line-through;
 }
 
-.charge-paywall-tiers article > div > b,
+.charge-tier-discount,
+.charge-tier-installments,
 .charge-tier-range-note {
   display: block;
-  color: #bfefff;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.5;
+}
+
+.charge-tier-discount {
+  color: #35e6a1;
+  text-transform: uppercase;
+}
+
+.charge-tier-installments {
+  color: #36c6ff;
 }
 
 .charge-tier-range-note {
   margin-top: auto;
+  color: #bfefff;
 }
 
-.charge-paywall-plans strong {
+.charge-paywall-plans .charge-tier-inclusions {
+  display: grid;
+  gap: 22px;
+  margin: 28px 0 0;
+  padding: 24px 0 0;
+  border-top: 1px solid rgba(99, 243, 175, 0.2);
+  list-style: none;
+}
+
+.charge-tier-inclusions li {
+  position: relative;
+  padding-left: 30px;
+  color: #d7e3ec;
+}
+
+.charge-tier-inclusions li::before {
+  position: absolute;
+  top: 1px;
+  left: 0;
+  color: #63f3af;
+  font-size: 18px;
+  font-weight: 800;
+  content: "✓";
+}
+
+.charge-tier-inclusions li > strong,
+.charge-tier-inclusions li > span {
   display: block;
-  margin-top: 10px;
+}
+
+.charge-tier-inclusions li > strong {
+  margin-bottom: 4px;
+  color: #f4f8fb;
+  font-size: 16px;
+}
+
+.charge-tier-inclusions li > span {
+  color: #c5d2dc;
+}
+
+.charge-tier-price {
+  display: block;
+  margin-top: 0;
   color: #eef8ff;
-  font-size: clamp(26px, 3vw, 36px);
+  font-size: clamp(44px, 6vw, 58px);
+  line-height: 1.05;
   letter-spacing: 0;
 }
 
-.charge-paywall-plans strong small {
+.charge-tier-price small {
   margin-left: 5px;
   color: #9eb6ca;
   font-size: 14px;
@@ -3572,7 +3649,10 @@ h2 {
 
 .charge-paywall-plans button {
   width: 100%;
+  min-height: 58px;
   margin-top: auto;
+  font-size: 18px;
+  text-transform: uppercase;
 }
 
 .charge-paywall-legal-note,
@@ -3635,6 +3715,22 @@ h2 {
 
   .charge-paywall-result {
     flex-direction: column;
+  }
+
+  .charge-paywall-plans > article {
+    padding: 24px;
+  }
+
+  .charge-tier-heading {
+    gap: 10px;
+  }
+
+  .charge-tier-heading h3 {
+    font-size: 24px;
+  }
+
+  .charge-tier-exclusive-offer {
+    font-size: 12px;
   }
 }
 
@@ -10144,6 +10240,73 @@ body[data-active-page="chat"] .workspace {
 .charge-testimony-dialogue {
   gap: 14px;
   padding: 18px 0 24px;
+}
+
+.charge-testimony-topics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.charge-testimony-topics li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(105, 165, 204, 0.2);
+  border-radius: 8px;
+  background: rgba(3, 19, 32, 0.45);
+}
+
+.charge-testimony-topics li > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid rgba(105, 165, 204, 0.36);
+  border-radius: 50%;
+  color: #9cb8c9;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.charge-testimony-topics strong,
+.charge-testimony-topics small {
+  display: block;
+}
+
+.charge-testimony-topics strong {
+  color: #dcecf4;
+  font-size: 0.75rem;
+}
+
+.charge-testimony-topics small {
+  margin-top: 4px;
+  color: #829dad;
+  font-size: 0.66rem;
+  line-height: 1.4;
+}
+
+.charge-testimony-topics li.is-active {
+  border-color: rgba(49, 247, 143, 0.65);
+  background: rgba(49, 247, 143, 0.07);
+}
+
+.charge-testimony-topics li.is-active > span,
+.charge-testimony-topics li.is-complete > span {
+  border-color: #31f78f;
+  color: #062319;
+  background: #31f78f;
+}
+
+@media (max-width: 720px) {
+  .charge-testimony-topics {
+    grid-template-columns: 1fr;
+  }
 }
 
 .charge-testimony-answer {

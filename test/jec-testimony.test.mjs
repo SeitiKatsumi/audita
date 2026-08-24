@@ -56,21 +56,8 @@ test("testimony refinement rejects insufficient input and missing AI configurati
   );
 });
 
-test("testimony conversation asks only for missing facts and completes within three answers", async () => {
+test("testimony conversation asks the four topics in order and synthesizes after the fourth answer", async () => {
   const requests = [];
-  const outputs = [
-    JSON.stringify({
-      status: "follow_up",
-      question: "Desde quando você se lembra de pagar essa cobrança e qual era o valor mensal?",
-      refined: "",
-    }),
-    JSON.stringify({
-      status: "complete",
-      question: "",
-      refined:
-        "Percebi uma cobrança de Proteção Financeira em minhas faturas. Lembro-me de pagá-la desde 2023, no valor mensal aproximado de R$ 89,90, e afirmo que nunca contratei nem autorizei esse serviço.",
-    }),
-  ];
   const service = createJecTestimonyService({
     env: { AUDITA_OPENAI_API_KEY: "test-key" },
     clientFactory() {
@@ -78,7 +65,10 @@ test("testimony conversation asks only for missing facts and completes within th
         responses: {
           async create(payload) {
             requests.push(payload);
-            return { output_text: outputs.shift() };
+            return {
+              output_text:
+                "Descobri a cobrança ao revisar o relatório em agosto de 2026. O lançamento Proteção Financeira aparecia mensalmente por R$ 89,90 e eu não o autorizei. Não tenho protocolo bancário.",
+            };
           },
         },
       };
@@ -87,24 +77,36 @@ test("testimony conversation asks only for missing facts and completes within th
 
   const first = await service.continueConversation([
     {
-      question: "Conte com suas palavras o que aconteceu.",
-      answer: "Vi Proteção Financeira nas faturas e nunca contratei esse serviço.",
+      question: "Como você descobriu a cobrança?",
+      answer: "Descobri ao revisar o relatório em agosto de 2026.",
     },
   ]);
-  const completed = await service.continueConversation([
+  const second = await service.continueConversation([
     ...first.turns,
-    { question: first.question, answer: "Desde 2023, cerca de R$ 89,90 por mês." },
+    { question: first.question, answer: "Proteção Financeira, R$ 89,90 por mês." },
+  ]);
+  const third = await service.continueConversation([
+    ...second.turns,
+    { question: second.question, answer: "Nunca contratei nem autorizei." },
+  ]);
+  const completed = await service.continueConversation([
+    ...third.turns,
+    { question: third.question, answer: "Não tenho protocolo bancário." },
   ]);
 
   assert.equal(first.status, "follow_up");
-  assert.match(first.question, /Desde quando/);
+  assert.match(first.question, /nome exato do lançamento/i);
+  assert.match(second.question, /contratou ou autorizou/i);
+  assert.match(third.question, /reclamou ou buscou atendimento/i);
   assert.equal(completed.status, "complete");
-  assert.match(completed.refined, /nunca contratei nem autorizei/i);
-  assert.match(requests[0].instructions, /no máximo 3/);
-  assert.equal(requests[0].text.format.type, "json_schema");
+  assert.match(completed.refined, /não o autorizei/i);
+  assert.equal(requests.length, 1);
+  assert.match(requests[0].instructions, /quatro tópicos/i);
+  assert.match(requests[0].instructions, /Não trate reclamação prévia ou protocolo como requisito/i);
+  assert.equal(requests[0].text.verbosity, "low");
 });
 
-test("testimony conversation forces the third answer to produce the final account", async () => {
+test("testimony conversation requires all four topic answers before the final account", async () => {
   let request;
   const service = createJecTestimonyService({
     env: { AUDITA_OPENAI_API_KEY: "test-key" },
@@ -114,12 +116,8 @@ test("testimony conversation forces the third answer to produce the final accoun
           async create(payload) {
             request = payload;
             return {
-              output_text: JSON.stringify({
-                status: "complete",
-                question: "",
-                refined:
-                  "Percebi cobranças mensais de seguro desde 2022. O valor variava e eu nunca contratei nem autorizei o serviço indicado nas faturas.",
-              }),
+              output_text:
+                "Percebi cobranças mensais de seguro desde 2022. O valor variava e eu nunca contratei nem autorizei o serviço indicado nas faturas. Não procurei o banco.",
             };
           },
         },
@@ -131,10 +129,11 @@ test("testimony conversation forces the third answer to produce the final accoun
     { question: "O que aconteceu?", answer: "Vi um seguro nas faturas." },
     { question: "Desde quando?", answer: "Desde 2022." },
     { question: "Você autorizou?", answer: "Nunca contratei nem autorizei." },
+    { question: "Procurou o banco?", answer: "Não procurei o banco." },
   ]);
 
   assert.equal(result.status, "complete");
-  assert.match(request.instructions, /terceira pergunta/i);
+  assert.match(request.instructions, /quatro tópicos/i);
 });
 
 test("testimony normalization preserves paragraphs and removes control characters", () => {

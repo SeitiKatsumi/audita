@@ -92,7 +92,7 @@ export const ITAU_CHARGE_SERVICE_TIERS = Object.freeze([
   {
     id: "itau-cobrancas-faixa-1",
     name: "Faixa 1",
-    minimumClaimCents: 499999,
+    minimumClaimCents: 299900,
     maximumClaimCents: 1000000,
     discountPercent: 50,
     fullPrice: money(39800),
@@ -104,9 +104,9 @@ export const ITAU_CHARGE_SERVICE_TIERS = Object.freeze([
     name: "Faixa 2",
     minimumClaimCents: 1000001,
     maximumClaimCents: 2000000,
-    discountPercent: 40,
-    fullPrice: money(66500),
-    price: money(39900),
+    discountPercent: 50,
+    fullPrice: money(79999),
+    price: money(39999),
     priceEnv: "STRIPE_PRICE_ITAU_CHARGE_TIER_2",
   },
   {
