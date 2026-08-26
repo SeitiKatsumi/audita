@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildChargeJecHandoff } from "../charge-analysis.js";
+import { buildChargeCalculationSnapshot } from "../charge-calculation.js";
 import { prepareJecPetition } from "../services/jec-petition.service.mjs";
 
 const claimant = {
@@ -19,20 +20,26 @@ const claimant = {
 };
 
 test("documentary charge flow reaches a ready model 1 petition", () => {
+  const caseData = {
+    candidates: [
+      {
+        id: "charge-1",
+        label: "Seguro Fatura Protegida",
+        date: "2025-07-10",
+        amount: 18.9,
+        answer: "not_recognized",
+      },
+    ],
+  };
+  const calculation = buildChargeCalculationSnapshot(caseData, {
+    asOf: "2025-07-10",
+    ipcaRates: [{ data: "01/07/2025", valor: "0" }],
+  });
   const handoff = buildChargeJecHandoff({
     handoffId: "model-1",
     documentAvailability: "complete",
-    caseData: {
-      candidates: [
-        {
-          id: "charge-1",
-          label: "Seguro Fatura Protegida",
-          date: "2025-07-10",
-          amount: 18.9,
-          answer: "not_recognized",
-        },
-      ],
-    },
+    caseData,
+    calculation,
   });
   const prepared = prepareJecPetition({
     caseData: handoff.caseData,
@@ -46,6 +53,10 @@ test("documentary charge flow reaches a ready model 1 petition", () => {
   assert.equal(prepared.template.sourceModel, 1);
   assert.equal(prepared.template.id, "audited_values");
   assert.match(prepared.draft, /Seguro Fatura Protegida/i);
+  assert.equal(prepared.calculationReport.items.length, 1);
+  assert.equal(prepared.claimant.doubleRefundAmount, 37.8);
+  assert.equal(prepared.claimant.moralDamagesAmount, 4_400);
+  assert.equal(prepared.claimant.caseValue, 4_456.7);
 });
 
 test("no-document charge flow cannot reach petition preparation", () => {

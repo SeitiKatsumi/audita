@@ -86,7 +86,6 @@ export const JEC_SOURCE_MODEL_1 = [
   "No mérito, que sejam julgados TOTALMENTE PROCEDENTES os pedidos para:",
   "• a) Declarar a inexistência de relação contratual quanto aos seguros/serviços contestados e a consequente nulidade de todos os débitos efetuados ante a ausência de consentimento e de autorização expressa;",
   "{{DOUBLE_REFUND_REQUEST}}",
-  ";",
   "{{LOST_PROFITS_REQUEST}}",
   "{{MORAL_DAMAGES_REQUEST}}",
   "Dá-se à causa o valor de R$ {{CASE_VALUE}}.",

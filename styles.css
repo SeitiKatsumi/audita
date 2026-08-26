@@ -3480,15 +3480,6 @@ h2 {
   content: "";
 }
 
-.charge-paywall-section-heading {
-  max-width: 720px;
-}
-
-.charge-paywall-section-heading > p:last-child {
-  margin: 0;
-}
-
-
 .charge-paywall-explainer ul,
 .charge-paywall-plans ul {
   margin: 14px 0 0;
@@ -3540,11 +3531,6 @@ h2 {
   font-size: 14px;
   font-style: normal;
   line-height: 1.2;
-}
-
-.charge-tier-description {
-  margin: 18px 0 0;
-  font-size: 16px;
 }
 
 .charge-tier-exclusive-offer {
@@ -3655,7 +3641,6 @@ h2 {
   text-transform: uppercase;
 }
 
-.charge-paywall-legal-note,
 .charge-paywall-demo {
   font-size: 13px;
 }

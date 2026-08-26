@@ -1473,6 +1473,20 @@ async function loadItauCheckoutIpcaRates() {
   return rates;
 }
 
+async function buildJecPetitionCalculation(caseData = {}) {
+  try {
+    const calculation = buildChargeCalculationSnapshot(caseData, {
+      ipcaRates: await loadItauCheckoutIpcaRates(),
+    });
+    if (calculation.itemCount && calculation.correctionAvailable) return calculation;
+  } catch {
+    // The browser already calculated the same snapshot; use it only if BCB is temporarily unavailable.
+  }
+  return Number(caseData?.calculation?.itemCount) > 0
+    ? caseData.calculation
+    : null;
+}
+
 async function createSession(response, request, userId) {
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashToken(token);
@@ -4187,6 +4201,7 @@ async function handleApi(request, response, pathname) {
       }
       const prepared = prepareJecPetition({
         caseData,
+        calculation: await buildJecPetitionCalculation(caseData),
         claimant: body.claimant || {},
         uf: body.uf,
         city: body.city,
@@ -4253,6 +4268,7 @@ async function handleApi(request, response, pathname) {
       }
       const prepared = prepareJecPetition({
         caseData,
+        calculation: await buildJecPetitionCalculation(caseData),
         claimant: body.claimant || {},
         uf: body.uf,
         city: body.city,
@@ -4328,6 +4344,7 @@ async function handleApi(request, response, pathname) {
       }
       const prepared = prepareJecPetition({
         caseData,
+        calculation: await buildJecPetitionCalculation(caseData),
         claimant: body.claimant || {},
         uf: body.uf,
         city: body.city,

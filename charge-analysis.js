@@ -441,7 +441,9 @@ export function buildChargeJecHandoff({
   const hasRequiredDocuments = documentAvailability !== "none";
   const ready = hasRequiredDocuments && disputedCount > 0 && pendingCount === 0;
   const suggestedDouble =
-    audit.totalDisputed > 0
+    Number(calculation?.doubleWithAdjustments) > 0
+      ? Number(calculation.doubleWithAdjustments)
+      : audit.totalDisputed > 0
       ? audit.hypotheticalDouble
       : 0;
   const suggestedMoralDamages = Number(calculation?.moralDamagesAmount) > 0
@@ -476,6 +478,7 @@ export function buildChargeJecHandoff({
       id: `guided-jec-${normalizedId}`,
       status: ready ? "evaluated" : caseData?.status || "review_required",
       candidates,
+      ...(Number(calculation?.itemCount) > 0 ? { calculation } : {}),
       answers: {
         ...(caseData?.answers || {}),
         historicalDocumentsAvailable,
@@ -1377,11 +1380,6 @@ if (stage) {
         </section>
 
         ${selectedTier ? `
-          <div class="charge-paywall-section-heading">
-            <p class="eyebrow">Contratação única por caso</p>
-            <h3>Continue seu caso com a IA AUDITA</h3>
-            <p>Não é assinatura: você paga uma única vez para continuar este caso.</p>
-          </div>
           <section id="chargePaywallPlans" class="charge-paywall-plans charge-paywall-tiers" aria-label="Oferta do serviço de cobranças indevidas">
               <article class="charge-tier-card recommended selected">
                 <div class="charge-tier-content">
@@ -1389,7 +1387,6 @@ if (stage) {
                     <h3>${escapeChargeHtml(selectedTier.name)}</h3>
                     <em>Sua faixa</em>
                   </header>
-                  <p class="charge-tier-description">Como o relatório gerou um provável valor a receber <strong>ATUALIZADO</strong> entre ${escapeChargeHtml(tierRangeLabel(selectedTier))}, o valor para adesão será:</p>
                   <p class="charge-tier-exclusive-offer">OFERTA EXCLUSIVA DE PRIMEIRA COMPRA · POR TEMPO LIMITADO</p>
                   <small class="charge-tier-full-price">De ${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.fullPrice?.cents || 0) / 100))}</small>
                   <b class="charge-tier-discount">${escapeChargeHtml(String(selectedTier.discountPercent))}% DE DESCONTO NA PRIMEIRA COMPRA</b>
@@ -1408,7 +1405,6 @@ if (stage) {
               </article>
           </section>` : ""}
         ${selectedTier ? `<p class="charge-paywall-demo" role="note">Fluxo liberado temporariamente para validação.</p>` : ""}
-        <p class="charge-paywall-legal-note">A simulação é preliminar e não garante restituição, indenização ou êxito judicial. Custas, consultas de terceiros e representação jurídica não estão incluídas, salvo informação expressa.</p>
         <div class="charge-result-actions"><button type="button" class="secondary-action" data-charge-action="new-document">Voltar aos documentos</button></div>
       </div>
     `;

@@ -654,6 +654,59 @@ function formatSuggestedMoney(value) {
   return Number.isFinite(value) ? formatPetitionMoney(value) : "";
 }
 
+function buildCalculationReport(calculation = {}) {
+  const items = (Array.isArray(calculation?.items) ? calculation.items : []).flatMap(
+    (item) => {
+      const amount = normalizeMoney(item?.amount);
+      const interest = Number(item?.interest);
+      const correction = Number(item?.correction);
+      if (
+        !(amount > 0) ||
+        !Number.isFinite(interest) ||
+        interest < 0 ||
+        !Number.isFinite(correction)
+      ) {
+        return [];
+      }
+      return [{
+        date: cleanText(item?.date, 10),
+        amount,
+        interest,
+        correction,
+        updatedPrincipal: Number((amount + interest + correction).toFixed(2)),
+        doubleWithAdjustments: Number((amount * 2 + interest + correction).toFixed(2)),
+      }];
+    },
+  ).sort((left, right) => left.date.localeCompare(right.date));
+  if (!items.length) return null;
+
+  const total = (field) => Number(
+    items.reduce((sum, item) => sum + item[field], 0).toFixed(2),
+  );
+  const principal = total("amount");
+  const interest = total("interest");
+  const correction = total("correction");
+  const updatedPrincipal = total("updatedPrincipal");
+  const doubleWithAdjustments = total("doubleWithAdjustments");
+  const damagesAmount = normalizeMoney(calculation?.moralDamagesAmount) ?? 4_400;
+  const estimatedClaimValue = Number(
+    (updatedPrincipal + doubleWithAdjustments + damagesAmount).toFixed(2),
+  );
+
+  return {
+    items,
+    principal,
+    interest,
+    correction,
+    updatedPrincipal,
+    doubleWithAdjustments,
+    damagesAmount,
+    estimatedClaimValue,
+    calculationAsOf: cleanText(calculation?.calculationAsOf, 10),
+    correctionAvailable: calculation?.correctionAvailable === true,
+  };
+}
+
 export function suggestJecClaimValues({ caseData = {}, claimant = {} } = {}) {
   const disputed = (Array.isArray(caseData?.candidates) ? caseData.candidates : []).filter(
     (candidate) => candidate?.answer === "not_recognized",
@@ -936,7 +989,7 @@ function buildDoubleRefundRequest(claimant = {}, templateId = "") {
   const scope = templateId === "document_exhibition"
     ? "dos lançamentos comprovados nesta etapa, sem prejuízo da apuração dos documentos faltantes"
     : "dos lançamentos comprovados no relatório técnico";
-  return `b) Condenar a Ré à Repetição do Indébito em Dobro ${scope}, no valor revisado de R$ ${formatPetitionMoney(amount)}, acrescido de atualização e juros na forma definida pelo Juízo;`;
+  return `b) Condenar a Ré à Repetição do Indébito em Dobro ${scope}, no valor atualizado de R$ ${formatPetitionMoney(amount)}, conforme a memória de cálculo anexa;`;
 }
 
 function buildActionTitle(templateId, claimant) {
@@ -1048,6 +1101,7 @@ function buildDraft({ caseData, claimant, templateId, generatedAt }) {
 export function prepareJecPetition({
   caseData = {},
   claimant = {},
+  calculation = caseData?.calculation || null,
   uf,
   city,
   generatedAt = new Date(),
@@ -1099,10 +1153,14 @@ export function prepareJecPetition({
   if (!disputed.length) missingFields.push("disputedCharge");
   if (journey === "undetermined") missingFields.push("historicalDocumentsAvailable");
 
-  const doubleRefundAmount = normalizeMoney(claimant.doubleRefundAmount);
+  const calculationReport = buildCalculationReport(calculation);
+  const doubleRefundAmount = calculationReport?.doubleWithAdjustments ??
+    normalizeMoney(claimant.doubleRefundAmount);
   const lostProfitsAmount = normalizeMoney(claimant.lostProfitsAmount);
-  const moralDamagesAmount = normalizeMoney(claimant.moralDamagesAmount);
-  const caseValue = normalizeMoney(claimant.caseValue);
+  const moralDamagesAmount = calculationReport?.damagesAmount ??
+    normalizeMoney(claimant.moralDamagesAmount);
+  const caseValue = calculationReport?.estimatedClaimValue ??
+    normalizeMoney(claimant.caseValue);
   const smallClaimsEligibility = evaluateJecSmallClaims(caseValue);
   if (templateId === "audited_values" && !(doubleRefundAmount > 0)) {
     missingFields.push("doubleRefundAmount");
@@ -1155,6 +1213,7 @@ export function prepareJecPetition({
       templateId,
       generatedAt,
     }),
+    calculationReport,
     template: {
       id: template.id,
       label: template.label,
@@ -1183,6 +1242,9 @@ export function prepareJecPetition({
       "Rascunho baseado no modelo fornecido: revise fatos, competência territorial, pedidos e valor da causa.",
       `Fonte do texto-base: ${template.sourceFile}.`,
       "Os valores jurídicos não são presumidos pela IA AUDITA; a sugestão usa somente lançamentos documentados e todos os valores devem ser revisados.",
+      ...(calculationReport
+        ? ["A memória de cálculo parcela a parcela será anexada ao final do PDF da petição."]
+        : []),
       ...(documentAvailability === "partial"
         ? ["A prova é parcial: o relatório e os valores abrangem somente os documentos enviados; o Modelo 2 pede a exibição do restante."]
         : []),

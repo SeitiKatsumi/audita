@@ -149,6 +149,7 @@ test("petition draft uses the supplied audited-values model", () => {
   assert.match(prepared.draft, /R\$\s+5\.079,80/);
   assert.doesNotMatch(prepared.draft, /\[PENDENTE:/);
   assert.doesNotMatch(prepared.draft, /\{\{/);
+  assert.doesNotMatch(prepared.draft, /\n\s*;\s*\n/);
   assert.deepEqual(prepared.attachments.evidenceFiles, ["fatura-julho.pdf"]);
   assert.equal(prepared.attachments.documentaryCoverage, "complete");
 

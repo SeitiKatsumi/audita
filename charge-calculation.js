@@ -1,6 +1,6 @@
 const MONTH_MS = 2629800000;
 const INTEREST_RATE_MONTHLY = 0.01;
-const DEFAULT_MORAL_DAMAGES = 2_000;
+const DEFAULT_MORAL_DAMAGES = 4_400;
 
 function parseChargeDate(value) {
   const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -70,10 +70,14 @@ export function buildChargeCalculationSnapshot(caseData = {}, options = {}) {
       interestMonths = Math.max(0, (asOf.getTime() - date.getTime()) / MONTH_MS);
     }
     const correctedAmount = amount * correctionFactor;
+    const correction = Number((correctedAmount - amount).toFixed(2));
+    const interest = Number((amount * INTEREST_RATE_MONTHLY * interestMonths).toFixed(2));
     return {
       ...candidate,
-      correction: Number((correctedAmount - amount).toFixed(2)),
-      interest: Number((amount * INTEREST_RATE_MONTHLY * interestMonths).toFixed(2)),
+      correction,
+      interest,
+      updatedPrincipal: Number((amount + correction + interest).toFixed(2)),
+      doubleWithAdjustments: Number((amount * 2 + correction + interest).toFixed(2)),
       correctionAvailable: Boolean(
         date &&
         ipcaRates.size > 0 &&
@@ -86,7 +90,15 @@ export function buildChargeCalculationSnapshot(caseData = {}, options = {}) {
   const monetaryAdjustment = calculatedItems.reduce((total, candidate) => total + candidate.correction, 0);
   const estimatedInterest = calculatedItems.reduce((total, candidate) => total + candidate.interest, 0);
   const hypotheticalDouble = principal * 2;
-  const estimatedMaterialClaim = hypotheticalDouble + monetaryAdjustment + estimatedInterest;
+  const updatedPrincipal = calculatedItems.reduce(
+    (total, candidate) => total + candidate.updatedPrincipal,
+    0,
+  );
+  const doubleWithAdjustments = calculatedItems.reduce(
+    (total, candidate) => total + candidate.doubleWithAdjustments,
+    0,
+  );
+  const estimatedMaterialClaim = updatedPrincipal + doubleWithAdjustments;
   const moralDamagesAmount = DEFAULT_MORAL_DAMAGES;
   const estimatedClaimValue = estimatedMaterialClaim + moralDamagesAmount;
   return {
@@ -94,6 +106,8 @@ export function buildChargeCalculationSnapshot(caseData = {}, options = {}) {
     itemCount: calculatedItems.length,
     principal: Number(principal.toFixed(2)),
     hypotheticalDouble: Number(hypotheticalDouble.toFixed(2)),
+    updatedPrincipal: Number(updatedPrincipal.toFixed(2)),
+    doubleWithAdjustments: Number(doubleWithAdjustments.toFixed(2)),
     monetaryAdjustment: Number(monetaryAdjustment.toFixed(2)),
     estimatedInterest: Number(estimatedInterest.toFixed(2)),
     estimatedMaterialClaim: Number(estimatedMaterialClaim.toFixed(2)),

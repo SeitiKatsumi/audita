@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildJecCalculationReportHtml,
   buildJecPetitionHtml,
   createJecPetitionPdf,
   resolveJecPdfBrowserExecutable,
@@ -38,6 +39,24 @@ const prepared = {
   ].join("\n"),
 };
 
+const calculationReport = {
+  items: [
+    {
+      date: "2025-07-10",
+      amount: 18.9,
+      interest: 1.9,
+      correction: 0.95,
+      updatedPrincipal: 21.75,
+      doubleWithAdjustments: 40.65,
+    },
+  ],
+  updatedPrincipal: 21.75,
+  doubleWithAdjustments: 40.65,
+  damagesAmount: 4_400,
+  estimatedClaimValue: 4_462.4,
+  calculationAsOf: "2026-08-26",
+};
+
 test("petition HTML uses A4 legal-document typography and escapes content", () => {
   const html = buildJecPetitionHtml({
     ...prepared,
@@ -50,6 +69,21 @@ test("petition HTML uses A4 legal-document typography and escapes content", () =
   assert.match(html, /class="action-title"/);
   assert.match(html, /class="signature-block"/);
   assert.match(html, /analista &lt;teste&gt;/);
+});
+
+test("petition HTML appends the calculation report after the legal document", () => {
+  const reportHtml = buildJecCalculationReportHtml({ calculationReport });
+  const html = buildJecPetitionHtml({ ...prepared, calculationReport });
+
+  assert.match(reportHtml, /RELATÓRIO TÉCNICO DE AUDITORIA FINANCEIRA/);
+  assert.match(reportHtml, /R\$\s*4\.400,00/);
+  assert.match(reportHtml, /R\$\s*4\.462,40/);
+  assert.match(reportHtml, /10\/07\/2025/);
+  assert.match(html, /page-break-before:\s*always/);
+  assert.ok(
+    html.indexOf('<section class="signature-block">') <
+      html.indexOf('<section class="audit-calculation-report"'),
+  );
 });
 
 test("PDF renderer accepts both petition models and returns PDF bytes", async () => {

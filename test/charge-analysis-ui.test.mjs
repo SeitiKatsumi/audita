@@ -508,7 +508,7 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.match(chargeAnalysisJs, /No momento, atendemos casos a partir de \$\{escapeChargeHtml\(formatChargeCurrency\(minimumClaimCents \/ 100\)\)\}/);
   assert.match(chargeAnalysisJs, /R\$ 2\.999 e R\$ 10 mil/);
   assert.doesNotMatch(chargeAnalysisJs, /Sua simulação documental indica \$\{formatChargeCurrency\(calculation\.estimatedMaterialClaim\)\}/);
-  assert.match(chargeAnalysisJs, /Contratação única por caso/);
+  assert.doesNotMatch(chargeAnalysisJs, /Contratação única por caso/);
   assert.match(chargeAnalysisJs, /data-charge-action="continue-itau-service"/);
   assert.doesNotMatch(chargeAnalysisJs, /Standard mensal/);
   assert.doesNotMatch(chargeAnalysisJs, /Standard anual/);
@@ -517,9 +517,11 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.doesNotMatch(chargeAnalysisJs, /Transparência antes de contratar/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-paywall-reference" role="group"/);
   assert.doesNotMatch(chargeAnalysisJs, /DevoluÃ§Ã£o em DOBRO automÃ¡tica|garantindo a reparaÃ§Ã£o integral|sem riscos financeiros/i);
-  assert.match(chargeAnalysisJs, /Continue seu caso com a IA AUDITA/);
+  assert.doesNotMatch(chargeAnalysisJs, /Continue seu caso com a IA AUDITA/);
   assert.doesNotMatch(chargeAnalysisJs, /charge-audit-table-wrap/);
-  assert.match(chargeAnalysisJs, /Não é assinatura: você paga uma única vez para continuar este caso/);
+  assert.doesNotMatch(chargeAnalysisJs, /Não é assinatura: você paga uma única vez para continuar este caso/);
+  assert.doesNotMatch(chargeAnalysisJs, /Como o relatório gerou um provável valor a receber/);
+  assert.doesNotMatch(chargeAnalysisJs, /A simulação é preliminar e não garante restituição/);
   assert.match(chargeAnalysisJs, />Comprar agora<\/button>/);
   assert.match(chargeAnalysisJs, /Relatório Técnico de Auditoria Financeira/);
   assert.match(chargeAnalysisJs, /Atualiza mês a mês e levanta todas as parcelas debitadas/);
@@ -583,9 +585,11 @@ test("calculation uses only confirmed non-recognized documentary occurrences", (
   assert.equal(calculation.hypotheticalDouble, 300);
   assert.equal(calculation.monetaryAdjustment, 8.64);
   assert.equal(calculation.estimatedInterest, 2.4);
-  assert.equal(calculation.estimatedMaterialClaim, 311.04);
-  assert.equal(calculation.moralDamagesAmount, 2_000);
-  assert.equal(calculation.estimatedClaimValue, 2_311.04);
+  assert.equal(calculation.updatedPrincipal, 161.04);
+  assert.equal(calculation.doubleWithAdjustments, 311.04);
+  assert.equal(calculation.estimatedMaterialClaim, 472.08);
+  assert.equal(calculation.moralDamagesAmount, 4_400);
+  assert.equal(calculation.estimatedClaimValue, 4_872.08);
   assert.equal(calculation.correctionAvailable, true);
   assert.equal(calculation.excludedWithoutAmount, 0);
 });
@@ -596,9 +600,11 @@ test("minimum service tier uses the full simulation including default moral dama
     { asOf: "2026-03-15", ipcaRates: [{ data: "01/03/2026", valor: "0" }] },
   );
 
-  assert.equal(calculation.estimatedMaterialClaim, 3_000);
-  assert.equal(calculation.moralDamagesAmount, 2_000);
-  assert.equal(calculation.estimatedClaimValue, 5_000);
+  assert.equal(calculation.updatedPrincipal, 1_500);
+  assert.equal(calculation.doubleWithAdjustments, 3_000);
+  assert.equal(calculation.estimatedMaterialClaim, 4_500);
+  assert.equal(calculation.moralDamagesAmount, 4_400);
+  assert.equal(calculation.estimatedClaimValue, 8_900);
   assert.equal(
     resolveItauChargeServiceTier(Math.round(calculation.estimatedClaimValue * 100))?.id,
     "itau-cobrancas-faixa-1",

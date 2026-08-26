@@ -51,6 +51,98 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+function formatReportMoney(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount)
+    ? amount.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "-";
+}
+
+function formatReportDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : "Data não informada";
+}
+
+export function buildJecCalculationReportHtml(prepared) {
+  const report = prepared?.calculationReport;
+  if (!Array.isArray(report?.items) || !report.items.length) return "";
+
+  const rows = report.items.map((item) => `
+    <tr>
+      <td>${escapeHtml(formatReportDate(item.date))}</td>
+      <td>${escapeHtml(formatReportMoney(item.amount))}</td>
+      <td>${escapeHtml(formatReportMoney(item.interest))}</td>
+      <td>${escapeHtml(formatReportMoney(item.correction))}</td>
+      <td>${escapeHtml(formatReportMoney(item.updatedPrincipal))}</td>
+      <td>${escapeHtml(formatReportMoney(item.doubleWithAdjustments))}</td>
+    </tr>`).join("");
+  const calculationDate = formatReportDate(report.calculationAsOf);
+
+  return `
+    <section class="audit-calculation-report" aria-label="Memória de cálculo da auditoria financeira">
+      <header class="audit-report-header">
+        <h1>IA AUDITA - RELATÓRIO TÉCNICO DE AUDITORIA FINANCEIRA</h1>
+        <p>Apuração de danos materiais, repetição de indébito e indenização por perdas e danos</p>
+      </header>
+
+      <div class="audit-summary-grid">
+        <article><span>1. Principal atualizado</span><strong>${escapeHtml(formatReportMoney(report.updatedPrincipal))}</strong></article>
+        <article><span>2. Repetição (dobro)</span><strong>${escapeHtml(formatReportMoney(report.doubleWithAdjustments))}</strong></article>
+        <article><span>3. Perdas e danos</span><strong>${escapeHtml(formatReportMoney(report.damagesAmount))}</strong></article>
+        <article class="audit-summary-total"><span>Soma total (1+2+3)</span><strong>${escapeHtml(formatReportMoney(report.estimatedClaimValue))}</strong></article>
+      </div>
+
+      <section class="audit-report-block">
+        <h2>Resumo dos pedidos apurados</h2>
+        <div class="audit-report-summary">
+          <p>(+) Principal atualizado (valor original + juros + correção monetária): <strong>${escapeHtml(formatReportMoney(report.updatedPrincipal))}</strong></p>
+          <p>(+) Repetição do indébito em dobro (2 x valor original + juros + correção): <strong>${escapeHtml(formatReportMoney(report.doubleWithAdjustments))}</strong></p>
+          <p>(+) Perdas e danos / danos morais (parâmetro referencial): <strong>${escapeHtml(formatReportMoney(report.damagesAmount))}</strong></p>
+          <p class="audit-report-grand-total">(=) Total geral apurado em auditoria: ${escapeHtml(formatReportMoney(report.estimatedClaimValue))}</p>
+        </div>
+      </section>
+
+      <section class="audit-report-block audit-methodology">
+        <h2>Critérios da memória de cálculo</h2>
+        <p><strong>Juros:</strong> 1% ao mês sobre cada lançamento, a partir da data do débito até ${escapeHtml(calculationDate)}.</p>
+        <p><strong>Correção monetária:</strong> variação mensal acumulada do IPCA disponível para o período de cada lançamento.</p>
+        <p><strong>Principal atualizado:</strong> valor original acrescido dos juros e da correção monetária.</p>
+        <p><strong>Repetição em dobro:</strong> duas vezes o valor original, acrescido dos juros e da correção monetária.</p>
+        <p><strong>Indenização referencial:</strong> ${escapeHtml(formatReportMoney(report.damagesAmount))}, sujeita à revisão conforme os fatos e as provas do caso.</p>
+      </section>
+
+      <section class="audit-report-block audit-table-block">
+        <h2>Memória de cálculo discriminada (parcela por parcela)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Valor orig.</th>
+              <th>Juros (1%/mês)</th>
+              <th>Correção mon.</th>
+              <th>Principal atualizado</th>
+              <th>Dobro atualizado</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot>
+            <tr>
+              <td colspan="5">Total geral apurado (principal atualizado + dobro + perdas e danos)</td>
+              <td>${escapeHtml(formatReportMoney(report.estimatedClaimValue))}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <p class="audit-report-disclaimer">Memória técnica estimativa elaborada a partir dos lançamentos documentados e classificados pelo consumidor como não reconhecidos. A incidência jurídica, os valores finais e eventual indenização dependem de revisão e decisão judicial.</p>
+    </section>`;
+}
+
 function paragraphClass(text, index, paragraphs, claimantName) {
   if (index === 0 && text.startsWith("EXCELENTÍSSIMO")) return "court-address";
   if (text.startsWith("AÇÃO ")) return "action-title";
@@ -107,6 +199,7 @@ export function buildJecPetitionHtml(prepared) {
   const modelLabel = escapeHtml(
     prepared.template?.label || "Relatório Técnico de Auditoria",
   );
+  const calculationReport = buildJecCalculationReportHtml(prepared);
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -158,10 +251,147 @@ export function buildJecPetitionHtml(prepared) {
         break-inside: avoid;
         page-break-inside: avoid;
       }
+      .audit-calculation-report {
+        break-before: page;
+        page-break-before: always;
+        color: #13283d;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 8.5pt;
+        line-height: 1.3;
+      }
+      .audit-report-header {
+        margin: 0 0 16pt;
+        padding: 16pt 18pt;
+        border-bottom: 4pt solid #2c6ca3;
+        background: #10283f;
+        color: #fff;
+      }
+      .audit-report-header h1 {
+        margin: 0 0 5pt;
+        font-size: 18pt;
+        letter-spacing: .2pt;
+      }
+      .audit-report-header p {
+        margin: 0;
+        color: #c7d6e7;
+        font-size: 10pt;
+      }
+      .audit-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8pt;
+        margin-bottom: 16pt;
+      }
+      .audit-summary-grid article {
+        min-height: 62pt;
+        padding: 10pt 8pt;
+        border: 1px solid #d4dce5;
+        border-radius: 4pt;
+        background: #f5f7fa;
+        text-align: center;
+      }
+      .audit-summary-grid span {
+        display: block;
+        min-height: 24pt;
+        color: #536274;
+        font-size: 7.5pt;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .audit-summary-grid strong {
+        display: block;
+        margin-top: 5pt;
+        color: #13283d;
+        font-size: 14pt;
+      }
+      .audit-summary-grid .audit-summary-total {
+        border-color: #10283f;
+        background: #10283f;
+      }
+      .audit-summary-grid .audit-summary-total span { color: #c7d6e7; }
+      .audit-summary-grid .audit-summary-total strong { color: #fff; }
+      .audit-report-block {
+        margin: 0 0 14pt;
+      }
+      .audit-report-block h2 {
+        margin: 0 0 8pt;
+        padding-bottom: 5pt;
+        border-bottom: 2px solid #13283d;
+        font-size: 12pt;
+        text-transform: uppercase;
+      }
+      .audit-report-summary {
+        padding: 8pt 10pt;
+        border: 1px solid #d4dce5;
+        border-radius: 4pt;
+        background: #f9fafb;
+      }
+      .audit-report-summary p,
+      .audit-methodology p {
+        margin: 0 0 4pt;
+      }
+      .audit-report-summary p:last-child,
+      .audit-methodology p:last-child {
+        margin-bottom: 0;
+      }
+      .audit-report-grand-total {
+        margin-top: 6pt !important;
+        padding-top: 6pt;
+        border-top: 1px dashed #536274;
+        font-size: 10pt;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .audit-table-block table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 7.2pt;
+      }
+      .audit-table-block thead { display: table-header-group; }
+      .audit-table-block tfoot { display: table-row-group; }
+      .audit-table-block tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .audit-table-block th,
+      .audit-table-block td {
+        padding: 4pt 3pt;
+        border: 1px solid #d4dce5;
+        text-align: right;
+        white-space: nowrap;
+      }
+      .audit-table-block th:first-child,
+      .audit-table-block td:first-child { text-align: left; }
+      .audit-table-block th {
+        border-color: #10283f;
+        background: #10283f;
+        color: #fff;
+        font-weight: 700;
+      }
+      .audit-table-block tbody tr:nth-child(even) { background: #f5f7fa; }
+      .audit-table-block tfoot td {
+        border-top: 2px solid #10283f;
+        background: #e8eef5;
+        font-weight: 700;
+      }
+      .audit-table-block tfoot td:first-child {
+        text-align: right;
+        text-transform: uppercase;
+      }
+      .audit-report-disclaimer {
+        margin: 10pt 0 0;
+        padding: 8pt;
+        border-left: 3px solid #2c6ca3;
+        background: #eef4fa;
+        color: #405267;
+        font-size: 7.5pt;
+      }
     </style>
   </head>
   <body>
     <main>${content}</main>
+    ${calculationReport}
   </body>
 </html>`;
 }
