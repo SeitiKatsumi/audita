@@ -1370,37 +1370,14 @@ if (stage) {
     `;
   }
 
-  async function purchaseItauService() {
+  function purchaseItauService() {
     if (state.busy) return;
-    state.busy = true;
+    const caseIds = state.caseBatches.map((item) => item.id).filter(Boolean);
+    // ponytail: liberação de validação só nesta sessão; reative o checkout quando a cobrança voltar.
+    state.access = { entitled: true, source: "temporary_validation", caseIds };
     state.error = "";
-    renderPaywall();
-    try {
-      const caseIds = state.caseBatches.map((item) => item.id).filter(Boolean);
-      const response = await fetch("/api/itau-refund/checkout", {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ caseIds, requestId: crypto.randomUUID() }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "A contratação ainda não está disponível.");
-      if (data.url) {
-        sessionStorage.setItem("audita:itau-checkout-cases", JSON.stringify({
-          caseIds,
-          documentAvailability: state.documentAvailability,
-          authorizationAnswer: state.authorizationAnswer,
-          selectedBrand: state.selectedBrand,
-          brandHistoryAnswer: state.brandHistoryAnswer,
-        }));
-        window.location.assign(data.url);
-        return;
-      }
-    } catch (error) {
-      state.error = error?.message || "Não foi possível contratar o serviço.";
-    } finally {
-      state.busy = false;
-      render();
-    }
+    state.screen = "result";
+    render();
   }
 
   function renderLawyerKit() {

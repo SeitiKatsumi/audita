@@ -537,10 +537,13 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.match(chargeAnalysisJs, /em 10x no cartão sem juros!/);
   assert.doesNotMatch(chargeAnalysisJs, /Não é apenas pedir o estorno/);
   assert.match(chargeAnalysisJs, /action === "continue-itau-service"\) \{\s*void purchaseItauService\(\);\s*return;/);
-  assert.doesNotMatch(chargeAnalysisJs, /action === "continue-itau-service"\) \{\s*state\.screen = "result"/);
-  assert.match(chargeAnalysisJs, /\/api\/itau-refund\/checkout/);
-  assert.match(chargeAnalysisJs, /audita:itau-checkout-cases/);
-  assert.match(chargeAnalysisJs, /itau_checkout/);
+  const purchaseFlow = chargeAnalysisJs.slice(
+    chargeAnalysisJs.indexOf("function purchaseItauService()"),
+    chargeAnalysisJs.indexOf("function renderLawyerKit()"),
+  );
+  assert.match(purchaseFlow, /state\.access = \{ entitled: true, source: "temporary_validation", caseIds \}/);
+  assert.match(purchaseFlow, /state\.screen = "result"/);
+  assert.doesNotMatch(purchaseFlow, /fetch\(|window\.location\.assign|\/api\/itau-refund\/checkout/);
   assert.match(serverJs, /resolveItauChargeServiceTier/);
   assert.match(serverJs, /stripeBillingService\.createCheckoutSession\(authContext/);
   assert.match(serverJs, /case: result\.case/);
