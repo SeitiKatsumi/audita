@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
+import { PDFDocument } from "pdf-lib";
 import WebSocket, { WebSocketServer } from "ws";
 import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
@@ -60,11 +61,13 @@ import {
   listJecPortals,
   prepareJecPetition,
 } from "./services/jec-petition.service.mjs";
-import { createJecPetitionPdf } from "./services/jec-petition-pdf.service.mjs";
+import {
+  appendJecPetitionAttachments,
+  createJecPetitionPdf,
+} from "./services/jec-petition-pdf.service.mjs";
 import {
   createJecTestimonyService,
   JecTestimonyError,
-  normalizeJecTestimony,
 } from "./services/jec-testimony.service.mjs";
 import {
   decryptUserProfile,
@@ -1284,6 +1287,104 @@ async function readBufferBody(request, maxBytes = 12 * 1024 * 1024) {
   }
 
   return Buffer.concat(chunks);
+}
+
+function hasPdfDigitalSignature(bytes) {
+  const source = Buffer.from(bytes).toString("latin1");
+  const byteRange = source.match(
+    /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/,
+  );
+  const contents = source.match(/\/Contents\s*<([\dA-Fa-f\s]+)>/);
+  const range = byteRange?.slice(1).map(Number) || [];
+  return Boolean(
+    byteRange &&
+      range[0] === 0 &&
+      range[1] > 0 &&
+      range[2] > range[1] &&
+      range[3] > 0 &&
+      range[2] + range[3] <= bytes.length &&
+      contents &&
+      /[1-9A-Fa-f]/.test(contents[1]) &&
+      /\/(?:Type|FT)\s*\/Sig\b/.test(source),
+  );
+}
+
+async function readJecPetitionPdfRequest(request) {
+  const contentType = String(request.headers["content-type"] || "");
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    return { body: await readJsonBody(request), attachments: [] };
+  }
+
+  const raw = await readBufferBody(request, 38 * 1024 * 1024);
+  let form;
+  try {
+    form = await new Request("http://localhost", {
+      method: "POST",
+      headers: { "content-type": contentType },
+      body: raw,
+    }).formData();
+  } catch {
+    const error = new Error(
+      "O envio do documento de identidade, do comprovante de residência e da procuração assinada está inválido. Tente novamente.",
+    );
+    error.code = "JEC_PDF_MULTIPART_INVALID";
+    throw error;
+  }
+  const body = JSON.parse(String(form.get("payload") || "{}"));
+  const readPdf = async (field, label) => {
+    const file = form.get(field);
+    if (!file || typeof file.arrayBuffer !== "function" || !file.size) {
+      const error = new Error(`Envie ${label} em PDF.`);
+      error.code = "JEC_PDF_ATTACHMENT_REQUIRED";
+      throw error;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      const error = new Error(`${label} deve ter no máximo 12 MB.`);
+      error.code = "JEC_PDF_ATTACHMENT_TOO_LARGE";
+      throw error;
+    }
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const hasPdfHeader = bytes.subarray(0, 1024).includes(Buffer.from("%PDF-"));
+    if ((file.type && file.type !== "application/pdf") || !hasPdfHeader) {
+      const error = new Error(`${label} deve ser um arquivo PDF válido.`);
+      error.code = "JEC_PDF_ATTACHMENT_INVALID_TYPE";
+      throw error;
+    }
+    try {
+      const pdf = await PDFDocument.load(bytes);
+      if (pdf.getPageCount() === 0) throw new Error("pdf_without_pages");
+    } catch {
+      const error = new Error(`${label} deve ser um arquivo PDF válido.`);
+      error.code = "JEC_PDF_ATTACHMENT_INVALID_TYPE";
+      throw error;
+    }
+    return { label, bytes };
+  };
+
+  const identityDocument = await readPdf(
+    "identityDocument",
+    "o documento de identidade",
+  );
+  const proofOfResidence = await readPdf(
+    "proofOfResidence",
+    "o comprovante de residência",
+  );
+  const signedPowerOfAttorney = await readPdf(
+    "signedPowerOfAttorney",
+    "a procuração assinada",
+  );
+  if (!hasPdfDigitalSignature(signedPowerOfAttorney.bytes)) {
+    const error = new Error(
+      "Não encontramos uma assinatura digital na procuração. Assine o PDF no gov.br e envie o arquivo baixado, sem imprimir ou salvar novamente como PDF.",
+    );
+    error.code = "JEC_PDF_SIGNATURE_REQUIRED";
+    throw error;
+  }
+
+  return {
+    body,
+    attachments: [identityDocument, proofOfResidence],
+  };
 }
 
 function sendJson(response, statusCode, payload) {
@@ -4230,19 +4331,16 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
       }
-      const body = await readJsonBody(request);
+      const { body, attachments } = await readJecPetitionPdfRequest(request);
       if (body.reviewConfirmed !== true) {
         sendJson(response, 400, { error: "jec_review_required" });
         return true;
       }
-      const reviewedTestimony = body.caseData?.answers?.consumerTestimony;
-      const testimonyText = normalizeJecTestimony(
-        reviewedTestimony?.refined || reviewedTestimony?.reviewed || "",
-      );
-      if (body.testimonyReviewed !== true || testimonyText.length < 40) {
+      if (attachments.length !== 2) {
         sendJson(response, 400, {
-          error: "jec_testimony_review_required",
-          message: "Revise e confirme o seu depoimento antes de gerar o PDF.",
+          error: "jec_pdf_attachments_required",
+          message:
+            "Envie o documento de identidade, o comprovante de residência e a procuração assinada em PDF.",
         });
         return true;
       }
@@ -4257,18 +4355,13 @@ async function handleApi(request, response, pathname) {
           return true;
         }
         if (stored.case) {
-          caseData = {
-            ...stored.case,
-            answers: {
-              ...(stored.case.answers || {}),
-              consumerTestimony: reviewedTestimony,
-            },
-          };
+          caseData = { ...stored.case };
         }
       }
-      const prepared = prepareJecPetition({
+      const calculation = await buildJecPetitionCalculation(caseData);
+      let prepared = prepareJecPetition({
         caseData,
-        calculation: await buildJecPetitionCalculation(caseData),
+        calculation,
         claimant: body.claimant || {},
         uf: body.uf,
         city: body.city,
@@ -4287,7 +4380,33 @@ async function handleApi(request, response, pathname) {
         });
         return true;
       }
-      const pdf = Buffer.from(await createJecPetitionPdf(prepared));
+      const generated = await jecTestimonyService.generateFromCaseData({
+        caseData: { ...caseData, calculation },
+      });
+      caseData = {
+        ...caseData,
+        calculation,
+        answers: {
+          ...(caseData.answers || {}),
+          consumerTestimony: {
+            original: "",
+            refined: generated.refined,
+            reviewed: true,
+            generated: true,
+          },
+        },
+      };
+      prepared = prepareJecPetition({
+        caseData,
+        calculation,
+        claimant: body.claimant || {},
+        uf: body.uf,
+        city: body.city,
+      });
+      const basePdf = await createJecPetitionPdf(prepared);
+      const pdf = Buffer.from(
+        await appendJecPetitionAttachments(basePdf, attachments),
+      );
       const modelNumber = Number(prepared.template?.sourceModel || 0) || 1;
       const fileName = `relatorio-tecnico-auditoria-itau-modelo-${modelNumber}.pdf`;
       response.writeHead(200, {
@@ -4299,9 +4418,38 @@ async function handleApi(request, response, pathname) {
       });
       response.end(pdf);
     } catch (error) {
-      sendJson(response, 500, {
-        error: "jec_petition_pdf_failed",
-        message: error instanceof Error ? error.message : "Unknown error",
+      const knownTestimonyError = error instanceof JecTestimonyError;
+      const statusByCode = {
+        BODY_TOO_LARGE: 413,
+        JEC_PDF_ATTACHMENT_REQUIRED: 400,
+        JEC_PDF_ATTACHMENT_TOO_LARGE: 413,
+        JEC_PDF_ATTACHMENT_INVALID_TYPE: 415,
+        JEC_PDF_MULTIPART_INVALID: 400,
+        JEC_PDF_SIGNATURE_REQUIRED: 422,
+        jec_petition_attachment_invalid: 422,
+      };
+      const statusCode = knownTestimonyError
+        ? error.statusCode
+        : error instanceof SyntaxError
+          ? 400
+          : statusByCode[error?.code] || 500;
+      const safeAttachmentMessage =
+        error?.code === "jec_petition_attachment_invalid"
+          ? "O documento de identidade ou o comprovante de residência não pôde ser lido como PDF. Envie outro arquivo; a procuração assinada também deve ser um PDF válido."
+          : "";
+      const bodyTooLargeMessage =
+        error?.code === "BODY_TOO_LARGE"
+          ? "Cada documento - identidade, comprovante de residência e procuração assinada - deve ter no máximo 12 MB."
+          : "";
+      sendJson(response, statusCode, {
+        error: knownTestimonyError ? error.code : error?.code || "jec_petition_pdf_failed",
+        message: knownTestimonyError
+          ? error.message
+          : safeAttachmentMessage ||
+            bodyTooLargeMessage ||
+            (statusCode < 500
+              ? error.message
+              : "Não foi possível gerar o PDF agora."),
       });
     }
     return true;

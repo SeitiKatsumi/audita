@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
+import { PDFDocument } from "pdf-lib";
 import { chromium } from "playwright";
 
 export function resolveJecPdfBrowserExecutable({
@@ -86,7 +87,8 @@ export function buildJecCalculationReportHtml(prepared) {
   return `
     <section class="audit-calculation-report" aria-label="Memória de cálculo da auditoria financeira">
       <header class="audit-report-header">
-        <h1>IA AUDITA - RELATÓRIO TÉCNICO DE AUDITORIA FINANCEIRA</h1>
+        <div class="audit-report-brand">IA AUDITA</div>
+        <h1>RELATÓRIO TÉCNICO DE AUDITORIA FINANCEIRA INDÉBITO E PERDAS E DANOS</h1>
         <p>Apuração de danos materiais, repetição de indébito e indenização por perdas e danos</p>
       </header>
 
@@ -268,8 +270,15 @@ export function buildJecPetitionHtml(prepared) {
       }
       .audit-report-header h1 {
         margin: 0 0 5pt;
-        font-size: 18pt;
+        font-size: 13pt;
         letter-spacing: .2pt;
+      }
+      .audit-report-brand {
+        margin: 0 0 3pt;
+        color: #7cc7d0;
+        font-size: 10pt;
+        font-weight: 700;
+        letter-spacing: .4pt;
       }
       .audit-report-header p {
         margin: 0;
@@ -438,4 +447,45 @@ export async function createJecPetitionPdf(
   } finally {
     await browser.close();
   }
+}
+
+function invalidPdf(code, label = "") {
+  const error = new Error(code);
+  error.code = code;
+  if (label) error.attachment = label;
+  return error;
+}
+
+async function loadPdf(bytes, code, label = "") {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+    throw invalidPdf(code, label);
+  }
+  try {
+    const pdf = await PDFDocument.load(bytes);
+    if (pdf.getPageCount() === 0) throw invalidPdf(code, label);
+    return pdf;
+  } catch (error) {
+    if (error?.code === code) throw error;
+    throw invalidPdf(code, label);
+  }
+}
+
+export async function appendJecPetitionAttachments(basePdf, attachments = []) {
+  const output = await loadPdf(basePdf, "jec_petition_pdf_invalid");
+  if (!Array.isArray(attachments)) {
+    throw invalidPdf("jec_petition_attachment_invalid");
+  }
+
+  for (const attachment of attachments) {
+    const label = String(attachment?.label || "").trim();
+    const source = await loadPdf(
+      attachment?.bytes,
+      "jec_petition_attachment_invalid",
+      label,
+    );
+    const pages = await output.copyPages(source, source.getPageIndices());
+    for (const page of pages) output.addPage(page);
+  }
+
+  return output.save();
 }

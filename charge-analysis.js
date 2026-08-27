@@ -300,7 +300,6 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   const calculationOpened = ["paywall", "result", "recovery"].includes(screen) && reviewComplete;
   const recoveryStarted = Boolean(recovery.handoff);
   const documentPrepared = Boolean(recovery.prepared?.ready);
-  const testimonyReviewed = Boolean(recovery.testimony?.reviewed);
   const documentGenerated = Boolean(recovery.pdfGeneratedAt);
 
   let percent = 0;
@@ -312,7 +311,6 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   if (calculationOpened) percent = 65;
   if (recoveryStarted) percent = 72;
   if (documentPrepared) percent = 80;
-  if (testimonyReviewed) percent = 86;
   if (documentGenerated) percent = 90;
 
   if (documentAvailability === "none") {
@@ -331,8 +329,6 @@ export function buildChargeProgressSnapshot(flowState = {}) {
   } else if (screen === "recovery") {
     activeStep = recovery.phase === "guide"
       ? "tribunal"
-      : recovery.phase === "testimony"
-        ? "report"
       : recovery.phase === "report"
         ? "report"
         : "recovery";
@@ -358,10 +354,8 @@ export function buildChargeProgressSnapshot(flowState = {}) {
     message = "Preparação iniciada. Complete e revise os dados necessários para gerar o documento.";
   } else if (documentGenerated) {
     message = "Documento gerado. O protocolo final continua pendente e deve ser concluído por uma pessoa.";
-  } else if (documentPrepared && !testimonyReviewed) {
-    message = "Documento preparado. Falta incluir e revisar o seu depoimento pessoal.";
-  } else if (testimonyReviewed && !documentGenerated) {
-    message = "Depoimento revisado. Falta gerar o PDF.";
+  } else if (documentPrepared) {
+    message = "Dados validados. Falta concluir a geração do PDF.";
   }
 
   if (documentAvailability === "partial" && selectedFileCount > 0) {
@@ -588,40 +582,6 @@ if (stage) {
   });
   faqDialog?.addEventListener("close", () => faqButton?.focus());
 
-  const RECOVERY_TESTIMONY_TOPICS = Object.freeze([
-    {
-      title: "Identificação",
-      summary: "Como descobriu a cobrança e quando isso aconteceu.",
-      question: "Como você descobriu a cobrança e quando isso aconteceu? Se a descoberta foi confirmada pelo Relatório Técnico de Auditoria Financeira, informe a data exata ou o mês e o ano.",
-    },
-    {
-      title: "Descrição do lançamento",
-      summary: "Nome exato, valores, quantidade e documentos relacionados.",
-      question: "Qual é o nome exato do lançamento como aparece na fatura ou no extrato, qual era o valor unitário ou total acumulado e quantas cobranças você identificou? Os documentos já enviados serão associados automaticamente ao relato.",
-    },
-    {
-      title: "Origem e contratação",
-      summary: "Origem da cobrança e existência de autorização.",
-      question: "Você contratou ou autorizou esses lançamentos? Conte o que sabe sobre a origem da cobrança.",
-    },
-    {
-      title: "Tentativa de solução",
-      summary: "Atendimento ao banco, resposta e protocolo, se houver.",
-      question: "Você reclamou ou buscou atendimento no banco? Se sim, informe o canal, a data, a resposta e o protocolo; se não tiver ou não lembrar, diga isso.",
-    },
-  ]);
-  const RECOVERY_TESTIMONY_FIRST_QUESTION = RECOVERY_TESTIMONY_TOPICS[0].question;
-
-  function emptyRecoveryTestimony() {
-    return {
-      turns: [],
-      currentQuestion: RECOVERY_TESTIMONY_FIRST_QUESTION,
-      original: "",
-      refined: "",
-      reviewed: false,
-    };
-  }
-
   const state = {
     screen: "triage",
     route: "consumer",
@@ -654,11 +614,11 @@ if (stage) {
       error: "",
     },
     recovery: {
-      phase: "intro",
+      phase: "report",
       handoff: null,
       claimant: {},
       prepared: null,
-      testimony: emptyRecoveryTestimony(),
+      attachments: null,
       portals: [],
       guideUf: "",
       loading: false,
@@ -672,11 +632,11 @@ if (stage) {
 
   function resetRecovery() {
     state.recovery = {
-      phase: "intro",
+      phase: "report",
       handoff: null,
       claimant: {},
       prepared: null,
-      testimony: emptyRecoveryTestimony(),
+      attachments: null,
       portals: [],
       guideUf: "",
       loading: false,
@@ -914,7 +874,7 @@ if (stage) {
         handoff.caseData.answers?.historicalDocumentsAvailable || "",
       ...(handoff.suggestion?.values || {}),
     };
-    state.recovery.phase = "intro";
+    state.recovery.phase = "report";
     state.screen = "recovery";
     void loadRecoveryDependencies();
   }
@@ -1712,7 +1672,7 @@ if (stage) {
   function renderResult() {
     const calculation = currentCalculation();
     const tiers = itauServiceTiers();
-    const selectedTier = selectedItauServiceTier(calculation);
+    const selectedTier = state.access?.entitled ? selectedItauServiceTier(calculation) : null;
     const claimCents = Math.round(Number(calculation.estimatedClaimValue || 0) * 100);
     const minimumClaimCents = Math.min(...tiers.map((tier) => Number(tier.minimumClaimCents || 0)));
     const belowMinimum = Number.isFinite(minimumClaimCents) && claimCents < minimumClaimCents;
@@ -1771,28 +1731,6 @@ if (stage) {
     return String(value || "").normalize("NFC").replace(/\s+/g, " ").trim();
   }
 
-  function renderRecoveryIntro() {
-    const loadingCopy = state.recovery.loading
-      ? "Carregando seus dados seguros..."
-      : "Preparar Relatório Técnico";
-    stage.innerHTML = `
-      <div class="charge-analysis-conversation charge-recovery-conversation">
-        ${assistantMessage(`
-          <p><strong>A análise terminou. Agora vamos organizar o caminho para buscar a restituição.</strong></p>
-          <p>A IA AUDITA não libera o dinheiro automaticamente. Ela ajuda você a reunir a prova, documentar o caso e chegar ao canal adequado com as informações organizadas.</p>
-        `, "IA AUDITA · Recuperação")}
-        ${assistantMessage(`
-          <p><strong>Agora você pode preparar a documentação para avaliar o Juizado Especial Cível.</strong></p>
-          <p>O Relatório Técnico de Auditoria reúne os dados da análise e organiza uma minuta para revisão. Depois do PDF, você escolhe o estado e recebe o passo a passo do tribunal. O protocolo final continua sendo feito por você.</p>
-        `, "IA AUDITA · Próxima etapa")}
-      </div>
-      <div class="charge-recovery-actions">
-        <button type="button" class="secondary-action" data-charge-action="back-to-result">Voltar à análise</button>
-        <button type="button" class="primary-action" data-charge-action="open-recovery-report" ${state.recovery.loading ? "disabled" : ""}>${loadingCopy}</button>
-      </div>
-    `;
-  }
-
   function recoveryUfOptions(selectedUf = "") {
     return RECOVERY_UFS.map(
       (uf) => `<option value="${uf}" ${selectedUf === uf ? "selected" : ""}>${uf}</option>`,
@@ -1817,12 +1755,13 @@ if (stage) {
   function recoveryReportFormMarkup() {
     const claimant = state.recovery.claimant || {};
     const prepared = state.recovery.prepared;
+    const attachments = state.recovery.attachments || {};
     const calculatedValues = state.recovery.handoff?.suggestion?.values || {};
     const historicalDocumentsAvailable =
       claimant.historicalDocumentsAvailable ||
       state.recovery.handoff?.caseData?.answers?.historicalDocumentsAvailable ||
       "";
-    const reportButtonLabel = prepared ? "Atualizar relatório" : "Preparar relatório";
+    const reportButtonLabel = "Gerar Relatório Técnico em PDF";
     return `
       <form class="charge-recovery-form" id="chargeRecoveryForm" aria-busy="${state.recovery.busy}">
         ${state.recovery.error ? `<p class="charge-recovery-form-error" role="alert">${escapeChargeHtml(state.recovery.error)}</p>` : ""}
@@ -1858,6 +1797,19 @@ if (stage) {
           <label><span>Cidade</span><input name="city" required maxlength="100" autocomplete="address-level2" value="${escapeChargeHtml(claimant.city || "")}" /></label>
         </div>
 
+        <div class="charge-recovery-section-title"><strong>3 documentos obrigatórios</strong><span>A identidade e o comprovante serão anexados ao PDF; a procuração deve permanecer separada.</span></div>
+        <div class="charge-power-of-attorney">
+          <strong>Baixe, preencha e assine a procuração</strong>
+          <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" download>Baixar modelo de procuração em PDF</a>. Depois de preencher, assine digitalmente; se preferir, use a <a href="https://www.gov.br/pt-br/servicos/assinatura-eletronica" target="_blank" rel="noopener noreferrer">assinatura eletrônica do gov.br</a>.</p>
+          <p>Guarde o PDF assinado original. Ele não será incorporado ao Relatório Técnico e deverá ser anexado separadamente no portal do tribunal para preservar a assinatura digital.</p>
+        </div>
+        <div class="charge-recovery-form-grid">
+          <label><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "PDF")}</small></span><input type="file" name="identityDocument" accept=".pdf,application/pdf" ${attachments.identityDocument ? "" : "required"} /></label>
+          <label><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "PDF")}</small></span><input type="file" name="proofOfResidence" accept=".pdf,application/pdf" ${attachments.proofOfResidence ? "" : "required"} /></label>
+          <label class="wide"><span>Procuração preenchida e assinada digitalmente <small>${escapeChargeHtml(attachments.signedPowerOfAttorney?.name || "PDF")}</small></span><input type="file" name="signedPowerOfAttorney" accept=".pdf,application/pdf" ${attachments.signedPowerOfAttorney ? "" : "required"} /></label>
+        </div>
+        <p class="charge-recovery-form-intro">Envie os três documentos em PDF, com até 12 MB por arquivo. A identidade e o comprovante de residência serão anexados ao relatório; a procuração assinada continuará separada.</p>
+
         <input type="hidden" name="historicalDocumentsAvailable" value="${escapeChargeHtml(historicalDocumentsAvailable)}" />
         <input type="hidden" name="doubleRefundAmount" value="${escapeChargeHtml(calculatedValues.doubleRefundAmount ?? claimant.doubleRefundAmount ?? "")}" />
         <input type="hidden" name="caseValue" value="${escapeChargeHtml(calculatedValues.caseValue ?? claimant.caseValue ?? "")}" />
@@ -1865,18 +1817,9 @@ if (stage) {
         <input type="hidden" name="moralDamagesAmount" value="${escapeChargeHtml(calculatedValues.moralDamagesAmount ?? claimant.moralDamagesAmount ?? "")}" />
 
         ${recoveryMissingFieldsMarkup(prepared)}
-        ${prepared ? `
-          <section class="charge-recovery-preview" aria-label="Prévia do Relatório Técnico">
-            <div><strong>${prepared.ready ? "Relatório pronto para revisão" : "Relatório incompleto"}</strong><span>${escapeChargeHtml(prepared.template?.label || "")}</span></div>
-            <details><summary>Revisar conteúdo do PDF</summary><pre>${escapeChargeHtml(prepared.draft || "")}</pre></details>
-            ${Array.isArray(prepared.warnings) && prepared.warnings.length ? `<details><summary>Avisos importantes</summary><ul>${prepared.warnings.map((warning) => `<li>${escapeChargeHtml(warning)}</li>`).join("")}</ul></details>` : ""}
-          </section>
-        ` : ""}
-
         <div class="charge-recovery-form-actions">
-          <button type="button" class="secondary-action" data-charge-action="back-to-recovery-intro">Voltar</button>
-          <button type="submit" class="secondary-action" data-recovery-submit="prepare" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Processando..." : reportButtonLabel}</button>
-          ${prepared?.ready ? `<button type="button" class="primary-action" data-charge-action="open-recovery-testimony" ${state.recovery.busy ? "disabled" : ""}>Continuar para o depoimento</button>` : ""}
+          <button type="button" class="secondary-action" data-charge-action="back-to-result">Voltar</button>
+          <button type="submit" class="primary-action" data-recovery-submit="prepare" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Processando..." : reportButtonLabel}</button>
         </div>
       </form>
     `;
@@ -1887,79 +1830,11 @@ if (stage) {
       <div class="charge-analysis-conversation charge-recovery-conversation compact">
         ${assistantMessage(`
           <p><strong>Agora vou montar o seu Relatório Técnico de Auditoria.</strong></p>
-          <p>Confira seus dados pessoais e o endereço. Os valores calculados na análise serão incluídos automaticamente. O documento organiza a análise e a minuta, mas ainda deve ser revisado por você ou por um profissional antes do protocolo.</p>
+          <p>Confira seus dados e envie os três PDFs obrigatórios: identidade, comprovante de residência e procuração preenchida e assinada digitalmente. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
         `, "IA AUDITA · Relatório")}
       </div>
       ${recoveryReportFormMarkup()}
     `;
-  }
-
-  function recoveryTestimonyMarkup() {
-    const testimony = state.recovery.testimony || {};
-    const turns = Array.isArray(testimony.turns) ? testimony.turns : [];
-    const hasRefinedText = Boolean(testimony.refined);
-    const questionNumber = Math.min(turns.length + 1, RECOVERY_TESTIMONY_TOPICS.length);
-    const activeTopic = RECOVERY_TESTIMONY_TOPICS[questionNumber - 1];
-    const transcript = turns
-      .map((turn, index) => `${assistantMessage(`<p>${escapeChargeHtml(turn.question)}</p>`, `IA AUDITA · ${RECOVERY_TESTIMONY_TOPICS[index]?.title || "Relato"}`)}${userMessage(turn.answer)}`)
-      .join("");
-    return `
-      <form class="charge-recovery-form charge-recovery-testimony" id="chargeRecoveryTestimonyForm" aria-busy="${state.recovery.busy}">
-        ${state.recovery.error ? `<p class="charge-recovery-form-error" role="alert">${escapeChargeHtml(state.recovery.error)}</p>` : ""}
-        <div class="charge-recovery-form-heading">
-          <div>
-            <p class="eyebrow">Relato pessoal</p>
-            <h3>Conte os fatos em quatro tópicos</h3>
-          </div>
-          <span>${hasRefinedText ? "Síntese pronta" : `Tópico ${questionNumber} de ${RECOVERY_TESTIMONY_TOPICS.length}`}</span>
-        </div>
-        <p class="charge-recovery-form-intro">Responda somente o que souber. Os documentos já enviados serão associados automaticamente e a tentativa de solução não é requisito para avançar.</p>
-        <ol class="charge-testimony-topics" aria-label="Tópicos do relato pessoal">
-          ${RECOVERY_TESTIMONY_TOPICS.map((topic, index) => `
-            <li class="${hasRefinedText || index < turns.length ? "is-complete" : index === questionNumber - 1 ? "is-active" : ""}">
-              <span>${index + 1}</span>
-              <div>
-                <strong>${escapeChargeHtml(topic.title)}</strong>
-                <small>${escapeChargeHtml(topic.summary)}</small>
-              </div>
-            </li>
-          `).join("")}
-        </ol>
-        <div class="charge-analysis-conversation charge-testimony-dialogue" aria-label="Conversa para coleta do depoimento">
-          ${transcript}
-          ${hasRefinedText
-            ? assistantMessage("<p><strong>Organizei o seu relato.</strong> Revise a versão abaixo antes de gerar o PDF.</p>", "IA AUDITA · Depoimento")
-            : assistantMessage(`<p><strong>${escapeChargeHtml(testimony.currentQuestion || RECOVERY_TESTIMONY_FIRST_QUESTION)}</strong></p>`, `IA AUDITA · ${activeTopic?.title || "Relato"}`)}
-          ${state.recovery.busy ? typingMessage() : ""}
-        </div>
-        ${!hasRefinedText ? `
-          <label class="charge-testimony-field charge-testimony-answer">
-            <span>Sua resposta</span>
-            <textarea name="testimonyAnswer" required minlength="2" maxlength="2000" rows="4" placeholder="Responda com suas palavras"></textarea>
-            <small>Não inclua senhas, número do cartão ou outros dados bancários.</small>
-          </label>
-        ` : ""}
-        ${hasRefinedText ? `
-          <label class="charge-testimony-field">
-            <span>Versão que entrará no documento</span>
-            <textarea name="refinedTestimony" required minlength="40" maxlength="5000" rows="8">${escapeChargeHtml(testimony.refined)}</textarea>
-          </label>
-          <label class="charge-testimony-confirmation">
-            <input type="checkbox" name="testimonyReviewed" ${testimony.reviewed ? "checked" : ""} />
-            <span>Revisei o texto e confirmo que ele corresponde aos fatos que relatei.</span>
-          </label>
-        ` : ""}
-        <div class="charge-recovery-form-actions">
-          <button type="button" class="secondary-action" data-charge-action="back-to-recovery-report">Voltar</button>
-          ${!hasRefinedText ? `<button type="submit" class="primary-action" data-testimony-submit="continue" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Analisando relato..." : "Responder"}</button>` : ""}
-          ${hasRefinedText ? `<button type="submit" class="primary-action" data-testimony-submit="pdf" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Gerando..." : "Gerar Relatório Técnico em PDF"}</button>` : ""}
-        </div>
-      </form>
-    `;
-  }
-
-  function renderRecoveryTestimony() {
-    stage.innerHTML = recoveryTestimonyMarkup();
   }
 
   function selectedRecoveryPortal() {
@@ -1979,7 +1854,7 @@ if (stage) {
       "Confirme a comarca, a unidade e se o caso deve seguir pelo Juizado Especial Cível.",
       "Faça o login, cadastro ou atendimento somente no ambiente oficial quando solicitado.",
       "Apresente os dados do consumidor, do banco e o relato conforme o relatório revisado.",
-      "Anexe o Relatório Técnico, documento pessoal, comprovante de residência e as provas disponíveis.",
+      "Anexe o Relatório Técnico, documento pessoal, comprovante de residência, a procuração assinada e as provas disponíveis.",
       "Revise todas as informações e conclua pessoalmente o protocolo ou atendimento.",
     ];
   }
@@ -2035,6 +1910,7 @@ if (stage) {
           ${requirements.length ? `<details><summary>O que separar antes de começar</summary><ul>${requirements.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
           ${humanOnly.length ? `<details><summary>Etapas que dependem de você</summary><ul>${humanOnly.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
           ${notes.length ? `<p class="charge-recovery-guide-note">${escapeChargeHtml(notes.join(" "))}</p>` : ""}
+          <p class="charge-recovery-guide-note"><strong>Procuração:</strong> anexe no tribunal o arquivo assinado original, separadamente do Relatório Técnico, para preservar a assinatura digital.</p>
           <div class="charge-recovery-guide-actions">
             <a class="primary-action" href="${escapeChargeHtml(portal.startUrl || portal.officialUrl || "#")}" target="_blank" rel="noreferrer">Abrir portal oficial</a>
             ${portal.officialUrl && portal.officialUrl !== portal.startUrl ? `<a class="secondary-action" href="${escapeChargeHtml(portal.officialUrl)}" target="_blank" rel="noreferrer">Ver orientações do tribunal</a>` : ""}
@@ -2069,9 +1945,8 @@ if (stage) {
 
   function renderRecovery() {
     if (state.recovery.phase === "guide") renderRecoveryGuide();
-    else if (state.recovery.phase === "testimony") renderRecoveryTestimony();
     else if (state.recovery.phase === "report") renderRecoveryReport();
-    else renderRecoveryIntro();
+    else renderRecoveryReport();
   }
 
   function readRecoveryClaimant(form) {
@@ -2103,23 +1978,8 @@ if (stage) {
 
   function recoveryPayload(claimant = state.recovery.claimant) {
     const caseData = state.recovery.handoff?.caseData || {};
-    const reviewedTestimony = String(state.recovery.testimony?.refined || "").trim();
     return {
-      caseData: {
-        ...caseData,
-        answers: {
-          ...(caseData.answers || {}),
-          ...(reviewedTestimony
-            ? {
-                consumerTestimony: {
-                  original: String(state.recovery.testimony?.original || "").trim(),
-                  refined: reviewedTestimony,
-                  reviewed: true,
-                },
-              }
-            : {}),
-        },
-      },
+      caseData,
       claimant,
       uf: claimant?.uf || "",
       city: claimant?.city || "",
@@ -2135,84 +1995,46 @@ if (stage) {
     return data.message || fallback;
   }
 
-  function readRecoveryTestimony(form) {
+  function readRecoveryPdfAttachments(form) {
     const data = new FormData(form);
-    return {
-      ...(state.recovery.testimony || emptyRecoveryTestimony()),
-      refined: String(data.get("refinedTestimony") || "").normalize("NFC").trim().slice(0, 5000),
-      reviewed: data.get("testimonyReviewed") === "on",
+    const previous = state.recovery.attachments || {};
+    const readPdf = (field, label) => {
+      const selected = data.get(field);
+      const file = selected?.size ? selected : previous[field];
+      if (!file?.size || typeof file.arrayBuffer !== "function") {
+        throw new Error(`Envie ${label} em PDF para continuar.`);
+      }
+      const isPdf = file.type === "application/pdf" || String(file.name || "").toLowerCase().endsWith(".pdf");
+      if (!isPdf) throw new Error(`${label} deve ser enviado em PDF.`);
+      if (file.size > 12 * 1024 * 1024) throw new Error(`${label} deve ter no máximo 12 MB.`);
+      return file;
     };
-  }
-
-  async function continueRecoveryTestimony(form) {
-    if (state.recovery.busy) return;
-    const data = new FormData(form);
-    const answer = String(data.get("testimonyAnswer") || "").normalize("NFC").trim().slice(0, 2000);
-    if (answer.length < 2) {
-      state.recovery.error = "Responda à pergunta para continuar.";
-      renderRecoveryTestimony();
-      return;
-    }
-    const testimony = state.recovery.testimony || emptyRecoveryTestimony();
-    const turns = [
-      ...(Array.isArray(testimony.turns) ? testimony.turns : []),
-      {
-        question: testimony.currentQuestion || RECOVERY_TESTIMONY_FIRST_QUESTION,
-        answer,
-      },
-    ];
-    state.recovery.testimony = { ...testimony, turns, reviewed: false };
-    state.recovery.busy = true;
-    state.recovery.error = "";
-    render();
-
-    try {
-      const response = await fetch("/api/jec/testimony/refine", {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ turns }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (response.status === 401) {
-        document.querySelector("#loginButton")?.click();
-        throw new Error("Entre na IA AUDITA para continuar o seu depoimento.");
-      }
-      if (!response.ok || !data.testimony?.status) {
-        throw new Error(recoveryApiError(data, "Não foi possível continuar o depoimento agora."));
-      }
-      const responseTurns = Array.isArray(data.testimony.turns) ? data.testimony.turns : turns;
-      state.recovery.testimony = data.testimony.status === "complete"
-        ? {
-            turns: responseTurns,
-            currentQuestion: "",
-            original: data.testimony.original || responseTurns.map((turn) => turn.answer).join("\n\n"),
-            refined: data.testimony.refined || "",
-            reviewed: false,
-          }
-        : {
-            ...testimony,
-            turns: responseTurns,
-            currentQuestion: data.testimony.question || "",
-            reviewed: false,
-          };
-    } catch (error) {
-      state.recovery.testimony = { ...testimony, turns };
-      state.recovery.error = error?.message || "Falha ao continuar o depoimento.";
-    } finally {
-      state.recovery.busy = false;
-      state.recovery.phase = "testimony";
-      render();
-    }
+    const attachments = {
+      identityDocument: readPdf("identityDocument", "o documento de identidade"),
+      proofOfResidence: readPdf("proofOfResidence", "o comprovante de residência"),
+      signedPowerOfAttorney: readPdf("signedPowerOfAttorney", "a procuração preenchida e assinada"),
+    };
+    return attachments;
   }
 
   async function prepareRecoveryReport(form) {
     if (state.recovery.busy) return;
     const claimant = readRecoveryClaimant(form);
+    let attachments;
+    try {
+      attachments = readRecoveryPdfAttachments(form);
+    } catch (error) {
+      state.recovery.error = error?.message || "Envie os três documentos obrigatórios em PDF.";
+      renderRecoveryReport();
+      return;
+    }
     state.recovery.claimant = claimant;
+    state.recovery.attachments = attachments;
     state.recovery.busy = true;
     state.recovery.error = "";
     render();
 
+    let shouldGenerate = false;
     try {
       const response = await fetch("/api/jec/petitions/prepare", {
         method: "POST",
@@ -2231,34 +2053,39 @@ if (stage) {
       state.recovery.error = data.prepared.ready
         ? ""
         : recoveryApiError(data.prepared, "Revise os campos indicados.");
+      state.recovery.phase = "report";
+      shouldGenerate = data.prepared.ready;
     } catch (error) {
       state.recovery.error = error?.message || "Falha ao preparar o Relatório Técnico.";
     } finally {
       state.recovery.busy = false;
-      state.recovery.phase = "report";
-      render();
     }
+    if (shouldGenerate) await downloadRecoveryReport(claimant, attachments);
+    else render();
   }
 
-  async function downloadRecoveryReport(claimant = state.recovery.claimant) {
-    if (
-      state.recovery.busy ||
-      !state.recovery.prepared?.ready ||
-      !state.recovery.testimony?.reviewed
-    ) return;
+  async function downloadRecoveryReport(
+    claimant = state.recovery.claimant,
+    attachments = state.recovery.attachments,
+  ) {
+    if (state.recovery.busy || !state.recovery.prepared?.ready || !attachments) return;
     state.recovery.busy = true;
     state.recovery.error = "";
     render();
 
     try {
+      const formData = new FormData();
+      formData.append("payload", JSON.stringify({
+        ...recoveryPayload(claimant),
+        reviewConfirmed: true,
+      }));
+      formData.append("identityDocument", attachments.identityDocument);
+      formData.append("proofOfResidence", attachments.proofOfResidence);
+      formData.append("signedPowerOfAttorney", attachments.signedPowerOfAttorney);
       const response = await fetch("/api/jec/petitions/pdf", {
         method: "POST",
-        headers: { "content-type": "application/json", accept: "application/pdf" },
-        body: JSON.stringify({
-          ...recoveryPayload(claimant),
-          reviewConfirmed: true,
-          testimonyReviewed: true,
-        }),
+        headers: { accept: "application/pdf" },
+        body: formData,
       });
       if (response.status === 401) {
         document.querySelector("#loginButton")?.click();
@@ -2286,7 +2113,7 @@ if (stage) {
       state.recovery.phase = "guide";
     } catch (error) {
       state.recovery.error = error?.message || "Falha ao gerar o Relatório Técnico.";
-      state.recovery.phase = "testimony";
+      state.recovery.phase = "report";
     } finally {
       state.recovery.busy = false;
       render();
@@ -2525,7 +2352,8 @@ if (stage) {
       state.documentAvailability = "";
       state.screen = "documents";
     } else if (action === "continue-itau-service") {
-      state.screen = "result";
+      void purchaseItauService();
+      return;
     } else if (action === "purchase-lawyer-kit") {
       void purchaseLawyerKit();
       return;
@@ -2534,15 +2362,6 @@ if (stage) {
       return;
     } else if (action === "back-to-result") {
       state.screen = "result";
-    } else if (action === "open-recovery-report") {
-      state.recovery.phase = "report";
-    } else if (action === "open-recovery-testimony") {
-      const form = button.closest("form");
-      if (form) state.recovery.claimant = readRecoveryClaimant(form);
-      state.recovery.error = "";
-      state.recovery.phase = "testimony";
-    } else if (action === "back-to-recovery-intro") {
-      state.recovery.phase = "intro";
     } else if (action === "back-to-recovery-report") {
       state.recovery.phase = "report";
     } else if (action === "download-report-again") {
@@ -2586,25 +2405,6 @@ if (stage) {
     if (event.target.id === "chargeRecoveryForm") {
       event.preventDefault();
       void prepareRecoveryReport(event.target);
-      return;
-    }
-
-    if (event.target.id === "chargeRecoveryTestimonyForm") {
-      event.preventDefault();
-      const action = event.submitter?.dataset.testimonySubmit || "continue";
-      if (action === "pdf") {
-        const testimony = readRecoveryTestimony(event.target);
-        if (!testimony.reviewed || testimony.refined.length < 40) {
-          state.recovery.error = "Revise o texto e confirme que ele corresponde aos fatos relatados.";
-          state.recovery.testimony = testimony;
-          renderRecoveryTestimony();
-          return;
-        }
-        state.recovery.testimony = testimony;
-        void downloadRecoveryReport();
-      } else {
-        void continueRecoveryTestimony(event.target);
-      }
       return;
     }
 

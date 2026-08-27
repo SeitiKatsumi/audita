@@ -7,6 +7,114 @@ import {
   normalizeJecTestimony,
 } from "../services/jec-testimony.service.mjs";
 
+test("case facts generation sends only structured non-personal evidence to the AI", async () => {
+  let request;
+  const service = createJecTestimonyService({
+    env: { AUDITA_OPENAI_API_KEY: "test-key", AUDITA_CHAT_MODEL: "gpt-test" },
+    clientFactory() {
+      return {
+        responses: {
+          async create(payload) {
+            request = payload;
+            return {
+              output_text:
+                "Ao revisar meus extratos, identifiquei em janeiro de 2026 uma cobrança de Seguro Alfa no valor de R$ 89,90, que marquei como não reconhecida.",
+            };
+          },
+        },
+      };
+    },
+  });
+
+  const result = await service.generateFromCaseData({
+    caseData: {
+      claimant: { name: "Nome Sigiloso", cpf: "123.456.789-00", address: "Rua Sigilosa" },
+      identityPdf: "JVBERi0xLjQ=",
+      candidates: [
+        {
+          answer: "not_recognized",
+          label: "Seguro Alfa",
+          date: "2026-01-15",
+          amount: 89.9,
+          sourceFileName: "extrato-janeiro.pdf",
+          rawText: "CPF 123.456.789-00",
+        },
+        { answer: "recognized", label: "Compra reconhecida", amount: 500 },
+      ],
+      answers: {
+        authorizationAnswer: "denied",
+        selectedBrand: "Itaú",
+        documentAvailability: "complete",
+        priorComplaint: "no",
+        cpf: "123.456.789-00",
+        address: "Rua Sigilosa",
+        consumerTestimony: "texto pessoal anterior",
+      },
+      calculation: {
+        items: [{
+          date: "2026-01-15",
+          amount: 89.9,
+          correction: 1.25,
+          interest: 2.1,
+          updatedPrincipal: 93.25,
+          doubleWithAdjustments: 183.15,
+          rawPdf: "JVBERi0xLjQ=",
+        }],
+        principal: 89.9,
+        doubleWithAdjustments: 183.15,
+        moralDamagesAmount: 4_400,
+        estimatedClaimValue: 4_676.4,
+        calculationAsOf: "2026-08-27",
+      },
+    },
+  });
+
+  const facts = JSON.parse(request.input);
+  assert.deepEqual(facts.lancamentosNaoReconhecidos, [{
+    descricao: "Seguro Alfa",
+    data: "2026-01-15",
+    valor: 89.9,
+  }]);
+  assert.equal(facts.informacoesColetadas.authorizationAnswer, undefined);
+  assert.equal(facts.informacoesColetadas.coberturaDosDocumentos, "completa");
+  assert.equal(facts.resumoDoCalculo.perdasEDanosReferenciais, 4_400);
+  assert.doesNotMatch(request.input, /Nome Sigiloso|123\.456|Rua Sigilosa|JVBER|Compra reconhecida|texto pessoal|extrato-janeiro/i);
+  assert.match(request.instructions, /primeira pessoa/i);
+  assert.match(request.instructions, /1 a 3 parágrafos/i);
+  assert.match(request.instructions, /nunca exponha chaves técnicas/i);
+  assert.match(request.instructions, /Não inclua fundamentos jurídicos, pedidos/i);
+  assert.equal(result.refined.includes("Seguro Alfa"), true);
+});
+
+test("case facts generation fails without AI, on provider error, and on short output", async () => {
+  await assert.rejects(
+    createJecTestimonyService({ env: {} }).generateFromCaseData({ caseData: {} }),
+    (error) => error instanceof JecTestimonyError && error.code === "jec_testimony_ai_unavailable",
+  );
+
+  const failing = createJecTestimonyService({
+    env: { AUDITA_OPENAI_API_KEY: "test-key" },
+    clientFactory() {
+      return { responses: { async create() { throw new Error("provider down"); } } };
+    },
+  });
+  await assert.rejects(
+    failing.generateFromCaseData({ caseData: {} }),
+    (error) => error instanceof JecTestimonyError && error.code === "jec_testimony_ai_failed",
+  );
+
+  const shortOutput = createJecTestimonyService({
+    env: { AUDITA_OPENAI_API_KEY: "test-key" },
+    clientFactory() {
+      return { responses: { async create() { return { output_text: "Poucos fatos." }; } } };
+    },
+  });
+  await assert.rejects(
+    shortOutput.generateFromCaseData({ caseData: {} }),
+    (error) => error instanceof JecTestimonyError && error.code === "jec_testimony_ai_invalid_output",
+  );
+});
+
 test("testimony refinement uses the production secret reference and a fact-preserving prompt", async () => {
   let clientConfig;
   let request;

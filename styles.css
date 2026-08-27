@@ -10127,7 +10127,7 @@ body[data-active-page="chat"] .workspace {
   box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
 }
 
-.jec-testimony-section {
+.jec-document-attachments {
   display: grid;
   gap: 12px;
   padding: 18px;
@@ -10137,194 +10137,36 @@ body[data-active-page="chat"] .workspace {
   background: rgba(5, 27, 45, 0.52);
 }
 
-.jec-testimony-section > strong {
+.jec-document-attachments > strong {
   color: #eef8fc;
 }
 
-.jec-testimony-section > p {
+.jec-document-attachments > p {
   margin: 0;
   color: #91aebe;
   font-size: 0.75rem;
   line-height: 1.5;
 }
 
-.jec-testimony-section > label:not(.jec-confirmation) {
-  display: grid;
-  gap: 7px;
-  color: #dcecf4;
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.jec-testimony-section textarea {
-  width: 100%;
-  min-height: 150px;
-  padding: 12px;
-  resize: vertical;
-  border: 1px solid rgba(105, 165, 204, 0.34);
-  border-radius: 6px;
-  outline: none;
-  color: #edf8fc;
-  background: rgba(3, 19, 32, 0.72);
-  font: inherit;
-  font-size: 0.8rem;
-  font-weight: 400;
-  line-height: 1.55;
-}
-
-.jec-testimony-section textarea:focus {
-  border-color: rgba(49, 247, 143, 0.65);
-  box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
-}
-
-.charge-testimony-prompts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 20px;
-}
-
-.charge-testimony-prompts span {
-  padding: 6px 9px;
-  border: 1px solid rgba(105, 165, 204, 0.22);
-  border-radius: 6px;
-  color: #a9c8da;
-  background: rgba(105, 165, 204, 0.07);
-  font-size: 0.7rem;
-}
-
-.charge-testimony-field {
-  display: grid;
-  gap: 8px;
-  color: #dcecf4;
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.charge-testimony-field textarea {
-  width: 100%;
-  min-height: 180px;
-  padding: 14px;
-  resize: vertical;
-  border: 1px solid rgba(105, 165, 204, 0.34);
-  border-radius: 6px;
-  outline: none;
-  color: #edf8fc;
-  background: rgba(3, 19, 32, 0.72);
-  font: inherit;
-  font-size: 0.83rem;
-  font-weight: 400;
-  line-height: 1.6;
-}
-
-.charge-testimony-field textarea:focus {
-  border-color: rgba(49, 247, 143, 0.65);
-  box-shadow: 0 0 0 3px rgba(49, 247, 143, 0.08);
-}
-
-.charge-testimony-dialogue {
-  gap: 14px;
-  padding: 18px 0 24px;
-}
-
-.charge-testimony-topics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin: 20px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.charge-testimony-topics li {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  gap: 9px;
-  align-items: start;
-  padding: 12px;
-  border: 1px solid rgba(105, 165, 204, 0.2);
-  border-radius: 8px;
-  background: rgba(3, 19, 32, 0.45);
-}
-
-.charge-testimony-topics li > span {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border: 1px solid rgba(105, 165, 204, 0.36);
-  border-radius: 50%;
-  color: #9cb8c9;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.charge-testimony-topics strong,
-.charge-testimony-topics small {
-  display: block;
-}
-
-.charge-testimony-topics strong {
-  color: #dcecf4;
-  font-size: 0.75rem;
-}
-
-.charge-testimony-topics small {
-  margin-top: 4px;
-  color: #829dad;
-  font-size: 0.66rem;
-  line-height: 1.4;
-}
-
-.charge-testimony-topics li.is-active {
-  border-color: rgba(49, 247, 143, 0.65);
-  background: rgba(49, 247, 143, 0.07);
-}
-
-.charge-testimony-topics li.is-active > span,
-.charge-testimony-topics li.is-complete > span {
-  border-color: #31f78f;
-  color: #062319;
-  background: #31f78f;
-}
-
-@media (max-width: 720px) {
-  .charge-testimony-topics {
-    grid-template-columns: 1fr;
-  }
-}
-
-.charge-testimony-answer {
-  margin-top: 4px;
-}
-
-.charge-testimony-answer textarea {
-  min-height: 112px;
-}
-
-.charge-testimony-field small {
-  color: #829dad;
-  font-size: 0.68rem;
-  font-weight: 400;
-  line-height: 1.45;
-}
-
-.charge-testimony-confirmation {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: start;
-  gap: 10px;
-  margin-top: 18px;
-  color: #b9ced9;
+.jec-power-of-attorney,
+.charge-power-of-attorney {
+  padding: 12px 14px;
+  border-left: 3px solid var(--lime);
+  color: #bcd0dd;
+  background: rgba(49, 247, 143, 0.06);
   font-size: 0.75rem;
   line-height: 1.5;
 }
 
-.charge-testimony-confirmation input {
-  width: 18px;
-  height: 18px;
-  margin: 1px 0 0;
-  accent-color: #31f78f;
+.jec-power-of-attorney p,
+.charge-power-of-attorney p {
+  margin: 6px 0 0;
+}
+
+.jec-power-of-attorney a,
+.charge-power-of-attorney a {
+  color: #69c9fa;
+  font-weight: 800;
 }
 
 .charge-recovery-section-title {
