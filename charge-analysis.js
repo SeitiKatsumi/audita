@@ -603,6 +603,7 @@ if (stage) {
       loading: false,
       access: { entitled: false, source: "none" },
       documents: [],
+      uf: "",
       checkoutStatus: "",
       error: "",
     },
@@ -1391,6 +1392,9 @@ if (stage) {
           { title: "Decisão de suspensão do processo", available: true },
         ];
     const entitled = Boolean(state.lawyerKit.access?.entitled);
+    const selectedUf = entitled
+      ? String(state.lawyerKit.access?.uf || "")
+      : state.lawyerKit.uf;
     const price = Number(product?.price?.cents || 39999) / 100;
     stage.innerHTML = `
       <div class="charge-analysis-conversation compact">
@@ -1409,6 +1413,11 @@ if (stage) {
           </div>
           <strong>${formatChargeCurrency(price)}</strong>
         </div>
+        ${entitled
+          ? `<p class="charge-lawyer-kit-note">Estado das jurisprudências: <strong>${escapeChargeHtml(selectedUf || "não definido")}</strong></p>`
+          : `<div class="charge-recovery-form-grid">
+              <label class="wide"><span>Estado das jurisprudências</span><select id="lawyerKitUf" required><option value="">Selecione</option>${RECOVERY_UFS.map((uf) => `<option value="${uf}" ${selectedUf === uf ? "selected" : ""}>${uf}</option>`).join("")}</select></label>
+            </div>`}
         <ul class="charge-lawyer-kit-documents">
           ${documents.map((document) => `
             <li>
@@ -1418,7 +1427,7 @@ if (stage) {
               </div>
               ${entitled && document.downloadUrl
                 ? `<a class="secondary-action" href="${escapeChargeHtml(document.downloadUrl)}">Baixar PDF</a>`
-                : `<span class="${document.included === false ? "pending" : "ready"}">${document.included === false ? "Não incluído" : "Incluído"}</span>`}
+                : `<span class="${document.available === false || document.included === false ? "pending" : "ready"}">${document.included === false ? "Não incluído" : document.available === false ? "Indisponível" : "Incluído"}</span>`}
             </li>
           `).join("")}
         </ul>
@@ -1436,7 +1445,7 @@ if (stage) {
           <button type="button" class="secondary-action" data-charge-action="back-triage">Voltar</button>
           ${entitled
             ? ""
-            : `<button type="button" class="primary-action" data-charge-action="purchase-lawyer-kit" ${state.lawyerKit.loading || !product?.checkoutAvailable ? "disabled" : ""}>${state.lawyerKit.loading ? "Carregando..." : "Comprar kit"}</button>`}
+            : `<button type="button" class="primary-action" data-charge-action="purchase-lawyer-kit" ${state.lawyerKit.loading || !product?.checkoutAvailable || !selectedUf ? "disabled" : ""}>${state.lawyerKit.loading ? "Carregando..." : "Comprar kit"}</button>`}
         </div>
         ${!entitled && product && !product.checkoutAvailable
           ? `<p class="charge-paywall-demo" role="note">O checkout está temporariamente indisponível.</p>`
@@ -1461,6 +1470,7 @@ if (stage) {
       }
       state.billingCatalog = catalog;
       state.lawyerKit.access = kit.access || { entitled: false, source: "none" };
+      if (state.lawyerKit.access.uf) state.lawyerKit.uf = state.lawyerKit.access.uf;
       state.lawyerKit.documents = Array.isArray(kit.documents) ? kit.documents : [];
     } catch (error) {
       state.lawyerKit.error = error?.message || "Não foi possível carregar o kit agora.";
@@ -1472,6 +1482,11 @@ if (stage) {
 
   async function purchaseLawyerKit() {
     if (state.lawyerKit.loading) return;
+    if (!RECOVERY_UFS.includes(state.lawyerKit.uf)) {
+      state.lawyerKit.error = "Selecione o estado das jurisprudências.";
+      renderLawyerKit();
+      return;
+    }
     state.lawyerKit.loading = true;
     state.lawyerKit.error = "";
     renderLawyerKit();
@@ -1479,7 +1494,7 @@ if (stage) {
       const response = await fetch("/api/itau-lawyer-kit/checkout", {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ requestId: crypto.randomUUID() }),
+        body: JSON.stringify({ requestId: crypto.randomUUID(), uf: state.lawyerKit.uf }),
       });
       const data = await response.json().catch(() => ({}));
       if (response.status === 401) {
@@ -2366,6 +2381,11 @@ if (stage) {
   });
 
   stage.addEventListener("change", (event) => {
+    if (event.target.id === "lawyerKitUf") {
+      state.lawyerKit.uf = String(event.target.value || "").toUpperCase();
+      state.lawyerKit.error = "";
+      renderLawyerKit();
+    }
     if (event.target.id === "chargeAnalysisFile") {
       const files = Array.from(event.target.files || []);
       state.selectedFiles = mergeChargeAnalysisFiles(state.selectedFiles, files);

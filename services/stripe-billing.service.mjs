@@ -12,6 +12,10 @@ const STRIPE_API_VERSION = "2026-06-24.dahlia";
 const STRIPE_INTEGRATION_IDENTIFIER = "audita_checkout_kmqrvzdp";
 const WEBHOOK_TOLERANCE_SECONDS = 300;
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
+const BRAZIL_UFS = new Set([
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+]);
 
 function text(value, fallback = "") {
   return String(value ?? fallback).trim();
@@ -20,6 +24,11 @@ function text(value, fallback = "") {
 function integer(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isInteger(parsed) ? parsed : fallback;
+}
+
+function normalizeUf(value) {
+  const uf = text(value).toUpperCase();
+  return BRAZIL_UFS.has(uf) ? uf : "";
 }
 
 function timestampToIso(value) {
@@ -61,6 +70,9 @@ function safeMetadata(metadata = {}) {
     itauTierId: text(metadata.itau_tier_id ?? metadata.itauTierId),
     itauLawyerKitId: text(
       metadata.itau_lawyer_kit_id ?? metadata.itauLawyerKitId,
+    ),
+    itauLawyerKitUf: normalizeUf(
+      metadata.itau_lawyer_kit_uf ?? metadata.itauLawyerKitUf,
     ),
     itauClaimCents: Math.max(0, integer(metadata.itau_claim_cents ?? metadata.itauClaimCents)),
     caseIds,
@@ -619,30 +631,33 @@ export function createStripeBillingService({
     if (!authContext?.tenantId) return { unauthorized: true };
     const { pool, ready } = db();
     if (!ready) {
-      const purchased = [...memoryEvents.values()].some(
+      const purchase = [...memoryEvents.values()].findLast(
         (event) =>
           event.status === "processed" &&
           event.tenantId === text(authContext.tenantId) &&
           event.metadata?.purchaseKind === "itau_lawyer_kit",
       );
       return {
-        entitled: purchased,
-        source: purchased ? "itau_lawyer_kit" : "none",
+        entitled: Boolean(purchase),
+        source: purchase ? "itau_lawyer_kit" : "none",
+        uf: normalizeUf(purchase?.metadata?.uf),
       };
     }
     const result = await pool.query(
-      `SELECT 1
+      `SELECT metadata
        FROM audita_billing_events
        WHERE tenant_id = $1
          AND status = 'processed'
          AND event_type = 'checkout.session.completed'
          AND metadata->>'purchaseKind' = 'itau_lawyer_kit'
+       ORDER BY processed_at DESC, id DESC
        LIMIT 1`,
       [authContext.tenantId],
     );
     return {
       entitled: Boolean(result.rows[0]),
       source: result.rows[0] ? "itau_lawyer_kit" : "none",
+      uf: normalizeUf(result.rows[0]?.metadata?.uf),
     };
   }
 
@@ -724,6 +739,10 @@ export function createStripeBillingService({
       };
     }
 
+    const lawyerKitUf = normalizeUf(input.uf);
+    if (selection.kind === "itau_lawyer_kit" && !lawyerKitUf) {
+      return { invalid: true, reason: "itau_lawyer_kit_uf_required" };
+    }
     const customer = await ensureCustomer(authContext);
     const requestId = text(input.requestId) || crypto.randomUUID();
     const caseIds = [...new Set((Array.isArray(input.caseIds) ? input.caseIds : []).map(text).filter(Boolean))]
@@ -741,6 +760,7 @@ export function createStripeBillingService({
       credits: String(selection.credits),
       itau_tier_id: selection.kind === "itau_charge_service" ? selection.id : "",
       itau_lawyer_kit_id: selection.kind === "itau_lawyer_kit" ? selection.id : "",
+      itau_lawyer_kit_uf: selection.kind === "itau_lawyer_kit" ? lawyerKitUf : "",
       itau_claim_cents:
         selection.kind === "itau_charge_service" ? String(Math.max(0, integer(input.claimAmountCents))) : "",
       itau_case_ids_1:
@@ -841,6 +861,7 @@ export function createStripeBillingService({
         purchase: {
           purchaseKind: metadata.purchaseKind,
           productId: metadata.itauLawyerKitId,
+          uf: metadata.itauLawyerKitUf,
           stripeCheckoutSessionId: text(object.id),
         },
       };

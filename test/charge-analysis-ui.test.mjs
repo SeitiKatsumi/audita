@@ -562,8 +562,11 @@ test("lawyer route sells a protected one-time document kit", () => {
   assert.match(chargeAnalysisJs, /document\.included === false/);
   assert.match(serverJs, /included: true/);
   assert.match(chargeAnalysisJs, /\/api\/itau-lawyer-kit\/checkout/);
+  assert.match(chargeAnalysisJs, /id="lawyerKitUf"/);
+  assert.match(chargeAnalysisJs, /body: JSON\.stringify\(\{ requestId: crypto\.randomUUID\(\), uf: state\.lawyerKit\.uf \}\)/);
   assert.match(serverJs, /\/api\/itau-lawyer-kit\/documents/);
   assert.match(serverJs, /itauLawyerKitAccessState/);
+  assert.match(serverJs, /directusLawyerKitService\.listJurisprudence\(access\.uf\)/);
   assert.match(serverJs, /private-documents/);
   assert.match(serverJs, /itau_lawyer_kit_purchase_required/);
   assert.doesNotMatch(chargeAnalysisJs, /Sou advogado ou advogada — disponível em breve/);

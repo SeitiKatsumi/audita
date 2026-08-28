@@ -223,10 +223,12 @@ test("paid lawyer kit checkout grants permanent tenant access", async () => {
   const checkout = await service.createCheckoutSession(member, {
     kind: "itau_lawyer_kit",
     requestId: "lawyer-kit-1",
+    uf: "SP",
   });
   assert.equal(checkout.kind, "itau_lawyer_kit");
   assert.equal(calls[1].body.get("mode"), "payment");
   assert.equal(calls[1].body.get("line_items[0][price]"), "price_itau_lawyer_kit");
+  assert.equal(calls[1].body.get("metadata[itau_lawyer_kit_uf]"), "SP");
   assert.match(calls[1].body.get("success_url"), /lawyer_kit_checkout=success/);
 
   const event = {
@@ -243,6 +245,7 @@ test("paid lawyer kit checkout grants permanent tenant access", async () => {
           audita_tenant_id: "tenant-1",
           purchase_kind: "itau_lawyer_kit",
           itau_lawyer_kit_id: "itau-kit-advocacia",
+          itau_lawyer_kit_uf: "SP",
         },
       },
     },
@@ -254,6 +257,20 @@ test("paid lawyer kit checkout grants permanent tenant access", async () => {
   assert.deepEqual(await service.itauLawyerKitAccessState(member), {
     entitled: true,
     source: "itau_lawyer_kit",
+    uf: "SP",
+  });
+});
+
+test("lawyer kit checkout requires a valid Brazilian state", async () => {
+  const service = createStripeBillingService({ env: configuredEnv() });
+  const result = await service.createCheckoutSession(AUTH, {
+    kind: "itau_lawyer_kit",
+    uf: "XX",
+  });
+
+  assert.deepEqual(result, {
+    invalid: true,
+    reason: "itau_lawyer_kit_uf_required",
   });
 });
 

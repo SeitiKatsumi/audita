@@ -29,6 +29,10 @@ import { createSuperAdminService } from "./services/super-admin.service.mjs";
 import { createDirectDataCourtService } from "./services/direct-data-court.service.mjs";
 import { createDirectDataCertificatesService } from "./services/direct-data-certificates.service.mjs";
 import {
+  createDirectusLawyerKitService,
+  DirectusLawyerKitError,
+} from "./services/directus-lawyer-kit.service.mjs";
+import {
   createDirectDataPersonService,
   personNamesMatch,
 } from "./services/direct-data-person.service.mjs";
@@ -108,12 +112,6 @@ const itauLawyerKitDocuments = Object.freeze([
     title: "Decisão de suspensão do processo",
     fileName: "suspensao-24-meses.pdf",
     downloadName: "ia-audita-decisao-suspensao-24-meses.pdf",
-  },
-  {
-    slug: "jurisprudencia-acordo-voto",
-    title: "Jurisprudências e Apelações",
-    fileName: "",
-    downloadName: "",
   },
 ]);
 loadLocalEnvFiles();
@@ -1643,6 +1641,7 @@ const stripeBillingService = createStripeBillingService({
   creditsService,
   accessService: billingAccessService,
 });
+const directusLawyerKitService = createDirectusLawyerKitService();
 const billingAdminService = createBillingAdminService({
   getDb: () => ({ pool, dbReady }),
   accessService: billingAccessService,
@@ -3355,18 +3354,52 @@ async function handleApi(request, response, pathname) {
     const access = authContext.unauthorized
       ? { entitled: false, source: "none" }
       : await stripeBillingService.itauLawyerKitAccessState(authContext);
+    const documents = itauLawyerKitDocuments.map((document) => ({
+      slug: document.slug,
+      title: document.title,
+      included: true,
+      available: Boolean(document.fileName),
+      downloadUrl:
+        access.entitled && document.fileName
+          ? `/api/itau-lawyer-kit/documents/${document.slug}`
+          : null,
+    }));
+    let jurisprudenceError = "";
+    if (access.entitled && access.uf) {
+      try {
+        const jurisprudence = await directusLawyerKitService.listJurisprudence(access.uf);
+        documents.push(...jurisprudence.files.map((file) => ({
+          slug: `jurisprudencia-${file.order}`,
+          title: file.title,
+          included: true,
+          available: true,
+          downloadUrl: `/api/itau-lawyer-kit/documents/jurisprudencia-${file.order}`,
+        })));
+      } catch (error) {
+        jurisprudenceError = error instanceof DirectusLawyerKitError
+          ? error.code
+          : "directus_lawyer_kit_unavailable";
+        documents.push(...[1, 2].map((order) => ({
+          slug: `jurisprudencia-${order}`,
+          title: `Jurisprudência ${access.uf} ${String(order).padStart(2, "0")}`,
+          included: true,
+          available: false,
+          downloadUrl: null,
+        })));
+      }
+    } else {
+      documents.push({
+        slug: "jurisprudencias-uf",
+        title: "2 jurisprudências e apelações do estado escolhido",
+        included: true,
+        available: !access.entitled,
+        downloadUrl: null,
+      });
+    }
     sendJson(response, 200, {
       access,
-      documents: itauLawyerKitDocuments.map((document) => ({
-        slug: document.slug,
-        title: document.title,
-        included: true,
-        available: Boolean(document.fileName),
-        downloadUrl:
-          access.entitled && document.fileName
-            ? `/api/itau-lawyer-kit/documents/${document.slug}`
-            : null,
-      })),
+      documents,
+      jurisprudenceError,
     });
     return true;
   }
@@ -3382,6 +3415,7 @@ async function handleApi(request, response, pathname) {
       const result = await stripeBillingService.createCheckoutSession(authContext, {
         kind: "itau_lawyer_kit",
         requestId: String(input.requestId || ""),
+        uf: String(input.uf || ""),
       });
       if (result.invalid) {
         sendJson(response, 400, { error: result.reason });
@@ -3422,8 +3456,40 @@ async function handleApi(request, response, pathname) {
       sendJson(response, 403, { error: "itau_lawyer_kit_purchase_required" });
       return true;
     }
+    const slug = lawyerKitDocumentMatch[1];
+    const jurisprudenceMatch = slug.match(/^jurisprudencia-([12])$/);
+    if (jurisprudenceMatch) {
+      try {
+        if (!access.uf) {
+          sendJson(response, 409, { error: "itau_lawyer_kit_uf_missing" });
+          return true;
+        }
+        const jurisprudence = await directusLawyerKitService.listJurisprudence(access.uf);
+        const file = jurisprudence.files[Number(jurisprudenceMatch[1]) - 1];
+        const bytes = await directusLawyerKitService.download(file.id);
+        response.writeHead(200, {
+          "content-type": "application/pdf",
+          "content-length": bytes.length,
+          "content-disposition": `attachment; filename="${file.fileName}"`,
+          "cache-control": "private, no-store",
+          "x-content-type-options": "nosniff",
+        });
+        response.end(bytes);
+      } catch (error) {
+        sendJson(
+          response,
+          error instanceof DirectusLawyerKitError ? error.statusCode : 503,
+          {
+            error: error instanceof DirectusLawyerKitError
+              ? error.code
+              : "directus_lawyer_kit_unavailable",
+          },
+        );
+      }
+      return true;
+    }
     const document = itauLawyerKitDocuments.find(
-      (candidate) => candidate.slug === lawyerKitDocumentMatch[1],
+      (candidate) => candidate.slug === slug,
     );
     if (!document?.fileName) {
       sendJson(response, 404, { error: "itau_lawyer_kit_document_not_available" });
