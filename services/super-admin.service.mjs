@@ -1,4 +1,4 @@
-const MANAGEABLE_ROLES = new Set(["owner", "admin", "analyst", "member"]);
+const MANAGEABLE_ROLES = new Set(["owner", "admin", "analyst", "member", "lawyer"]);
 const MANAGEABLE_STATUSES = new Set(["active", "suspended"]);
 
 function text(value) {

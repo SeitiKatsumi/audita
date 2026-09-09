@@ -23,7 +23,31 @@ CREATE TABLE IF NOT EXISTS audita_users (
 ALTER TABLE audita_users DROP CONSTRAINT IF EXISTS audita_users_role_check;
 ALTER TABLE audita_users
   ADD CONSTRAINT audita_users_role_check
-  CHECK (role IN ('super_admin', 'owner', 'admin', 'analyst', 'member'));
+  CHECK (role IN ('super_admin', 'owner', 'admin', 'analyst', 'member', 'lawyer'));
+
+CREATE TABLE IF NOT EXISTS audita_lawyer_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id BIGINT NOT NULL REFERENCES audita_tenants(id),
+  user_id BIGINT NOT NULL REFERENCES audita_users(id),
+  submission_key TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'claimed', 'filed')),
+  claimant JSONB NOT NULL,
+  acceptance JSONB NOT NULL,
+  report_pdf BYTEA NOT NULL,
+  source_documents JSONB NOT NULL DEFAULT '[]'::jsonb,
+  power_of_attorney_pdf BYTEA NOT NULL,
+  agreement_pdf BYTEA NOT NULL,
+  lawyer_id BIGINT REFERENCES audita_users(id),
+  protocol_number TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  claimed_at TIMESTAMPTZ,
+  filed_at TIMESTAMPTZ,
+  UNIQUE (user_id, submission_key),
+  CHECK ((status = 'queued' AND lawyer_id IS NULL) OR (status IN ('claimed', 'filed') AND lawyer_id IS NOT NULL)),
+  CHECK (status <> 'filed' OR (protocol_number IS NOT NULL AND filed_at IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS audita_lawyer_jobs_queue_idx ON audita_lawyer_jobs (created_at) WHERE status = 'queued';
+CREATE INDEX IF NOT EXISTS audita_lawyer_jobs_assignee_idx ON audita_lawyer_jobs (lawyer_id);
 
 CREATE TABLE IF NOT EXISTS audita_user_profiles (
   id BIGSERIAL PRIMARY KEY,

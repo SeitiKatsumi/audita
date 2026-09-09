@@ -11,6 +11,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY index.html styles.css app.js billing-admin.js charge-analysis.js charge-calculation.js itau-faq.js server.mjs ./
+COPY advogados.html advogados.js ./
 COPY plans.html plans.css plans.js ./
 COPY super-admin.html super-admin.css super-admin.js ./
 COPY assets ./assets

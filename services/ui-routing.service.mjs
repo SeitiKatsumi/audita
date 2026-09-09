@@ -4,6 +4,7 @@ const SUPER_ADMIN_PATH = "/super-admin";
 
 export function resolveUiRoute(pathname) {
   const path = String(pathname || "/");
+  if (path === "/advogados" || path === "/advogados/") return { type: "file", path: "/advogados.html" };
 
   if (path === "/chat/") {
     return {

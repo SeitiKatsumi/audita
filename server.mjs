@@ -1,3 +1,4 @@
+import { createLawyerQueueService, requireLawyer } from "./services/lawyer-queue.service.mjs";
 import http from "node:http";
 import crypto from "node:crypto";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
@@ -67,7 +68,11 @@ import {
 } from "./services/jec-petition.service.mjs";
 import {
   appendJecPetitionAttachments,
+  buildLegalServicesAgreementHtml,
+  createLegalServicesAgreementPdf,
+  createPowerOfAttorneyPdf,
   createJecPetitionPdf,
+  validatePowerOfAttorneyAcceptance,
 } from "./services/jec-petition-pdf.service.mjs";
 import {
   createJecTestimonyService,
@@ -1287,33 +1292,13 @@ async function readBufferBody(request, maxBytes = 12 * 1024 * 1024) {
   return Buffer.concat(chunks);
 }
 
-function hasPdfDigitalSignature(bytes) {
-  const source = Buffer.from(bytes).toString("latin1");
-  const byteRange = source.match(
-    /\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/,
-  );
-  const contents = source.match(/\/Contents\s*<([\dA-Fa-f\s]+)>/);
-  const range = byteRange?.slice(1).map(Number) || [];
-  return Boolean(
-    byteRange &&
-      range[0] === 0 &&
-      range[1] > 0 &&
-      range[2] > range[1] &&
-      range[3] > 0 &&
-      range[2] + range[3] <= bytes.length &&
-      contents &&
-      /[1-9A-Fa-f]/.test(contents[1]) &&
-      /\/(?:Type|FT)\s*\/Sig\b/.test(source),
-  );
-}
-
 async function readJecPetitionPdfRequest(request) {
   const contentType = String(request.headers["content-type"] || "");
   if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
     return { body: await readJsonBody(request), attachments: [] };
   }
 
-  const raw = await readBufferBody(request, 38 * 1024 * 1024);
+  const raw = await readBufferBody(request, request.url?.includes("/petitions/submit") ? 90 * 1024 * 1024 : 26 * 1024 * 1024);
   let form;
   try {
     form = await new Request("http://localhost", {
@@ -1323,7 +1308,7 @@ async function readJecPetitionPdfRequest(request) {
     }).formData();
   } catch {
     const error = new Error(
-      "O envio do documento de identidade, do comprovante de residência e da procuração assinada está inválido. Tente novamente.",
+      "O envio do documento de identidade e do comprovante de residência está inválido. Tente novamente.",
     );
     error.code = "JEC_PDF_MULTIPART_INVALID";
     throw error;
@@ -1359,6 +1344,22 @@ async function readJecPetitionPdfRequest(request) {
     return { label, bytes };
   };
 
+  const sources = [];
+  const sourceFiles = form.getAll("sourceDocuments").filter(file => file?.size);
+  if (sourceFiles.length > 20) throw Object.assign(new Error("Envie no máximo 20 documentos de origem."), { code: "JEC_PDF_ATTACHMENT_TOO_LARGE" });
+  for (const file of sourceFiles) {
+    if (file.size > 12 * 1024 * 1024) throw Object.assign(new Error("Cada documento deve ter no máximo 12 MB."), { code: "JEC_PDF_ATTACHMENT_TOO_LARGE" });
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const name = String(file.name || "documento").replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 120);
+    const pdf = bytes.subarray(0, 1024).includes(Buffer.from("%PDF-"));
+    const png = bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+    const jpg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+    const plain = /\.(txt|csv)$/i.test(name) && !bytes.includes(0);
+    if (!pdf && !png && !jpg && !plain) throw Object.assign(new Error("Documento de origem inválido. Use PDF, PNG, JPG, TXT ou CSV."), { code: "JEC_PDF_ATTACHMENT_INVALID_TYPE" });
+    if (pdf) await PDFDocument.load(bytes);
+    sources.push({ name, type: pdf ? "application/pdf" : png ? "image/png" : jpg ? "image/jpeg" : "text/plain", base64: bytes.toString("base64") });
+  }
+
   const identityDocument = await readPdf(
     "identityDocument",
     "o documento de identidade",
@@ -1367,21 +1368,31 @@ async function readJecPetitionPdfRequest(request) {
     "proofOfResidence",
     "o comprovante de residência",
   );
-  const signedPowerOfAttorney = await readPdf(
-    "signedPowerOfAttorney",
-    "a procuração assinada",
-  );
-  if (!hasPdfDigitalSignature(signedPowerOfAttorney.bytes)) {
-    const error = new Error(
-      "Não encontramos uma assinatura digital na procuração. Assine o PDF no gov.br e envie o arquivo baixado, sem imprimir ou salvar novamente como PDF.",
-    );
-    error.code = "JEC_PDF_SIGNATURE_REQUIRED";
-    throw error;
-  }
 
   return {
     body,
     attachments: [identityDocument, proofOfResidence],
+    sources,
+  };
+}
+
+function buildPowerOfAttorneyAcceptanceRecord(request, body, authContext, acceptance) {
+  const forwardedFor = String(request.headers["x-forwarded-for"] || "")
+    .split(",")[0]
+    .trim();
+  const record = {
+    ...acceptance,
+    id: crypto.randomUUID(),
+    acceptedAt: new Date().toISOString(),
+    userId: String(authContext.user?.id || "authenticated-user"),
+    caseId: String(body.caseId || ""),
+    document: String(body.claimant?.document || "").replace(/\D/g, "").slice(0, 11),
+    ipAddress: (forwardedFor || request.socket?.remoteAddress || "unknown").slice(0, 80),
+    userAgent: String(request.headers["user-agent"] || "unknown").slice(0, 500),
+  };
+  return {
+    ...record,
+    fingerprint: crypto.createHash("sha256").update(JSON.stringify(record)).digest("hex"),
   };
 }
 
@@ -3222,7 +3233,42 @@ async function runChatConversation(request) {
   return synchronizedCase ? { ...result, itauCase: synchronizedCase } : result;
 }
 
+const lawyerQueue = createLawyerQueueService({ getDb: () => ({ pool, dbReady }) });
+
 async function handleApi(request, response, pathname) {
+  if (pathname.startsWith("/api/advogados/")) {
+    try {
+      const user = await getSessionUser(request);
+      requireLawyer(user);
+      if (pathname === "/api/advogados/jobs" && request.method === "GET") {
+        sendJson(response, 200, { jobs: await lawyerQueue.list(user), user: publicUser(user) });
+        return true;
+      }
+      const match = pathname.match(/^\/api\/advogados\/jobs\/([0-9a-f-]{36})\/(claim|complete|documents\/(report|powerOfAttorney|agreement|source-\d+))$/i);
+      if (match && request.method === "POST" && ["claim", "complete"].includes(match[2])) {
+        const origin = request.headers.origin;
+        if (origin && new URL(origin).host !== request.headers.host) {
+          sendJson(response, 403, { message: "Origem não autorizada." });
+          return true;
+        }
+        const job = match[2] === "claim" ? await lawyerQueue.claim(user, match[1])
+          : await lawyerQueue.complete(user, match[1], (await readJsonBody(request)).protocolNumber);
+        sendJson(response, 200, { job });
+        return true;
+      }
+      if (match?.[3] && request.method === "GET") {
+        const document = await lawyerQueue.document(user, match[1], match[3]);
+        response.writeHead(200, { "content-type": document.type, "cache-control": "no-store",
+          "content-disposition": `attachment; filename="${document.name}"`, "x-content-type-options": "nosniff" });
+        response.end(document.bytes);
+        return true;
+      }
+      sendJson(response, 404, { message: "Recurso não encontrado." });
+    } catch (error) {
+      sendJson(response, error.status || 500, { message: error.status ? error.message : "Não foi possível acessar a fila agora." });
+    }
+    return true;
+  }
   if (pathname === "/api/billing/plans" && request.method === "GET") {
     sendJson(response, 200, stripeBillingService.catalog());
     return true;
@@ -4390,14 +4436,147 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
-  if (pathname === "/api/jec/petitions/pdf" && request.method === "POST") {
+  if (pathname === "/api/jec/legal-services-contract/preview" && request.method === "GET") {
+    response.writeHead(200, {
+      "content-type": "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    });
+    response.end(buildLegalServicesAgreementHtml());
+    return true;
+  }
+
+  if (
+    ["/api/jec/legal-documents", "/api/jec/power-of-attorney/pdf"].includes(pathname) &&
+    request.method === "POST"
+  ) {
     try {
       const authContext = await getTenantIdForRequest(request);
       if (authContext.unauthorized) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
       }
-      const { body, attachments } = await readJecPetitionPdfRequest(request);
+      const body = await readJsonBody(request);
+      let caseData = body.caseData || {};
+      if (body.caseId) {
+        const stored = itauRefundService.getCase(body.caseId, {
+          tenantId: authContext.tenantId,
+          userId: authContext.user?.id || null,
+        });
+        if (stored.forbidden) {
+          sendJson(response, 403, { error: "itau_case_forbidden" });
+          return true;
+        }
+        if (stored.case) caseData = { ...stored.case };
+      }
+      const prepared = prepareJecPetition({
+        caseData,
+        claimant: body.claimant || {},
+        uf: body.uf,
+        city: body.city,
+      });
+      if (prepared.unsupported) {
+        sendJson(response, 422, {
+          error: "jec_state_not_supported",
+          supportedUfs: prepared.supportedUfs,
+        });
+        return true;
+      }
+      if (!prepared.ready) {
+        sendJson(response, 422, {
+          error: "jec_petition_incomplete",
+          missingFields: prepared.missingFields,
+        });
+        return true;
+      }
+      const acceptance = validatePowerOfAttorneyAcceptance({
+        claimant: prepared.claimant,
+        powerOfAttorneyAcceptance: body.powerOfAttorneyAcceptance,
+      });
+      const acceptanceRecord = buildPowerOfAttorneyAcceptanceRecord(
+        request,
+        body,
+        authContext,
+        acceptance,
+      );
+      const powerOfAttorneyPdf = Buffer.from(
+        await createPowerOfAttorneyPdf({
+          claimant: prepared.claimant,
+          acceptance: acceptanceRecord,
+        }),
+      );
+      if (pathname === "/api/jec/legal-documents") {
+        const agreementPdf = Buffer.from(
+          await createLegalServicesAgreementPdf({
+            claimant: prepared.claimant,
+            acceptance: acceptanceRecord,
+          }),
+        );
+        const documents = new FormData();
+        documents.append(
+          "powerOfAttorney",
+          new Blob([powerOfAttorneyPdf], { type: "application/pdf" }),
+          "procuracao-assinada-eletronicamente.pdf",
+        );
+        documents.append(
+          "legalServicesAgreement",
+          new Blob([agreementPdf], { type: "application/pdf" }),
+          "contrato-prestacao-servicos-juridicos-assinado-eletronicamente.pdf",
+        );
+        documents.append("acceptanceId", acceptanceRecord.id);
+        documents.append("acceptedAt", acceptanceRecord.acceptedAt);
+        const multipart = new Response(documents);
+        const payload = Buffer.from(await multipart.arrayBuffer());
+        response.writeHead(200, {
+          "content-type": multipart.headers.get("content-type"),
+          "content-length": payload.length,
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff",
+          "x-audita-acceptance-id": acceptanceRecord.id,
+        });
+        response.end(payload);
+        return true;
+      }
+      response.writeHead(200, {
+        "content-type": "application/pdf",
+        "content-disposition": 'attachment; filename="procuracao-assinada-eletronicamente.pdf"',
+        "content-length": powerOfAttorneyPdf.length,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+        "x-audita-acceptance-id": acceptanceRecord.id,
+      });
+      response.end(powerOfAttorneyPdf);
+    } catch (error) {
+      const statusCode = [
+        "JEC_POWER_OF_ATTORNEY_ACCEPTANCE_REQUIRED",
+        "JEC_POWER_OF_ATTORNEY_NAME_MISMATCH",
+      ].includes(error?.code)
+        ? 422
+        : error instanceof SyntaxError
+          ? 400
+          : 500;
+      sendJson(response, statusCode, {
+        error: error?.code || "jec_power_of_attorney_pdf_failed",
+        message: statusCode < 500
+          ? error.message
+          : "Não foi possível gerar a procuração e o contrato agora.",
+      });
+    }
+    return true;
+  }
+
+  if (["/api/jec/petitions/pdf", "/api/jec/petitions/submit"].includes(pathname) && request.method === "POST") {
+    try {
+      const authContext = await getTenantIdForRequest(request);
+      if (authContext.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (pathname.endsWith("/submit") && (!authContext.user || !pool || !dbReady)) {
+        sendJson(response, authContext.user ? 503 : 401, { message: "Entre na Audita e tente novamente quando a fila estiver disponível. A solicitação ainda não foi enviada." });
+        return true;
+      }
+      const { body, attachments, sources = [] } = await readJecPetitionPdfRequest(request);
       if (body.reviewConfirmed !== true) {
         sendJson(response, 400, { error: "jec_review_required" });
         return true;
@@ -4406,7 +4585,7 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 400, {
           error: "jec_pdf_attachments_required",
           message:
-            "Envie o documento de identidade, o comprovante de residência e a procuração assinada em PDF.",
+            "Envie o documento de identidade e o comprovante de residência em PDF.",
         });
         return true;
       }
@@ -4446,6 +4625,14 @@ async function handleApi(request, response, pathname) {
         });
         return true;
       }
+      if (pathname.endsWith("/submit") && prepared.attachments.evidenceFiles.length > sources.length) {
+        sendJson(response, 422, { message: "Anexe os extratos ou faturas utilizados na análise para encaminhar o conjunto completo ao advogado." });
+        return true;
+      }
+      validatePowerOfAttorneyAcceptance({
+        claimant: prepared.claimant,
+        powerOfAttorneyAcceptance: body.powerOfAttorneyAcceptance,
+      });
       const generated = await jecTestimonyService.generateFromCaseData({
         caseData: { ...caseData, calculation },
       });
@@ -4473,6 +4660,17 @@ async function handleApi(request, response, pathname) {
       const pdf = Buffer.from(
         await appendJecPetitionAttachments(basePdf, attachments),
       );
+      if (pathname.endsWith("/submit")) {
+        const acceptance = buildPowerOfAttorneyAcceptanceRecord(request, body, authContext,
+          validatePowerOfAttorneyAcceptance({ claimant: prepared.claimant, powerOfAttorneyAcceptance: body.powerOfAttorneyAcceptance }));
+        const powerOfAttorney = Buffer.from(await createPowerOfAttorneyPdf({ claimant: prepared.claimant, acceptance }));
+        const agreement = Buffer.from(await createLegalServicesAgreementPdf({ claimant: prepared.claimant, acceptance }));
+        const key = JSON.stringify([body.caseData || {}, body.caseId || "", prepared.claimant.document]);
+        const job = await lawyerQueue.submit(authContext.user, { key, claimant: prepared.claimant,
+          acceptance, documents: { report: pdf, powerOfAttorney, agreement }, sources });
+        sendJson(response, 200, { job });
+        return true;
+      }
       const modelNumber = Number(prepared.template?.sourceModel || 0) || 1;
       const fileName = `relatorio-tecnico-auditoria-itau-modelo-${modelNumber}.pdf`;
       response.writeHead(200, {
@@ -4491,21 +4689,22 @@ async function handleApi(request, response, pathname) {
         JEC_PDF_ATTACHMENT_TOO_LARGE: 413,
         JEC_PDF_ATTACHMENT_INVALID_TYPE: 415,
         JEC_PDF_MULTIPART_INVALID: 400,
-        JEC_PDF_SIGNATURE_REQUIRED: 422,
+        JEC_POWER_OF_ATTORNEY_ACCEPTANCE_REQUIRED: 422,
+        JEC_POWER_OF_ATTORNEY_NAME_MISMATCH: 422,
         jec_petition_attachment_invalid: 422,
       };
       const statusCode = knownTestimonyError
         ? error.statusCode
         : error instanceof SyntaxError
           ? 400
-          : statusByCode[error?.code] || 500;
+          : error.status || statusByCode[error?.code] || 500;
       const safeAttachmentMessage =
         error?.code === "jec_petition_attachment_invalid"
-          ? "O documento de identidade ou o comprovante de residência não pôde ser lido como PDF. Envie outro arquivo; a procuração assinada também deve ser um PDF válido."
+          ? "O documento de identidade ou o comprovante de residência não pôde ser lido como PDF. Envie outro arquivo."
           : "";
       const bodyTooLargeMessage =
         error?.code === "BODY_TOO_LARGE"
-          ? "Cada documento - identidade, comprovante de residência e procuração assinada - deve ter no máximo 12 MB."
+          ? "Cada documento - identidade e comprovante de residência - deve ter no máximo 12 MB."
           : "";
       sendJson(response, statusCode, {
         error: knownTestimonyError ? error.code : error?.code || "jec_petition_pdf_failed",

@@ -159,7 +159,6 @@ const ITAU_PHONE_CHANNELS_URL =
   "https://www.itau.com.br/atendimento-itau/para-voce/telefones";
 const ITAU_OMBUDSMAN_URL =
   "https://www.itau.com.br/atendimento-itau/para-voce/ouvidoria";
-const JEC_LAW_URL = "https://www.planalto.gov.br/ccivil_03/leis/l9099.htm";
 const CDC_ARTICLE_42_URL = "https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm#art42";
 const BCB_IPCA_URL =
   "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/2011";
@@ -620,6 +619,7 @@ if (stage) {
       claimant: {},
       prepared: null,
       attachments: null,
+      powerOfAttorneyAcceptance: { accepted: false, signerName: "" },
       portals: [],
       guideUf: "",
       loading: false,
@@ -638,6 +638,7 @@ if (stage) {
       claimant: {},
       prepared: null,
       attachments: null,
+      powerOfAttorneyAcceptance: { accepted: false, signerName: "" },
       portals: [],
       guideUf: "",
       loading: false,
@@ -1748,12 +1749,13 @@ if (stage) {
     const claimant = state.recovery.claimant || {};
     const prepared = state.recovery.prepared;
     const attachments = state.recovery.attachments || {};
+    const powerOfAttorneyAcceptance = state.recovery.powerOfAttorneyAcceptance || {};
     const calculatedValues = state.recovery.handoff?.suggestion?.values || {};
     const historicalDocumentsAvailable =
       claimant.historicalDocumentsAvailable ||
       state.recovery.handoff?.caseData?.answers?.historicalDocumentsAvailable ||
       "";
-    const reportButtonLabel = "Gerar Relatório Técnico em PDF";
+    const reportButtonLabel = "Concluir e encaminhar ao advogado";
     return `
       <form class="charge-recovery-form" id="chargeRecoveryForm" aria-busy="${state.recovery.busy}">
         ${state.recovery.error ? `<p class="charge-recovery-form-error" role="alert">${escapeChargeHtml(state.recovery.error)}</p>` : ""}
@@ -1789,18 +1791,23 @@ if (stage) {
           <label><span>Cidade</span><input name="city" required maxlength="100" autocomplete="address-level2" value="${escapeChargeHtml(claimant.city || "")}" /></label>
         </div>
 
-        <div class="charge-recovery-section-title"><strong>3 documentos obrigatórios</strong><span>A identidade e o comprovante serão anexados ao PDF; a procuração deve permanecer separada.</span></div>
+        <div class="charge-recovery-section-title"><strong>Documentos e assinatura</strong><span>A identidade e o comprovante serão anexados ao laudo; a procuração e o contrato serão gerados separadamente.</span></div>
         <div class="charge-power-of-attorney">
-          <strong>Baixe, preencha e assine a procuração</strong>
-          <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" download>Baixar modelo de procuração em PDF</a>. Depois de preencher, assine digitalmente; se preferir, use a <a href="https://www.gov.br/pt-br/servicos/assinatura-eletronica" target="_blank" rel="noopener noreferrer">assinatura eletrônica do gov.br</a>.</p>
-          <p>Guarde o PDF assinado original. Ele não será incorporado ao Relatório Técnico e deverá ser anexado separadamente no portal do tribunal para preservar a assinatura digital.</p>
+          <strong>Leia e assine a procuração e o contrato</strong>
+          <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" target="_blank" rel="noopener noreferrer">Ler a procuração</a> e <a href="/api/jec/legal-services-contract/preview" target="_blank" rel="noopener noreferrer">ler o contrato</a>. A IA AUDITA preencherá seus dados e gerará um PDF separado para cada documento.</p>
+          <label class="jec-confirmation">
+            <input type="checkbox" name="powerOfAttorneyAccepted" ${powerOfAttorneyAcceptance.accepted ? "checked" : ""} />
+            <span>Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Jurídicos e Honorários Advocatícios, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.</span>
+          </label>
+          <p>A data, a hora e o mesmo identificador serão registrados nos dois PDFs. Não é necessário desenhar a assinatura.</p>
         </div>
         <div class="charge-recovery-form-grid">
           <label><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "PDF")}</small></span><input type="file" name="identityDocument" accept=".pdf,application/pdf" ${attachments.identityDocument ? "" : "required"} /></label>
           <label><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "PDF")}</small></span><input type="file" name="proofOfResidence" accept=".pdf,application/pdf" ${attachments.proofOfResidence ? "" : "required"} /></label>
-          <label class="wide"><span>Procuração preenchida e assinada digitalmente <small>${escapeChargeHtml(attachments.signedPowerOfAttorney?.name || "PDF")}</small></span><input type="file" name="signedPowerOfAttorney" accept=".pdf,application/pdf" ${attachments.signedPowerOfAttorney ? "" : "required"} /></label>
+          <label class="wide"><span>Extratos e faturas da análise (se precisar anexar novamente)</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /></label>
+          <label class="wide"><span>Digite seu nome completo para assinar os dois documentos</span><input name="powerOfAttorneySignerName" required maxlength="160" autocomplete="off" value="${escapeChargeHtml(powerOfAttorneyAcceptance.signerName || "")}" /></label>
         </div>
-        <p class="charge-recovery-form-intro">Envie os três documentos em PDF, com até 12 MB por arquivo. A identidade e o comprovante de residência serão anexados ao relatório; a procuração assinada continuará separada.</p>
+        <p class="charge-recovery-form-intro">Envie identidade e comprovante de residência em PDF, com até 12 MB por arquivo. O relatório, a procuração, o contrato e os anexos serão encaminhados ao advogado.</p>
 
         <input type="hidden" name="historicalDocumentsAvailable" value="${escapeChargeHtml(historicalDocumentsAvailable)}" />
         <input type="hidden" name="doubleRefundAmount" value="${escapeChargeHtml(calculatedValues.doubleRefundAmount ?? claimant.doubleRefundAmount ?? "")}" />
@@ -1822,117 +1829,20 @@ if (stage) {
       <div class="charge-analysis-conversation charge-recovery-conversation compact">
         ${assistantMessage(`
           <p><strong>Agora vou montar o seu Relatório Técnico de Auditoria.</strong></p>
-          <p>Confira seus dados e envie os três PDFs obrigatórios: identidade, comprovante de residência e procuração preenchida e assinada digitalmente. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
+          <p>Confira seus dados, envie identidade e comprovante de residência em PDF e assine a procuração e o contrato com um único aceite e seu nome completo. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
         `, "IA AUDITA · Relatório")}
       </div>
       ${recoveryReportFormMarkup()}
     `;
   }
 
-  function selectedRecoveryPortal() {
-    const selectedUf = state.recovery.guideUf || state.recovery.claimant?.uf || "";
-    const portals = state.recovery.portals || [];
-    const selected = portals.find((portal) => portal.uf === selectedUf);
-    if (selected) return selected;
-    const preparedPortal = state.recovery.prepared?.portal;
-    return preparedPortal?.uf === selectedUf ? preparedPortal : null;
-  }
-
-  function recoveryGuideSteps(portal) {
-    const manualSteps = portal?.manualFiling?.steps;
-    if (Array.isArray(manualSteps) && manualSteps.length) return manualSteps;
-    return [
-      `Acesse o canal oficial do ${portal?.tribunal || "tribunal"}.`,
-      "Confirme a comarca, a unidade e se o caso deve seguir pelo Juizado Especial Cível.",
-      "Faça o login, cadastro ou atendimento somente no ambiente oficial quando solicitado.",
-      "Apresente os dados do consumidor, do banco e o relato conforme o relatório revisado.",
-      "Anexe o Relatório Técnico, documento pessoal, comprovante de residência, a procuração assinada e as provas disponíveis.",
-      "Revise todas as informações e conclua pessoalmente o protocolo ou atendimento.",
-    ];
-  }
-
-  function recoveryGuideMarkup() {
-    const portal = selectedRecoveryPortal();
-    if (!state.recovery.guideUf) {
-      return `<div class="charge-recovery-guide-empty"><strong>Selecione o estado</strong><p>O roteiro correspondente aparecerá aqui.</p></div>`;
-    }
-    if (!portal) {
-      return `<div class="charge-recovery-guide-empty"><strong>Guia indisponível</strong><p>Não foi possível carregar o tribunal desta UF agora.</p></div>`;
-    }
-    const steps = recoveryGuideSteps(portal);
-    const requirements = Array.isArray(portal.requirements) ? portal.requirements : [];
-    const humanOnly = Array.isArray(portal.guide?.humanOnly) ? portal.guide.humanOnly : [];
-    const notes = Array.isArray(portal.guide?.caseNotes) ? portal.guide.caseNotes : [];
-    const eligibility = state.recovery.prepared?.smallClaimsEligibility || portal.manualFiling?.smallClaims || null;
-    const aboveLimit = eligibility?.status === "above_limit";
-    const limitLabel = eligibility?.maximumCaseValueBrl
-      ? formatChargeCurrency(eligibility.maximumCaseValueBrl)
-      : "20 salários mínimos";
-    const caseValueLabel = eligibility?.caseValue
-      ? formatChargeCurrency(eligibility.caseValue)
-      : "valor ainda não confirmado";
-    return `
-      <section class="charge-recovery-guide" aria-label="Passo a passo do ${escapeChargeHtml(portal.tribunal || "tribunal")}">
-        <header><div><p class="eyebrow">${escapeChargeHtml(portal.uf)}</p><h3>${escapeChargeHtml(portal.name || portal.tribunal)}</h3></div><span>${escapeChargeHtml(portal.tribunal || "")}</span></header>
-        <div class="charge-small-claims-explainer ${aboveLimit ? "is-blocked" : "is-eligible"}" role="note">
-          <strong>${aboveLimit ? "Este caso ultrapassa o limite atendido pela IA AUDITA" : "O que são pequenas causas?"}</strong>
-          <p>Pequenas causas são tratadas no Juizado Especial Cível. A IA AUDITA orienta, por enquanto, somente casos de até 20 salários mínimos. Nessa faixa, o advogado é facultativo na primeira instância. Em 2026, esse limite corresponde a ${escapeChargeHtml(limitLabel)}.</p>
-          ${eligibility?.known ? `<span>Valor da causa nesta simulação: ${escapeChargeHtml(caseValueLabel)}.</span>` : ""}
-          ${aboveLimit ? "" : `
-            <details>
-              <summary>Entenda advogado, custos e recursos</summary>
-              <ul>
-                <li>O ingresso no Juizado Especial não exige pagamento antecipado de custas, taxas ou despesas em primeiro grau.</li>
-                <li>A sentença de primeiro grau não condena o vencido em custas e honorários, salvo litigância de má-fé.</li>
-                <li>Em recurso, a representação por advogado é obrigatória e pode haver preparo, custas e honorários conforme o resultado e eventual gratuidade.</li>
-                <li>Ausência em audiência e outras situações processuais podem gerar consequências. Por isso, não existe garantia de “risco zero”.</li>
-              </ul>
-              <a href="${JEC_LAW_URL}" target="_blank" rel="noreferrer">Consultar a Lei 9.099/1995</a>
-            </details>
-          `}
-        </div>
-        ${aboveLimit ? `
-          <div class="charge-recovery-contact-placeholder">
-            <strong>Este caso precisa de atendimento profissional</strong>
-            <p>Como o valor ultrapassa 20 salários mínimos, não vamos direcionar você ao protocolo de pequenas causas. O contato com o time IA AUDITA será disponibilizado em breve.</p>
-            <button type="button" class="secondary-action" disabled>Falar com o time IA AUDITA · em breve</button>
-          </div>
-        ` : `
-          <ol>${steps.map((step) => `<li><span>${escapeChargeHtml(step)}</span></li>`).join("")}</ol>
-          ${requirements.length ? `<details><summary>O que separar antes de começar</summary><ul>${requirements.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
-          ${humanOnly.length ? `<details><summary>Etapas que dependem de você</summary><ul>${humanOnly.map((item) => `<li>${escapeChargeHtml(item)}</li>`).join("")}</ul></details>` : ""}
-          ${notes.length ? `<p class="charge-recovery-guide-note">${escapeChargeHtml(notes.join(" "))}</p>` : ""}
-          <p class="charge-recovery-guide-note"><strong>Procuração:</strong> anexe no tribunal o arquivo assinado original, separadamente do Relatório Técnico, para preservar a assinatura digital.</p>
-          <div class="charge-recovery-guide-actions">
-            <a class="primary-action" href="${escapeChargeHtml(portal.startUrl || portal.officialUrl || "#")}" target="_blank" rel="noreferrer">Abrir portal oficial</a>
-            ${portal.officialUrl && portal.officialUrl !== portal.startUrl ? `<a class="secondary-action" href="${escapeChargeHtml(portal.officialUrl)}" target="_blank" rel="noreferrer">Ver orientações do tribunal</a>` : ""}
-          </div>
-          <small>O login, a escolha da unidade, os anexos e o protocolo final são realizados pelo usuário. A IA AUDITA não envia o processo automaticamente.</small>
-        `}
-      </section>
-    `;
-  }
-
   function renderRecoveryGuide() {
-    const selectedUf = state.recovery.guideUf || "";
-    stage.innerHTML = `
-      <div class="charge-analysis-conversation charge-recovery-conversation compact">
-        ${assistantMessage(`
-          <p><strong>Seu Relatório Técnico foi gerado.</strong></p>
-          <p>Agora selecione o estado onde pretende iniciar a pequena causa. A IA AUDITA mostrará o caminho oficial conhecido para o tribunal, mas você ainda deve confirmar a comarca e a competência territorial.</p>
-        `, "IA AUDITA · Tribunal")}
-      </div>
-      <section class="charge-recovery-tribunal-picker">
-        <label><span>Estado do tribunal</span><select id="chargeRecoveryGuideUf"><option value="">Selecione</option>${recoveryUfOptions(selectedUf)}</select></label>
-        <p>Normalmente o consumidor inicia o pedido no local do seu domicílio. Confirme essa informação antes de protocolar.</p>
-      </section>
-      ${recoveryGuideMarkup()}
-      <div class="charge-recovery-actions">
-        <button type="button" class="secondary-action" data-charge-action="back-to-recovery-report">Revisar relatório</button>
-        <button type="button" class="secondary-action" data-charge-action="download-report-again" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Gerando..." : "Baixar relatório novamente"}</button>
-        <button type="button" class="primary-action" data-charge-action="restart">Iniciar nova análise</button>
-      </div>
-    `;
+    stage.innerHTML = `<section class="charge-analysis-finish" role="status">
+      <h2>Sua solicitação está completa.</h2>
+      <p>O advogado responsável da Audita dará início ao protocolo da sua petição no tribunal competente da sua região.</p>
+      <p>Solicitação: <strong>${escapeChargeHtml(state.recovery.job?.id || "")}</strong></p>
+      <button type="button" class="primary-action" data-charge-action="restart">Iniciar nova análise</button>
+    </section>`;
   }
 
   function renderRecovery() {
@@ -1975,6 +1885,7 @@ if (stage) {
       claimant,
       uf: claimant?.uf || "",
       city: claimant?.city || "",
+      powerOfAttorneyAcceptance: state.recovery.powerOfAttorneyAcceptance,
     };
   }
 
@@ -2004,19 +1915,39 @@ if (stage) {
     const attachments = {
       identityDocument: readPdf("identityDocument", "o documento de identidade"),
       proofOfResidence: readPdf("proofOfResidence", "o comprovante de residência"),
-      signedPowerOfAttorney: readPdf("signedPowerOfAttorney", "a procuração preenchida e assinada"),
     };
+    const sources = data.getAll("sourceDocuments").filter(file => file?.size);
+    attachments.sourceDocuments = sources.length ? sources : previous.sourceDocuments || state.selectedFiles || [];
     return attachments;
+  }
+
+  function validateRecoveryPowerOfAttorneyAcceptance(claimant, acceptance) {
+    const comparableName = (value) => normalizeRecoveryText(value)
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLocaleLowerCase("pt-BR");
+    if (!acceptance.accepted || !acceptance.signerName) {
+      throw new Error("Aceite a procuração e o contrato e digite seu nome completo para continuar.");
+    }
+    if (comparableName(acceptance.signerName) !== comparableName(claimant.fullName)) {
+      throw new Error("O nome digitado na assinatura deve ser igual ao nome completo informado acima.");
+    }
   }
 
   async function prepareRecoveryReport(form) {
     if (state.recovery.busy) return;
     const claimant = readRecoveryClaimant(form);
+    const powerOfAttorneyAcceptance = {
+      accepted: Boolean(form.elements.powerOfAttorneyAccepted?.checked),
+      signerName: normalizeRecoveryText(form.elements.powerOfAttorneySignerName?.value),
+    };
+    state.recovery.powerOfAttorneyAcceptance = powerOfAttorneyAcceptance;
     let attachments;
     try {
       attachments = readRecoveryPdfAttachments(form);
+      validateRecoveryPowerOfAttorneyAcceptance(claimant, powerOfAttorneyAcceptance);
     } catch (error) {
-      state.recovery.error = error?.message || "Envie os três documentos obrigatórios em PDF.";
+      state.recovery.error = error?.message || "Revise os documentos e a assinatura eletrônica.";
       renderRecoveryReport();
       return;
     }
@@ -2066,17 +1997,18 @@ if (stage) {
     render();
 
     try {
-      const formData = new FormData();
-      formData.append("payload", JSON.stringify({
+      const payload = {
         ...recoveryPayload(claimant),
         reviewConfirmed: true,
-      }));
+      };
+      const formData = new FormData();
+      formData.append("payload", JSON.stringify(payload));
       formData.append("identityDocument", attachments.identityDocument);
       formData.append("proofOfResidence", attachments.proofOfResidence);
-      formData.append("signedPowerOfAttorney", attachments.signedPowerOfAttorney);
-      const response = await fetch("/api/jec/petitions/pdf", {
+      for (const file of attachments.sourceDocuments || []) formData.append("sourceDocuments", file);
+      const response = await fetch("/api/jec/petitions/submit", {
         method: "POST",
-        headers: { accept: "application/pdf" },
+        headers: { accept: "application/json" },
         body: formData,
       });
       if (response.status === 401) {
@@ -2087,19 +2019,9 @@ if (stage) {
         const data = await response.json().catch(() => ({}));
         throw new Error(recoveryApiError(data, "Não foi possível gerar o PDF agora."));
       }
-      const blob = await response.blob();
-      const disposition = response.headers.get("content-disposition") || "";
-      const fileName =
-        disposition.match(/filename="([^"]+)"/i)?.[1] ||
-        "relatorio-tecnico-auditoria-itau.pdf";
-      const downloadUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = downloadUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      const result = await response.json();
+      if (!result.job?.id) throw new Error("A solicitação não foi confirmada. Tente novamente.");
+      state.recovery.job = result.job;
       state.recovery.pdfGeneratedAt = new Date().toISOString();
       state.recovery.guideUf = claimant.uf || state.recovery.guideUf || "";
       state.recovery.phase = "guide";
@@ -2391,10 +2313,6 @@ if (stage) {
       state.selectedFiles = mergeChargeAnalysisFiles(state.selectedFiles, files);
       state.selectedFile = state.selectedFiles[0] || null;
       renderUpload();
-    }
-    if (event.target.id === "chargeRecoveryGuideUf") {
-      state.recovery.guideUf = event.target.value;
-      renderRecoveryGuide();
     }
   });
 

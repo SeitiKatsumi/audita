@@ -3124,7 +3124,7 @@ function renderJecManualFiling(caseData = {}, state = {}) {
           .map((step) => `<li>${escapeHtml(step)}</li>`)
           .join("")}</ol>
         <p>${escapeHtml(guide.note || "")}</p>
-        <p><strong>Procuração:</strong> anexe no tribunal o PDF assinado original, separadamente do Relatório Técnico, para preservar a assinatura digital.</p>
+        <p><strong>Documentos jurídicos:</strong> anexe a procuração no tribunal separadamente do Relatório Técnico e guarde sua via do contrato.</p>
         ${
           guide.informationUrl
             ? `<a class="jec-official-info" href="${escapeHtml(guide.informationUrl)}" target="_blank" rel="noreferrer">Ver orientações oficiais do tribunal</a>`
@@ -3148,12 +3148,14 @@ function renderJecManualFiling(caseData = {}, state = {}) {
 function renderJecPetitionPanel(caseData = {}) {
   if (!caseData?.id || !shouldShowJecPanel(caseData)) return "";
   const state = jecCaseStates.get(caseData.id) || {};
+  if (state.lawyerJob?.id) return `<section class="jec-manual-filing" role="status"><h3>Sua solicitação está completa.</h3><p>O advogado responsável da Audita dará início ao protocolo da sua petição no tribunal competente da sua região.</p><p>Solicitação: ${escapeHtml(state.lawyerJob.id)}</p></section>`;
   const claimant = state.claimant || {};
   const prepared = state.prepared || null;
   const smallClaimsAboveLimit =
     prepared?.smallClaimsEligibility?.status === "above_limit";
   const suggestion = state.suggestion || null;
   const attachments = state.attachments || {};
+  const powerOfAttorneyAcceptance = state.powerOfAttorneyAcceptance || {};
   const missingFields = Array.isArray(prepared?.missingFields) ? prepared.missingFields : [];
   const historicalDocumentsAvailable =
     claimant.historicalDocumentsAvailable ||
@@ -3350,12 +3352,16 @@ function renderJecPetitionPanel(caseData = {}) {
                 <pre>${escapeHtml(prepared.draft || "")}</pre>
               </details>
               <section class="jec-document-attachments">
-                <strong>3 documentos obrigatórios</strong>
-                <p>A identidade e o comprovante de residência serão anexados ao PDF completo. A procuração assinada deve permanecer separada.</p>
+                <strong>Documentos e assinatura</strong>
+                <p>A identidade e o comprovante de residência serão anexados ao PDF completo. A procuração e o contrato serão gerados em arquivos separados.</p>
                 <div class="jec-power-of-attorney">
-                  <strong>Baixe, preencha e assine a procuração</strong>
-                  <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" download>Baixar modelo de procuração em PDF</a>. Depois de preencher, assine digitalmente; se preferir, use a <a href="https://www.gov.br/pt-br/servicos/assinatura-eletronica" target="_blank" rel="noopener noreferrer">assinatura eletrônica do gov.br</a>.</p>
-                  <p>Guarde o PDF assinado original. Ele não será incorporado ao Relatório Técnico e deverá ser anexado separadamente no portal do tribunal para preservar a assinatura digital.</p>
+                  <strong>Leia e assine a procuração e o contrato</strong>
+                  <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" target="_blank" rel="noopener noreferrer">Ler a procuração</a> e <a href="/api/jec/legal-services-contract/preview" target="_blank" rel="noopener noreferrer">ler o contrato</a>. A IA AUDITA preencherá seus dados e gerará um PDF separado para cada documento.</p>
+                  <label class="jec-confirmation">
+                    <input name="powerOfAttorneyAccepted" type="checkbox" ${powerOfAttorneyAcceptance.accepted ? "checked" : ""} />
+                    <span>Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Jurídicos e Honorários Advocatícios, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.</span>
+                  </label>
+                  <p>A data, a hora e o mesmo identificador serão registrados nos dois PDFs. Não é necessário desenhar a assinatura.</p>
                 </div>
                 <div class="jec-form-grid">
                   <label>
@@ -3368,10 +3374,10 @@ function renderJecPetitionPanel(caseData = {}) {
                     <input name="proofOfResidence" type="file" accept=".pdf,application/pdf" ${attachments.proofOfResidence ? "" : "required"} />
                     ${attachments.proofOfResidence ? `<small>${escapeHtml(attachments.proofOfResidence.name)}</small>` : ""}
                   </label>
+                  <label class="jec-field-wide"><span>Extratos e faturas utilizados na análise</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /></label>
                   <label class="jec-field-wide">
-                    <span>Procuração preenchida e assinada digitalmente (PDF)</span>
-                    <input name="signedPowerOfAttorney" type="file" accept=".pdf,application/pdf" ${attachments.signedPowerOfAttorney ? "" : "required"} />
-                    ${attachments.signedPowerOfAttorney ? `<small>${escapeHtml(attachments.signedPowerOfAttorney.name)}</small>` : ""}
+                    <span>Digite seu nome completo para assinar os dois documentos</span>
+                    <input name="powerOfAttorneySignerName" required maxlength="160" autocomplete="off" value="${escapeHtml(powerOfAttorneyAcceptance.signerName || "")}" />
                   </label>
                 </div>
               </section>
@@ -3400,7 +3406,7 @@ function renderJecPetitionPanel(caseData = {}) {
           ${
             prepared?.ready
               ? `
-                <button class="secondary-action" type="submit" data-jec-action="pdf">Gerar Relatório Técnico em PDF</button>
+                <button class="secondary-action" type="submit" data-jec-action="pdf">Concluir e encaminhar ao advogado</button>
                 ${smallClaimsAboveLimit ? "" : `<button class="secondary-action" type="submit" data-jec-action="browser" formnovalidate>Abrir navegador assistido</button>`}
               `
               : ""
@@ -3919,10 +3925,30 @@ function readJecPdfAttachments(form, previous = {}) {
   const attachments = {
     identityDocument: readPdf("identityDocument", "o documento de identidade"),
     proofOfResidence: readPdf("proofOfResidence", "o comprovante de residência"),
-    signedPowerOfAttorney: readPdf("signedPowerOfAttorney", "a procuração preenchida e assinada"),
   };
+  const sources = [...(form.elements.sourceDocuments?.files || [])].filter(file => file.size);
+  attachments.sourceDocuments = sources.length ? sources : previous.sourceDocuments || [];
   return attachments;
 }
+
+function readJecPowerOfAttorneyAcceptance(form, claimant) {
+  const acceptance = {
+    accepted: Boolean(form.elements.powerOfAttorneyAccepted?.checked),
+    signerName: normalizeJecText(form.elements.powerOfAttorneySignerName?.value),
+  };
+  const comparableName = (value) => normalizeJecText(value)
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("pt-BR");
+  if (!acceptance.accepted || !acceptance.signerName) {
+    throw new Error("Aceite a procuração e o contrato e digite seu nome completo para continuar.");
+  }
+  if (comparableName(acceptance.signerName) !== comparableName(claimant.fullName)) {
+    throw new Error("O nome digitado na assinatura deve ser igual ao nome completo informado acima.");
+  }
+  return acceptance;
+}
+
 
 async function submitJecPetitionForm(form, action) {
   const caseId = form?.dataset.jecForm || "";
@@ -3931,7 +3957,17 @@ async function submitJecPetitionForm(form, action) {
   const claimant = readJecClaimant(form);
   const previous = jecCaseStates.get(caseId) || {};
   let attachments = previous.attachments || {};
-  for (const field of ["identityDocument", "proofOfResidence", "signedPowerOfAttorney"]) {
+  let powerOfAttorneyAcceptance = previous.powerOfAttorneyAcceptance || {
+    accepted: false,
+    signerName: "",
+  };
+  if (action === "pdf") {
+    powerOfAttorneyAcceptance = {
+      accepted: Boolean(form.elements.powerOfAttorneyAccepted?.checked),
+      signerName: normalizeJecText(form.elements.powerOfAttorneySignerName?.value),
+    };
+  }
+  for (const field of ["identityDocument", "proofOfResidence"]) {
     const selected = form.elements[field]?.files?.[0];
     if (selected?.size) attachments = { ...attachments, [field]: selected };
   }
@@ -3945,7 +3981,13 @@ async function submitJecPetitionForm(form, action) {
           ? "Abrindo navegador..."
           : "Preparando...";
   }
-  jecCaseStates.set(caseId, { ...previous, claimant, attachments, error: "" });
+  jecCaseStates.set(caseId, {
+    ...previous,
+    claimant,
+    attachments,
+    powerOfAttorneyAcceptance,
+    error: "",
+  });
 
   try {
     let profileStored = previous.profileStored || false;
@@ -3963,6 +4005,7 @@ async function submitJecPetitionForm(form, action) {
       claimant,
       uf: claimant.uf,
       city: claimant.city,
+      powerOfAttorneyAcceptance,
     };
     if (action === "browser") {
       const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
@@ -3996,6 +4039,7 @@ async function submitJecPetitionForm(form, action) {
         profileStored,
         prepared: previous.prepared,
         attachments,
+        powerOfAttorneyAcceptance,
         portal: data.portal || previous.portal,
         session: data.session,
         agent: data.agent || null,
@@ -4006,10 +4050,18 @@ async function submitJecPetitionForm(form, action) {
       return;
     }
     if (action === "pdf") {
+      powerOfAttorneyAcceptance = readJecPowerOfAttorneyAcceptance(form, claimant);
+      payload.powerOfAttorneyAcceptance = powerOfAttorneyAcceptance;
       const reviewConfirmed = Boolean(form.elements.reviewConfirmed?.checked);
       if (!reviewConfirmed) throw new Error("Revise e confirme o rascunho antes de gerar o PDF.");
       attachments = readJecPdfAttachments(form, attachments);
-      jecCaseStates.set(caseId, { ...previous, claimant, attachments, error: "" });
+      jecCaseStates.set(caseId, {
+        ...previous,
+        claimant,
+        attachments,
+        powerOfAttorneyAcceptance,
+        error: "",
+      });
       const formData = new FormData();
       formData.append("payload", JSON.stringify({
         ...payload,
@@ -4017,8 +4069,8 @@ async function submitJecPetitionForm(form, action) {
       }));
       formData.append("identityDocument", attachments.identityDocument);
       formData.append("proofOfResidence", attachments.proofOfResidence);
-      formData.append("signedPowerOfAttorney", attachments.signedPowerOfAttorney);
-      const response = await fetch("/api/jec/petitions/pdf", {
+      for (const file of attachments.sourceDocuments || []) formData.append("sourceDocuments", file);
+      const response = await fetch("/api/jec/petitions/submit", {
         method: "POST",
         headers: { accept: "application/pdf" },
         body: formData,
@@ -4034,24 +4086,16 @@ async function submitJecPetitionForm(form, action) {
           : "";
         throw new Error(data.message || `Não foi possível gerar o PDF.${missing}`);
       }
-      const blob = await response.blob();
-      const disposition = response.headers.get("content-disposition") || "";
-      const fileName =
-        disposition.match(/filename="([^"]+)"/i)?.[1] || "relatorio-tecnico-auditoria-itau.pdf";
-      const downloadUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = downloadUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      const result = await response.json();
+      if (!result.job?.id) throw new Error("A solicitação não foi confirmada. Tente novamente.");
       jecCaseStates.set(caseId, {
         ...previous,
         claimant,
         profileStored,
         prepared: previous.prepared,
         attachments,
+        powerOfAttorneyAcceptance,
+        lawyerJob: result.job,
         pdfDownloadedAt: new Date().toISOString(),
         error: "",
       });
@@ -4079,6 +4123,7 @@ async function submitJecPetitionForm(form, action) {
       profileStored,
       prepared: data.prepared,
       attachments,
+      powerOfAttorneyAcceptance,
       portal: data.prepared?.portal,
       error: "",
     });
@@ -4088,6 +4133,7 @@ async function submitJecPetitionForm(form, action) {
       ...previous,
       claimant,
       attachments,
+      powerOfAttorneyAcceptance,
       error: error instanceof Error ? error.message : "Falha ao preparar o fluxo JEC.",
     });
     renderChatWorkspace();

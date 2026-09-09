@@ -700,8 +700,8 @@ test("guided results continue through recovery without redirecting to chat", () 
   assert.match(chargeAnalysisJs, /function renderRecoveryGuide\(\)/);
   assert.doesNotMatch(chargeAnalysisJs, /\/api\/jec\/testimony\/refine/);
   assert.match(chargeAnalysisJs, /\/api\/jec\/petitions\/prepare/);
-  assert.match(chargeAnalysisJs, /\/api\/jec\/petitions\/pdf/);
-  assert.match(chargeAnalysisJs, /id="chargeRecoveryGuideUf"/);
+  assert.match(chargeAnalysisJs, /\/api\/jec\/petitions\/submit/);
+  assert.doesNotMatch(chargeAnalysisJs, /id="chargeRecoveryGuideUf"/);
   assert.doesNotMatch(chargeAnalysisJs, /audita:open-jec/);
   assert.doesNotMatch(appJs, /function openGuidedChargeJec\(event\)/);
   assert.doesNotMatch(appJs, /window\.history\.pushState\(\{\}, "", "\/chat"\)/);
@@ -723,27 +723,31 @@ test("app hides the one-page shell until the initial route is ready", () => {
       appJs.lastIndexOf("const authState = await loadAuthState();"),
   );
   assert.match(indexHtml, /styles\.css\?v=20260827-procuracao-1/);
-  assert.match(indexHtml, /app\.js\?v=20260827-procuracao-1/);
+  assert.match(indexHtml, /charge-analysis\.js\?v=20260828-legal-documents-1/);
+  assert.match(indexHtml, /app\.js\?v=20260828-legal-documents-1/);
 });
 
-test("recovery requires the three PDFs and generates the facts without a testimony stage", () => {
+test("recovery uses one electronic acceptance for the contract and power of attorney", () => {
   assert.equal(powerOfAttorneyTemplate.subarray(0, 5).toString(), "%PDF-");
   assert.ok(powerOfAttorneyTemplate.length > 1000);
   assert.doesNotMatch(chargeAnalysisJs, /Relatório pronto para revisão|Revisar conteúdo do PDF|Avisos importantes|Continuar para o depoimento/);
   assert.doesNotMatch(chargeAnalysisJs, /RECOVERY_TESTIMONY_TOPICS|chargeRecoveryTestimonyForm|testimonyAnswer|refinedTestimony|testimonyReviewed|consumerTestimony/);
   assert.match(chargeAnalysisJs, /name="identityDocument" accept="\.pdf,application\/pdf"/);
   assert.match(chargeAnalysisJs, /name="proofOfResidence" accept="\.pdf,application\/pdf"/);
-  assert.match(chargeAnalysisJs, /name="signedPowerOfAttorney" accept="\.pdf,application\/pdf"/);
-  assert.match(chargeAnalysisJs, /href="\/assets\/documents\/procuracao-ad-judicia-et-extra\.pdf" download/);
-  assert.match(chargeAnalysisJs, /https:\/\/www\.gov\.br\/pt-br\/servicos\/assinatura-eletronica/);
-  assert.match(chargeAnalysisJs, /anexado separadamente no portal do tribunal para preservar a assinatura digital/);
+  assert.match(chargeAnalysisJs, /name="powerOfAttorneyAccepted"/);
+  assert.match(chargeAnalysisJs, /name="powerOfAttorneySignerName"/);
+  assert.equal((chargeAnalysisJs.match(/name="powerOfAttorneyAccepted"/g) || []).length, 1);
+  assert.doesNotMatch(chargeAnalysisJs, /name="(?:contract|agreement)Accepted"/i);
+  assert.match(chargeAnalysisJs, /a digitação do meu nome completo representa minha assinatura eletrônica/);
+  assert.match(chargeAnalysisJs, /\/api\/jec\/legal-services-contract\/preview/);
+  assert.doesNotMatch(chargeAnalysisJs, /name="signedPowerOfAttorney"|assinatura-eletronica" target|href="https:\/\/www\.gov\.br/);
   assert.match(chargeAnalysisJs, /file\.size > 12 \* 1024 \* 1024/);
   assert.match(chargeAnalysisJs, /const formData = new FormData\(\)/);
   assert.match(chargeAnalysisJs, /formData\.append\("identityDocument", attachments\.identityDocument\)/);
   assert.match(chargeAnalysisJs, /formData\.append\("proofOfResidence", attachments\.proofOfResidence\)/);
-  assert.match(chargeAnalysisJs, /formData\.append\("signedPowerOfAttorney", attachments\.signedPowerOfAttorney\)/);
+  assert.doesNotMatch(chargeAnalysisJs, /formData\.append\("signedPowerOfAttorney"/);
   assert.doesNotMatch(chargeAnalysisJs, /autoGenerateTestimony/);
-  assert.match(chargeAnalysisJs, /headers: \{ accept: "application\/pdf" \}/);
+  assert.match(chargeAnalysisJs, /headers: \{ accept: "application\/json" \}/);
   assert.match(chargeAnalysisJs, /if \(shouldGenerate\) await downloadRecoveryReport\(claimant, attachments\)/);
   assert.doesNotMatch(chargeAnalysisJs, /data-recovery-submit="pdf"/);
   assert.match(serverJs, /readJecPetitionPdfRequest\(request\)/);
@@ -754,14 +758,16 @@ test("recovery requires the three PDFs and generates the facts without a testimo
   assert.doesNotMatch(appJs, /originalTestimony|refinedTestimony|testimonyReviewed|data-jec-action="testimony"|\/api\/jec\/testimony\/refine/);
   assert.match(appJs, /name="identityDocument" type="file" accept="\.pdf,application\/pdf"/);
   assert.match(appJs, /name="proofOfResidence" type="file" accept="\.pdf,application\/pdf"/);
-  assert.match(appJs, /name="signedPowerOfAttorney" type="file" accept="\.pdf,application\/pdf"/);
-  assert.match(appJs, /href="\/assets\/documents\/procuracao-ad-judicia-et-extra\.pdf" download/);
-  assert.match(appJs, /https:\/\/www\.gov\.br\/pt-br\/servicos\/assinatura-eletronica/);
-  assert.match(appJs, /formData\.append\("signedPowerOfAttorney", attachments\.signedPowerOfAttorney\)/);
+  assert.match(appJs, /name="powerOfAttorneyAccepted" type="checkbox"/);
+  assert.match(appJs, /name="powerOfAttorneySignerName"/);
+  assert.equal((appJs.match(/name="powerOfAttorneyAccepted" type="checkbox"/g) || []).length, 1);
+  assert.doesNotMatch(appJs, /name="(?:contract|agreement)Accepted"/i);
+  assert.match(appJs, /\/api\/jec\/legal-services-contract\/preview/);
+  assert.doesNotMatch(appJs, /name="signedPowerOfAttorney"|formData\.append\("signedPowerOfAttorney"|href="https:\/\/www\.gov\.br/);
   assert.doesNotMatch(appJs, /autoGenerateTestimony/);
   assert.match(appJs, /data-jec-action="prepare" formnovalidate/);
   assert.match(appJs, /data-jec-action="browser" formnovalidate/);
-  assert.match(appJs, /for \(const field of \["identityDocument", "proofOfResidence", "signedPowerOfAttorney"\]\)/);
+  assert.match(appJs, /for \(const field of \["identityDocument", "proofOfResidence"\]\)/);
   assert.match(stylesCss, /\.jec-document-attachments/);
   assert.match(stylesCss, /\.jec-power-of-attorney,[\s\S]*?\.charge-power-of-attorney/);
   assert.doesNotMatch(stylesCss, /\.jec-testimony-section|\.charge-testimony-/);
@@ -784,15 +790,9 @@ test("recovery report reuses calculated values without asking for another review
   assert.match(chargeAnalysisJs, /action === "back-to-recovery-report"[\s\S]*state\.recovery\.phase = "report"/);
 });
 
-test("tribunal guide explains small claims and redirects cases above 20 minimum wages", () => {
-  assert.match(chargeAnalysisJs, /O que são pequenas causas\?/);
-  assert.match(chargeAnalysisJs, /Entenda advogado, custos e recursos/);
-  assert.match(chargeAnalysisJs, /não existe garantia de “risco zero”/);
-  assert.match(chargeAnalysisJs, /Lei 9\.099\/1995/);
-  assert.match(chargeAnalysisJs, /Falar com o time IA AUDITA · em breve/);
-  assert.match(chargeAnalysisJs, /eligibility\?\.status === "above_limit"/);
-  assert.match(chargeAnalysisJs, />Abrir portal oficial<\/a>/);
-  assert.match(appJs, /Pequenas causas/);
-  assert.match(appJs, /Contato em breve/);
-  assert.match(appJs, /smallClaimsAboveLimit/);
+test("completed recovery goes to the lawyer instead of client filing instructions", () => {
+  assert.match(chargeAnalysisJs, /Sua solicitação está completa/);
+  assert.match(chargeAnalysisJs, /O advogado responsável da Audita dará início ao protocolo/);
+  assert.doesNotMatch(chargeAnalysisJs, />Abrir portal oficial<\/a>/);
+  assert.match(appJs, /if \(state\.lawyerJob\?\.id\)/);
 });

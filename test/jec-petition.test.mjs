@@ -623,7 +623,7 @@ test("chat UI focuses the JEC secure intake returned by the AI tool", async () =
   assert.match(source, /pendingJecFocusCaseId/);
   assert.match(source, /panel\.scrollIntoView/);
   assert.match(source, /state\.open \|\| state\.prepared/);
-  assert.match(source, /\/api\/jec\/petitions\/pdf/);
+  assert.match(source, /\/api\/jec\/petitions\/submit/);
   assert.match(source, /Gerar Relatório Técnico em PDF/);
   assert.match(source, /data-jec-monitoring-form/);
   assert.match(source, /\/api\/integrations\/direct-data\/tj\/processes/);

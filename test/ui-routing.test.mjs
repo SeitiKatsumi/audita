@@ -68,6 +68,8 @@ test("production image includes every root-level UI asset", () => {
     "plans.html",
     "plans.css",
     "plans.js",
+    "advogados.html",
+    "advogados.js",
     "super-admin.html",
     "super-admin.css",
     "super-admin.js",

@@ -2,14 +2,19 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { PDFDocument, PDFHexString, PDFName } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 
 import {
   appendJecPetitionAttachments,
   buildJecCalculationReportHtml,
   buildJecPetitionHtml,
+  buildLegalServicesAgreementHtml,
+  buildPowerOfAttorneyHtml,
+  createLegalServicesAgreementPdf,
+  createPowerOfAttorneyPdf,
   createJecPetitionPdf,
   resolveJecPdfBrowserExecutable,
+  validatePowerOfAttorneyAcceptance,
 } from "../services/jec-petition-pdf.service.mjs";
 
 const prepared = {
@@ -198,66 +203,164 @@ test("PDF attachment composition rejects malformed files with mappable codes", a
   );
 });
 
-test("signed power of attorney is validated but never copied into the final PDF", () => {
+test("petition upload accepts only identity and residence while requiring electronic acceptance", () => {
   const serverSource = readFileSync(new URL("../server.mjs", import.meta.url), "utf8");
   const requestReader = serverSource.slice(
     serverSource.indexOf("async function readJecPetitionPdfRequest"),
     serverSource.indexOf("function sendJson"),
   );
 
-  assert.match(requestReader, /readBufferBody\(request, 38 \* 1024 \* 1024\)/);
+  assert.match(requestReader, /readBufferBody\(request, request\.url\?\.includes\("\/petitions\/submit"\) \? 90 \* 1024 \* 1024 : 26 \* 1024 \* 1024\)/);
   assert.match(requestReader, /file\.size > 12 \* 1024 \* 1024/);
   assert.match(requestReader, /PDFDocument\.load\(bytes\)/);
-  assert.match(
-    requestReader,
-    /const signedPowerOfAttorney = await readPdf\(/,
-  );
+  assert.doesNotMatch(requestReader, /signedPowerOfAttorney|hasPdfDigitalSignature/);
   assert.match(
     requestReader,
     /attachments: \[identityDocument, proofOfResidence\]/,
   );
-  assert.doesNotMatch(
-    requestReader,
-    /attachments: \[[^\]]*signedPowerOfAttorney[^\]]*\]/,
-  );
-  assert.match(
-    serverSource,
-    /documento de identidade, o comprovante de residência e a procuração assinada em PDF/,
-  );
-  assert.match(serverSource, /JEC_PDF_SIGNATURE_REQUIRED: 422/);
-  assert.match(serverSource, /Assine o PDF no gov\.br/);
+  assert.match(serverSource, /validatePowerOfAttorneyAcceptance\(\{/);
+  assert.match(serverSource, /\/api\/jec\/legal-documents/);
+  assert.match(serverSource, /documents\.append\(\s*"powerOfAttorney"/);
+  assert.match(serverSource, /documents\.append\(\s*"legalServicesAgreement"/);
+  assert.match(serverSource, /createLegalServicesAgreementPdf\(\{/);
+  assert.match(serverSource, /JEC_POWER_OF_ATTORNEY_ACCEPTANCE_REQUIRED: 422/);
+  assert.match(serverSource, /JEC_POWER_OF_ATTORNEY_NAME_MISMATCH: 422/);
+  assert.doesNotMatch(serverSource, /Assine o PDF no gov\.br|JEC_PDF_SIGNATURE_REQUIRED/);
 });
 
-test("digital-signature detector rejects an unsigned PDF and accepts a signature dictionary", async () => {
-  const serverSource = readFileSync(new URL("../server.mjs", import.meta.url), "utf8");
-  const detectorSource = serverSource.slice(
-    serverSource.indexOf("function hasPdfDigitalSignature"),
-    serverSource.indexOf("async function readJecPetitionPdfRequest"),
+test("electronic acceptance requires the typed claimant name", () => {
+  assert.deepEqual(
+    validatePowerOfAttorneyAcceptance({
+      claimant: { fullName: "João da Silva" },
+      powerOfAttorneyAcceptance: {
+        accepted: true,
+        signerName: "  joao   DA SILVA ",
+      },
+    }),
+    {
+      accepted: true,
+      signerName: "joao DA SILVA",
+      statement: "Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Jurídicos e Honorários Advocatícios, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.",
+      version: "2026-08-28-contract-1",
+    },
   );
-  const hasPdfDigitalSignature = Function(
-    `${detectorSource}; return hasPdfDigitalSignature;`,
-  )();
-  const unsignedPdf = await pdfWithPageSizes([[310, 410]]);
-  const unsignedTemplate = readFileSync(
-    new URL("../assets/documents/procuracao-ad-judicia-et-extra.pdf", import.meta.url),
+  assert.throws(
+    () => validatePowerOfAttorneyAcceptance({
+      claimant: { fullName: "João da Silva" },
+      powerOfAttorneyAcceptance: { accepted: true, signerName: "Outra Pessoa" },
+    }),
+    (error) => error.code === "JEC_POWER_OF_ATTORNEY_NAME_MISMATCH",
   );
-  const signedPdf = await PDFDocument.create();
-  const page = signedPdf.addPage([310, 410]);
-  const signature = signedPdf.context.obj({
-    Type: PDFName.of("Sig"),
-    ByteRange: [0, 100, 200, 300],
-    Contents: PDFHexString.of("A1B2C3D4"),
-  });
-  page.node.set(
-    PDFName.of("AuditaSignatureTest"),
-    signedPdf.context.register(signature),
-  );
+});
 
-  assert.equal(hasPdfDigitalSignature(Buffer.alloc(0)), false);
-  assert.equal(hasPdfDigitalSignature(unsignedPdf), false);
-  assert.equal(hasPdfDigitalSignature(unsignedTemplate), false);
-  assert.equal(
-    hasPdfDigitalSignature(await signedPdf.save({ useObjectStreams: false })),
-    true,
-  );
+test("power of attorney contains the typed signature and renders as a separate PDF", async () => {
+  const document = {
+    claimant: {
+      fullName: "João da Silva",
+      document: "52998224725",
+      rg: "12.345.678-9",
+      nationality: "Brasileiro",
+      maritalStatus: "Solteiro",
+      profession: "Analista",
+      email: "joao@example.com",
+      phone: "11999999999",
+      street: "Rua das Flores",
+      addressNumber: "123",
+      district: "Centro",
+      postalCode: "01001000",
+      city: "São Paulo",
+      uf: "SP",
+    },
+    acceptance: {
+      accepted: true,
+      signerName: "João da Silva",
+      statement: "Declaro que li e aceito integralmente esta procuração.",
+      version: "2026-08-28",
+      id: "acceptance-test-id",
+      acceptedAt: "2026-08-28T15:00:00.000Z",
+      ipAddress: "127.0.0.1",
+      userAgent: "Test Browser",
+      fingerprint: "abc123",
+    },
+  };
+  const html = buildPowerOfAttorneyHtml(document);
+  assert.match(html, /Assinado eletronicamente por/);
+  assert.match(html, /João da Silva/);
+  assert.match(html, /ID acceptan/);
+  assert.doesNotMatch(html, /REGISTRO DE ACEITE ELETRÔNICO|ICP-Brasil|Origem técnica do acesso/);
+
+  let renderedHtml = "";
+  let browserClosed = false;
+  const bytes = Buffer.from(await createPowerOfAttorneyPdf(document, {
+    launch: async () => ({
+      newPage: async () => ({
+        setContent: async (value) => { renderedHtml = value; },
+        emulateMedia: async () => {},
+        pdf: async () => pdfWithPageSizes([[595, 842]]),
+      }),
+      close: async () => { browserClosed = true; },
+    }),
+  }));
+  assert.match(renderedHtml, /João da Silva/);
+  assert.equal(bytes.subarray(0, 5).toString("ascii"), "%PDF-");
+  assert.equal(browserClosed, true);
+  const output = await PDFDocument.load(bytes);
+  assert.equal(output.getPageCount(), 1);
+  assert.match(output.getSubject(), /acceptance-test-id/);
+  assert.match(output.getSubject(), /abc123/);
+});
+
+test("legal-services contract preserves the supplied terms and uses the same compact acceptance", async () => {
+  const document = {
+    claimant: {
+      fullName: "Maria José <Cliente>",
+      document: "52998224725",
+      rg: "12.345.678-9",
+      nationality: "Brasileira",
+      maritalStatus: "Solteira",
+      profession: "Analista",
+      street: "Rua das Flores",
+      addressNumber: "123",
+      district: "Centro",
+      postalCode: "01001-000",
+      city: "São Paulo",
+      uf: "SP",
+    },
+    acceptance: {
+      accepted: true,
+      signerName: "Maria José <Cliente>",
+      id: "shared-acceptance-id",
+      acceptedAt: "2026-08-28T15:00:00.000Z",
+      fingerprint: "shared-fingerprint",
+    },
+  };
+  const html = buildLegalServicesAgreementHtml(document);
+  assert.match(html, /CONTRATO DE PRESTAÇÃO DE SERVIÇOS JURÍDICOS E HONORÁRIOS ADVOCATÍCIOS/);
+  assert.match(html, /10% \(dez por cento\)/);
+  assert.match(html, /fica totalmente isento\(a\) do pagamento de taxas judiciárias/);
+  assert.match(html, /CONTRATADO NÃO interporá recurso/);
+  assert.match(html, /risco financeiro direto[\s\S]*?ZERO/);
+  assert.match(html, /Advogado responsável pendente de vinculação/);
+  assert.match(html, /Assinado eletronicamente pelo contratante/);
+  assert.match(html, /Maria José &lt;Cliente&gt;/);
+  assert.match(html, /ID shared-a/);
+
+  let renderedHtml = "";
+  let browserClosed = false;
+  const bytes = Buffer.from(await createLegalServicesAgreementPdf(document, {
+    launch: async () => ({
+      newPage: async () => ({
+        setContent: async (value) => { renderedHtml = value; },
+        emulateMedia: async () => {},
+        pdf: async () => pdfWithPageSizes([[595, 842], [595, 842]]),
+      }),
+      close: async () => { browserClosed = true; },
+    }),
+  }));
+  assert.match(renderedHtml, /shared-a/);
+  assert.equal(browserClosed, true);
+  const output = await PDFDocument.load(bytes);
+  assert.equal(output.getPageCount(), 2);
+  assert.match(output.getSubject(), /shared-acceptance-id/);
+  assert.match(output.getSubject(), /shared-fingerprint/);
 });
