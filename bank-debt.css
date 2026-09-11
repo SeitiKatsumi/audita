@@ -1,0 +1,29 @@
+/* Conversation, avatar, header and choices inherit the existing Itaú UI. */
+#dividas-bancarias [hidden]{display:none!important}
+#dividas-bancarias h2{font-size:1rem;line-height:1.6;margin:20px 0 0;color:inherit}
+#dividas-bancarias .charge-analysis-bubble{display:block;min-width:0}
+#dividas-bancarias .charge-analysis-actions button{font:inherit;font-weight:700;text-align:left;white-space:normal}
+#dividas-bancarias :is(button,a,input,select,textarea,summary):focus-visible{outline:2px solid #91d8ff;outline-offset:4px}
+#dividas-bancarias button:disabled{opacity:.55;cursor:wait}
+#dividas-bancarias summary{cursor:pointer;color:#a8bfd0}
+#dividas-bancarias details{margin-top:20px}
+#dividas-bancarias a{color:#91d8ff;overflow-wrap:anywhere}
+.debt-form{display:grid;gap:16px;margin:20px 0}
+.debt-form label{display:grid;gap:7px;font-size:.9rem}
+.debt-form input:not([type=checkbox]),.debt-form textarea,.debt-form select{box-sizing:border-box;width:100%;min-width:0;padding:12px;border:1px solid #315b75;border-radius:8px;font:inherit;background:#092033;color:#e4eef7;color-scheme:dark}
+.debt-form .debt-check{display:flex;align-items:flex-start;gap:12px;line-height:1.6}
+.debt-check input{flex:none;margin-top:5px;accent-color:var(--lime)}
+.debt-note{font-size:.8rem;color:#a8bfd0;margin-top:16px!important}
+.debt-summary{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+.debt-summary dt{font-size:.8rem;color:#a8bfd0}.debt-summary dd{margin:5px 0 0;overflow-wrap:anywhere}
+.debt-result,.debt-plan{padding:20px;border:1px solid #315b75;border-radius:10px;margin:20px 0;background:rgba(12,42,67,.74)}
+.debt-result strong{display:block;font-size:1.8rem;color:var(--lime);margin:8px 0}
+.debt-plan h3{font-size:1.6rem;margin:12px 0}.debt-plan small{font-size:.8rem}.debt-plan li{margin:10px 0}
+.debt-pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem}
+.debt-documents,.debt-review{border-top:1px solid #244a63;margin-top:24px;padding-top:16px}
+.debt-history{margin:0 0 24px 62px;font-size:.85rem;max-width:590px}
+#debtCases{display:grid;gap:8px;margin:16px 0}
+#debtCases button{display:grid;gap:7px;text-align:left;padding:12px;border:1px solid #244a63;border-radius:8px;background:#092033;color:#e4eef7;cursor:pointer}
+#debtCases .selected{border-color:var(--lime)}#debtCases small{color:#a8bfd0}
+.debt-success{color:var(--lime);margin:20px 0!important}
+@media(max-width:600px){.debt-summary{grid-template-columns:1fr}.debt-history{margin-left:0}.debt-plan{padding:14px}}

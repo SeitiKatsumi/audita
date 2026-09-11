@@ -16,6 +16,7 @@ function render() {
   $("#jobs").innerHTML = visible.length ? visible.map(job => `<article>
     <span class="badge">${({queued:"Aguardando advogado",claimed:"Em atendimento",filed:"Protocolo registrado pelo advogado"})[job.status]}</span>
     <h2>${escape(job.client_name || "Solicitação " + job.id.slice(0, 8))}</h2>
+    ${job.module_label ? `<p><strong>${escape(job.module_label)}</strong></p>` : ""}
     <p>${escape(job.city)} · ${escape(job.uf)}<br><small>Recebida em ${escape(new Date(job.created_at).toLocaleString("pt-BR"))}</small></p>
     ${job.status === "queued" ? `<button data-claim="${escape(job.id)}">Assumir solicitação</button>` : `<div class="actions">${Object.entries({report:"Relatório e anexos",powerOfAttorney:"Procuração",agreement:"Contrato"}).map(([name,label])=>`<a class="download" href="/api/advogados/jobs/${escape(job.id)}/documents/${name}">${label}</a>`).join("")}${(job.sources || []).map((name, i) => `<a class="download" href="/api/advogados/jobs/${escape(job.id)}/documents/source-${i}">${escape(name)}</a>`).join("")}</div>
     ${job.status === "claimed" ? `<p>Revise os documentos e confirme a unidade competente antes de protocolar no portal do tribunal.</p><form class="protocol" data-complete="${escape(job.id)}"><label>Número do protocolo ou processo<input name="protocol" required minlength="5" maxlength="100"></label><button>Registrar protocolo concluído</button></form>` : `<p>Protocolo: <strong>${escape(job.protocol_number)}</strong></p>`}`}

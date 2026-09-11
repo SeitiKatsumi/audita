@@ -884,6 +884,7 @@ const auditSourceLabels = {
 
 const pageMeta = {
   "isencao-ir": { title: "Isenção e restituição de IR", eyebrow: "Triagem guiada" },
+  "dividas-bancarias": { title: "Dívidas Bancárias Abusivas", eyebrow: "Análise guiada" },
   chat: {
     title: "IA AUDITA",
     eyebrow: "Intelig\u00eancia jur\u00eddica conversacional",

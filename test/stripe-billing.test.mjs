@@ -48,6 +48,21 @@ function stripeSignature(payload, secret, timestamp) {
   return `t=${timestamp},v1=${digest}`;
 }
 
+test('debt checkout binds server proposal and dispatches only signed webhooks', async () => {
+  let params, delivered=0;
+  const service=createStripeBillingService({env:configuredEnv(),
+    fetchImpl:async(url,options)=>{params=new URLSearchParams(options.body);return response({id:'cs_debt',url:'https://checkout.stripe.com/c/pay/cs_debt',expires_at:1800000000});},
+    onDebtPaymentEvent:async event=>{delivered++;assert.equal(event.data.object.metadata.debt_case_id,'case-debt');return {received:true};}});
+  await service.createDebtCheckoutSession(AUTH,{caseId:'case-debt',reviewId:'review-1',amountCents:19900,attempt:1});
+  assert.equal(params.get('metadata[purchase_kind]'),'bank_debt');
+  assert.equal(params.get('metadata[audita_user_id]'),AUTH.user.id);
+  assert.equal(params.get('line_items[0][price_data][unit_amount]'),'19900');
+  assert.match(params.get('success_url'),/#dividas-bancarias$/);
+  const body=JSON.stringify({id:'evt_debt_signed',type:'checkout.session.completed',data:{object:{metadata:{purchase_kind:'bank_debt',debt_case_id:'case-debt'}}}});
+  await assert.rejects(service.handleWebhook(body,'invalid'));assert.equal(delivered,0);
+  await service.handleWebhook(body,stripeSignature(body,'whsec_example',Math.floor(Date.now()/1000)));assert.equal(delivered,1);
+});
+
 function response(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,

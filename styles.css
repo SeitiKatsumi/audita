@@ -10975,11 +10975,11 @@ body[data-active-page="chat"] .workspace {
 }
 
 /* Chat-led charge analysis */
-body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .workspace {
+body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"], [data-active-page="dividas-bancarias"]) .workspace {
   position: relative;
 }
 
-body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar {
+body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"], [data-active-page="dividas-bancarias"]) .topbar {
   position: absolute;
   z-index: 6;
   top: 0;
@@ -10988,7 +10988,7 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"])
   margin: 0;
 }
 
-body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar > div:first-child {
+body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"], [data-active-page="dividas-bancarias"]) .topbar > div:first-child {
   display: none;
 }
 
@@ -11509,7 +11509,7 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"])
 }
 
 @media (max-width: 820px) {
-  body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar {
+  body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"], [data-active-page="dividas-bancarias"]) .topbar {
     top: 64px;
     right: 18px;
   }
@@ -11562,7 +11562,7 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"])
 }
 
 @media (max-width: 520px) {
-  body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar {
+  body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"], [data-active-page="dividas-bancarias"]) .topbar {
     display: none;
   }
 

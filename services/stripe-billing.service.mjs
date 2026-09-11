@@ -259,6 +259,7 @@ export function createStripeBillingService({
   creditsService,
   accessService,
   onIrPaymentEvent,
+  onDebtPaymentEvent,
   fetchImpl = globalThis.fetch,
   env = process.env,
   now = () => Date.now(),
@@ -733,6 +734,23 @@ export function createStripeBillingService({
     return {id: session.id, url: session.url, expiresAt: session.expires_at};
   }
 
+  // Server-validated analysis owns the price and identity; no client amount is accepted.
+  async function createDebtCheckoutSession(authContext, proposal) {
+    const config = configuration();
+    if (!config.checkoutReady || !config.appUrl) throw new StripeBillingError("billing_not_configured", "Pagamento ainda não configurado.", 503);
+    const metadata = {purchase_kind: "bank_debt", audita_tenant_id: String(authContext.tenantId),
+      audita_user_id: String(authContext.user.id), debt_case_id: proposal.caseId, debt_review_id: proposal.reviewId};
+    const session = await stripeRequest("/v1/checkout/sessions", {
+      mode: "payment", customer_email: authContext.user.email,
+      success_url: `${config.appUrl}/?debt_case=${proposal.caseId}&debt_payment=return#dividas-bancarias`,
+      cancel_url: `${config.appUrl}/?debt_case=${proposal.caseId}#dividas-bancarias`,
+      locale: "pt-BR", integration_identifier: config.integrationIdentifier,
+      line_items: [{quantity: 1, price_data: {currency: "brl", unit_amount: proposal.amountCents,
+        product_data: {name: "Audita — Dívidas Bancárias Abusivas"}}}], metadata, payment_intent_data: {metadata},
+    }, {idempotencyKey: `audita-debt-${proposal.caseId}-${proposal.reviewId}-${proposal.attempt}`});
+    return {id: session.id, url: session.url, expiresAt: session.expires_at};
+  }
+
   async function createCheckoutSession(authContext, input = {}) {
     if (!authContext?.tenantId || !authContext?.user) {
       return { unauthorized: true };
@@ -1051,6 +1069,10 @@ export function createStripeBillingService({
 
   async function processEvent(event) {
     const object = event?.data?.object || {};
+    if (object.metadata?.purchase_kind === "bank_debt") {
+      if (!onDebtPaymentEvent) throw new StripeBillingError("debt_handler_unavailable", "Processamento de dívida indisponível.", 503);
+      return onDebtPaymentEvent(event);
+    }
     if (object.metadata?.purchase_kind === "ir_proposal") {
       if (!onIrPaymentEvent) throw new StripeBillingError("ir_handler_unavailable", "Processamento IR indisponível.", 503);
       return onIrPaymentEvent(event);
@@ -1146,6 +1168,7 @@ export function createStripeBillingService({
     getSubscription: loadSubscription,
     handleWebhook,
     createIrCheckoutSession,
+    createDebtCheckoutSession,
     setCancellationAtPeriodEnd,
   };
 }

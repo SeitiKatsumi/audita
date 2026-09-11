@@ -14,6 +14,7 @@ COPY index.html styles.css app.js billing-admin.js charge-analysis.js charge-cal
 COPY advogados.html advogados.js ./
 COPY plans.html plans.css plans.js ./
 COPY ir-exemption.css ir-exemption.js ./
+COPY bank-debt.css bank-debt.js ./
 COPY super-admin.html super-admin.css super-admin.js ./
 COPY assets ./assets
 COPY data ./data
