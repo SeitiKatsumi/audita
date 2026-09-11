@@ -6,6 +6,7 @@
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
     <link rel="stylesheet" href="styles.css?v=20260827-procuracao-1" />
+    <link rel="stylesheet" href="/ir-exemption.css?v=20260910-integrated" />
   </head>
   <body>
     <div class="app-boot" id="appBoot" role="status" aria-live="polite" aria-label="Carregando IA AUDITA">
@@ -79,6 +80,10 @@
             <img class="nav-icon" src="assets/nav-icons/sparkles.svg" alt="" aria-hidden="true" />
             <span class="nav-label">IA AUDITA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+          </a>
+          <a href="#isencao-ir">
+            <img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" aria-hidden="true" />
+            <span class="nav-label">Isenção e restituição de IR</span>
           </a>
           <a href="#analise-cobrancas">
             <img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" aria-hidden="true" />
@@ -201,7 +206,7 @@
                   Navegador <span aria-hidden="true"></span>
                 </button>
                 <button class="chat-tools-button" id="chatToolsButton" type="button" aria-expanded="false" aria-controls="chatToolsPanel">
-                  Ferramentas <span id="chatToolCount">7</span>
+                  Ferramentas <span id="chatToolCount">8</span>
                 </button>
                 <button class="chat-icon-button chat-mobile-new" id="chatMobileNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
               </div>
@@ -211,6 +216,7 @@
                 <div><span class="tool-status active"></span><strong>IBGE</strong><small>API p&uacute;blica ativa</small></div>
                 <a href="/#consulta-imoveis"><span class="tool-status review"></span><strong>Busca de im&oacute;veis</strong><small>Em homologa&ccedil;&atilde;o</small></a>
                 <a href="/#consulta-cnib"><span class="tool-status pending"></span><strong>Indisponibilidade</strong><small>Aguardando provedor</small></a>
+                <a href="#isencao-ir"><span class="tool-status review"></span><strong>Isenção de IR</strong><small>Triagem e acompanhamento</small></a>
                 <a href="/chat?tool=itau-refund"><span class="tool-status active"></span><strong>Revis&atilde;o Ita&uacute;</strong><small>An&aacute;lise de faturas ativa</small></a>
                 <a href="/#historico"><span class="tool-status active"></span><strong>Hist&oacute;rico</strong><small>Consultas do usu&aacute;rio</small></a>
               </div>
@@ -452,6 +458,23 @@
               </section>
             </div>
           </article>
+        </section>
+
+        <section class="charge-analysis-page" id="isencao-ir" data-page="isencao-ir">
+          <div class="charge-analysis-shell">
+            <header class="charge-analysis-header">
+              <div class="charge-analysis-identity">
+                <span class="charge-analysis-mark" aria-hidden="true"><img src="/assets/audita-logo-original.png" alt="" /></span>
+                <p><strong>IA AUDITA</strong> está analisando com você</p>
+              </div>
+              <button class="charge-analysis-help" type="button" data-action="help" aria-label="Ajuda sobre isenção de IR"><span aria-hidden="true">?</span><span>Ajuda</span></button>
+            </header>
+            <div class="charge-analysis-workspace"><div class="charge-analysis-content">
+              <p id="notice" class="ir-notice" role="alert" hidden></p>
+              <div id="app" class="charge-analysis-stage" aria-live="polite" aria-busy="true">Preparando seu atendimento…</div>
+              <details class="ir-summary ir-cases"><summary id="caseListTitle">Seus atendimentos de IR</summary><div id="caseList"></div><button type="button" class="secondary-action" id="newCase">Novo atendimento</button></details>
+            </div></div>
+          </div>
         </section>
 
         <section class="charge-analysis-page" id="analise-cobrancas" data-page="analise-cobrancas">
@@ -1833,7 +1856,8 @@
     </div>
 
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
+    <script type="module" src="/ir-exemption.js?v=20260910-reintegrated"></script>
     <script type="module" src="charge-analysis.js?v=20260828-legal-documents-1"></script>
-    <script type="module" src="app.js?v=20260828-legal-documents-1"></script>
+    <script type="module" src="app.js?v=20260828-legal-documents-1-ir-20260910"></script>
   </body>
 </html>

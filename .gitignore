@@ -36,3 +36,6 @@ Thumbs.db
 backups/
 storage/
 !storage/.gitkeep
+
+# Private IR case documents (encrypted, persistent runtime volume)
+private-documents/ir/

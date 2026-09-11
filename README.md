@@ -111,3 +111,22 @@ AUDITA_BASE_URL=https://audita.seudominio.com.br npm run smoke:production
 Nao commite valores reais de `DATABASE_URL`.
 
 O usuario admin inicial e criado/atualizado automaticamente quando `AUDITA_BOOTSTRAP_ADMIN_EMAIL` e `AUDITA_BOOTSTRAP_ADMIN_PASSWORD` estao configurados. Depois do primeiro acesso em producao, troque a senha e remova ou rotacione essas variaveis conforme a politica de seguranca do ambiente.
+
+## Isenção e restituição de IR
+
+Novo atendimento: `/chat?tool=ir-exemption`. Veja [operação e configuração](docs/ir-exemption.md).
+Requer PostgreSQL e chave de criptografia; não usa fallback em memória.
+
+Para iniciar um banco de desenvolvimento local persistente, sem Docker:
+
+```bash
+npm install --prefix storage/dev-tools embedded-postgres
+node scripts/start-local-postgres.mjs
+# Em outro terminal:
+npm start
+```
+
+O helper mantém o banco em `storage/postgresql`, escuta apenas em `127.0.0.1:54329`
+e cria `.env.local` somente se o arquivo ainda não existir. Preserva contas locais
+anteriores ao inicializar um banco vazio. Não habilita cobrança ou chamadas de IA.
+Não usar o helper em produção. Testes do módulo: `node --test test/ir-exemption.test.mjs`.

@@ -12,3 +12,5 @@ build
 logs
 *.log
 backups
+
+private-documents/ir/

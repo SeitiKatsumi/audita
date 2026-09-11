@@ -1,4 +1,7 @@
 import { createLawyerQueueService, requireLawyer } from "./services/lawyer-queue.service.mjs";
+import { createIrExemptionService } from "./services/ir-exemption.service.mjs";
+import { createIrExemptionHandler } from "./services/ir-exemption-api.mjs";
+import { createIrExtractor } from "./services/ir-exemption-ai.mjs";
 import http from "node:http";
 import crypto from "node:crypto";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
@@ -526,6 +529,7 @@ async function initializeDatabase() {
     if (autoMigrate) {
       const schema = await readFile(join(root, "db", "schema.sql"), "utf8");
       await pool.query(schema);
+      await pool.query(await readFile(join(root, "db", "ir-exemption.sql"), "utf8"));
     }
 
     await pool.query("SELECT 1");
@@ -1651,6 +1655,18 @@ const stripeBillingService = createStripeBillingService({
   getDb: () => ({ pool, dbReady }),
   creditsService,
   accessService: billingAccessService,
+  onIrPaymentEvent: (event) => irExemptionService.paymentEvent(event),
+});
+const irExemptionService = createIrExemptionService({
+  getDb: () => ({ pool, dbReady }),
+  checkout: (auth, proposal) => stripeBillingService.createIrCheckoutSession(auth, proposal),
+  extractor: createIrExtractor({recordUsage: async (usage, auth) => {
+    if (auth) await apiUsageService.record(auth, {provider: "openai", operation: "ir_document_extraction", ...usage});
+  }}),
+});
+const irExemptionHandler = createIrExemptionHandler({
+  service: irExemptionService, getAuth: getTenantIdForRequest,
+  readJson: readJsonBody, readBuffer: readBufferBody, sendJson,
 });
 const directusLawyerKitService = createDirectusLawyerKitService();
 const billingAdminService = createBillingAdminService({
@@ -5965,6 +5981,7 @@ async function handleApi(request, response, pathname) {
 const chatBrowserWss = new WebSocketServer({ noServer: true });
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host}`);
+  if (await irExemptionHandler(request, response, url)) return;
   if (await handleApi(request, response, url.pathname)) {
     return;
   }
@@ -5980,6 +5997,14 @@ const server = http.createServer(async (request, response) => {
   }
 
   const requestedPath = uiRoute.path;
+  // Keep private storage, configuration and server implementation outside the static surface.
+  const publicRootFiles = new Set(["index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
+    "advogados.html", "advogados.js", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
+    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js"]);
+  const staticName = String(requestedPath).replace(/^\/+/, "");
+  if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
+    response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;
+  }
   if (
     String(requestedPath)
       .replace(/\\/g, "/")
@@ -6083,6 +6108,15 @@ server.on("upgrade", async (request, socket, head) => {
 await initializeProfileEncryptionKey();
 await initializeDatabase();
 
+let irJobRunning = false;
+const irJobTimer = setInterval(async () => {
+  if (irJobRunning) return;
+  irJobRunning = true;
+  try { await irExemptionService.runJobs(); } catch { console.error("[audita] IR scheduler unavailable"); }
+  finally { irJobRunning = false; }
+}, 60000);
+irJobTimer.unref();
+server.on("close", () => clearInterval(irJobTimer));
 server.listen(port, host, () => {
   console.log(`Audita web app running at http://${host}:${port}/`);
 });

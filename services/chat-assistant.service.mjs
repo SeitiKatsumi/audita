@@ -8,6 +8,7 @@ const DEFAULT_TIMEOUT_MS = 90000;
 const DEFAULT_MAX_TURNS = 8;
 
 export const AUDITA_CHAT_CAPABILITIES = [
+  { id: "ir_exemption", name: "Isenção e restituição de IR", description: "Triagem por perguntas, documentos e acompanhamento com equipe. Disponível quando habilitado.", status: "configuration_required", statusLabel: "Requer configuração", route: "/chat?tool=ir-exemption" },
   {
     id: "state_courts",
     name: "Certidoes estaduais",
@@ -78,6 +79,7 @@ export const AUDITA_CHAT_CAPABILITIES = [
 ];
 
 const MODULE_ACTIONS = {
+  ir_exemption: {label: "Abrir análise de IR", title: "Isenção e restituição de IR", description: "Responda às perguntas no módulo seguro de IR.", route: "/chat?tool=ir-exemption"},
   state_courts: {
     label: "Abrir certid\u00f5es estaduais",
     title: "Certid\u00f5es estaduais",
@@ -1140,6 +1142,7 @@ function buildChatTools({
           "asset_unavailability",
           "audit_history",
           "itau_refund",
+          "ir_exemption",
         ]),
         uf: z.string().optional(),
         reason: z.string().optional(),

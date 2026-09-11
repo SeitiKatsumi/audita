@@ -10975,11 +10975,11 @@ body[data-active-page="chat"] .workspace {
 }
 
 /* Chat-led charge analysis */
-body[data-active-page="analise-cobrancas"] .workspace {
+body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .workspace {
   position: relative;
 }
 
-body[data-active-page="analise-cobrancas"] .topbar {
+body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar {
   position: absolute;
   z-index: 6;
   top: 0;
@@ -10988,7 +10988,7 @@ body[data-active-page="analise-cobrancas"] .topbar {
   margin: 0;
 }
 
-body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
+body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar > div:first-child {
   display: none;
 }
 
@@ -11509,7 +11509,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 }
 
 @media (max-width: 820px) {
-  body[data-active-page="analise-cobrancas"] .topbar {
+  body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar {
     top: 64px;
     right: 18px;
   }
@@ -11562,7 +11562,7 @@ body[data-active-page="analise-cobrancas"] .topbar > div:first-child {
 }
 
 @media (max-width: 520px) {
-  body[data-active-page="analise-cobrancas"] .topbar {
+  body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"]) .topbar {
     display: none;
   }
 

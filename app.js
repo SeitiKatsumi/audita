@@ -883,6 +883,7 @@ const auditSourceLabels = {
 };
 
 const pageMeta = {
+  "isencao-ir": { title: "Isenção e restituição de IR", eyebrow: "Triagem guiada" },
   chat: {
     title: "IA AUDITA",
     eyebrow: "Intelig\u00eancia jur\u00eddica conversacional",
@@ -969,6 +970,7 @@ function getActivePage() {
   if (pageMeta[hash]) {
     return hash;
   }
+  if (window.location.pathname === "/chat" && new URLSearchParams(window.location.search).get("tool") === "ir-exemption") return "isencao-ir";
   return window.location.pathname.replace(/\/$/, "") === "/chat" ? "chat" : "home";
 }
 

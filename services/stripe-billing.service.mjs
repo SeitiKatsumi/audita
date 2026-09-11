@@ -258,6 +258,7 @@ export function createStripeBillingService({
   getDb,
   creditsService,
   accessService,
+  onIrPaymentEvent,
   fetchImpl = globalThis.fetch,
   env = process.env,
   now = () => Date.now(),
@@ -710,6 +711,28 @@ export function createStripeBillingService({
     };
   }
 
+  // Called only by the IR service with a locked, accepted server-side proposal.
+  async function createIrCheckoutSession(authContext, proposal) {
+    const config = configuration();
+    if (!config.checkoutReady) throw new StripeBillingError("billing_not_configured", "Pagamento ainda não configurado.", 503);
+    const metadata = {
+      purchase_kind: "ir_proposal", audita_tenant_id: String(authContext.tenantId),
+      audita_user_id: String(authContext.user.id), ir_case_id: proposal.caseId,
+      ir_proposal_id: proposal.id, ir_proposal_version: String(proposal.version),
+    };
+    const session = await stripeRequest("/v1/checkout/sessions", {
+      mode: "payment", customer_email: authContext.user.email,
+      client_reference_id: String(authContext.tenantId),
+      success_url: `${config.appUrl}/chat?tool=ir-exemption&case=${proposal.caseId}&payment=return`,
+      cancel_url: `${config.appUrl}/chat?tool=ir-exemption&case=${proposal.caseId}`,
+      locale: "pt-BR", integration_identifier: config.integrationIdentifier,
+      line_items: [{quantity: 1, price_data: {currency: "brl", unit_amount: proposal.amountCents,
+        product_data: {name: `Audita — serviço ${proposal.kind.toUpperCase()}`}}}],
+      metadata, payment_intent_data: {metadata},
+    }, {idempotencyKey: `audita-ir-${proposal.id}-${proposal.attempt}`});
+    return {id: session.id, url: session.url, expiresAt: session.expires_at};
+  }
+
   async function createCheckoutSession(authContext, input = {}) {
     if (!authContext?.tenantId || !authContext?.user) {
       return { unauthorized: true };
@@ -1028,6 +1051,10 @@ export function createStripeBillingService({
 
   async function processEvent(event) {
     const object = event?.data?.object || {};
+    if (object.metadata?.purchase_kind === "ir_proposal") {
+      if (!onIrPaymentEvent) throw new StripeBillingError("ir_handler_unavailable", "Processamento IR indisponível.", 503);
+      return onIrPaymentEvent(event);
+    }
     switch (text(event?.type)) {
       case "checkout.session.completed":
         return processCheckoutCompleted(object);
@@ -1118,6 +1145,7 @@ export function createStripeBillingService({
     createDemoSubscription,
     getSubscription: loadSubscription,
     handleWebhook,
+    createIrCheckoutSession,
     setCancellationAtPeriodEnd,
   };
 }
