@@ -976,6 +976,7 @@ function getActivePage() {
 
 function setActivePage(page) {
   const activePage = pageMeta[page] ? page : "home";
+  const enteringChat = activePage === "chat" && document.body.dataset.activePage !== "chat";
   document.body.dataset.activePage = activePage;
   const activeMeta = pageMeta[activePage];
 
@@ -1012,6 +1013,10 @@ function setActivePage(page) {
   applyAuditRouteDefaults(activePage);
   setMobileMenu(false);
   if (activePage === "chat") {
+    if (enteringChat) {
+      startNewChat();
+      initializeChatEntryContext();
+    }
     renderChatWorkspace();
     requestAnimationFrame(() => chatInput?.focus());
   }
@@ -2121,8 +2126,6 @@ function initializeChatEntryContext() {
   thread.updatedAt = new Date().toISOString();
   saveChatState();
 }
-
-initializeChatEntryContext();
 
 function saveChatState() {
   try {
