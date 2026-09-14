@@ -28,7 +28,7 @@ export async function debtDocuments(p,id) {
   const report=await debtPdf('Petição de revisão de dívida bancária — minuta para conferência e protocolo',[
     `AO JUÍZO COMPETENTE DA COMARCA DE ${c.city.toUpperCase()}/${c.uf}\nA unidade e a via processual serão confirmadas pelo advogado antes do protocolo.`,
     `AUTOR: ${c.fullName}, CPF ${c.document}, ${c.nationality}, ${c.maritalStatus}, ${c.profession}, ${c.street}, ${c.number}, ${c.complement}, ${c.neighborhood}, ${c.city}/${c.uf}, CEP ${c.postalCode}, ${c.email}, telefone ${c.phone}.\nADVOGADO: ${r.lawyerName}, OAB ${r.lawyerOab}.\nRÉU: ${r.creditorLegalName}, CNPJ ${r.creditorDocument}, ${r.creditorAddress}.`,
-    `I — DOS FATOS\nO autor relata dívida em aberto desde ${d.since}, com principal informado de ${debtMoney(d.originalCents)} e cobrança atual de ${debtMoney(d.chargedCents)}. Relata recebimento de notificações e questiona os encargos.\nRelato: ${d.description||'Conforme documentos anexos.'}\nProposta pessoal de pagamento: ${debtMoney(d.offeredCents)}. Essa proposta não constitui o resultado técnico.`,
+    `I — DOS FATOS\nO autor relata dívida em aberto desde ${d.since}, com principal informado de ${debtMoney(d.originalCents)} e cobrança atual de ${debtMoney(d.chargedCents)}. Questiona os encargos cobrados.\nRelato: ${d.description||'Conforme documentos anexos.'}`,
     `II — DA ANÁLISE FINANCEIRA\nValor recalculado submetido à revisão: ${debtMoney(r.reviewedCents)}. Diferença em discussão: ${debtMoney(d.chargedCents-r.reviewedCents)}.\nMemória e metodologia:\n${r.methodology}`,
     ...(p.estimate?[`ESTIMATIVA COMPARATIVA PRELIMINAR — a análise validada acima prevalece.\n${estimateText(p.estimate)}`]:[]),
     `III — DOS FUNDAMENTOS\n${r.legalBasis}`,

@@ -18,7 +18,7 @@ const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),checkout:as
 const sample=await PDFDocument.create();sample.addPage();const bytes=Buffer.from(await sample.save());
 const stages=['calculation_pending','offer','paid','signature','submitted'];
 for(const stage of stages){let c=await service.create(auth);const cmd=async(action,extra={},who=auth)=>c=await service.command(who,c.id,{revision:c.revision,action,...extra},{ip:'127.0.0.1',userAgent:'Demonstração isolada'});
-  for(const key of ['open','notified','excessive'])await cmd('answer',{key,value:true});
+  for(const key of ['open'])await cmd('answer',{key,value:true});
   await cmd('details',{details:{creditor:'Banco Exemplo · '+stage,kind:'overdraft',since:'2025-03-01',originalCents:1000000,chargedCents:4000000,offeredCents:1200000,description:'CASO FICTÍCIO. Demonstração local. NÃO PROTOCOLAR.',consent:true}});
   c=await service.upload(auth,c.id,{bytes,name:'cobranca-ficticia.pdf',kind:'evidence'});
   if(stage==='calculation_pending')continue;

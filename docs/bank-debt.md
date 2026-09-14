@@ -4,8 +4,8 @@ Entrada na aplicação: `/#dividas-bancarias`. Implementação local, sem public
 
 ## Fluxo
 
-1. Três perguntas com botões: dívida em aberto, notificações de cobrança e percepção de juros excessivos. Resposta negativa encerra o enquadramento inicial, sem afirmar ausência de direitos.
-2. Coleta do credor, modalidade, data da inadimplência, principal informado, cobrança atual, proposta pessoal do cliente.
+1. Uma pergunta com botões: existência de dívida bancária em aberto. Resposta positiva segue diretamente para os dados da dívida. Notificações e percepção de juros excessivos não são requisitos de enquadramento. Resposta negativa encerra o enquadramento inicial, sem afirmar ausência de direitos.
+2. Coleta do credor, modalidade, data da inadimplência, principal informado, cobrança atual.
 3. Anexos da cobrança e atendimento salvo aguardando cálculo Audita.
 4. Análise validada, resultado, memória de cálculo e contratação em pagamento único pela Stripe.
 5. Após webhook de pagamento confirmado: dados pessoais, endereço/UF e interesse em conciliação.
@@ -20,7 +20,7 @@ Modalidades confirmadas: pessoa física, cheque especial (25463), crédito pesso
 
 O cliente informa contratação, data e valor do saldo inicial, data da cobrança, taxa mensal contratada (opcional), premissa simples/composta e cada pagamento com data/valor. Confirma ausência de novas utilizações. Usa dias corridos/30: compostos por saldo × ((1 + taxa mensal)^(dias/30) − 1), ou simples por principal remanescente × taxa mensal × dias/30. Arredondamento a centavos em cada evento, pagamentos primeiro em juros e depois em principal. Pagamentos acima do saldo simulado exigem revisão manual, sem saldo negativo presumido.
 
-Resultado: saldo estimado BACEN, cenário à taxa contratada quando informada, diferença entre taxas em pontos percentuais e máximo entre zero e cobrança menos saldo BACEN. A proposta pessoal não participa do cálculo. Persiste taxa, série, mês, observação original, URL, data da consulta, entradas, evolução e premissas. O PDF final inclui essa memória como estimativa preliminar separada da análise validada.
+Resultado: saldo estimado BACEN, cenário à taxa contratada quando informada, diferença entre taxas em pontos percentuais e máximo entre zero e cobrança menos saldo BACEN. A proposta pessoal foi retirada do fluxo; valores históricos permanecem armazenados e não participam do cálculo. Persiste taxa, série, mês, observação original, URL, data da consulta, entradas, evolução e premissas. O PDF final inclui essa memória como estimativa preliminar separada da análise validada.
 
 Limitações explícitas: cenário do saldo em aberto; não reconstrói Price/SAC, renegociações ou limites legais específicos. Não acrescenta mora, multa, IOF, seguros, tarifas ou correção, nem remove encargos já embutidos no saldo-base. A diferença pode refletir esses componentes e dados divergentes; não equivale automaticamente a abusividade, redução garantida ou restituição. O advogado valida a metodologia antes da petição.
 

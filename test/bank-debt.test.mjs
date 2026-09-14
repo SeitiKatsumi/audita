@@ -21,15 +21,27 @@ test('dívida: validações e fluxo persistente de análise, pagamento, assinatu
     const rateProvider=async()=>({code:25463,month:'2025-01',monthlyPercent:2,url:'https://api.bcb.gov.br/test',retrievedAt:'2025-04-01T00:00:00Z',label:'Teste'});
     let service=createBankDebtService({getDb,checkout,rateProvider}),c=await service.create(owner);
     const action=async(type,extra={},auth=owner)=>{c=await service.command(auth,c.id,{revision:c.revision,action:type,...extra},{ip:'127.0.0.1',userAgent:'Automated local test'});return c};
+    for(const [status,answers] of [['triage',{open:true}],['not_eligible',{open:true,notified:false}],['not_eligible',{open:true,excessive:false}]]){
+      const old=await service.create(owner);
+      await pg.query('UPDATE audita_debt_cases SET status=$2,payload=$3 WHERE id=$1',[old.id,status,{answers}]);
+      const resumed=await service.get(owner,old.id);assert.equal(resumed.status,'details');
+      assert.equal((await service.list(owner)).find(x=>x.id===old.id).status,'details');
+      const advanced=await service.command(owner,old.id,{revision:resumed.revision,action:'details',details});
+      assert.equal(advanced.status,'calculation_pending');assert.deepEqual(advanced.answers,answers);
+    }
+    const noDebt=await service.create(owner);
+    assert.equal((await service.command(owner,noDebt.id,{revision:noDebt.revision,action:'answer',key:'open',value:false})).status,'not_eligible');
     await assert.rejects(service.get(stranger,c.id),{status:404});
     await assert.rejects(service.createCheckout(owner,c.id,{}),{status:409});
     await assert.rejects(action('answer',{key:'excessive',value:true}),{status:422});
-    for(const key of ['open','notified','excessive'])await action('answer',{key,value:true});
+    for(const key of ['open'])await action('answer',{key,value:true});
     assert.equal(c.status,'details');
     assert.throws(()=>debtParse(debtDetails,{...details,since:'2025-02-30'}));
     assert.throws(()=>debtParse(debtDetails,{...details,originalCents:-1}));
     assert.throws(()=>debtParse(debtClaimant,{...claimant,document:'11111111111'}));
     await action('details',{details});assert.equal(c.status,'calculation_pending');assert.equal(c.review,null);
+    const {offeredCents,...withoutProposal}=details;assert.equal(debtParse(debtDetails,withoutProposal).offeredCents,undefined);
+    await action('details',{details:withoutProposal});assert.equal(c.details.offeredCents,offeredCents);
     const scenario={modality:'overdraft',contractDate:'2025-01-01',baseDate:'2025-03-01',asOf:'2025-03-31',baseCents:1000000,contractMonthlyRate:5,capitalization:'simple',payments:[],confirmed:true};
     await action('estimate',{scenario});assert.equal(c.status,'calculation_pending');assert.equal(c.estimate.revised.balanceCents,1020000);assert.equal(c.review,null);assert.match(c.estimateText,/ESTIMATIVA/);
     await assert.rejects(service.createCheckout(owner,c.id,{}),{status:409});

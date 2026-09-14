@@ -123,3 +123,16 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 ### 2026-09-14 — Publicação da estimativa BACEN
 - Codex. Publicação autorizada dos ajustes de dívidas: remoção de relato, máscara BRL e estimativa BACEN. Main remota conferida em 7e96a25; preservar coletores locais e arquivos privados. Vinte testes pertinentes passaram, um teste opcional de fila será executado com PGlite. Duas falhas de testes legados IR/PIS já documentadas não envolvem os arquivos alterados. Publicação em andamento.
 - Publicação concluída: commit f4f3c18 no GitHub/main e imagem CapRover audita:107 em produção. Backup do banco verificado antes do deploy. Smoke de produção passou com banco pronto; index.html e assets bancários conferidos byte a byte com o commit. Consulta BACEN executada dentro do container com cenário fictício, sem persistência, confirmou SGS 25463/03-2025 = 7,27% a.m., saldo R$ 9.691,28 e diferença R$ 5.308,72. API de casos sem login retorna 401. Revisão obrigatória preservada; não houve pagamento nem protocolo real. Teste opcional da fila também passou com PGlite.
+
+### 2026-09-14 — Remover pergunta sobre notificações
+- Codex, codex/remover-notificacoes, base main consolidada. Escopo: triagem, compatibilidade com atendimentos antigos, texto da minuta e testes. Preservar respostas históricas. Em andamento.
+- Concluído na main local/porta 3000, servidor reiniciado e arquivo servido conferido. Triagem passa de dívida em aberto para juros excessivos; casos antigos aguardando notificações e encerrados por resposta negativa retomam sem perder histórico. Minuta não afirma recebimento de notificações. Cinco testes passaram, incluindo retomada e persistência; sintaxe e diff conferidos. Sem commit/push/deploy.
+
+### 2026-09-14 — Simplificar triagem para dívida em aberto
+- Codex, continuação em codex/remover-notificacoes. Remover também percepção de juros excessivos; preservar respostas antigas e retomar casos para detalhes.
+- Concluído localmente: confirmação de dívida em aberto avança diretamente para detalhes. Casos antigos aguardando ou recusados pelos critérios removidos retomam sem apagar respostas; ausência de dívida continua encerrando a triagem. Cinco testes passaram; sintaxe/diff e arquivo servido na porta 3000 conferidos após reinício. Sem commit/push/deploy.
+
+### 2026-09-14 — Retirar proposta pessoal
+- Codex, continuação em codex/remover-notificacoes. Remover pergunta e texto auxiliar da proposta, resumo e menção na nova minuta; campo histórico opcional, sem apagar registros anteriores.
+- Concluído na main local/porta 3000: pergunta, texto auxiliar, resumo da proposta e menção em novas minutas removidos; API aceita ausência do campo e conserva propostas históricas. Cinco testes passaram; sintaxe, diff e arquivo servido conferidos após reinício. Sem commit/push/deploy.
+- Publicação autorizada em 14/09/2026: triagem somente com dívida em aberto, remoção da proposta pessoal e compatibilidade com históricos. Cinco testes pertinentes passaram; publicação em andamento.

@@ -1,7 +1,7 @@
 import {estimateDebt,estimateText} from './bank-debt-estimate.mjs';
 import {randomUUID} from 'node:crypto';
 import {PDFDocument} from 'pdf-lib';
-import {DEBT_VERSION,DEBT_TERMS,DEBT_QUESTIONS,debtDetails,debtClaimant,debtReview,debtParse,debtRequire,debtLegalTexts} from './bank-debt-domain.mjs';
+import {DEBT_VERSION,DEBT_TERMS,DEBT_QUESTIONS,debtDetails,debtClaimant,debtReview,debtParse,debtRequire,debtLegalTexts,debtTriageStatus} from './bank-debt-domain.mjs';
 import {debtHash,debtDocuments} from './bank-debt-pdf.mjs';
 import {createLawyerQueueService} from './lawyer-queue.service.mjs';
 
@@ -10,11 +10,11 @@ export function createBankDebtService({getDb,checkout,rateProvider,now=()=>new D
   const operator=auth=>auth?.user?.role==='super_admin';
   function signed(auth){debtRequire(auth?.user?.id&&auth.tenantId,'Entre na sua conta para salvar e continuar.',401);}
   async function tx(fn){const c=await db().connect();try{await c.query('BEGIN');const result=await fn(c);await c.query('COMMIT');return result;}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}
-  async function access(c,auth,id,lock=false){signed(auth);debtRequire(/^[0-9a-f-]{36}$/i.test(id),'Atendimento não encontrado.',404);const r=(await c.query(`SELECT * FROM audita_debt_cases WHERE id=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];debtRequire(r&&(operator(auth)||(String(r.tenant_id)===String(auth.tenantId)&&String(r.user_id)===String(auth.user.id))),'Atendimento não encontrado.',404);return r;}
+  async function access(c,auth,id,lock=false){signed(auth);debtRequire(/^[0-9a-f-]{36}$/i.test(id),'Atendimento não encontrado.',404);const r=(await c.query(`SELECT * FROM audita_debt_cases WHERE id=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];debtRequire(r&&(operator(auth)||(String(r.tenant_id)===String(auth.tenantId)&&String(r.user_id)===String(auth.user.id))),'Atendimento não encontrado.',404);r.status=debtTriageStatus(r.status,r.payload.answers);return r;}
   const owner=(r,auth)=>debtRequire(String(r.user_id)===String(auth.user.id)&&String(r.tenant_id)===String(auth.tenantId),'Somente o solicitante pode confirmar esta etapa.',403);
   async function save(c,r,auth,kind){await c.query('UPDATE audita_debt_cases SET payload=$2,status=$3,revision=revision+1,updated_at=NOW() WHERE id=$1',[r.id,r.payload,r.status]);await c.query('INSERT INTO audita_debt_events(id,case_id,actor_id,kind) VALUES($1,$2,$3,$4)',[randomUUID(),r.id,auth?.user?.id||null,kind]);r.revision++;}
   async function view(c,r,auth){const documents=(await c.query('SELECT id,kind,name,mime,sha256,octet_length(bytes) AS size FROM audita_debt_documents WHERE case_id=$1 ORDER BY created_at',[r.id])).rows;let job=null;if(r.payload.jobId)job=(await c.query('SELECT id,status,protocol_number,filed_at FROM audita_lawyer_jobs WHERE id=$1',[r.payload.jobId])).rows[0];const {checkout:paymentSession,...payload}=r.payload;return {id:r.id,revision:r.revision,status:r.status,...payload,documents,job,estimateText:payload.estimate?estimateText(payload.estimate):null,operator:operator(auth),owner:String(r.user_id)===String(auth.user.id)&&String(r.tenant_id)===String(auth.tenantId),terms:DEBT_TERMS,version:DEBT_VERSION,legalTexts:payload.claimant&&payload.review?debtLegalTexts(payload):null};}
-  async function list(auth){signed(auth);return (await db().query(`SELECT id,status,updated_at,payload->'details'->>'creditor' AS creditor FROM audita_debt_cases ${operator(auth)?'':'WHERE tenant_id=$1 AND user_id=$2'} ORDER BY updated_at DESC LIMIT 100`,operator(auth)?[]:[auth.tenantId,auth.user.id])).rows;}
+  async function list(auth){signed(auth);return (await db().query(`SELECT id,status,updated_at,payload->'answers' AS answers,payload->'details'->>'creditor' AS creditor FROM audita_debt_cases ${operator(auth)?'':'WHERE tenant_id=$1 AND user_id=$2'} ORDER BY updated_at DESC LIMIT 100`,operator(auth)?[]:[auth.tenantId,auth.user.id])).rows.map(({answers,...r})=>({...r,status:debtTriageStatus(r.status,answers)}));}
   async function create(auth){signed(auth);const r=(await db().query('INSERT INTO audita_debt_cases(id,tenant_id,user_id,payload) VALUES($1,$2,$3,$4) RETURNING *',[randomUUID(),auth.tenantId,auth.user.id,{answers:{}}])).rows[0];return view(db(),r,auth);}
   async function get(auth,id){return view(db(),await access(db(),auth,id),auth);}
   async function command(auth,id,input,requestInfo={}){
@@ -34,7 +34,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,now=()=>new D
       p.answers[q.key]=input.value;r.status=!input.value?'not_eligible':DEBT_QUESTIONS.every(x=>p.answers[x.key]===true)?'details':'triage';
     }else if(action==='details'){
       owner(r,auth);debtRequire(['details','calculation_pending','offer'].includes(r.status),'Não é possível alterar a dívida nesta etapa.',409);
-      p.details=debtParse(debtDetails,input.details);p.review=null;p.estimate=null;r.status='calculation_pending';
+      const details=debtParse(debtDetails,input.details);if(details.offeredCents===undefined&&p.details?.offeredCents!==undefined)details.offeredCents=p.details.offeredCents;p.details=details;p.review=null;p.estimate=null;r.status='calculation_pending';
     }else if(action==='estimate'){
       owner(r,auth);debtRequire(r.status==='calculation_pending','A revisão já foi publicada.',409);p.estimate=estimate;
     }else if(action==='review'){
