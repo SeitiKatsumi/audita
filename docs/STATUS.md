@@ -106,4 +106,4 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 ### Publicação consolidada — 2026-09-14
 - Usuário autorizou commit e push da main. Inclui Central, contas de luz, Área dos Advogados no shell original, edição de usuários/senhas do superadmin, ajustes de chat e porta 3000.
-- Fetch confirmou ausência de commits remotos pendentes; 372 testes passaram, nenhum ignorado, e git diff --check passou. Configuração privada, credenciais e documentos excluídos. Commit consolidado preparado; envio deve ser confirmado pelo hash remoto. Deploy não executado nesta tarefa.
+- Fetch confirmou ausência de commits remotos pendentes; 372 testes passaram, nenhum ignorado, e git diff --check passou. Configuração privada, credenciais e documentos excluídos. Publicado na main pelo conector GitHub: `545a2c9`, confirmado por fetch e comparação integral sem diferenças. Histórico local anterior preservado em `codex/local-before-publication-20260914`; main local alinhada ao remoto. Deploy não executado nesta tarefa.
