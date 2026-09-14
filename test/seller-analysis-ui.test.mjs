@@ -5,10 +5,9 @@ import test from "node:test";
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
-test("seller analysis is grouped under real estate purchase and sale", () => {
-  assert.match(indexHtml, /<span class="nav-label">An&aacute;lise Compra e Venda de Im&oacute;veis<\/span>/);
-  assert.match(indexHtml, /href="#analise-vendedor"/);
-  assert.match(indexHtml, /<span class="nav-label">An&aacute;lise de Vendedor<\/span>/);
+test("seller analysis is available in the property category of the service catalog", () => {
+  assert.match(indexHtml, /href="#analise-vendedor" data-service-card data-categories="certidoes imoveis"/);
+  assert.match(indexHtml, /<strong>Certidões do vendedor<\/strong>/);
 });
 
 test("seller analysis route opens its introductory screen", () => {

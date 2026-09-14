@@ -1,0 +1,37 @@
+/* Only module layout: navigation, typography, colors and controls come from styles.css. */
+.lawyer-page [hidden]{display:none!important}
+.lawyer-page .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.lawyer-intro{color:var(--muted);margin:0 0 24px;line-height:1.6}
+.lawyer-page .workspace-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px}
+.lawyer-page .primary{min-width:0}
+.lawyer-page .lawyer-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}
+.lawyer-page .lawyer-metrics article{display:flex;align-items:center;gap:16px}
+.lawyer-page .lawyer-metrics img{width:26px;height:26px;filter:brightness(0) saturate(100%) invert(69%) sepia(18%) saturate(842%) hue-rotate(169deg) brightness(94%) contrast(88%)}
+.lawyer-page .filters{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}
+.lawyer-page input,.lawyer-page select,.lawyer-page textarea{font:inherit;color:var(--text);background:var(--bg-elevated);border:1px solid var(--line-strong);border-radius:8px;padding:12px;min-height:44px;min-width:0;max-width:100%}
+.lawyer-page input::placeholder{color:var(--muted)}
+.lawyer-page .filters input{flex:1 1 210px}.lawyer-page .filters select{flex:1 1 160px}
+.lawyer-page .tabs{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.lawyer-page .tabs button{min-height:44px}
+.lawyer-page .tabs button[aria-pressed=true]{outline:2px solid var(--lime);outline-offset:2px}
+.lawyer-page .list-panel{padding:0;overflow:auto}
+.lawyer-page table{border-collapse:collapse;width:100%;font-size:.85rem}
+.lawyer-page th{text-align:left;color:var(--muted);font-weight:500;padding:16px;border-bottom:1px solid var(--line)}
+.lawyer-page td{padding:18px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+.lawyer-page tr:last-child td{border:0}
+.lawyer-page td strong,.lawyer-page td small{display:block}.lawyer-page td small{margin-top:6px}
+.lawyer-page .badge{display:inline-block;border:1px solid var(--line-strong);border-radius:20px;padding:6px 9px;font-size:.75rem;color:var(--aqua)}
+.lawyer-page .badge.pending{color:var(--warning);border-color:var(--warning)}.lawyer-page .badge.closed{color:var(--lime);border-color:var(--lime)}
+.lawyer-page .secondary-action{display:inline-flex;align-items:center;justify-content:center;min-height:44px;text-decoration:none}
+.lawyer-page .activity .module{margin-bottom:18px}.lawyer-page .activity h2{font-size:1rem;margin:0 0 12px}
+.lawyer-page .activity article{padding:14px 0;border-bottom:1px solid var(--line)}.lawyer-page .activity article:last-child{border:0}
+.lawyer-page .activity strong,.lawyer-page .activity small{display:block;font-size:.8rem}
+.lawyer-page .activity p,.lawyer-page .muted{color:var(--muted);font-size:.8rem;line-height:1.6}
+#lawyer-message{color:var(--danger);white-space:pre-wrap}#lawyer-message:empty{display:none}#lawyer-empty{padding:20px;color:var(--muted)}
+#lawyer-details{margin-top:20px;overflow-wrap:anywhere;scroll-margin-top:90px}#lawyer-detailBody{margin-top:20px}
+.lawyer-page label{display:grid;gap:8px;margin:14px 0}.lawyer-page .actions{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
+.lawyer-page .ir-form{display:grid;gap:12px}.lawyer-page .ir-form textarea{width:100%;min-height:100px}.lawyer-page .ir-check{display:flex;align-items:start;gap:12px}.lawyer-page .ir-check input{width:auto}
+.lawyer-page .ir-readable{white-space:pre-wrap}.lawyer-page dd{margin:8px 0 18px}.lawyer-page summary{cursor:pointer;padding:12px 0}
+.lawyer-page :focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+@media(max-width:1350px){.lawyer-page .workspace-grid{grid-template-columns:minmax(0,1fr)}.lawyer-page .activity{display:grid;grid-template-columns:1fr 1fr;gap:18px}.lawyer-page .activity>.muted{grid-column:1/-1}}
+@media(max-width:650px){.lawyer-page .lawyer-metrics{gap:8px}.lawyer-page .lawyer-metrics article{padding:12px;gap:0}.lawyer-page .lawyer-metrics img{display:none}.lawyer-page .metrics strong{font-size:1.5rem}.lawyer-page .metrics span{font-size:.75rem}.lawyer-page .activity{grid-template-columns:1fr}.lawyer-page input,.lawyer-page select{font-size:16px}.lawyer-page .filters input{flex-basis:100%}.lawyer-page table,.lawyer-page tbody,.lawyer-page tr{display:block}.lawyer-page thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.lawyer-page tr{padding:14px;border-bottom:1px solid var(--line)}.lawyer-page td{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border:0;overflow-wrap:anywhere}.lawyer-page td:first-child{display:block}.lawyer-page td[data-label]::before{content:attr(data-label);color:var(--muted)}.lawyer-page td:last-child button,.lawyer-page td:last-child a{width:100%}}

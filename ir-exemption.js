@@ -1,3 +1,4 @@
+import {createAuditaChatMotion} from './audita-chat-motion.js';
 const irRoot = document.querySelector('#isencao-ir');
 const $ = (selector, root=irRoot) => root.querySelector(selector);
 const $$ = (selector, root=irRoot) => [...root.querySelectorAll(selector)];
@@ -5,7 +6,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const money = cents => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(cents||0)/100);
 const fmtDate = date => date ? new Date(date).toLocaleString('pt-BR') : '—';
 const apiRoot='/api/ir-exemption';
-const state={user:null,config:null,cases:[],case:null,tab:'chat',editing:null,busy:false,staff:[]};
+const state={user:null,config:null,case:null,tab:'chat',editing:null,busy:false,staff:[]};
 const benefitTypes={retirement:'Aposentadoria',pension:'Pensão',military:'Reforma / reserva',private:'Previdência complementar',salary:'Salário da ativa',unknown:'Não sei'};
 const shortSteps={role:'Solicitante',consent:'Autorização',identity:'Contato',subject:'Titular',benefits:'Benefícios',conditions:'Histórico médico',diagnosis:'Diagnóstico',medical:'Laudo',taxes:'Imposto',prior:'Pedidos anteriores',heir:'Espólio',documents:'Documentos'};
 const financialLabels={published:'Aguardando aceite',superseded:'Substituída',accepted:'Aceita · aguardando pagamento',payment_pending:'Pagamento em andamento',paid:'Pagamento confirmado'};
@@ -19,77 +20,12 @@ async function api(path='',options={}) {
 }
 const post=(path,body)=>api(path,{method:'POST',body:JSON.stringify(body||{})});
 async function guarded(fn){if(state.busy)return;state.busy=true;notice();$$('button[type=submit]').forEach(b=>b.disabled=true);try{await fn();}catch(e){notice(e.message);if(e.code==='case_conflict'&&state.case){await loadCase(state.case.id).catch(()=>{});}}finally{state.busy=false;$$('button[type=submit]').forEach(b=>b.disabled=false);}}
-function sidebar(){ $('#caseList').innerHTML=state.cases.length?state.cases.map(c=>`<button data-case="${esc(c.id)}" class="${state.case?.id===c.id?'active':''}">${esc(c.title)}<small>${esc(state.config.statuses[c.status]||c.status)} · ${new Date(c.updatedAt).toLocaleDateString('pt-BR')}</small></button>`).join(''):`<p>${state.user?'Seus atendimentos aparecerão aqui.':'Entre para acompanhar seus casos.'}</p>`; }
-async function refreshList(){if(state.config.ready&&state.user)state.cases=(await api('/cases')).cases;sidebar();}
-async function loadCase(id){state.tab='chat';state.case=(await api(`/cases/${encodeURIComponent(id)}`)).case;state.editing=null;const url=new URL(location.href);url.searchParams.set('case',id);history.replaceState(null,'',url);render();await refreshList();scrollLatestAssistant();}
-async function updateCase(result,animate=false){state.case=result.case;state.editing=null;await render(animate);await refreshList();}
+async function loadCase(id){state.tab='chat';state.case=(await api(`/cases/${encodeURIComponent(id)}`)).case;state.editing=null;const url=new URL(location.href);url.searchParams.set('case',id);history.replaceState(null,'',url);render();scrollLatestAssistant();}
+async function updateCase(result,animate=false){state.case=result.case;state.editing=null;await render(animate);}
 async function command(action,extra={}){await updateCase(await post(`/cases/${state.case.id}/actions`,{action,revision:state.case.revision,...extra}),action==='answer');}
 async function startCase(){if(!state.user){document.querySelector('#loginButton')?.click();return;}if(!state.config.ready){notice('O atendimento será liberado assim que o armazenamento seguro estiver configurado.');return;}state.tab='chat';const result=await post('/cases');await loadCase(result.case.id);}
 function assistantBubble(content){return `<div class="charge-analysis-message assistant charge-analysis-intro-message"><span class="charge-analysis-avatar-anchor" aria-hidden="true"></span><div class="charge-analysis-bubble">${content}</div></div>`;}
-let floatingAssistantAvatar=null;
-function moveAssistantAvatar(conversation,{immediate=false}={}){
-  const stage=$('#app');
-  if(!floatingAssistantAvatar){
-    floatingAssistantAvatar=document.createElement('span');
-    floatingAssistantAvatar.className='charge-analysis-avatar charge-analysis-floating-avatar';
-    floatingAssistantAvatar.setAttribute('aria-hidden','true');
-    floatingAssistantAvatar.innerHTML='<img src="/assets/audita-profile-assistant.png" alt="" loading="eager" decoding="async">';
-  }
-  if(!stage.contains(floatingAssistantAvatar))stage.appendChild(floatingAssistantAvatar);
-  const avatar=floatingAssistantAvatar;
-  const messages=conversation?.querySelectorAll('.charge-analysis-message.assistant');
-  const anchor=messages?.[messages.length-1]?.querySelector('.charge-analysis-avatar-anchor');
-  if(!anchor){avatar.classList.remove('is-ready');return;}
-  const positionAvatar=()=>{
-    if(!anchor.isConnected)return;
-    const stageRect=stage.getBoundingClientRect(),anchorRect=anchor.getBoundingClientRect();
-    avatar.style.setProperty('--charge-avatar-x',`${Math.round(anchorRect.left-stageRect.left+stage.scrollLeft)}px`);
-    avatar.style.setProperty('--charge-avatar-y',`${Math.round(anchorRect.top-stageRect.top+stage.scrollTop)}px`);
-    avatar.classList.add('is-ready');
-  };
-  if(immediate||!avatar.classList.contains('is-ready')){
-    avatar.classList.add('is-positioning');positionAvatar();avatar.getBoundingClientRect();avatar.classList.remove('is-positioning');
-  }else window.requestAnimationFrame(positionAvatar);
-}
-let cancelTyping=()=>{};
-function scrollLatestAssistant(message=$('.charge-analysis-conversation')?.lastElementChild){
-  window.requestAnimationFrame(()=>{
-    if(message?.isConnected&&document.body.dataset.activePage==='isencao-ir')message.scrollIntoView({behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches?'auto':'smooth',block:'end'});
-  });
-}
-function animateAssistant(){
-  const conversation=$('.charge-analysis-conversation'),message=conversation?.lastElementChild;
-  if(!message)return;
-  message.remove();
-  moveAssistantAvatar(conversation);
-  scrollLatestAssistant(conversation.lastElementChild);
-  // Itaú: show the reply, pause 900 ms, move the avatar to typing, then wait 1500 ms.
-  return new Promise(resolve=>{
-    let typing,timer;
-    const finish=()=>{
-      window.clearTimeout(timer);
-      typing?.remove();
-      conversation.appendChild(message);
-      moveAssistantAvatar(conversation);
-      cancelTyping=()=>{};
-      resolve();
-    };
-    timer=window.setTimeout(()=>{
-      typing=document.createElement('div');
-      typing.className='charge-analysis-message assistant charge-analysis-message-typing';
-      typing.setAttribute('role','status');
-      typing.innerHTML='<span class="charge-analysis-avatar-anchor" aria-hidden="true"></span><div class="charge-analysis-typing">IA AUDITA está digitando…</div>';
-      conversation.appendChild(typing);
-      moveAssistantAvatar(conversation);
-      scrollLatestAssistant(typing);
-      timer=window.setTimeout(()=>{
-        finish();
-        if(message.isConnected){message.classList.add('charge-analysis-message-typing');scrollLatestAssistant(message);}
-      },1500);
-    },900);
-    cancelTyping=finish;
-  });
-}
+const {moveAssistantAvatar,scrollLatestAssistant,animateAssistant,cancelTyping}=createAuditaChatMotion({getStage:()=>$('#app'),getConversation:()=>$('.charge-analysis-conversation'),isActive:()=>document.body.dataset.activePage==='isencao-ir'});
 function landing(){return assistantBubble(`<p>Olá! Sou a assistente virtual IA AUDITA. Vou conduzir uma verificação inicial de possíveis direitos à <strong>isenção e restituição de Imposto de Renda</strong> para aposentados, pensionistas e pessoas na reserva ou reforma com histórico de doença grave.</p><p>A triagem é gratuita e será revisada pela equipe. Você também pode solicitar a análise como representante ou herdeiro.</p><p class="charge-analysis-intro-question"><strong>Para quem você está buscando a análise?</strong></p><div class="charge-analysis-actions">${Object.entries({self:'Para mim',representative:'Represento uma pessoa viva',heir:'Sou herdeiro(a)'}).map(([role,label])=>`<button type="button" data-start-role="${role}"><strong>${label}</strong></button>`).join('')}</div>${!state.user?'<p class="ir-micro">Entre na sua conta para salvar e retomar o atendimento.</p>':''}`)+(state.config?.staffRole==='super_admin'?staffSection():'');}
 function input(name,label,value='',type='text',required=false){return `<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${type==='number'?'step="0.01" min="0"':''}></label>`;}
 function select(name,label,options,value){return `<label>${esc(label)}<select name="${name}">${Object.entries(options).map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;}
@@ -128,7 +64,7 @@ function answerLabel(step,value){
 function chatView(){
   const c=state.case,q=state.editing?c.steps.find(s=>s.key===state.editing):c.question;
   const history=c.steps.filter(s=>c.answers[s.key]!==undefined).map(s=>`${assistantBubble(`<p>${esc(s.title)}</p>`)}<div class="charge-analysis-message user"><div class="charge-analysis-bubble"><p class="ir-readable">${esc(answerLabel(s,c.answers[s.key]))}</p>${c.permissions.owner?`<button class="ir-text-button" data-edit="${s.key}" aria-label="Voltar à pergunta: ${esc(shortSteps[s.key])}">Voltar</button>`:''}</div></div>`).join('');
-  const next=q?`<p id="questionTitle" tabindex="-1"><strong>${state.editing?'Vamos voltar a esta pergunta. ':''}${esc(q.title)}</strong></p>${q.help?`<p>${esc(q.help)}</p>`:''}${c.permissions.owner?questionFields(q,c.answers[q.key]):'<p>Aguardo a confirmação do solicitante para continuar.</p>'}${state.editing?'<button class="ir-text-button" data-action="cancel-edit">Retomar conversa</button>':''}`:`<p id="questionTitle" tabindex="-1"><strong>Obrigado por compartilhar essas informações.</strong></p><p>Posso organizar seu resumo para a revisão da equipe. Você pode enviar documentos ou corrigir uma resposta nesta conversa.</p><div class="charge-analysis-actions"><button data-action="analyze"><strong>${c.analysis?'Atualizar meu resumo':'Ver meu resumo'}</strong></button></div>`;
+  const next=q?`<p id="questionTitle" tabindex="-1"><strong>${state.editing?'Vamos voltar a esta pergunta. ':''}${esc(q.title)}</strong></p>${q.help?`<p>${esc(q.help)}</p>`:''}${c.permissions.owner?questionFields(q,c.answers[q.key]):'<p>Aguardo a confirmação do solicitante para continuar.</p>'}${state.editing?'<button class="ir-text-button" data-action="cancel-edit">Retomar conversa</button>':''}`:`<p id="questionTitle" tabindex="-1"><strong>Obrigado por compartilhar essas informações.</strong></p><p>Posso organizar seu resumo para a revisão da equipe. Você pode enviar documentos ou corrigir uma resposta nesta conversa.</p><div class="charge-analysis-actions"><button data-action="analyze"><strong>${c.analysis?'Atualizar meu resumo':'Ver meu resumo'}</strong></button>${c.permissions.owner?'<button type="button" data-action="start"><strong>Iniciar nova análise</strong></button>':''}</div>`;
   return `<div class="charge-analysis-conversation ir-chat-log" aria-label="Conversa com a assistente virtual Audita">${history}${assistantBubble(next)}</div>`;
 }
 
@@ -140,7 +76,7 @@ function staffSection(){return `<section class="ir-section ir-staff-form"><h2>Cr
 function operatorView(){const c=state.case,docsOptions=type=>Object.fromEntries(c.documents.filter(d=>d.type===type).map(d=>[d.id,d.name]));return `<div class="ir-two-col"><section class="ir-section"><h2>Revisão da equipe</h2>${form('reviewForm','<label>Fundamentação e pendências<textarea name="note" required>'+esc(c.review?.note||'')+'</textarea></label>'+input('reviewed','Valor revisado (R$, opcional)',c.review?.reviewedCents==null?'':c.review.reviewedCents/100,'number')+check('confirmed','Revisei as informações, datas e documentação do caso.'),'Registrar revisão')}</section><section class="ir-section"><h2>Publicar proposta</h2>${form('proposalForm',select('kind','Via',{adm:'ADM — administrativo',ouro:'Ouro — judicial'},'adm')+input('amount','Preço deste serviço (R$)','','number',true)+'<label>Entregas<textarea name="scope" required></textarea></label><label>Condições<textarea name="terms" required></textarea></label><label>Justificativa da via (casos especiais)<textarea name="rationale"></textarea></label><label class="ir-check"><input type="checkbox" name="additional"><span>Este preço é o valor adicional do upgrade ADM → Ouro.</span></label>','Publicar proposta')}</section><section class="ir-section"><h2>Responsável e situação</h2>${c.permissions.assign?form('assignForm',select('userId','Operador credenciado',Object.fromEntries(state.staff.map(u=>[u.id,`${u.name} · ${u.role}`])),String(c.assignedUserId||'')),'Atribuir'):''}${form('statusForm',select('status','Próxima situação',Object.fromEntries((statusNext[c.status]||[]).map(s=>[s,state.config.statuses[s]])))+input('note','Observação'),'Atualizar situação')}<h3>Documentos para revisão</h3><div class="ir-toolbar"><a class="ir-secondary" href="${apiRoot}/cases/${c.id}/generate?kind=request">Gerar requerimento</a><a class="ir-secondary" href="${apiRoot}/cases/${c.id}/generate?kind=dossier">Gerar dossiê</a></div><p>Minutas sujeitas à revisão. Protocole no canal oficial e registre o comprovante.</p></section><section class="ir-section"><h2>Atualizações e tarefas</h2>${form('noteForm','<label>Atualização<textarea name="text" required></textarea></label><label class="ir-check"><input type="checkbox" name="internal" checked><span>Anotação interna (não visível ao cliente)</span></label>','Registrar atualização')}<hr>${form('taskForm',input('title','Próxima tarefa','','text',true)+input('dueDate','Prazo oficial (opcional)','','date'),'Adicionar tarefa')}</section><section class="ir-section"><h2>Registrar protocolo</h2><p>Anexe primeiro o comprovante em Documentos.</p>${form('protocolForm',select('kind','Tipo',{administrative:'Administrativo',judicial:'Judicial'},'administrative')+input('authority','Órgão / tribunal','','text',true)+input('number','Número do protocolo ou número CNJ','','text',true)+input('date','Data do protocolo','','date',true)+select('tribunal','Tribunal DataJud (somente judicial)',Object.fromEntries(state.config.tribunals.map(t=>[t,t.toUpperCase()])))+select('documentId','Comprovante anexado',docsOptions('protocol')),'Registrar protocolo')}</section><section class="ir-section"><h2>Registrar resultado</h2>${form('outcomeForm',select('kind','Resultado',{exemption:'Decisão de isenção',refund:'Restituição'},'exemption')+select('documentId','Evidência (decisão ou comprovante)',Object.fromEntries(c.documents.filter(d=>['decision','refund'].includes(d.type)).map(d=>[d.id,d.name])))+input('note','Descrição do resultado','','text',true)+input('amount','Valor recebido, se aplicável (R$)','','number')+'<label class="ir-check"><input type="checkbox" name="granted"><span>Isenção concedida ao titular vivo</span></label>','Registrar resultado')}</section></div>${state.config.staffRole==='super_admin'?staffSection():''}`;}
 function render(animate=false){
   cancelTyping();
-  sidebar();$('#app').setAttribute('aria-busy','false');
+  $('#app').setAttribute('aria-busy','false');
   if(!state.case){$('#app').innerHTML=`<div class="charge-analysis-conversation">${landing()}</div>`;moveAssistantAvatar($('.charge-analysis-conversation'));return;}
   const c=state.case,views={documents:documentsView,analysis:analysisView,proposals:proposalsView,timeline:timelineView,...(c.permissions.operator?{operator:operatorView}:{})};
   const actions={...(!c.question||c.answers.documents?{documents:'Enviar documentos'}:{}),...(c.analysis?{analysis:'Ver meu resumo',timeline:'Acompanhar pedido'}:{}),...(c.proposals?.length?{proposals:'Ver propostas'}:{}),...(c.permissions.operator?{operator:'Painel da equipe'}:{})};
@@ -149,7 +85,7 @@ function render(animate=false){
   if(animate && state.tab==='chat') return animateAssistant();
   moveAssistantAvatar($('.charge-analysis-conversation'));
 }
-async function init(){const [auth,config]=await Promise.all([api('/api/auth/me'),api('/config')]);state.user=auth.user;state.config=config;if(['super_admin','manager'].includes(config.staffRole))state.staff=(await api('/staff')).staff;await refreshList();const id=new URLSearchParams(location.search).get('case');if(id&&state.user&&config.ready)await loadCase(id);else await render(true);}
+async function init(){const [auth,config]=await Promise.all([api('/api/auth/me'),api('/config')]);state.user=auth.user;state.config=config;if(['super_admin','manager'].includes(config.staffRole))state.staff=(await api('/staff')).staff;const id=new URLSearchParams(location.search).get('case');if(id&&state.user&&config.ready)await loadCase(id);else await render(true);}
 async function submitAnswer(formEl){const q=state.editing?state.case.steps.find(s=>s.key===state.editing):state.case.question,f=new FormData(formEl),get=k=>String(f.get(k)||'');let value;
  switch(q.type){case 'consent':value={analysis:f.has('analysis'),representation:f.has('representation')};break;case 'identity':value={name:get('name'),cpf:get('cpf'),phone:get('phone'),email:get('email')};break;case 'subject':value={name:get('name'),cpf:get('cpf')};break;case 'benefits':value=$$('[data-row=benefit]',formEl).map(r=>({type:$('[name=type]',r).value,payer:$('[name=payer]',r).value,start:$('[name=start]',r).value||null}));break;case 'multi':value=f.getAll('conditions');break;case 'diagnosis':value={date:get('date')||null,year:get('year')?Number(get('year')):null,remission:get('remission')};break;case 'taxes':value={withheld:get('withheld'),periods:$$('[data-row=period]',formEl).map(r=>({benefitIndex:Number($('[name=benefitIndex]',r).value),month:$('[name=month]',r).value,paidCents:Math.round(Number($('[name=paid]',r).value)*100),refundedCents:Math.round(Number($('[name=refunded]',r).value)*100)}))};break;case 'heir':value={deathDate:get('deathDate'),relationship:get('relationship'),estate:get('estate'),representative:get('representative')};break;case 'documents':value=get('documents');break;default:return;}
  await command('answer',{key:q.key,value});$('#questionTitle')?.focus({preventScroll:true});}
@@ -157,7 +93,6 @@ irRoot.addEventListener('click',event=>{const el=event.target.closest('button,[d
  if(el.dataset.startRole){guarded(async()=>{await startCase();if(state.case){await command('answer',{key:'role',value:el.dataset.startRole});$('#questionTitle')?.focus({preventScroll:true});}});return;}
  if(el.dataset.tab){state.tab=el.dataset.tab;state.editing=null;render();(state.tab==='chat'?$('#questionTitle'):$('#irConversationPanel'))?.focus();return;}
  if(el.dataset.edit){state.tab='chat';state.editing=el.dataset.edit;render();$('#questionTitle')?.focus({preventScroll:true});return;}
- if(el.dataset.case){guarded(()=>loadCase(el.dataset.case));return;}
  if(el.dataset.answerKey){guarded(async()=>{await command('answer',{key:el.dataset.answerKey,value:el.dataset.answerValue});$('#questionTitle')?.focus({preventScroll:true});});return;}
  if(el.dataset.checkout){guarded(async()=>{const r=await post(`/cases/${state.case.id}/proposals/${el.dataset.checkout}/checkout`);const u=new URL(r.url);if(u.protocol!=='https:')throw new Error('Endereço de pagamento inválido.');location.assign(u.href);});return;}
  if(el.dataset.extract){guarded(async()=>{await updateCase(await post(`/cases/${state.case.id}/documents/${el.dataset.extract}/extract`));state.tab='documents';render();});return;}
@@ -186,11 +121,10 @@ irRoot.addEventListener('submit',event=>{const f=event.target;event.preventDefau
  else if(f.id==='outcomeForm')await command('outcome',{outcome:{...Object.fromEntries(data),amountCents:s('amount')?Math.round(Number(s('amount'))*100):null,granted:data.has('granted')}});
  else if(f.id==='staffForm'){await post('/staff',Object.fromEntries(data));state.staff=(await api('/staff')).staff;render();notice('Operador credenciado. Atribua os casos no painel da equipe.');}
  });});
-$('#newCase').addEventListener('click',()=>guarded(startCase));
 let initializing;
 function activate(){if(document.body.dataset.activePage!=='isencao-ir')return;initializing ||= init().catch(e=>{notice(e.message);$('#app').setAttribute('aria-busy','false');$('#app').innerHTML='<button type="button" class="secondary-action" id="retryInit">Tentar novamente</button>';$('#retryInit').onclick=()=>{initializing=null;activate();};});}
 document.addEventListener('audita:pagechange',()=>{if(document.body.dataset.activePage!=='isencao-ir')cancelTyping();activate();});
-window.addEventListener('audita:auth-changed',()=>{state.case=null;state.cases=[];state.staff=[];initializing=null;activate();});
+window.addEventListener('audita:auth-changed',()=>{state.case=null;state.staff=[];initializing=null;activate();});
 activate();
 
 window.addEventListener('resize',()=>{if(document.body.dataset.activePage==='isencao-ir')moveAssistantAvatar($('.charge-analysis-conversation'),{immediate:true});});

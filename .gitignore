@@ -1,5 +1,5 @@
 # dependencies
-node_modules/
+node_modules
 vendor/
 
 # environment
@@ -39,3 +39,7 @@ storage/
 
 # Private IR case documents (encrypted, persistent runtime volume)
 private-documents/ir/
+
+private-documents/pis/
+
+private-documents/energy/

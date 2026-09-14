@@ -5,19 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex,nofollow" />
     <title>Audita — Super Admin</title>
-    <link rel="stylesheet" href="/super-admin.css?v=1" />
+    <link rel="stylesheet" href="/super-admin.css?v=4" />
   </head>
   <body>
     <main class="shell">
       <section class="login-view" id="loginView">
-        <div class="brand-mark"><img src="/assets/audita-logo-white.svg" alt="Audita" /></div>
+        <a class="brand-mark" href="/#home"><img src="/assets/audita-logo-original.png" alt="" /><span>IA AUDITA</span></a>
         <div class="login-copy">
           <span class="kicker">Área restrita</span>
-          <h1>Controle central,<br />sem ruído.</h1>
+          <h1>Administração da Audita</h1>
           <p>Acesso exclusivo para administração global da plataforma.</p>
         </div>
         <form class="login-card" id="loginForm">
-          <div><span class="step">01</span><h2>Super Admin</h2></div>
+          <div><h2>Super Admin</h2></div>
           <label>E-mail<input id="loginEmail" name="email" type="email" autocomplete="username" required /></label>
           <label>Senha<input id="loginPassword" name="password" type="password" autocomplete="current-password" required /></label>
           <p class="error hidden" id="loginError" role="alert"></p>
@@ -28,12 +28,13 @@
 
       <section class="dashboard hidden" id="dashboardView">
         <aside>
-          <img src="/assets/audita-logo-white.svg" alt="Audita" />
-          <div class="rail-label">SUPER<br />ADMIN</div>
-          <nav>
-            <button class="active" data-tab="overview">Visão geral</button>
-            <button data-tab="users">Usuários</button>
-            <button data-tab="subscriptions">Assinaturas</button>
+          <a class="brand-mark" href="/#home"><img src="/assets/audita-logo-original.png" alt="" /><span>IA AUDITA</span></a>
+          <div class="rail-label">Administração</div>
+          <nav aria-label="Administração">
+            <a href="/#home"><img src="/assets/nav-icons/home.svg" alt="" />Voltar à Audita</a>
+            <button class="active" data-tab="overview"><img src="/assets/nav-icons/home.svg" alt="" />Visão geral</button>
+            <button data-tab="users"><img src="/assets/nav-icons/settings.svg" alt="" />Usuários</button>
+            <button data-tab="subscriptions"><img src="/assets/nav-icons/file-dollar.svg" alt="" />Assinaturas</button>
           </nav>
           <button class="logout" id="logoutButton">Sair</button>
         </aside>
@@ -55,15 +56,27 @@
           </section>
 
           <section class="panel" data-panel="users">
-            <article class="table-card"><div class="card-heading"><div><span class="index">DIRETÓRIO GLOBAL</span><h2>Usuários</h2></div><input id="userSearch" type="search" placeholder="Buscar nome, e-mail ou organização" /></div><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Organização</th><th>Papel</th><th>Acesso</th><th>Status</th><th></th></tr></thead><tbody id="userRows"></tbody></table></div></article>
+            <article class="table-card"><div class="card-heading"><div><span class="index">DIRETÓRIO GLOBAL</span><h2>Usuários</h2></div><input aria-label="Buscar usuários" id="userSearch" type="search" placeholder="Buscar nome, e-mail ou organização" /></div><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Organização</th><th>Papel</th><th>Acesso</th><th>Status</th><th></th></tr></thead><tbody id="userRows"></tbody></table></div></article>
           </section>
 
           <section class="panel" data-panel="subscriptions">
-            <article class="table-card"><div class="card-heading"><div><span class="index">STRIPE</span><h2>Assinaturas</h2></div><select id="subscriptionFilter"><option value="">Todos os status</option><option value="active">Ativas</option><option value="trialing">Em teste</option><option value="past_due">Em atraso</option><option value="canceled">Canceladas</option></select></div><div class="table-wrap"><table><thead><tr><th>Organização</th><th>Plano</th><th>Status</th><th>Renovação</th><th>Créditos</th><th></th></tr></thead><tbody id="subscriptionRows"></tbody></table></div></article>
+            <article class="table-card"><div class="card-heading"><div><span class="index">STRIPE</span><h2>Assinaturas</h2></div><select aria-label="Filtrar assinaturas" id="subscriptionFilter"><option value="">Todos os status</option><option value="active">Ativas</option><option value="trialing">Em teste</option><option value="past_due">Em atraso</option><option value="canceled">Canceladas</option></select></div><div class="table-wrap"><table><thead><tr><th>Organização</th><th>Plano</th><th>Status</th><th>Renovação</th><th>Créditos</th><th></th></tr></thead><tbody id="subscriptionRows"></tbody></table></div></article>
           </section>
         </div>
       </section>
     </main>
-    <script type="module" src="/super-admin.js?v=1"></script>
+    <dialog id="editUserDialog" aria-labelledby="editUserTitle">
+      <form id="editUserForm">
+        <h2 id="editUserTitle">Editar usuário</h2>
+        <p>Atualize o nome e o e-mail de acesso à Audita.</p>
+        <label>Nome<input id="editUserName" name="name" required minlength="2" maxlength="160" autocomplete="off" /></label>
+        <label>E-mail de acesso<input id="editUserEmail" name="email" type="email" required maxlength="254" autocomplete="off" /></label>
+        <label>Nova senha (opcional)<input id="editUserPassword" name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" aria-describedby="editPasswordHint" /></label>
+        <p id="editPasswordHint">Use de 8 a 128 caracteres. Deixe em branco para manter a senha atual. Ao alterar, o usuário precisará entrar novamente.</p>
+        <p id="editUserError" class="error hidden" role="alert"></p>
+        <div class="row-actions"><button type="button" id="cancelUserEdit">Cancelar</button><button type="submit" class="primary">Salvar alterações</button></div>
+      </form>
+    </dialog>
+    <script type="module" src="/super-admin.js?v=3"></script>
   </body>
 </html>

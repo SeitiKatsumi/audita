@@ -1,58 +1,61 @@
 /* The IR module shares Audita's shell, assistant bubbles and Itaú choice buttons. */
-#isencao-ir { color: #e4eef7; }
-#isencao-ir [hidden] { display: none !important; }
-#isencao-ir .ir-workspace { min-width: 0; }
-#isencao-ir .ir-case-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0; }
-#isencao-ir .ir-case-header h1 { margin: 4px 0; font-size: 1.15rem; }
-#isencao-ir .ir-case-header p, #isencao-ir .ir-micro, #isencao-ir .ir-eyebrow { color: #a8bfd0; font-size: .8rem; }
-#isencao-ir .ir-badge { color: var(--lime); font-size: .8rem; }
-#isencao-ir .ir-tabs { display: flex; overflow-x: auto; gap: 18px; border-bottom: 1px solid #244a63; }
-#isencao-ir .ir-tabs button { border: 0; border-radius: 0; background: transparent; padding: 12px 0; color: #a8bfd0; white-space: nowrap; }
-#isencao-ir .ir-tabs button.active { color: #91d8ff; box-shadow: inset 0 -2px #91d8ff; }
-#isencao-ir .ir-form { display: grid; gap: 16px; margin-top: 20px; }
-#isencao-ir .ir-form label { display: grid; gap: 7px; font-size: .9rem; }
-#isencao-ir .ir-form input, #isencao-ir .ir-form select, #isencao-ir .ir-form textarea { width: 100%; min-width: 0; padding: 12px; border: 1px solid #315b75; border-radius: 8px; background: #092033; color: #e4eef7; font: inherit; }
-#isencao-ir .ir-form textarea { min-height: 100px; resize: vertical; }
-#isencao-ir .ir-form .ir-check { display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; }
-#isencao-ir .ir-check input { width: 18px; height: 18px; flex: none; margin-top: 4px; accent-color: var(--lime); }
-#isencao-ir .ir-check-grid, #isencao-ir .ir-field-row, #isencao-ir .ir-two-col { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
-#isencao-ir .ir-array-row { display: grid; gap: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid #244a63; border-radius: 8px; }
-#isencao-ir fieldset { min-width: 0; border: 0; padding: 0; }
-#isencao-ir .ir-toolbar { display: flex; flex-wrap: wrap; gap: 12px; }
-#isencao-ir .ir-primary, #isencao-ir .ir-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 20px; border: 1px solid #315b75; border-radius: 24px; background: #092033; color: #e4eef7; font: inherit; font-weight: 700; text-decoration: none; }
-#isencao-ir .ir-primary { border-color: #31b685; }
-#isencao-ir .ir-text-button, #isencao-ir .ir-remove { border: 0; background: transparent; color: #91d8ff; text-decoration: underline; padding: 10px 0; }
-#isencao-ir button { cursor: pointer; }
-#isencao-ir button:disabled { opacity: .55; cursor: wait; }
-#isencao-ir :is(button,a,input,select,textarea,summary):focus-visible { outline: 2px solid #91d8ff; outline-offset: 4px; }
-#isencao-ir .ir-section, #isencao-ir .ir-summary { border: 1px solid #244a63; border-radius: 10px; background: rgba(12,42,67,.74); margin: 20px 0; padding: 20px; overflow-wrap: anywhere; }
-#isencao-ir .ir-section h2 { margin-top: 0; font-size: 1.15rem; }
-#isencao-ir .ir-section p, #isencao-ir .ir-section li { color: #b8cad9; line-height: 1.65; }
-#isencao-ir .ir-summary summary { cursor: pointer; color: #a8bfd0; }
-#isencao-ir .ir-summary article { padding-top: 16px; }
-#isencao-ir .ir-readable { white-space: pre-wrap; line-height: 1.65; }
-#isencao-ir .ir-cases { background: transparent; }
-#isencao-ir #caseList { display: grid; gap: 8px; margin: 16px 0; }
-#isencao-ir #caseList button { text-align: left; background: #092033; border: 1px solid #244a63; border-radius: 8px; padding: 12px; color: #e4eef7; }
-#isencao-ir #caseList small { display: block; margin-top: 6px; color: #a8bfd0; }
-#isencao-ir .ir-notice, #isencao-ir .ir-pending { padding: 16px; background: #302b21; color: #f1d49c; border-radius: 8px; }
-#isencao-ir .ir-table-wrap { overflow-x: auto; }
-#isencao-ir .ir-table { width: 100%; border-collapse: collapse; }
-#isencao-ir .ir-table :is(th,td) { text-align: left; padding: 12px; border-bottom: 1px solid #244a63; }
-#isencao-ir .ir-kpi { font-size: 1.6rem; color: var(--lime); }
-#isencao-ir .ir-kpi small { display: block; font-size: .8rem; }
-#isencao-ir .ir-event { border-left: 2px solid #315b75; padding: 0 0 20px 16px; }
-#isencao-ir .ir-event small { color: #a8bfd0; }
+:is(#isencao-ir,#pis-pasep) { color: #e4eef7; }
+:is(#isencao-ir,#pis-pasep) [hidden] { display: none !important; }
+:is(#isencao-ir,#pis-pasep) .ir-workspace { min-width: 0; }
+:is(#isencao-ir,#pis-pasep) .ir-case-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 12px 0; }
+:is(#isencao-ir,#pis-pasep) .ir-case-header h1 { margin: 4px 0; font-size: 1.15rem; }
+:is(#isencao-ir,#pis-pasep) .ir-case-header p, :is(#isencao-ir,#pis-pasep) .ir-micro, :is(#isencao-ir,#pis-pasep) .ir-eyebrow { color: #a8bfd0; font-size: .8rem; }
+:is(#isencao-ir,#pis-pasep) .ir-badge { color: var(--lime); font-size: .8rem; }
+:is(#isencao-ir,#pis-pasep) .ir-tabs { display: flex; overflow-x: auto; gap: 18px; border-bottom: 1px solid #244a63; }
+:is(#isencao-ir,#pis-pasep) .ir-tabs button { border: 0; border-radius: 0; background: transparent; padding: 12px 0; color: #a8bfd0; white-space: nowrap; }
+:is(#isencao-ir,#pis-pasep) .ir-tabs button.active { color: #91d8ff; box-shadow: inset 0 -2px #91d8ff; }
+:is(#isencao-ir,#pis-pasep) .ir-form { display: grid; gap: 16px; margin-top: 20px; }
+:is(#isencao-ir,#pis-pasep) .ir-form label { display: grid; gap: 7px; font-size: .9rem; }
+:is(#isencao-ir,#pis-pasep) .ir-form input, :is(#isencao-ir,#pis-pasep) .ir-form select, :is(#isencao-ir,#pis-pasep) .ir-form textarea { width: 100%; min-width: 0; padding: 12px; border: 1px solid #315b75; border-radius: 8px; background: #092033; color: #e4eef7; font: inherit; }
+:is(#isencao-ir,#pis-pasep) .ir-form textarea { min-height: 100px; resize: vertical; }
+:is(#isencao-ir,#pis-pasep) .ir-form .ir-check { display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; }
+:is(#isencao-ir,#pis-pasep) .ir-check input { width: 18px; height: 18px; flex: none; margin-top: 4px; accent-color: var(--lime); }
+:is(#isencao-ir,#pis-pasep) .ir-check-grid, :is(#isencao-ir,#pis-pasep) .ir-field-row, :is(#isencao-ir,#pis-pasep) .ir-two-col { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+:is(#isencao-ir,#pis-pasep) .ir-array-row { display: grid; gap: 12px; padding: 16px; margin-bottom: 12px; border: 1px solid #244a63; border-radius: 8px; }
+:is(#isencao-ir,#pis-pasep) fieldset { min-width: 0; border: 0; padding: 0; }
+:is(#isencao-ir,#pis-pasep) .ir-toolbar { display: flex; flex-wrap: wrap; gap: 12px; }
+:is(#isencao-ir,#pis-pasep) .ir-primary, :is(#isencao-ir,#pis-pasep) .ir-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 12px 20px; border: 1px solid #315b75; border-radius: 24px; background: #092033; color: #e4eef7; font: inherit; font-weight: 700; text-decoration: none; }
+:is(#isencao-ir,#pis-pasep) .ir-primary { border-color: #31b685; }
+:is(#isencao-ir,#pis-pasep) .ir-text-button, :is(#isencao-ir,#pis-pasep) .ir-remove { border: 0; background: transparent; color: #91d8ff; text-decoration: underline; padding: 10px 0; }
+:is(#isencao-ir,#pis-pasep) button { cursor: pointer; }
+:is(#isencao-ir,#pis-pasep) button:disabled { opacity: .55; cursor: wait; }
+:is(#isencao-ir,#pis-pasep) :is(button,a,input,select,textarea,summary):focus-visible { outline: 2px solid #91d8ff; outline-offset: 4px; }
+:is(#isencao-ir,#pis-pasep) .ir-section, :is(#isencao-ir,#pis-pasep) .ir-summary { border: 1px solid #244a63; border-radius: 10px; background: rgba(12,42,67,.74); margin: 20px 0; padding: 20px; overflow-wrap: anywhere; }
+:is(#isencao-ir,#pis-pasep) .ir-section h2 { margin-top: 0; font-size: 1.15rem; }
+:is(#isencao-ir,#pis-pasep) .ir-section p, :is(#isencao-ir,#pis-pasep) .ir-section li { color: #b8cad9; line-height: 1.65; }
+:is(#isencao-ir,#pis-pasep) .ir-summary summary { cursor: pointer; color: #a8bfd0; }
+:is(#isencao-ir,#pis-pasep) .ir-summary article { padding-top: 16px; }
+:is(#isencao-ir,#pis-pasep) .ir-readable { white-space: pre-wrap; line-height: 1.65; }
+:is(#isencao-ir,#pis-pasep) .ir-cases { background: transparent; }
+:is(#isencao-ir,#pis-pasep) :is(#caseList,#pisCaseList) { display: grid; gap: 8px; margin: 16px 0; }
+:is(#isencao-ir,#pis-pasep) :is(#caseList,#pisCaseList) button { text-align: left; background: #092033; border: 1px solid #244a63; border-radius: 8px; padding: 12px; color: #e4eef7; }
+:is(#isencao-ir,#pis-pasep) :is(#caseList,#pisCaseList) small { display: block; margin-top: 6px; color: #a8bfd0; }
+:is(#isencao-ir,#pis-pasep) .ir-notice, :is(#isencao-ir,#pis-pasep) .ir-pending { padding: 16px; background: #302b21; color: #f1d49c; border-radius: 8px; }
+:is(#isencao-ir,#pis-pasep) .ir-table-wrap { overflow-x: auto; }
+:is(#isencao-ir,#pis-pasep) .ir-table { width: 100%; border-collapse: collapse; }
+:is(#isencao-ir,#pis-pasep) .ir-table :is(th,td) { text-align: left; padding: 12px; border-bottom: 1px solid #244a63; }
+:is(#isencao-ir,#pis-pasep) .ir-kpi { font-size: 1.6rem; color: var(--lime); }
+:is(#isencao-ir,#pis-pasep) .ir-kpi small { display: block; font-size: .8rem; }
+:is(#isencao-ir,#pis-pasep) .ir-event { border-left: 2px solid #315b75; padding: 0 0 20px 16px; }
+:is(#isencao-ir,#pis-pasep) .ir-event small { color: #a8bfd0; }
 @media(max-width:760px) {
-  #isencao-ir .ir-check-grid, #isencao-ir .ir-field-row, #isencao-ir .ir-two-col { grid-template-columns: 1fr; }
-  #isencao-ir .ir-case-header { flex-wrap: wrap; }
-  #isencao-ir .ir-section, #isencao-ir .ir-summary { padding: 14px; }
+  :is(#isencao-ir,#pis-pasep) .ir-check-grid, :is(#isencao-ir,#pis-pasep) .ir-field-row, :is(#isencao-ir,#pis-pasep) .ir-two-col { grid-template-columns: 1fr; }
+  :is(#isencao-ir,#pis-pasep) .ir-case-header { flex-wrap: wrap; }
+  :is(#isencao-ir,#pis-pasep) .ir-section, :is(#isencao-ir,#pis-pasep) .ir-summary { padding: 14px; }
 }
 
 /* Keep each confirmed answer in the conversation instead of replacing a step. */
-#isencao-ir .ir-chat-log { display: flex; flex-direction: column; gap: 18px; padding: 24px 0; }
-#isencao-ir .ir-chat-log .charge-analysis-message.user { margin: 0 0 12px auto; max-width: min(330px,72%); }
-#isencao-ir .ir-chat-log .ir-readable { margin: 0; }
-#isencao-ir .ir-chat-log .ir-text-button { font-size: .8rem; }
-#isencao-ir .ir-chat-tools { margin: 20px 0; }
-#isencao-ir #irConversationPanel { margin-top: 24px; }
+:is(#isencao-ir,#pis-pasep) .ir-chat-log { display: flex; flex-direction: column; gap: 18px; padding: 24px 0 48px; }
+:is(#isencao-ir,#pis-pasep) .ir-chat-log .charge-analysis-message.user { margin: 0 0 12px auto; max-width: min(330px,72%); }
+:is(#isencao-ir,#pis-pasep) .ir-chat-log .ir-readable { margin: 0; }
+:is(#isencao-ir,#pis-pasep) .ir-chat-log .ir-text-button { font-size: .8rem; }
+:is(#isencao-ir,#pis-pasep) .ir-chat-tools { margin: 20px 0; }
+:is(#isencao-ir,#pis-pasep) #irConversationPanel { margin-top: 24px; }
+
+#pis-pasep .ir-section a { color: #91d8ff; }
+#pisDetails { scroll-margin-top: 76px; }

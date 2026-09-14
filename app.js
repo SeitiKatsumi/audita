@@ -1,3 +1,4 @@
+import { initServicesCatalog } from "./services-catalog.js";
 const canvas = document.querySelector("#signalCanvas");
 const ctx = canvas?.getContext("2d");
 const riskScore = document.querySelector("#riskScore");
@@ -883,6 +884,10 @@ const auditSourceLabels = {
 };
 
 const pageMeta = {
+  advogados: {title: "Área dos Advogados", eyebrow: "Atendimentos da equipe"},
+  "contas-de-luz": { title: "Auditoria de contas de luz", eyebrow: "Energia" },
+  "central-servicos": {title: "Central de Serviços", eyebrow: "Consultas e análises"},
+  "pis-pasep": {title:"Cotas antigas PIS/PASEP",eyebrow:"Consulta assistida"},
   "isencao-ir": { title: "Isenção e restituição de IR", eyebrow: "Triagem guiada" },
   "dividas-bancarias": { title: "Dívidas Bancárias Abusivas", eyebrow: "Análise guiada" },
   chat: {
@@ -979,6 +984,9 @@ function setActivePage(page) {
   const activePage = pageMeta[page] ? page : "home";
   const enteringChat = activePage === "chat" && document.body.dataset.activePage !== "chat";
   document.body.dataset.activePage = activePage;
+  if(currentAuthState.authRequired&&!currentAuthState.user){
+    if(["pis-pasep","contas-de-luz"].includes(activePage))hideLogin();else showLogin();
+  }
   const activeMeta = pageMeta[activePage];
 
   pageTitle.textContent = activeMeta.title;
@@ -1013,6 +1021,8 @@ function setActivePage(page) {
 
   applyAuditRouteDefaults(activePage);
   setMobileMenu(false);
+  // Hashes select pages; keep the page header above the content after anchor scrolling.
+  requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "instant" }));
   if (activePage === "chat") {
     if (enteringChat) {
       startNewChat();
@@ -7130,6 +7140,7 @@ function canAccessApiUsageAdmin(authState = currentAuthState) {
 
 function configureApiUsageAdmin(authState) {
   currentAuthState = authState || { authRequired: false, user: null };
+  document.querySelectorAll("[data-lawyer-entry]").forEach(entry => { entry.hidden = !["lawyer", "super_admin"].includes(currentAuthState.user?.role); });
   const allowed = canAccessApiUsageAdmin(currentAuthState);
   adminBillingNav?.classList.toggle("hidden", !allowed);
   adminUsageNav?.classList.toggle("hidden", !allowed);
@@ -9130,7 +9141,7 @@ renderProfile(authState.user);
 configureApiUsageAdmin(authState);
 await loadCurrentUserProfile();
 if (authState.authRequired && !authState.user) {
-  showLogin();
+  if(getActivePage()==="pis-pasep")hideLogin();else showLogin();
   finishAppBoot();
 } else {
   if (authState.user) {
@@ -9161,3 +9172,5 @@ if (authState.authRequired && !authState.user) {
     await loadApiUsageDashboard();
   }
 }
+
+initServicesCatalog();

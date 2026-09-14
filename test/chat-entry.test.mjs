@@ -14,7 +14,7 @@ test('entering AI starts blank while history selection survives renders', () => 
     applyAuditRouteDefaults() {}, setMobileMenu() {}, renderChatWorkspace() {},
     requestAnimationFrame() {}, CustomEvent: class {}, chatInput: { focus() {} },
     createChatThread: () => ({ id: 'new', messages: [] }), saveChatState() {}, setChatError() {},
-    initializeChatEntryContext() {},
+    initializeChatEntryContext() {}, currentAuthState: { authRequired: false, user: null },
   });
   vm.runInContext(extract('setActivePage', 'finishAppBoot') + extract('startNewChat', 'resizeChatInput'), context);
   vm.runInContext('setActivePage("chat")', context);

@@ -1,0 +1,23 @@
+#energyApp { position:relative; max-width:1120px; margin:auto; padding-bottom:48px; }
+#energyApp .charge-analysis-conversation {padding-bottom:48px;}
+#energyApp .charge-analysis-message {scroll-margin-bottom:48px;}
+#energyApp .charge-analysis-bubble {min-width:0;width:100%;}
+#energyApp .ir-form {margin:20px 0;display:grid;gap:14px;}
+#energyApp input:not([type=checkbox]),#energyApp select {width:100%;min-height:44px;}
+#energyApp fieldset {min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;border:1px solid var(--line);margin:12px 0;}
+#energyApp label {display:grid;gap:6px;font-size:1rem;}
+#energyApp .ir-check {display:flex;align-items:start;}
+#energyApp .secondary-action {display:inline-flex;align-items:center;justify-content:center;white-space:normal;text-align:center;margin:6px 4px 6px 0;padding:8px 14px;font-size:1rem;}
+#energyApp li,#energyApp p {overflow-wrap:anywhere;}
+#energyApp .energy-finding {border:1px solid var(--line);border-radius:8px;padding:16px;margin:16px 0;}
+#energyApp .energy-error {color:#ffcf91;}
+#energyApp details {margin:18px 0;}
+#energyApp :focus-visible {outline:2px solid var(--lime);outline-offset:3px;}
+@media(max-width:600px){#energyApp fieldset{grid-template-columns:1fr;}#energyApp .charge-analysis-bubble{padding:18px;}#energyApp .charge-analysis-message{padding-left:0;}}
+
+#energyApp input:not([type=checkbox]), #energyApp select {padding:12px;border:1px solid #315b75;border-radius:8px;background:#092033;color:#e4eef7;font:inherit;min-width:0;}
+#energyApp input[type=checkbox] {width:18px;height:18px;flex:none;accent-color:var(--lime);margin-top:4px;}
+#energyApp .ir-check {gap:12px;line-height:1.6;}
+#energyApp [data-energy-result] {scroll-margin-bottom:48px;scroll-margin-top:80px;}
+#energyApp button {min-height:44px;cursor:pointer;}
+#energyApp button:disabled {opacity:.55;cursor:wait;}

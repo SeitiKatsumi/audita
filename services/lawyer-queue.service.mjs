@@ -34,7 +34,7 @@ export function createLawyerQueueService({ getDb }) {
   }
 
   async function list(user) {
-    requireLawyer(user);
+    if (user?.role !== "super_admin") requireLawyer(user);
     // ponytail: listagem integral; paginar quando o volume de atendimentos exigir.
     // A fila central mostra apenas localização até o advogado assumir o atendimento.
     return (await db().query(`SELECT id, status, created_at, claimed_at, filed_at, protocol_number,
@@ -43,8 +43,8 @@ export function createLawyerQueueService({ getDb }) {
       CASE WHEN lawyer_id = $1 THEN claimant->>'fullName' END AS client_name,
       CASE WHEN lawyer_id = $1 THEN (SELECT jsonb_agg(item->>'name') FROM jsonb_array_elements(source_documents) item) END AS sources,
       lawyer_id = $1 AS mine
-      FROM audita_lawyer_jobs WHERE (status = 'queued' AND (claimant->>'lawyerUserId' IS NULL OR claimant->>'lawyerUserId' = ($1::bigint)::text)) OR lawyer_id = $1
-      ORDER BY created_at DESC`, [user.id])).rows;
+      FROM audita_lawyer_jobs WHERE $2::boolean OR (status = 'queued' AND (claimant->>'lawyerUserId' IS NULL OR claimant->>'lawyerUserId' = ($1::bigint)::text)) OR lawyer_id = $1
+      ORDER BY created_at DESC`, [user.id, user.role === "super_admin"])).rows;
   }
 
   async function claim(user, id) {

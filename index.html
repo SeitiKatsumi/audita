@@ -5,10 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260827-procuracao-1" />
-    <link rel="stylesheet" href="/ir-exemption.css?v=20260910-integrated" />
+    <link rel="stylesheet" href="styles.css?v=20260911-chat-spacing" />
+    <link rel="stylesheet" href="/ir-exemption.css?v=20260911-chat-spacing" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
-  </head>
+  <link rel="stylesheet" href="/advogados.css?v=3" />
+  <link rel="stylesheet" href="/energy-audit.css">
+</head>
   <body>
     <div class="app-boot" id="appBoot" role="status" aria-live="polite" aria-label="Carregando IA AUDITA">
       <img src="assets/audita-logo-original.png" alt="" />
@@ -82,32 +84,11 @@
             <span class="nav-label">IA AUDITA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
           </a>
-          <a href="#isencao-ir">
-            <img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" aria-hidden="true" />
-            <span class="nav-label">Isenção e restituição de IR</span>
+          <a href="#central-servicos" data-nav-pages="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz">
+            <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
+            <span class="nav-label">Central de Serviços</span>
           </a>
-          <a href="#dividas-bancarias">
-            <img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" aria-hidden="true" />
-            <span class="nav-label">Dívidas Bancárias Abusivas</span>
-          </a>
-          <a href="#analise-cobrancas">
-            <img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" aria-hidden="true" />
-            <span class="nav-label">An&aacute;lise de cobran&ccedil;as indevidas</span>
-            <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-          </a>
-          <details class="nav-group">
-            <summary>
-              <img class="nav-icon" src="assets/nav-icons/building.svg" alt="" aria-hidden="true" />
-              <span class="nav-label">An&aacute;lise Compra e Venda de Im&oacute;veis</span>
-              <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-            </summary>
-            <div class="nav-children">
-              <a class="nav-child" href="#analise-vendedor">
-                <span class="nav-label">An&aacute;lise de Vendedor</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-            </div>
-          </details>
+          <a href="#advogados" data-lawyer-entry hidden><img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" /><span class="nav-label">Área dos Advogados</span></a>
           <details class="nav-group" open>
             <summary>
               <img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" aria-hidden="true" />
@@ -182,6 +163,18 @@
           </div>
         </header>
 
+        <section id="advogados" class="lawyer-page page-hidden" data-page="advogados" aria-label="Área dos Advogados"><p class="lawyer-intro">Organize documentos, pendências e próximos passos.</p><p id="lawyer-message" role="alert"></p>
+<section id="lawyer-login" class="module"><h2>Acesso restrito</h2><p>Entre com uma conta de advogado ou superadmin para consultar os atendimentos.</p></section>
+<div id="lawyer-dashboard" hidden><div class="workspace-grid"><div class="primary"><div class="metrics lawyer-metrics"><article><img src="/assets/nav-icons/file-dollar.svg" alt=""><div><strong id="lawyer-countActive">0</strong><span>Em atendimento</span></div></article><article><img src="/assets/nav-icons/tool.svg" alt=""><div><strong id="lawyer-countPending">0</strong><span>Com pendências</span></div></article><article><img src="/assets/nav-icons/building.svg" alt=""><div><strong id="lawyer-countAvailable">0</strong><span>Disponíveis</span></div></article></div>
+<div class="filters"><label class="sr-only" for="lawyer-search">Buscar atendimento</label><input id="lawyer-search" type="search" placeholder="Buscar atendimento"><label class="sr-only" for="lawyer-service">Filtrar por serviço</label><select id="lawyer-service"><option value="all">Todos os serviços</option><option value="itau">Itaú / JEC</option><option value="pis">PIS/PASEP</option><option value="ir">Isenção de IR</option><option value="energy">Contas de luz</option></select><button class="secondary-action" id="lawyer-refresh">Atualizar</button></div>
+<nav class="tabs" aria-label="Filtrar atendimentos"><button class="secondary-action" data-filter="available" aria-pressed="false">Disponíveis</button><button class="secondary-action" data-filter="active" aria-pressed="true" id="lawyer-activeLabel">Meus atendimentos</button><button class="secondary-action" data-filter="closed" aria-pressed="false">Finalizados / protocolados</button></nav>
+<div class="module list-panel"><table><thead><tr><th>Atendimento</th><th>Serviço</th><th>Situação</th><th>Próximo passo</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="lawyer-caseRows"></tbody></table><p id="lawyer-empty" hidden>Nenhum atendimento nesta lista.</p></div>
+<section id="lawyer-details" class="panel" hidden tabindex="-1"><button class="secondary-action" id="lawyer-closeDetails">Voltar à lista</button><div id="lawyer-detailBody"></div></section></div>
+<aside class="activity"><section class="panel"><h2>Pendências de atenção</h2><div id="lawyer-attention"></div></section><section class="panel"><h2>Atualizações recentes</h2><div id="lawyer-recent"></div></section><p class="muted">Os prazos oficiais devem ser conferidos pela equipe nos canais responsáveis.</p></aside></div></div></section>
+        <nav class="service-return page-hidden" data-page="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz" aria-label="Voltar ao catálogo de serviços">
+          <a href="#central-servicos"><img src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />Voltar à Central de Serviços</a>
+        </nav>
+
         <section class="chat-page" id="chat" data-page="chat">
           <aside class="chat-threads" aria-label="Conversas recentes">
             <a class="chat-home-link" href="/#home" aria-label="Voltar à IA AUDITA">
@@ -221,6 +214,7 @@
                 <div><span class="tool-status active"></span><strong>IBGE</strong><small>API p&uacute;blica ativa</small></div>
                 <a href="/#consulta-imoveis"><span class="tool-status review"></span><strong>Busca de im&oacute;veis</strong><small>Em homologa&ccedil;&atilde;o</small></a>
                 <a href="/#consulta-cnib"><span class="tool-status pending"></span><strong>Indisponibilidade</strong><small>Aguardando provedor</small></a>
+                <a href="#pis-pasep" data-pis-entry hidden><span class="tool-status review"></span><strong>PIS/PASEP</strong><small>Consulta assistida de cotas antigas</small></a>
                 <a href="#isencao-ir"><span class="tool-status review"></span><strong>Isenção de IR</strong><small>Triagem e acompanhamento</small></a>
                 <a href="/chat?tool=itau-refund"><span class="tool-status active"></span><strong>Revis&atilde;o Ita&uacute;</strong><small>An&aacute;lise de faturas ativa</small></a>
                 <a href="/#historico"><span class="tool-status active"></span><strong>Hist&oacute;rico</strong><small>Consultas do usu&aacute;rio</small></a>
@@ -360,6 +354,58 @@
           </aside>
         </section>
 
+        <section id="contas-de-luz" data-page="contas-de-luz" class="page-hidden"><div id="energyApp" aria-label="Auditoria de contas de luz"></div></section>
+        <section class="services-page page-hidden" id="central-servicos" data-page="central-servicos" aria-label="Central de Serviços">
+          <p class="services-intro">Encontre a consulta ou análise de que você precisa.</p>
+          <label class="services-search">Buscar serviço
+            <input type="search" placeholder="Busque por serviço, documento ou assunto" aria-controls="servicesGrid" />
+          </label>
+          <div class="services-categories" role="group" aria-label="Filtrar por categoria">
+            <button class="secondary-action" type="button" data-service-category="all" aria-pressed="true">Todos</button>
+            <button class="secondary-action" type="button" data-service-category="certidoes" aria-pressed="false">Certidões</button>
+            <button class="secondary-action" type="button" data-service-category="imoveis" aria-pressed="false">Imóveis</button>
+            <button class="secondary-action" type="button" data-service-category="beneficios" aria-pressed="false">Benefícios e tributos</button>
+            <button class="secondary-action" type="button" data-service-category="energia" aria-pressed="false">Energia</button>
+            <button class="secondary-action" type="button" data-service-category="bancario" aria-pressed="false">Bancário</button>
+          </div>
+          <div class="services-heading"><h2>Explore os serviços</h2><p data-service-count role="status" aria-live="polite"></p></div>
+          <div class="services-grid" id="servicesGrid">
+<a class="home-module-action service-card" href="#contas-de-luz" data-service-card data-service-energy data-categories="energia" data-keywords="fatura tarifa ICMS solar restituição energia" hidden><span class="home-module-icon"><img src="assets/nav-icons/file-dollar.svg" alt=""></span><span class="home-module-copy"><small class="service-category-label">Energia</small><strong>Auditoria de contas de luz</strong><small>Confira suas faturas e prepare um pedido de revisão.</small></span><span class="home-module-chevron" aria-hidden="true">→</span></a>
+
+              <a class="home-module-action service-card" href="#analise-vendedor" data-service-card data-categories="certidoes imoveis" data-keywords="vendedor compra venda certidao" >
+                <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                <span class="home-module-copy"><small class="service-category-label">Certidões · Imóveis</small><strong>Certidões do vendedor</strong><small>Reúna as certidões disponíveis para analisar uma compra de imóvel.</small></span>
+                <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="home-module-action service-card" href="#consulta-imoveis" data-service-card data-categories="imoveis" data-keywords="imovel onr patrimonio" >
+                <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                <span class="home-module-copy"><small class="service-category-label">Imóveis</small><strong>Consulta de imóveis</strong><small>Consulte informações e buscas de imóveis pelos canais disponíveis.</small></span>
+                <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="home-module-action service-card" href="#isencao-ir" data-service-card data-categories="beneficios" data-keywords="imposto renda aposentadoria" >
+                <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
+                <span class="home-module-copy"><small class="service-category-label">Benefícios e tributos</small><strong>Isenção e restituição de IR</strong><small>Faça a triagem e organize os documentos para revisão da equipe.</small></span>
+                <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="home-module-action service-card" href="#pis-pasep" data-service-card data-categories="beneficios" data-keywords="pis pasep cotas beneficio" data-service-pis hidden>
+                <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
+                <span class="home-module-copy"><small class="service-category-label">Benefícios e tributos</small><strong>Cotas antigas PIS/PASEP</strong><small>Receba orientação para consultar cotas e reunir documentos.</small></span>
+                <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="home-module-action service-card" href="#analise-cobrancas" data-service-card data-categories="bancario" data-keywords="itau seguros tarifas" >
+                <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
+                <span class="home-module-copy"><small class="service-category-label">Bancário</small><strong>Cobranças indevidas</strong><small>Analise possíveis cobranças indevidas em cartões e contas Itaú.</small></span>
+                <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+              <a class="home-module-action service-card" href="#dividas-bancarias" data-service-card data-categories="bancario" data-keywords="divida juros contrato banco" >
+                <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
+                <span class="home-module-copy"><small class="service-category-label">Bancário</small><strong>Dívidas bancárias</strong><small>Organize informações e documentos para a análise do seu contrato.</small></span>
+                <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
+              </a>
+          </div>
+          <div class="services-empty" data-service-empty hidden><h3>Nenhum serviço encontrado</h3><p>Tente outro termo ou escolha uma categoria diferente.</p><button class="secondary-action" type="button" data-service-clear>Limpar busca e filtros</button></div>
+        </section>
+
         <section class="home-hero" id="home" data-page="home">
           <article class="home-hero-panel">
             <div class="home-hero-copy">
@@ -369,6 +415,7 @@
                 <em>an&aacute;lise inteligente</em>, laudos completos e uma linguagem simples para
                 <em>decis&otilde;es mais seguras</em>.
               </h2>
+              <a class="secondary-action services-home-link" href="#central-servicos">Explorar a Central de Serviços</a>
               <nav class="home-module-actions" aria-label="M&oacute;dulos dispon&iacute;veis">
                 <a class="home-module-action" href="#analise-cobrancas">
                   <span class="home-module-icon" aria-hidden="true">
@@ -465,6 +512,22 @@
           </article>
         </section>
 
+        <section class="charge-analysis-page" id="pis-pasep" data-page="pis-pasep">
+          <div class="charge-analysis-shell">
+            <header class="charge-analysis-header">
+              <div class="charge-analysis-identity">
+                <span class="charge-analysis-mark" aria-hidden="true"><img src="/assets/audita-logo-original.png" alt="" /></span>
+                <p><strong>IA AUDITA</strong> está analisando com você</p>
+              </div>
+              <button class="charge-analysis-help" type="button" data-pis-help aria-label="Ajuda sobre PIS/PASEP"><span aria-hidden="true">?</span><span>Ajuda</span></button>
+            </header>
+            <div class="charge-analysis-workspace"><div class="charge-analysis-content">
+              <p id="pisNotice" class="ir-notice" role="alert" hidden></p>
+              <div id="pisApp" class="charge-analysis-stage" aria-live="polite" aria-busy="true">Preparando seu atendimento…</div>
+            </div></div>
+          </div>
+        </section>
+
         <section class="charge-analysis-page page-hidden" id="dividas-bancarias" data-page="dividas-bancarias">
           <div class="charge-analysis-shell">
             <header class="charge-analysis-header">
@@ -490,7 +553,6 @@
             <div class="charge-analysis-workspace"><div class="charge-analysis-content">
               <p id="notice" class="ir-notice" role="alert" hidden></p>
               <div id="app" class="charge-analysis-stage" aria-live="polite" aria-busy="true">Preparando seu atendimento…</div>
-              <details class="ir-summary ir-cases"><summary id="caseListTitle">Seus atendimentos de IR</summary><div id="caseList"></div><button type="button" class="secondary-action" id="newCase">Novo atendimento</button></details>
             </div></div>
           </div>
         </section>
@@ -1873,10 +1935,13 @@
       </main>
     </div>
 
+    <script type="module" src="/advogados.js?v=3"></script>
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
     <script type="module" src="/ir-exemption.js?v=20260910-reintegrated"></script>
     <script type="module" src="/bank-debt.js?v=20260911"></script>
     <script type="module" src="charge-analysis.js?v=20260828-legal-documents-1"></script>
     <script type="module" src="app.js?v=20260828-legal-documents-1-ir-20260910"></script>
-  </body>
+      <script type="module" src="/pis-pasep.js?v=20260911"></script>
+  <script type="module" src="energy-audit.js"></script>
+</body>
 </html>

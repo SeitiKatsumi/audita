@@ -1,5 +1,7 @@
 # Contexto Para IA
 
+Leia primeiro [`AGENTS.md`](../AGENTS.md) para as instruções operacionais e [`STATUS.md`](STATUS.md) para a passagem de trabalho. Este documento mantém as diretrizes gerais do produto; não é registro de tarefas em andamento.
+
 Este arquivo deve ser lido por Codex, ChatGPT ou qualquer assistente de desenvolvimento antes de executar mudancas relevantes no projeto Audita.
 
 ## Resumo do projeto

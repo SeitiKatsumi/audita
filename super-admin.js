@@ -21,7 +21,7 @@ function accessFor(user) { if (["active","trialing"].includes(user.subscription?
 function renderUsers() {
   const query = $("#userSearch").value.trim().toLowerCase();
   const users = (dashboard?.users || []).filter((user) => !query || [user.name,user.email,user.tenantName].some((v) => String(v||"").toLowerCase().includes(query)));
-  $("#userRows").innerHTML = users.length ? users.map((user) => { const access=accessFor(user); const self=String(user.id)===String(currentUser.id); const tester=user.testerGrant?.status==="active" && access.detail==="Liberação manual"; return `<tr><td><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.email)}</small></td><td>${escapeHtml(user.tenantName)}</td><td><select data-user-role="${escapeHtml(user.id)}" ${self?'disabled':''}>${["owner","admin","analyst","member","lawyer"].map((role)=>`<option value="${role}" ${user.role===role?'selected':''}>${label(role)}</option>`).join("")}${self?'<option selected>Super Admin</option>':''}</select></td><td><span class="badge ${access.tone}">${escapeHtml(access.name)}</span><small>${escapeHtml(access.detail)}</small></td><td><span class="badge ${tone(user.status)}">${label(user.status)}</span></td><td><div class="row-actions"><button data-access="${tester?'revoke':'grant'}" data-user="${escapeHtml(user.id)}" ${user.subscription && access.tone==='positive'?'disabled':''}>${tester?'Revogar tester':'Liberar tester'}</button><button class="${user.status==='active'?'':'primary'}" data-status="${user.status==='active'?'suspended':'active'}" data-user="${escapeHtml(user.id)}" ${self?'disabled':''}>${user.status==='active'?'Suspender':'Reativar'}</button></div></td></tr>`; }).join("") : empty(6,"Nenhum usuário encontrado.");
+  $("#userRows").innerHTML = users.length ? users.map((user) => { const access=accessFor(user); const self=String(user.id)===String(currentUser.id); const tester=user.testerGrant?.status==="active" && access.detail==="Liberação manual"; return `<tr><td><strong>${escapeHtml(user.name)}</strong><small>${escapeHtml(user.email)}</small></td><td>${escapeHtml(user.tenantName)}</td><td><select data-user-role="${escapeHtml(user.id)}" ${self?'disabled':''}>${["owner","admin","analyst","member","lawyer"].map((role)=>`<option value="${role}" ${user.role===role?'selected':''}>${label(role)}</option>`).join("")}${self?'<option selected>Super Admin</option>':''}</select></td><td><span class="badge ${access.tone}">${escapeHtml(access.name)}</span><small>${escapeHtml(access.detail)}</small></td><td><span class="badge ${tone(user.status)}">${label(user.status)}</span></td><td><div class="row-actions"><button data-edit-user="${escapeHtml(user.id)}" ${user.role==='super_admin'?'disabled':''}>Editar dados</button><button data-access="${tester?'revoke':'grant'}" data-user="${escapeHtml(user.id)}" ${user.subscription && access.tone==='positive'?'disabled':''}>${tester?'Revogar tester':'Liberar tester'}</button><button class="${user.status==='active'?'':'primary'}" data-status="${user.status==='active'?'suspended':'active'}" data-user="${escapeHtml(user.id)}" ${self?'disabled':''}>${user.status==='active'?'Suspender':'Reativar'}</button></div></td></tr>`; }).join("") : empty(6,"Nenhum usuário encontrado.");
 }
 
 function renderSubscriptions() {
@@ -42,4 +42,33 @@ $("#userSearch").addEventListener("input",renderUsers); $("#subscriptionFilter")
 $("#userRows").addEventListener("change",async(event)=>{const id=event.target.dataset.userRole;if(!id)return;setBusy(true);try{await api(`/api/super-admin/users/${encodeURIComponent(id)}`,{method:"PATCH",body:JSON.stringify({role:event.target.value})});await loadDashboard();}catch(error){showError(error.message);await loadDashboard();}});
 $("#userRows").addEventListener("click",async(event)=>{const button=event.target.closest("button[data-user]");if(!button)return;setBusy(true);try{if(button.dataset.access)await api(`/api/super-admin/users/${encodeURIComponent(button.dataset.user)}/access`,{method:"POST",body:JSON.stringify({action:button.dataset.access})});else await api(`/api/super-admin/users/${encodeURIComponent(button.dataset.user)}`,{method:"PATCH",body:JSON.stringify({status:button.dataset.status})});await loadDashboard();}catch(error){showError(error.message);setBusy(false);}});
 $("#subscriptionRows").addEventListener("click",async(event)=>{const button=event.target.closest("button[data-subscription]");if(!button)return;setBusy(true);try{await api(`/api/super-admin/subscriptions/${encodeURIComponent(button.dataset.subscription)}`,{method:"POST",body:JSON.stringify({action:button.dataset.cancel})});await loadDashboard();}catch(error){showError(error.message);setBusy(false);}});
+let editingUserId = null;
+$("#userRows").addEventListener("click", event => {
+  const button = event.target.closest("button[data-edit-user]");
+  if (!button) return;
+  const user = dashboard.users.find(user => String(user.id) === button.dataset.editUser);
+  if (!user || user.role === "super_admin") return;
+  editingUserId = user.id;
+  $("#editUserName").value = user.name || "";
+  $("#editUserEmail").value = user.email || "";
+  $("#editUserPassword").value = "";
+  $("#editUserError").classList.add("hidden");
+  $("#editUserDialog").showModal();
+});
+$("#editUserDialog").addEventListener("close", () => { $("#editUserPassword").value = ""; });
+$("#cancelUserEdit").addEventListener("click", () => $("#editUserDialog").close());
+$("#editUserForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const buttons = [...event.currentTarget.querySelectorAll("button")];
+  buttons.forEach(button => button.disabled = true);
+  try {
+    await api('/api/super-admin/users/' + encodeURIComponent(editingUserId), {method:"PATCH", body:JSON.stringify({name:$("#editUserName").value.trim(),email:$("#editUserEmail").value.trim(),...($("#editUserPassword").value ? {password:$("#editUserPassword").value} : {})})});
+    $("#editUserDialog").close();
+    await loadDashboard();
+  } catch (error) {
+    const messages = {invalid_user_password:"Use uma senha de 8 a 128 caracteres.",email_already_registered:"Este e-mail já está em uso por outra conta.",invalid_user_name:"Informe um nome entre 2 e 160 caracteres.",invalid_user_email:"Informe um e-mail válido.",user_edit_requires_database:"Banco de dados indisponível. Tente novamente mais tarde."};
+    $("#editUserError").textContent = messages[error.message] || "Não foi possível salvar. Confira sua conexão e tente novamente.";
+    $("#editUserError").classList.remove("hidden");
+  } finally { buttons.forEach(button => button.disabled = false); }
+});
 initialize();

@@ -10,7 +10,7 @@ test("lawyer access is explicit and queue refuses nonpersistent storage", async 
   const queue = createLawyerQueueService({ getDb: () => ({}) });
   await assert.rejects(queue.list({ role: "lawyer" }), { status: 503 });
   await assert.rejects(queue.submit({ id: 1 }, {}), { status: 422 });
-  for (const path of ["/advogados", "/advogados/"]) assert.equal(resolveUiRoute(path).path, "/advogados.html");
+  for (const path of ["/advogados", "/advogados/", "/advogado", "/advogados.html"]) assert.deepEqual(resolveUiRoute(path), {type:"redirect",location:"/#advogados"});
 });
 
 // Run against isolated PostgreSQL in WASM: set TEST_PGLITE_MODULE to its installed dist/index.js.
@@ -40,6 +40,14 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   const winner = claims[0].status === "fulfilled" ? lawyer : other;
   const loser = winner === lawyer ? other : lawyer;
   assert.equal((await queue.list(loser)).length, 0);
+  const supervisor = {id:999,role:'super_admin'};
+  const overview = await queue.list(supervisor);
+  assert.equal(overview.length,1);
+  assert.equal(overview[0].client_name,null);
+  assert.equal(overview[0].sources,null);
+  await assert.rejects(queue.document(supervisor,job.id,'report'),{status:403});
+  await assert.rejects(queue.claim(supervisor,job.id),{status:403});
+  await assert.rejects(queue.list({id:101,role:'member'}),{status:403});
   await assert.rejects(queue.document(loser, job.id, "report"), { status: 404 });
   assert.deepEqual(Buffer.from((await queue.document(winner, job.id, "report")).bytes), pdf);
   assert.deepEqual(Buffer.from((await queue.document(winner, job.id, "source-0")).bytes), pdf);

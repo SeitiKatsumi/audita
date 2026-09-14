@@ -744,10 +744,12 @@ if (stage) {
   }
 
   function scrollLatestMessage(container) {
-    if (!window.matchMedia?.("(max-width: 820px)")?.matches) return;
-    container?.lastElementChild?.scrollIntoView?.({
-      behavior: prefersReducedMotion ? "auto" : "smooth",
-      block: "nearest",
+    window.requestAnimationFrame(() => {
+      if (document.body.dataset.activePage !== "analise-cobrancas") return;
+      container?.lastElementChild?.scrollIntoView?.({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "end",
+      });
     });
   }
 
@@ -2065,6 +2067,7 @@ if (stage) {
     else if (triageStarted) renderTriage();
     else stage.innerHTML = '<div class="charge-analysis-conversation" data-charge-conversation></div>';
     syncFloatingAssistantAvatar();
+    scrollLatestMessage(stage.querySelector(".charge-analysis-conversation"));
     setError(state.error);
   }
 

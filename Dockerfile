@@ -10,10 +10,10 @@ ENV APP_VERSION=${CAPROVER_GIT_COMMIT_SHA}
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY index.html styles.css app.js billing-admin.js charge-analysis.js charge-calculation.js itau-faq.js server.mjs ./
-COPY advogados.html advogados.js ./
+COPY energy-audit.js energy-audit.css services-catalog.js index.html styles.css app.js billing-admin.js charge-analysis.js charge-calculation.js itau-faq.js server.mjs ./
+COPY advogados.html advogados.js advogados.css ./
 COPY plans.html plans.css plans.js ./
-COPY ir-exemption.css ir-exemption.js ./
+COPY ir-exemption.css ir-exemption.js audita-chat-motion.js pis-pasep.js pis-pasep-panel.js ./
 COPY bank-debt.css bank-debt.js ./
 COPY super-admin.html super-admin.css super-admin.js ./
 COPY assets ./assets

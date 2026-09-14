@@ -15,7 +15,8 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
     window: { addEventListener() {} },
     Intl, URL, URLSearchParams,
   });
-  vm.runInContext(await readFile(new URL('../ir-exemption.js', import.meta.url), 'utf8'), context);
+  vm.runInContext((await readFile(new URL('../audita-chat-motion.js', import.meta.url), 'utf8')).replace('export function','function'), context);
+  vm.runInContext((await readFile(new URL('../ir-exemption.js', import.meta.url), 'utf8')).replace(/^import .*;\n/,''), context);
   vm.runInContext(`
     state.config = { statuses: { triage: 'Triagem' } };
     const role = { key:'role', type:'choice', title:'Para quem?', options:[{ value:'self', label:'Para mim' }] };
@@ -36,11 +37,14 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
   assert.ok(next.indexOf('Como você se chama?') < next.indexOf('Você tem laudo?'));
   assert.ok(next.includes('&lt;script&gt;test&lt;/script&gt;'));
   assert.ok(next.includes('Voltar à pergunta: Contato'));
+  assert.ok(!next.includes('Iniciar nova análise'));
   assert.ok(!next.includes('ir-tabs'));
   assert.ok(!next.includes('etapas concluídas'));
   for(const action of ['documents','proposals','timeline']) assert.ok(!next.includes(`data-tab="${action}"`));
   vm.runInContext('state.case.question=null; render();',context);
   const completed=element('#app').innerHTML;
+  assert.ok(completed.includes('data-action="start"'));
+  assert.ok(completed.includes('Iniciar nova análise'));
   assert.ok(completed.includes('data-tab="documents"'));
   assert.ok(!completed.includes('data-tab="proposals"'));
   vm.runInContext('state.case.analysis={}; state.case.proposals=[{state:"published"}]; render();',context);
@@ -48,6 +52,20 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
   assert.ok(reviewed.includes('data-tab="proposals"'));
   assert.ok(reviewed.includes('data-tab="timeline"'));
 
+
+  vm.runInContext("state.editing='role'; render();",context);
+  assert.ok(!element('#app').innerHTML.includes('Iniciar nova análise'));
+  vm.runInContext('state.editing=null; state.case.permissions.owner=false; render();',context);
+  assert.ok(!element('#app').innerHTML.includes('Iniciar nova análise'));
+  const page=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  assert.ok(!page.includes('id="newCase"'));
+  assert.ok(!page.includes('id="pisNewCase"'));
+  assert.ok(!page.includes('id="caseList"'));
+  assert.ok(!page.includes('Seus atendimentos de IR'));
+  const irSource=await readFile(new URL('../ir-exemption.js',import.meta.url),'utf8');
+  assert.ok(!irSource.includes("$('#caseList')"));
+  assert.ok(irSource.includes("get('case')"));
+  assert.ok(!page.includes('id="pisCaseList"'));
 
   // Check the Itaú order: user reply -> 900 ms -> typing -> 1500 ms -> question.
   let finishTimer, delay, scrollOptions;
@@ -84,4 +102,22 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
   finishTimer();
   await reduced;
   assert.deepEqual(children,[reply,question]);
+});
+
+test('Itaú follows new messages on desktop and mobile only while active', async () => {
+  const source=await readFile(new URL('../charge-analysis.js',import.meta.url),'utf8');
+  const start=source.indexOf('  function scrollLatestMessage(container) {');
+  const end=source.indexOf('  async function revealTriageMessages',start);
+  let options;
+  const context=vm.createContext({window:{requestAnimationFrame:fn=>fn()},document:{body:{dataset:{activePage:'analise-cobrancas'}}},prefersReducedMotion:false,container:{lastElementChild:{scrollIntoView:value=>{options=value;}}}});
+  vm.runInContext(source.slice(start,end)+'\nscrollLatestMessage(container);',context);
+  assert.equal(options.block,'end');
+  assert.equal(options.behavior,'smooth');
+  context.prefersReducedMotion=true;
+  vm.runInContext('scrollLatestMessage(container)',context);
+  assert.equal(options.behavior,'auto');
+  options=null;
+  context.document.body.dataset.activePage='home';
+  vm.runInContext('scrollLatestMessage(container)',context);
+  assert.equal(options,null);
 });

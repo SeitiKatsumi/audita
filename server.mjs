@@ -1,3 +1,9 @@
+import {refreshReferences} from './services/energy-audit-references.mjs';
+import {createEnergyService} from "./services/energy-audit.service.mjs";
+import {createEnergyHandler} from "./services/energy-audit-api.mjs";
+import {createEnergyExtractor} from "./services/energy-audit-ai.mjs";
+import {createPisPasepService} from './services/pis-pasep.service.mjs';
+import {createPisPasepHandler} from './services/pis-pasep-api.mjs';
 import { createLawyerQueueService, requireLawyer } from "./services/lawyer-queue.service.mjs";
 import { createIrExemptionService } from "./services/ir-exemption.service.mjs";
 import { createBankDebtService } from "./services/bank-debt.service.mjs";
@@ -532,7 +538,9 @@ async function initializeDatabase() {
       const schema = await readFile(join(root, "db", "schema.sql"), "utf8");
       await pool.query(schema);
       await pool.query(await readFile(join(root, "db", "ir-exemption.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "pis-pasep.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "bank-debt.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "energy-audit.sql"), "utf8"));
     }
 
     await pool.query("SELECT 1");
@@ -1678,6 +1686,10 @@ const irExemptionHandler = createIrExemptionHandler({
   service: irExemptionService, getAuth: getTenantIdForRequest,
   readJson: readJsonBody, readBuffer: readBufferBody, sendJson,
 });
+const energyService=createEnergyService({getDb:()=>({pool,dbReady}),extractor:createEnergyExtractor({recordUsage:async(usage,auth)=>{if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'energy_extraction',...usage});}})});
+const energyHandler=createEnergyHandler({service:energyService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
+const pisPasepService=createPisPasepService({getDb:()=>({pool,dbReady})});
+const pisPasepHandler=createPisPasepHandler({service:pisPasepService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
 const directusLawyerKitService = createDirectusLawyerKitService();
 const billingAdminService = createBillingAdminService({
   getDb: () => ({ pool, dbReady }),
@@ -5992,6 +6004,8 @@ const chatBrowserWss = new WebSocketServer({ noServer: true });
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host}`);
   if (await irExemptionHandler(request, response, url)) return;
+  if (await pisPasepHandler(request, response, url)) return;
+  if (await energyHandler(request, response, url)) return;
   if (await bankDebtHandler(request, response, url)) return;
   if (await handleApi(request, response, url.pathname)) {
     return;
@@ -6009,9 +6023,9 @@ const server = http.createServer(async (request, response) => {
 
   const requestedPath = uiRoute.path;
   // Keep private storage, configuration and server implementation outside the static surface.
-  const publicRootFiles = new Set(["index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
-    "advogados.html", "advogados.js", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
-    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "bank-debt.js", "bank-debt.css"]);
+  const publicRootFiles = new Set(["energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
+    "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
+    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");
   if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;
@@ -6128,6 +6142,13 @@ const irJobTimer = setInterval(async () => {
 }, 60000);
 irJobTimer.unref();
 server.on("close", () => clearInterval(irJobTimer));
+let energyRunning=false;
+const energyTimer=setInterval(async()=>{if(energyRunning||process.env.AUDITA_ENERGY_ENABLED!=='true')return;energyRunning=true;try{await energyService.runJobs();}catch{console.error('[audita] energy scheduler unavailable');}finally{energyRunning=false;}},5000);
+energyTimer.unref();server.on('close',()=>clearInterval(energyTimer));
 server.listen(port, host, () => {
   console.log(`Audita web app running at http://${host}:${port}/`);
 });
+
+let energyReferencesRunning=false;
+const energyReferencesTimer=setInterval(async()=>{if(energyReferencesRunning||!dbReady||process.env.AUDITA_ENERGY_ENABLED!=='true')return;energyReferencesRunning=true;try{await refreshReferences(pool);}catch{console.error('[audita] energy references unavailable');}finally{energyReferencesRunning=false;}},60000);
+energyReferencesTimer.unref();server.on('close',()=>clearInterval(energyReferencesTimer));

@@ -35,9 +35,9 @@ test("charge analysis module is available from the dashboard sidebar", () => {
   assert.match(appJs, /"analise-cobrancas":\s*\{/);
 });
 
-test("sidebar keeps charge analysis at the main level and uses the selected adaptive navigation", () => {
+test("sidebar groups service modules and preserves adaptive navigation", () => {
   const chargeMainLink = indexHtml.match(
-    /<a href="#analise-cobrancas">[\s\S]*?An&aacute;lise de cobran&ccedil;as indevidas[\s\S]*?<\/a>/,
+    /<a href="#central-servicos"[\s\S]*?Central de Serviços[\s\S]*?<\/a>/,
   )?.[0];
   const settingsGroup = indexHtml.match(
     /<details class="nav-group" open>\s*<summary>[\s\S]*?Configura&ccedil;&otilde;es[\s\S]*?<\/summary>[\s\S]*?<\/details>/,
@@ -48,7 +48,7 @@ test("sidebar keeps charge analysis at the main level and uses the selected adap
   const developmentGroup = indexHtml.slice(developmentStart, developmentEnd + "</details>".length);
 
   assert.ok(chargeMainLink);
-  assert.match(chargeMainLink, /assets\/nav-icons\/file-dollar\.svg/);
+  assert.match(chargeMainLink, /assets\/nav-icons\/tool\.svg/);
   assert.ok(settingsGroup);
   assert.match(settingsGroup, /\sopen(?:\s|>)/);
   assert.match(settingsGroup, /#historico/);
@@ -61,7 +61,7 @@ test("sidebar keeps charge analysis at the main level and uses the selected adap
   assert.match(developmentGroup, /#consulta-tjdft-pf/);
   assert.match(developmentGroup, /#consulta-imoveis/);
   assert.match(developmentGroup, /#consulta-cnib/);
-  assert.ok(indexHtml.indexOf(settingsGroup) > indexHtml.indexOf("#analise-vendedor"));
+  assert.ok(indexHtml.indexOf(settingsGroup) > indexHtml.indexOf("#central-servicos"));
   assert.ok(indexHtml.indexOf(developmentGroup) > indexHtml.indexOf(settingsGroup));
   assert.match(indexHtml, /id="sidebarToggleIcon"[\s\S]*?assets\/nav-icons\/chevron-left\.svg/);
   assert.match(indexHtml, /id="sidebarScrim"/);
@@ -722,7 +722,7 @@ test("app hides the one-page shell until the initial route is ready", () => {
     appJs.lastIndexOf("finishAppBoot();") >
       appJs.lastIndexOf("const authState = await loadAuthState();"),
   );
-  assert.match(indexHtml, /styles\.css\?v=20260827-procuracao-1/);
+  assert.match(indexHtml, /styles\.css\?v=[\w-]+/);
   assert.match(indexHtml, /charge-analysis\.js\?v=20260828-legal-documents-1/);
   assert.match(indexHtml, /app\.js\?v=20260828-legal-documents-1/);
 });
