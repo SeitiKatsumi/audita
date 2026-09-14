@@ -1,3 +1,4 @@
+import {estimateText} from './bank-debt-estimate.mjs';
 import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
 import {createHash} from 'node:crypto';
 import {debtLegalTexts,debtMoney} from './bank-debt-domain.mjs';
@@ -29,6 +30,7 @@ export async function debtDocuments(p,id) {
     `AUTOR: ${c.fullName}, CPF ${c.document}, ${c.nationality}, ${c.maritalStatus}, ${c.profession}, ${c.street}, ${c.number}, ${c.complement}, ${c.neighborhood}, ${c.city}/${c.uf}, CEP ${c.postalCode}, ${c.email}, telefone ${c.phone}.\nADVOGADO: ${r.lawyerName}, OAB ${r.lawyerOab}.\nRÉU: ${r.creditorLegalName}, CNPJ ${r.creditorDocument}, ${r.creditorAddress}.`,
     `I — DOS FATOS\nO autor relata dívida em aberto desde ${d.since}, com principal informado de ${debtMoney(d.originalCents)} e cobrança atual de ${debtMoney(d.chargedCents)}. Relata recebimento de notificações e questiona os encargos.\nRelato: ${d.description||'Conforme documentos anexos.'}\nProposta pessoal de pagamento: ${debtMoney(d.offeredCents)}. Essa proposta não constitui o resultado técnico.`,
     `II — DA ANÁLISE FINANCEIRA\nValor recalculado submetido à revisão: ${debtMoney(r.reviewedCents)}. Diferença em discussão: ${debtMoney(d.chargedCents-r.reviewedCents)}.\nMemória e metodologia:\n${r.methodology}`,
+    ...(p.estimate?[`ESTIMATIVA COMPARATIVA PRELIMINAR — a análise validada acima prevalece.\n${estimateText(p.estimate)}`]:[]),
     `III — DOS FUNDAMENTOS\n${r.legalBasis}`,
     'IV — DOS PEDIDOS\nRequer-se a citação da parte ré; a apresentação do contrato e demonstrativo de evolução da dívida; a revisão dos encargos especificamente impugnados na fundamentação; a apuração do saldo conforme a memória de cálculo; e a produção das provas documentais e técnicas cabíveis. Eventual consignação, depósito, tutela de urgência e pedidos acessórios dependem da definição da via e revisão expressa do advogado, sem declaração de depósito já realizado.',
     `V — VALOR DA CAUSA\nBenefício econômico controvertido indicado: ${debtMoney(d.chargedCents-r.reviewedCents)}, sujeito à adequação pelo advogado à cumulação de pedidos e à via processual escolhida.\nO autor tem interesse na tentativa de conciliação, conforme confirmação na coleta cadastral.`,

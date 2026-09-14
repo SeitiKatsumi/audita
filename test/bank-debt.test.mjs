@@ -18,7 +18,8 @@ test('dívida: validações e fluxo persistente de análise, pagamento, assinatu
     await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,role,password_hash) VALUES (101,1,'cliente@example.test','Cliente','member','test'),(102,1,'admin@example.test','Admin','super_admin','test'),(104,1,'adv@example.test','Advogado','lawyer','test')");
     const pool={query:(...a)=>pg.query(...a),connect:async()=>({query:(...a)=>pg.query(...a),release(){}})},getDb=()=>({pool,dbReady:true});
     let calls=0;const checkout=async(auth,p)=>{calls++;return {id:'cs_test_debt',url:'https://checkout.stripe.com/test',expiresAt:Math.floor(Date.now()/1000)+1800}};
-    let service=createBankDebtService({getDb,checkout}),c=await service.create(owner);
+    const rateProvider=async()=>({code:25463,month:'2025-01',monthlyPercent:2,url:'https://api.bcb.gov.br/test',retrievedAt:'2025-04-01T00:00:00Z',label:'Teste'});
+    let service=createBankDebtService({getDb,checkout,rateProvider}),c=await service.create(owner);
     const action=async(type,extra={},auth=owner)=>{c=await service.command(auth,c.id,{revision:c.revision,action:type,...extra},{ip:'127.0.0.1',userAgent:'Automated local test'});return c};
     await assert.rejects(service.get(stranger,c.id),{status:404});
     await assert.rejects(service.createCheckout(owner,c.id,{}),{status:409});
@@ -29,6 +30,12 @@ test('dívida: validações e fluxo persistente de análise, pagamento, assinatu
     assert.throws(()=>debtParse(debtDetails,{...details,originalCents:-1}));
     assert.throws(()=>debtParse(debtClaimant,{...claimant,document:'11111111111'}));
     await action('details',{details});assert.equal(c.status,'calculation_pending');assert.equal(c.review,null);
+    const scenario={modality:'overdraft',contractDate:'2025-01-01',baseDate:'2025-03-01',asOf:'2025-03-31',baseCents:1000000,contractMonthlyRate:5,capitalization:'simple',payments:[],confirmed:true};
+    await action('estimate',{scenario});assert.equal(c.status,'calculation_pending');assert.equal(c.estimate.revised.balanceCents,1020000);assert.equal(c.review,null);assert.match(c.estimateText,/ESTIMATIVA/);
+    await assert.rejects(service.createCheckout(owner,c.id,{}),{status:409});
+    await assert.rejects(action('estimate',{scenario},stranger),{status:404});
+    await action('details',{details});assert.equal(c.estimate,null);
+    await action('estimate',{scenario});
     await assert.rejects(action('review',{review}),{status:403});
     await assert.rejects(action('review',{review},admin),{status:422});
     const pdf=await PDFDocument.create();pdf.addPage();const bytes=Buffer.from(await pdf.save());

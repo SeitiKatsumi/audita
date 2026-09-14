@@ -107,3 +107,18 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 ### Publicação consolidada — 2026-09-14
 - Usuário autorizou commit e push da main. Inclui Central, contas de luz, Área dos Advogados no shell original, edição de usuários/senhas do superadmin, ajustes de chat e porta 3000.
 - Fetch confirmou ausência de commits remotos pendentes; 372 testes passaram, nenhum ignorado, e git diff --check passou. Configuração privada, credenciais e documentos excluídos. Publicado na main pelo conector GitHub: `545a2c9`, confirmado por fetch e comparação integral sem diferenças. Histórico local anterior preservado em `codex/local-before-publication-20260914`; main local alinhada ao remoto. Deploy não executado nesta tarefa.
+
+### 2026-09-14 — Remover relato opcional de dívidas
+- Codex, branch codex/remover-relato-divida, base main atualizada a pedido do usuário. Escopo: bank-debt.js e documentação. Retirar o campo de relato, preservar dados anteriores; validação em andamento.
+- Concluído na main local/porta 3000: campo removido; relatos anteriores preservados ao salvar. Teste do fluxo bancário, sintaxe e arquivo servido conferidos. Sem commit/push/deploy. Substituição anterior do texto sobre a proposta ainda aguarda definição do trecho.
+
+### 2026-09-14 — Máscara monetária de dívidas
+- Codex, codex/remover-relato-divida, continuação dos ajustes solicitados. Escopo: bank-debt.js e teste de moeda. Formatação BRL nos valores, preservando centavos e limites do servidor.
+- Concluído na main local/porta 3000: máscara R$ com milhares e centavos em valores da dívida e revisão. Envio em centavos, limites mínimo/máximo e dados anteriores preservados. Dois testes passaram; sintaxe, diff e correspondência do arquivo servido conferidos. Sem commit/push/deploy.
+
+### 2026-09-14 — Estimativa bancária com BACEN
+- Codex, codex/estimativa-bacen, base main atualizada pelo usuário. Escopo: cálculo, serviço bancário, interface, PDF e testes. Taxa oficial mensal, evolução do saldo e pagamentos, premissas explícitas; revisão continua obrigatória. Em andamento.
+- Integrado à main local; servidor reiniciado na porta 3000. Cinco testes do módulo passaram; suíte geral 374/376, com duas falhas preexistentes nos testes de IR/PIS (imports no VM), reproduzidas com arquivos inalterados. Navegador com API de atendimento simulada e taxa BACEN real validou formulário, máscara, pagamentos e resultado em desktop/celular; PDF de memória renderizado e conferido. PostgreSQL isolado validou persistência, invalidação e bloqueio de checkout sem revisão. Na porta 3000, interface servida e health ok, mas configuração local não tem banco pronto (ready=false); fluxo autenticado com persistência não validado nesse servidor. Sem commit/push/deploy.
+
+### 2026-09-14 — Publicação da estimativa BACEN
+- Codex. Publicação autorizada dos ajustes de dívidas: remoção de relato, máscara BRL e estimativa BACEN. Main remota conferida em 7e96a25; preservar coletores locais e arquivos privados. Vinte testes pertinentes passaram, um teste opcional de fila será executado com PGlite. Duas falhas de testes legados IR/PIS já documentadas não envolvem os arquivos alterados. Publicação em andamento.
