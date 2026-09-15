@@ -185,3 +185,24 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 - Publicação autorizada em 15/09: envio das melhorias consolidadas ao GitHub/main e CapRover audita. Suíte geral com 380 aprovações e teste opcional da fila executado separadamente com PostgreSQL embarcado. Sem alteração de esquema ou configuração privada; rollback pela imagem anterior 109. Backup recente registrado em 14/09. Implantação em andamento.
 - Publicado e verificado: código 3698f7e no GitHub/main; CI 35017745449 concluído com sucesso. CapRover concluiu o build; produção responde com o SHA completo desse commit, banco configured/ready=true, smoke aprovado, API de casos protegida (401) e bank-debt.js idêntico ao publicado. Navegador confirmou o novo texto e o botão Enviar extratos e analisar. Os 381 testes foram cobertos somando suíte geral e execução do teste opcional. Checkout persistente autenticado não foi repetido em produção nesta publicação; jornada validada anteriormente em ambiente isolado. Configuração e dados preservados.
+
+### 2026-09-15 — Texto de início da perícia
+- Codex, codex/debt-report-copy, base main. Escopo: substituir a orientação de cobrança recente em bank-debt.js pelo texto solicitado para perícia e emissão de relatório. Ajuste textual local em andamento.
+- Concluído: texto substituído conforme solicitado, sem mudar cálculo ou regras de contratação. Sintaxe e diff verificados; integrado à main local e arquivo servido na porta 3000 conferido. Sem commit/push/deploy nesta alteração.
+
+### 2026-09-15 — Central de Serviços em ordem alfabética
+- Codex, codex/catalog-alphabetical, base main. Escopo: index.html e services-catalog.js; ordenar cards e incluir dois laudos em desenvolvimento. Preservar ajuste local de bank-debt.js. Em andamento.
+- Concluído localmente: nove cards ordenados alfabeticamente; laudos de análise de exames e atualização de processos judiciais exibidos como Em desenvolvimento, sem link de contratação. Filtro Laudos e contador de resultados incluídos. Três testes existentes passaram; ordem, quantidade e status conferidos no HTML servido em localhost:3000. Diff sem erros. Sem commit/push/deploy; ajuste anterior de bank-debt.js preservado.
+
+### 2026-09-15 — Indicador de análise em andamento
+- Codex, codex/debt-loading, base main com texto local preservado. Escopo: bank-debt.js, bank-debt.css e teste de apresentação. Reutilizar loading do Itaú apenas durante análise, respeitando redução de movimento.
+- Concluído: indicador circular do Itaú exibido enquanto analysisPending estiver ativo e removido no resultado; sem porcentagem simulada. Animação desativada com prefers-reduced-motion. Teste de apresentação passou e assets na porta 3000 conferidos. Integrado à main local, preservando catálogo e texto anteriores. Sem commit/push/deploy.
+
+### 2026-09-15 — Conciliação dos extratos e revisão assistida
+- Codex, codex/debt-review-fallback, base main com texto/loading locais preservados. Escopo: análise e serviço de dívidas, bank-debt.js e testes; conciliar continuidade comprovável entre documentos e disponibilizar solicitação de revisão antes da contratação. Sem mudança de esquema. Em andamento.
+- Implementado: conciliação de fronteira com evidência e auditoria, identificação do valor divergente e revisão assistida persistente priorizada na lista da equipe. Cliente avança sem anexo novo; equipe preserva extração ao conferir dados e publica revisão para liberar contratação. Complementos opcionais, consulta automática e loading preservados.
+- Validação: dez testes de dívidas passaram, incluindo isolamento, idempotência, bloqueio de cobrança antes da revisão e revisão seguida de checkout fictício. Reexecução local das extrações reais conciliou o saldo entre documentos, manteve juros/mora e não inventou redução. Interface isolada confirmou avanço sem novo anexo e solicitação persistida. Integração na main local, preservando catálogo e texto anteriores; sem commit/push/deploy.
+- Porta 3000 reiniciada com o código integrado e saúde OK; bank-debt.js servido confere com o arquivo local. Banco local permanece sem configuração, portanto a persistência e o avanço completo foram validados em PostgreSQL isolado, não em atendimentos reais locais ou de produção.
+
+### 2026-09-15 — Publicação consolidada de catálogo e revisão
+- Codex; publicação de todas as alterações funcionais pendentes autorizada pelo usuário. Inclui cards alfabéticos e dois laudos em desenvolvimento, texto de perícia, loading, conciliação e revisão assistida. 382 testes aprovados, nenhum ignorado. Sem migração ou mudança de configuração privada. Rollback para código 3698f7e; backup recente registrado em 14/09. Push e deploy em andamento.

@@ -15,13 +15,24 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {PDFDocument} from 'pdf-lib';
 import {createBankDebtService} from '../services/bank-debt.service.mjs';
+
+test('concilia saldo comprovado entre extratos sem inventar principal nem ignorar outras divergências',async()=>{
+ const next={...structuredClone(data),opening:{date:'2024-01-31',balanceCents:0,evidence:'0,00-'},entries:[{...data.entries[0],date:'2024-02-29',balanceCents:-140000}],closing:{date:'2024-02-29',balanceCents:-140000,evidence:'Saldo final'},issues:['Página 1, linha 3: os movimentos não fecham com o saldo impresso.'],checkpoints:[{page:1,line:3,expectedCents:-20000,printedCents:-140000}]};
+ const run=d=>analyzeStatements([{id:'first',data},{id:'next',data:d}],{rateProvider});
+ const result=await run(next);assert.ok(result.range);assert.equal(result.reconciliations.length,1);assert.equal(result.reconciliations[0].openingBalanceCents,-120000);assert.equal(next.opening.balanceCents,0);
+ for(const mutate of [d=>d.accountKey='other',d=>d.opening.date='2024-01-30',d=>d.entries[0].balanceCents=-1400010,d=>d.closing.balanceCents=-150000]){const changed=structuredClone(next);mutate(changed);const r=await run(changed);assert.equal(r.reconciliations.length,0);assert.equal(r.range,null);}
+ const unreadable=structuredClone(next);unreadable.issues.push('Taxa ilegível');assert.equal((await run(unreadable)).range,null);
+ const missingStart=structuredClone(data);missingStart.opening.balanceCents=0;const gap=await analyzeStatements([{id:'first',data:missingStart}],{rateProvider});assert.equal(gap.range,null);assert.equal(gap.issues.find(i=>i.differenceCents)?.differenceCents,100000);
+ const investment=structuredClone(data);investment.entries.unshift({date:'2024-01-05',page:1,description:'RESGATE INV FAC',amountCents:1000,kind:'transfer',ratePercent:null,balanceCents:-99000});investment.entries[1].balanceCents=-119000;investment.closing.balanceCents=-119000;assert.ok((await analyzeStatements([{id:'investment',data:investment}],{rateProvider})).range);
+ investment.entries[0].description='ENC LIM CREDITO';assert.equal((await analyzeStatements([{id:'ambiguous',data:investment}],{rateProvider})).range,null);
+});
 test('documentos até contratação e negociação: autenticação, revisão e webhook',async()=>{
  const pg=new PGlite();try{
  await pg.exec((await readFile(new URL('../db/schema.sql',import.meta.url),'utf8')).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;',''));await pg.exec(await readFile(new URL('../db/bank-debt.sql',import.meta.url),'utf8'));
  await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,role,password_hash) VALUES(801,1,'example@example.test','Teste','member','test')");
  const auth={tenantId:1,user:{id:801}},pool={query:(...a)=>pg.query(...a),connect:async()=>({query:(...a)=>pg.query(...a),release(){}})};
- let calls=0,release,started;const hold=new Promise(r=>release=r),reading=new Promise(r=>started=r);
- const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async()=>{calls++;started();await hold;return data;},rateProvider,checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
+ let calls=0,release,started,extracted=data;const hold=new Promise(r=>release=r),reading=new Promise(r=>started=r);
+ const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async()=>{calls++;started();await hold;return extracted;},rateProvider,checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
  let c=await service.create(auth);const doc=await PDFDocument.create();doc.addPage();const bytes=Buffer.from(await doc.save());
  c=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio.pdf'});assert.equal(c.status,'calculation_pending');
  const duplicate=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio (1).pdf'});assert.equal(duplicate.documents.length,1);assert.equal(duplicate.revision,c.revision);
@@ -40,5 +51,18 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  await assert.rejects(service.download({tenantId:2,user:{id:802}},c.id,'negotiation'),{status:404});
  c=await service.command(auth,c.id,{action:'judicial',revision:c.revision});assert.equal(c.judicialRequested,true);assert.equal(c.job,null);
  c=await service.upload(auth,c.id,{bytes,kind:'identity',name:'identificacao-ficticia.pdf'});assert.equal(c.documents.length,2);
+ extracted={...structuredClone(data),issues:['Conferir saldo anterior']};let pending=await service.create(auth);
+ pending=await service.upload(auth,pending.id,{bytes,kind:'evidence',name:'pendente.pdf'});
+ await assert.rejects(service.command(auth,pending.id,{action:'request-review',revision:pending.revision}),{status:409});
+ pending=await service.command(auth,pending.id,{action:'analyze',consent:true,revision:pending.revision});
+ await assert.rejects(service.command({tenantId:2,user:{id:802}},pending.id,{action:'request-review',revision:pending.revision}),{status:404});
+ pending=await service.command(auth,pending.id,{action:'request-review',revision:pending.revision});assert.ok(pending.manualReview);assert.equal(pending.docOffer,null);
+ const again=await service.command(auth,pending.id,{action:'request-review',revision:pending.revision});assert.equal(again.revision,pending.revision);
+ const admin={tenantId:1,user:{id:801,role:'super_admin'}};const queue=await service.list(admin);assert.equal(queue[0].id,pending.id);assert.ok(queue[0].manual_review_requested);
+ await assert.rejects(service.createCheckout(auth,pending.id,{accepted:true}),{status:409});
+ pending=await service.command(admin,pending.id,{action:'details',revision:pending.revision,details:{creditor:'Banco Teste',kind:'overdraft',since:'2024-01-01',originalCents:100000,chargedCents:120000,description:"",consent:true}});assert.ok(pending.analysis);assert.ok(pending.manualReview);
+ await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,role,password_hash) VALUES(803,1,'lawyer@example.test','Advogado Teste','lawyer','test')");
+ pending=await service.command(admin,pending.id,{action:'review',revision:pending.revision,review:{reviewedCents:105000,priceCents:19900,methodology:'Conferência manual fictícia do saldo e encargos para teste.',legalBasis:'Fundamentação fictícia registrada apenas para validar o fluxo técnico.',creditorLegalName:'Banco Teste',creditorDocument:'00000000000000',creditorAddress:'Endereço de teste',lawyerUserId:803,lawyerName:'Advogado Teste',lawyerOab:'SP 000000',confirmed:true}});assert.equal(pending.status,'offer');assert.ok(pending.review);assert.ok(pending.analysis);
+ await service.createCheckout(auth,pending.id,{accepted:true,reviewId:pending.review.id});
  }finally{await pg.close();}
 });

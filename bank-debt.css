@@ -27,3 +27,6 @@
 #debtCases .selected{border-color:var(--lime)}#debtCases small{color:#a8bfd0}
 .debt-success{color:var(--lime);margin:20px 0!important}
 @media(max-width:600px){.debt-summary{grid-template-columns:1fr}.debt-history{margin-left:0}.debt-plan{padding:14px}}
+
+.debt-analysis-loader{margin-top:16px}
+@media(prefers-reduced-motion:reduce){.debt-analysis-loader{animation:none}}

@@ -18,7 +18,7 @@ export function initServicesCatalog(root = document.querySelector('#central-serv
       if (!card.hidden) count++;
     }
     buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.serviceCategory === category)));
-    root.querySelector('[data-service-count]').textContent = `${count} ${count === 1 ? 'serviço disponível' : 'serviços disponíveis'}`;
+    root.querySelector('[data-service-count]').textContent = `${count} ${count === 1 ? 'serviço encontrado' : 'serviços encontrados'}`;
     root.querySelector('[data-service-empty]').hidden = count !== 0;
   }
   input.addEventListener('input', render);

@@ -17,7 +17,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
   async function save(c,r,auth,kind){await c.query('UPDATE audita_debt_cases SET payload=$2,status=$3,revision=revision+1,updated_at=NOW() WHERE id=$1',[r.id,r.payload,r.status]);await c.query('INSERT INTO audita_debt_events(id,case_id,actor_id,kind) VALUES($1,$2,$3,$4)',[randomUUID(),r.id,auth?.user?.id||null,kind]);r.revision++;}
   const uniqueDocuments=documents=>{const seen=new Set();return documents.filter(d=>{const key=d.kind+':'+d.sha256;if(seen.has(key))return false;seen.add(key);return true;});};
   async function view(c,r,auth){const documents=uniqueDocuments((await c.query('SELECT id,kind,name,mime,sha256,octet_length(bytes) AS size FROM audita_debt_documents WHERE case_id=$1 ORDER BY created_at,id',[r.id])).rows);let job=null;if(r.payload.jobId)job=(await c.query('SELECT id,status,protocol_number,filed_at FROM audita_lawyer_jobs WHERE id=$1',[r.payload.jobId])).rows[0];const {checkout:paymentSession,...payload}=r.payload;return {id:r.id,revision:r.revision,status:r.status,...payload,documents,job,estimateText:payload.estimate?estimateText(payload.estimate):null,operator:operator(auth),owner:String(r.user_id)===String(auth.user.id)&&String(r.tenant_id)===String(auth.tenantId),terms:DEBT_TERMS,version:DEBT_VERSION,legalTexts:payload.claimant&&payload.review?debtLegalTexts(payload):null};}
-  async function list(auth){signed(auth);return (await db().query(`SELECT id,status,updated_at,payload->'answers' AS answers,payload->'details'->>'creditor' AS creditor FROM audita_debt_cases ${operator(auth)?'':'WHERE tenant_id=$1 AND user_id=$2'} ORDER BY updated_at DESC LIMIT 100`,operator(auth)?[]:[auth.tenantId,auth.user.id])).rows.map(({answers,...r})=>({...r,status:debtTriageStatus(r.status,answers)}));}
+  async function list(auth){signed(auth);return (await db().query(`SELECT id,status,updated_at,payload->'answers' AS answers,coalesce(payload->'details'->>'creditor',payload->'analysis'->>'bank') AS creditor,payload->'manualReview'->>'requestedAt' AS manual_review_requested FROM audita_debt_cases ${operator(auth)?'':'WHERE tenant_id=$1 AND user_id=$2'} ORDER BY (status='calculation_pending' AND payload->'manualReview'->>'requestedAt' IS NOT NULL) DESC,updated_at DESC LIMIT 100`,operator(auth)?[]:[auth.tenantId,auth.user.id])).rows.map(({answers,...r})=>({...r,status:debtTriageStatus(r.status,answers)}));}
   async function create(auth){signed(auth);const r=(await db().query('INSERT INTO audita_debt_cases(id,tenant_id,user_id,payload) VALUES($1,$2,$3,$4) RETURNING *',[randomUUID(),auth.tenantId,auth.user.id,{answers:{}}])).rows[0];return view(db(),r,auth);}
   async function get(auth,id){return view(db(),await access(db(),auth,id),auth);}
   async function startAnalysis(auth,id,input){
@@ -56,6 +56,11 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     if(action==='analyze'){
       owner(r,auth);p.analysisPending=null;p.analysisError=null;p.analysis=analysis;p.review=null;p.docOffer=null;p.estimate=null;p.documentConsent={at:now().toISOString()};r.status='calculation_pending';
       if(analysis.range){const range=analysis.range,plan=debtPlan(range.chargedCents-range.maxCents);p.docOffer={id:randomUUID(),priceCents:plan.price.cents,planName:plan.name,range};r.status='offer';}
+     }else if(action==='request-review'){
+      owner(r,auth);debtRequire(r.status==='calculation_pending'&&!p.analysisPending&&(p.analysis||p.analysisError),'Aguarde a leitura terminar antes de solicitar revisão.',409);
+      if(p.manualReview)return view(c,r,auth);
+      debtRequire((await c.query("SELECT id FROM audita_debt_documents WHERE case_id=$1 AND kind='evidence' LIMIT 1",[id])).rows.length,'Envie ao menos um documento da dívida antes de solicitar revisão.');
+      p.manualReview={requestedAt:now().toISOString(),by:auth.user.id};
     }else if(action==='judicial'){
       owner(r,auth);debtRequire(p.paid,'Confirme a contratação antes de solicitar o advogado.',409);p.judicialRequested=true;
     }else if(action==='answer'){
@@ -64,7 +69,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
       p.answers[q.key]=input.value;r.status=!input.value?'not_eligible':DEBT_QUESTIONS.every(x=>p.answers[x.key]===true)?'details':'triage';
     }else if(action==='details'){
       debtRequire(operator(auth)||String(r.user_id)===String(auth.user.id),'Acesso restrito.',403);debtRequire(['details','calculation_pending','offer','paid'].includes(r.status),'Não é possível alterar a dívida nesta etapa.',409);
-      const details=debtParse(debtDetails,input.details);if(details.offeredCents===undefined&&p.details?.offeredCents!==undefined)details.offeredCents=p.details.offeredCents;p.details=details;p.review=null;if(!p.paid){p.estimate=null;p.docOffer=null;p.analysis=null;r.status='calculation_pending';}
+      const details=debtParse(debtDetails,input.details);if(details.offeredCents===undefined&&p.details?.offeredCents!==undefined)details.offeredCents=p.details.offeredCents;p.details=details;p.review=null;if(!p.paid){p.estimate=null;p.docOffer=null;if(!p.manualReview)p.analysis=null;r.status='calculation_pending';}
     }else if(action==='estimate'){
       owner(r,auth);debtRequire(r.status==='calculation_pending','A revisão já foi publicada.',409);p.estimate=estimate;
     }else if(action==='review'){
