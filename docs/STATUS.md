@@ -172,3 +172,4 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 ### 2026-09-15 — Publicação da análise documental de dívidas
 - Codex; publicação de todo o trabalho consolidado autorizada pelo usuário. Suíte completa: 380 testes passaram, nenhum ignorado; corrigida compatibilidade CRLF dos testes IR/PIS. Inclui navegação/energia já na main. Sem migração nova de banco. Imagem anterior de produção 108, commit 52e7d3d; backup verificado documentado em 14/09. GitHub e implantação em andamento.
+- Publicado: GitHub/main 0a6ddda, CI 35011157217 concluído com sucesso; CapRover audita:109. Smoke passou com banco pronto, autenticação exigida e versão correta; bank-debt.js, app.js e energy-audit.js conferidos contra o commit. API de atendimentos sem sessão retorna 401. Porta 3000 reiniciada na mesma versão. Nenhuma cobrança ou protocolo real executado.
