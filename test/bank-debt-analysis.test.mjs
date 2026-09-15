@@ -20,11 +20,18 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  await pg.exec((await readFile(new URL('../db/schema.sql',import.meta.url),'utf8')).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;',''));await pg.exec(await readFile(new URL('../db/bank-debt.sql',import.meta.url),'utf8'));
  await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,role,password_hash) VALUES(801,1,'example@example.test','Teste','member','test')");
  const auth={tenantId:1,user:{id:801}},pool={query:(...a)=>pg.query(...a),connect:async()=>({query:(...a)=>pg.query(...a),release(){}})};
- const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async()=>data,rateProvider,checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
+ let calls=0,release,started;const hold=new Promise(r=>release=r),reading=new Promise(r=>started=r);
+ const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async()=>{calls++;started();await hold;return data;},rateProvider,checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
  let c=await service.create(auth);const doc=await PDFDocument.create();doc.addPage();const bytes=Buffer.from(await doc.save());
  c=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio.pdf'});assert.equal(c.status,'calculation_pending');
+ const duplicate=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio (1).pdf'});assert.equal(duplicate.documents.length,1);assert.equal(duplicate.revision,c.revision);
+ await pg.query("INSERT INTO audita_debt_documents(id,case_id,kind,name,mime,bytes,sha256) SELECT '00000000-0000-4000-8000-000000000001',case_id,kind,'copia-antiga.pdf',mime,bytes,sha256 FROM audita_debt_documents WHERE case_id=$1",[c.id]);
+ assert.equal((await service.get(auth,c.id)).documents.length,1);
  await assert.rejects(service.command(auth,c.id,{action:'analyze',revision:c.revision,consent:false}));
- c=await service.startAnalysis(auth,c.id,{action:'analyze',revision:c.revision,consent:true});assert.ok(c.analysisPending);for(let i=0;i<100&&c.analysisPending;i++){await new Promise(resolve=>setTimeout(resolve,10));c=await service.get(auth,c.id);}assert.equal(c.analysisPending,null);assert.equal(c.status,'offer');assert.equal(c.docOffer.priceCents,19900);assert.equal(c.review,null);
+ c=await service.startAnalysis(auth,c.id,{action:'analyze',revision:c.revision,consent:true});await reading;assert.ok(c.analysisPending);assert.ok(c.documentConsent);
+ const unchanged=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'novamente.pdf'});assert.equal(unchanged.revision,c.revision);assert.equal(unchanged.analysisPending,c.analysisPending);
+ await assert.rejects(service.upload(auth,c.id,{bytes:Buffer.concat([bytes,Buffer.from('\n')]),kind:'evidence',name:'outro.pdf'}),{status:409});
+ release();for(let i=0;i<100&&c.analysisPending;i++){await new Promise(resolve=>setTimeout(resolve,10));c=await service.get(auth,c.id);}assert.equal(c.analysisPending,null);assert.equal(c.status,'offer');assert.equal(c.docOffer.priceCents,19900);assert.equal(c.review,null);assert.equal(calls,1);assert.equal(c.analysis.documentHashes.length,1);
  await assert.rejects(service.download(auth,c.id,'negotiation'),{status:403});
  await service.createCheckout(auth,c.id,{accepted:true,reviewId:c.docOffer.id});
  const event={id:'evt_test_docs',type:'checkout.session.completed',data:{object:{id:'cs_test_docs',payment_status:'paid',currency:'brl',amount_total:19900,metadata:{debt_case_id:c.id,debt_review_id:c.docOffer.id,audita_user_id:'801',audita_tenant_id:'1'}}}};
@@ -32,5 +39,6 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  c=await service.get(auth,c.id);assert.equal(c.status,'paid');const report=await service.download(auth,c.id,'negotiation');assert.ok((await PDFDocument.load(report.bytes)).getPageCount()>0);
  await assert.rejects(service.download({tenantId:2,user:{id:802}},c.id,'negotiation'),{status:404});
  c=await service.command(auth,c.id,{action:'judicial',revision:c.revision});assert.equal(c.judicialRequested,true);assert.equal(c.job,null);
+ c=await service.upload(auth,c.id,{bytes,kind:'identity',name:'identificacao-ficticia.pdf'});assert.equal(c.documents.length,2);
  }finally{await pg.close();}
 });

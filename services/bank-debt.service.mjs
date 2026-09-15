@@ -15,7 +15,8 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
   async function access(c,auth,id,lock=false){signed(auth);debtRequire(/^[0-9a-f-]{36}$/i.test(id),'Atendimento não encontrado.',404);const r=(await c.query(`SELECT * FROM audita_debt_cases WHERE id=$1${lock?' FOR UPDATE':''}`,[id])).rows[0];debtRequire(r&&(operator(auth)||(String(r.tenant_id)===String(auth.tenantId)&&String(r.user_id)===String(auth.user.id))),'Atendimento não encontrado.',404);r.status=debtTriageStatus(r.status,r.payload.answers);return r;}
   const owner=(r,auth)=>debtRequire(String(r.user_id)===String(auth.user.id)&&String(r.tenant_id)===String(auth.tenantId),'Somente o solicitante pode confirmar esta etapa.',403);
   async function save(c,r,auth,kind){await c.query('UPDATE audita_debt_cases SET payload=$2,status=$3,revision=revision+1,updated_at=NOW() WHERE id=$1',[r.id,r.payload,r.status]);await c.query('INSERT INTO audita_debt_events(id,case_id,actor_id,kind) VALUES($1,$2,$3,$4)',[randomUUID(),r.id,auth?.user?.id||null,kind]);r.revision++;}
-  async function view(c,r,auth){const documents=(await c.query('SELECT id,kind,name,mime,sha256,octet_length(bytes) AS size FROM audita_debt_documents WHERE case_id=$1 ORDER BY created_at',[r.id])).rows;let job=null;if(r.payload.jobId)job=(await c.query('SELECT id,status,protocol_number,filed_at FROM audita_lawyer_jobs WHERE id=$1',[r.payload.jobId])).rows[0];const {checkout:paymentSession,...payload}=r.payload;return {id:r.id,revision:r.revision,status:r.status,...payload,documents,job,estimateText:payload.estimate?estimateText(payload.estimate):null,operator:operator(auth),owner:String(r.user_id)===String(auth.user.id)&&String(r.tenant_id)===String(auth.tenantId),terms:DEBT_TERMS,version:DEBT_VERSION,legalTexts:payload.claimant&&payload.review?debtLegalTexts(payload):null};}
+  const uniqueDocuments=documents=>{const seen=new Set();return documents.filter(d=>{const key=d.kind+':'+d.sha256;if(seen.has(key))return false;seen.add(key);return true;});};
+  async function view(c,r,auth){const documents=uniqueDocuments((await c.query('SELECT id,kind,name,mime,sha256,octet_length(bytes) AS size FROM audita_debt_documents WHERE case_id=$1 ORDER BY created_at,id',[r.id])).rows);let job=null;if(r.payload.jobId)job=(await c.query('SELECT id,status,protocol_number,filed_at FROM audita_lawyer_jobs WHERE id=$1',[r.payload.jobId])).rows[0];const {checkout:paymentSession,...payload}=r.payload;return {id:r.id,revision:r.revision,status:r.status,...payload,documents,job,estimateText:payload.estimate?estimateText(payload.estimate):null,operator:operator(auth),owner:String(r.user_id)===String(auth.user.id)&&String(r.tenant_id)===String(auth.tenantId),terms:DEBT_TERMS,version:DEBT_VERSION,legalTexts:payload.claimant&&payload.review?debtLegalTexts(payload):null};}
   async function list(auth){signed(auth);return (await db().query(`SELECT id,status,updated_at,payload->'answers' AS answers,payload->'details'->>'creditor' AS creditor FROM audita_debt_cases ${operator(auth)?'':'WHERE tenant_id=$1 AND user_id=$2'} ORDER BY updated_at DESC LIMIT 100`,operator(auth)?[]:[auth.tenantId,auth.user.id])).rows.map(({answers,...r})=>({...r,status:debtTriageStatus(r.status,answers)}));}
   async function create(auth){signed(auth);const r=(await db().query('INSERT INTO audita_debt_cases(id,tenant_id,user_id,payload) VALUES($1,$2,$3,$4) RETURNING *',[randomUUID(),auth.tenantId,auth.user.id,{answers:{}}])).rows[0];return view(db(),r,auth);}
   async function get(auth,id){return view(db(),await access(db(),auth,id),auth);}
@@ -24,7 +25,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
       debtRequire(input.consent===true,'Autorize a leitura dos documentos.');
       debtRequire(['triage','details','calculation_pending'].includes(r.status)&&r.revision===input.revision,'Atualize antes de analisar.',409);
       debtRequire(!analyzing.has(id)&&(!r.payload.analysisPending||Date.now()-Date.parse(r.payload.analysisPending)>15*60*1000),'A leitura já está em andamento.',409);
-      r.payload.analysisPending=new Date().toISOString();r.payload.analysisError=null;await save(c,r,auth,'analysis_started');return view(c,r,auth);});
+      r.payload.analysisPending=new Date().toISOString();r.payload.documentConsent={at:now().toISOString()};r.payload.analysisError=null;await save(c,r,auth,'analysis_started');return view(c,r,auth);});
     // Trabalho externo fora da transação; revisão otimista impede publicar sobre arquivos alterados.
     void command(auth,id,{...input,revision:snapshot.revision}).catch(async()=>{
       try{await tx(async c=>{const r=await access(c,auth,id,true);if(r.payload.analysisPending===snapshot.analysisPending){r.payload.analysisPending=null;r.payload.analysisError='Não foi possível concluir a leitura. Tente novamente ou envie arquivos menores.';await save(c,r,auth,'analysis_failed');}});}catch{}
@@ -38,7 +39,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
       debtRequire(['triage','details','calculation_pending'].includes(snapshot.status)&&snapshot.revision===input.revision,'Atualize antes de analisar.',409);
       debtRequire(input.consent===true,'Autorize a leitura dos documentos.');
       debtRequire(extractor,'Leitura por IA indisponível.',503);
-      const docs=(await db().query("SELECT id,mime,bytes,sha256 FROM audita_debt_documents WHERE case_id=$1 AND kind='evidence' ORDER BY created_at",[id])).rows;
+      const docs=uniqueDocuments((await db().query("SELECT id,kind,mime,bytes,sha256 FROM audita_debt_documents WHERE case_id=$1 AND kind='evidence' ORDER BY created_at,id",[id])).rows);
       debtRequire(docs.length,'Envie seus extratos primeiro.');
       debtRequire(!analyzing.has(id),'A análise deste atendimento já está em andamento.',409);analyzing.add(id);try{const parsed=[];for(const doc of docs)parsed.push({id:doc.id,data:await extractor({...doc,bytes:Buffer.from(doc.bytes)},auth)});analysis=await analyzeStatements(parsed,{rateProvider});}finally{analyzing.delete(id);}
       analysis.documentHashes=docs.map(d=>({id:d.id,sha256:d.sha256}));
@@ -85,7 +86,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     }else if(action==='submit'){
       owner(r,auth);if(r.status==='submitted')return view(c,r,auth);
       debtRequire(r.status==='signature'&&p.paid&&p.acceptance,'Confirme o pagamento e assine os documentos antes de enviar.',409);
-      const sources=(await c.query('SELECT * FROM audita_debt_documents WHERE case_id=$1',[id])).rows;
+      const sources=uniqueDocuments((await c.query('SELECT * FROM audita_debt_documents WHERE case_id=$1 ORDER BY created_at,id',[id])).rows);
       debtRequire(['identity','address','evidence'].every(kind=>sources.some(d=>d.kind===kind)),'Anexe identificação, comprovante de residência e documentos da cobrança.');
       const documents=await debtDocuments(p,id);
       const bundle=await PDFDocument.load(documents.report);
@@ -100,12 +101,15 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     }else debtRequire(false,'Ação inválida.',400);
     await save(c,r,auth,action);return view(c,r,auth);
   });}
-  function pInvalidate(r){r.payload.analysis=null;r.payload.docOffer=null;r.payload.estimate=null;r.payload.review=null;}
+  function pInvalidate(r){r.payload.analysis=null;r.payload.docOffer=null;r.payload.estimate=null;r.payload.review=null;r.payload.analysisPending=null;r.payload.analysisError=null;}
   async function upload(auth,id,{bytes,name,kind}){return tx(async c=>{
     const r=await access(c,auth,id,true);owner(r,auth);debtRequire(['triage','details','calculation_pending','paid','signature'].includes(r.status),'Anexos não podem ser alterados nesta etapa.',409);
     debtRequire(['identity','address','evidence'].includes(kind),'Tipo de documento inválido.');
     if(['triage','details','calculation_pending'].includes(r.status))debtRequire(kind==='evidence','Envie agora os documentos da dívida.');
     debtRequire(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=10*1024*1024,'Envie um arquivo de até 10 MB.');
+    const hash=debtHash(bytes);
+    if((await c.query('SELECT id FROM audita_debt_documents WHERE case_id=$1 AND kind=$2 AND sha256=$3',[id,kind,hash])).rows.length)return view(c,r,auth);
+    debtRequire(!analyzing.has(id)&&(!r.payload.analysisPending||Date.now()-Date.parse(r.payload.analysisPending)>15*60*1000),'Aguarde a análise terminar antes de enviar novos documentos.',409);
     let mime='';if(bytes.subarray(0,5).toString()==='%PDF-'){try{await PDFDocument.load(bytes);mime='application/pdf';}catch{debtRequire(false,'PDF inválido ou protegido.');}}
     else if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))mime='image/png';
     else if(bytes[0]===255&&bytes[1]===216&&bytes[2]===255)mime='image/jpeg';
@@ -114,7 +118,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     const count=(await c.query('SELECT count(*)::int AS total,coalesce(sum(octet_length(bytes)),0)::bigint AS size FROM audita_debt_documents WHERE case_id=$1',[id])).rows[0];
     debtRequire(count.total<15&&Number(count.size)+bytes.length<=40*1024*1024,'Limite de 15 documentos ou 40 MB por atendimento.');
     const filename=String(name||'documento').replace(/[\x00-\x1f/\\]/g,'_').slice(0,160);
-    await c.query('INSERT INTO audita_debt_documents(id,case_id,kind,name,mime,bytes,sha256) VALUES($1,$2,$3,$4,$5,$6,$7)',[randomUUID(),id,kind,filename,mime,bytes,debtHash(bytes)]);
+    await c.query('INSERT INTO audita_debt_documents(id,case_id,kind,name,mime,bytes,sha256) VALUES($1,$2,$3,$4,$5,$6,$7)',[randomUUID(),id,kind,filename,mime,bytes,hash]);
     if(['triage','details','calculation_pending'].includes(r.status)){pInvalidate(r);r.status='calculation_pending';}await save(c,r,auth,'document_uploaded');return view(c,r,auth);
   });}
   async function createCheckout(auth,id,input){return tx(async c=>{
