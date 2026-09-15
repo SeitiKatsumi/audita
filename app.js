@@ -7594,6 +7594,14 @@ loginForm.addEventListener("submit", async (event) => {
       return;
     }
 
+    const authState = await loadAuthState();
+    if (!authState.user) {
+      showLogin("Não foi possível manter sua sessão. Tente entrar novamente.");
+      return;
+    }
+    renderProfile(authState.user);
+    configureApiUsageAdmin(authState);
+    await loadCurrentUserProfile();
     loginName.value = "";
     loginPassword.value = "";
     hideLogin();
@@ -9079,7 +9087,11 @@ logoutButton.addEventListener("click", async () => {
   if (activeChatBrowserSession?.id) {
     await chatBrowserAction("close");
   }
-  await fetch("/api/auth/logout", { method: "POST" });
+  const response = await fetch("/api/auth/logout", { method: "POST" });
+  if (!response.ok) return;
+  configureApiUsageAdmin({ ...currentAuthState, user: null });
+  currentUserProfile = null;
+  renderProfile(null);
   showLogin("Sessão encerrada.");
 });
 

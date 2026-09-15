@@ -61,3 +61,7 @@ Para o cliente, acompanhamento e histórico aparecem somente após preparar o pe
 `node --test test/energy-audit.test.mjs` cobre regras, datas, arredondamento, classes de consumidor, versões, duplicatas/retificações, várias unidades, falhas, retomada, referências indisponíveis, consentimento, isolamento e jornada até PDF/protocolo/resposta/recebimento.
 
 Teste integrado local com fatura fictícia em PDF e imagem confirmou acesso ao leitor OpenAI. Dados reais e cobrança/protocolo externos não foram usados. Configuração de produção e deploy não foram alterados.
+
+## Interface simplificada — 15/09/2026
+
+O bloco de acompanhamento, registro de protocolo/resultado, mensagens, histórico e providências está temporariamente oculto para cliente e equipe. Dados e APIs permanecem preservados. Envio, análise, confirmação, PDF e encaminhamento à equipe continuam disponíveis; casos protocolados mantêm suas restrições. Os fluxos operacionais descritos acima permanecem no servidor, mas seus formulários de acompanhamento não são exibidos nesta versão.

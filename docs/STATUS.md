@@ -137,3 +137,22 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Concluído na main local/porta 3000: pergunta, texto auxiliar, resumo da proposta e menção em novas minutas removidos; API aceita ausência do campo e conserva propostas históricas. Cinco testes passaram; sintaxe, diff e arquivo servido conferidos após reinício. Sem commit/push/deploy.
 - Publicação autorizada em 14/09/2026: triagem somente com dívida em aberto, remoção da proposta pessoal e compatibilidade com históricos. Cinco testes pertinentes passaram; publicação em andamento.
 - Publicado e verificado: commit 52e7d3d no GitHub/main e imagem audita:108 em produção. Backup verificado antes do deploy; atualização concluída, smoke passou com banco pronto, index.html e bank-debt.js conferidos byte a byte com o commit. Sem pagamentos ou protocolos reais.
+
+### 2026-09-15 — Atualização local do GitHub
+- Codex, main: recebidos quatro commits por fast-forward, de 7e96a25 até be6d0eb, conforme solicitação do usuário. Sem conflitos ou alterações locais anteriores.
+- Servidor reiniciado na porta 3000; HTTP 200. Cinco testes de dívidas bancárias passaram, nenhum ignorado. Código alinhado ao GitHub; apenas este registro é local, sem novo commit/push/deploy.
+
+### 2026-09-15 — Ativação PIS/PASEP e energia em produção
+- Codex, configuração CapRover da aplicação audita, autorizada pelo usuário. Habilitados ambos os módulos, chaves próprias de módulo configuradas sem alterar segredos existentes; volume nomeado audita-private-documents montado em /audita-private, com subdiretórios pis e energy. Sem mudança de código ou imagem.
+- Após salvar e reiniciar: APIs de ambos com enabled/ready=true; energia com storageReady=true. Safari autenticado confirmou sete serviços na Central. APIs de casos sem sessão retornam 401. Não houve criação de casos, cobrança ou protocolo de teste em produção. Disponibilidade real do leitor e coleta ANEEL não foram exercitadas nesta ativação; backup do novo volume/chaves ainda precisa ser incorporado ao procedimento operacional. Registro local, sem commit/push.
+
+### 2026-09-15 — Sessão ao navegar
+- Codex, codex/login-navigation, base main. Corrigir atualização do estado autenticado após login/cadastro e saída; arquivos app.js e teste de regressão. Validação em andamento.
+- Concluído localmente na porta 3000: login/cadastro atualizam usuário e permissões antes de liberar navegação; logout limpa estado após sucesso. Dois testes passaram (regressão login/cadastro/navegação/logout e entrada do chat); sintaxe, diff e arquivo servido conferidos. Sem commit/push/deploy; produção ainda requer publicação desta correção.
+
+### 2026-09-15 — Ocultar acompanhamento de energia
+- Codex, codex/energy-hide-tracking, base main. Escopo: remover bloco de acompanhamento/providências da interface para cliente e equipe, preservando APIs, dados e restrições. Validação em andamento.
+- Concluído na porta 3000: bloco removido da renderização, sem mudanças no servidor. Seis cenários de renderização passaram (cliente/equipe × novo/preparado/protocolado), incluindo ausência dos formulários, análise/PDF preservados e faturas protocoladas sem edição. Sintaxe e arquivo servido conferidos; diff sem erros. Sem commit/push/deploy.
+
+### 2026-09-15 — Publicação das correções de navegação e energia
+- Commit e push na main autorizados pelo usuário. Inclui estado de login/cadastro/logout, ocultação do acompanhamento de energia e registros operacionais anteriores. Onze testes pertinentes passaram; sem divergência remota e diff sem erros. Publicação preparada para verificação por fetch; nenhum novo deploy solicitado ou executado nesta tarefa.
