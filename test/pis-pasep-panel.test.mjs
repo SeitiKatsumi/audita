@@ -21,7 +21,7 @@ test('PIS/PASEP ends with tracking only and preserves the previous case',async()
   createAuditaChatMotion:()=>({cancelTyping(){},moveAssistantAvatar(){},scrollLatestAssistant(){},async animateAssistant(){}}),
   e:String,pisAnswerLabel:()=> 'Para mim',pisApi:async()=>({enabled:false}),
  });
- vm.runInContext((await readFile(new URL('../pis-pasep.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,''),context);
+ vm.runInContext((await readFile(new URL('../pis-pasep.js',import.meta.url),'utf8')).replace(/^import .*;\r?\n/gm,''),context);
  await vm.runInContext(`
   state.user={id:'user'};state.config={ready:true,statuses:{triage:'Triagem'}};
   const question={key:'role',title:'Para quem?',type:'choice',options:[{value:'self',label:'Para mim'}]};

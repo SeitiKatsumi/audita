@@ -156,3 +156,19 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 ### 2026-09-15 — Publicação das correções de navegação e energia
 - Commit e push na main autorizados pelo usuário. Inclui estado de login/cadastro/logout, ocultação do acompanhamento de energia e registros operacionais anteriores. Onze testes pertinentes passaram; sem divergência remota e diff sem erros. Publicação preparada para verificação por fetch; nenhum novo deploy solicitado ou executado nesta tarefa.
+
+### 2026-09-15 — Dívidas: análise documental por IA
+- Responsável: Codex; branch codex/dividas-extratos-ia, base main 6912d48. Escopo: entrada por documentos, extração, cálculo rastreável e negociação pós-pagamento. Arquivos compartilhados: bank-debt.js, server.mjs, serviços e testes do módulo. Em desenvolvimento local; sem publicação.
+
+- Resultado: entrada por anexos sem questionário técnico; leitura por IA em segundo plano, validação do JSON e conferência financeira; oferta comparativa com faixa/percentual e preços Itaú autorizados; PDF de negociação após webhook e solicitação judicial para revisão da equipe.
+- Validação: sete testes do módulo passaram, incluindo fluxo novo em PostgreSQL isolado, pagamento simulado e isolamento. Leitura real dos dois PDFs executada; os arquivos contêm inconsistências e não liberaram oferta automática. Imagem testada com classificação PJ e taxas impressas. Interface conferida no navegador.
+- Integração: arquivos conciliados na main local, porta 3000; sem commit, push ou deploy. Configuração privada preservada. O banco local continua não configurado: a integração persistente foi testada em PostgreSQL isolado, não com atendimentos reais na porta 3000.
+- Pendência financeira dos exemplos: confirmar enquadramento da conta, saldo inicial e evolução da dívida/mora; não foi apurado valor definitivo a pagar. Produção permanece na versão anterior.
+
+- Continuação autorizada: separar transcrição visual de classificação, exigir saldos intermediários e reler páginas divergentes. Validar novamente os dois extratos; sem publicação solicitada.
+- Melhorias concluídas: transcrição literal por página, classificação determinística pelo sinal, conferência dos saldos intermediários e uma releitura auditável por página divergente. Complementos sem valor não duplicam movimentos; leitura usa modelo próprio do módulo. A releitura não pode reduzir a quantidade de linhas para aparentar reconciliação.
+- Validação real: ambos os PDFs reprocessados; crédito anteriormente confundido com juros agora identificado corretamente, juros e mora separados. Cada documento conserva uma divergência no saldo inicial impresso; demais conferências intermediárias fecharam. Oferta permanece bloqueada por lacunas e encargos a esclarecer. Documentos e respostas reais ficam somente em arquivos privados locais, fora do versionamento.
+- Entrega local: oito testes pertinentes passaram, incluindo regressão de sinais/omissões e integração em PostgreSQL isolado; diff sem erros. Alterações conciliadas na main local e servidor da porta 3000 reiniciado e respondendo HTTP 200. Banco da porta 3000 ainda não configurado. Sem commit, push ou deploy nesta continuação.
+
+### 2026-09-15 — Publicação da análise documental de dívidas
+- Codex; publicação de todo o trabalho consolidado autorizada pelo usuário. Suíte completa: 380 testes passaram, nenhum ignorado; corrigida compatibilidade CRLF dos testes IR/PIS. Inclui navegação/energia já na main. Sem migração nova de banco. Imagem anterior de produção 108, commit 52e7d3d; backup verificado documentado em 14/09. GitHub e implantação em andamento.

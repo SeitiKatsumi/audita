@@ -1,3 +1,4 @@
+import {createDebtExtractor} from './services/bank-debt-ai.mjs';
 import {refreshReferences} from './services/energy-audit-references.mjs';
 import {createEnergyService} from "./services/energy-audit.service.mjs";
 import {createEnergyHandler} from "./services/energy-audit-api.mjs";
@@ -1670,6 +1671,7 @@ const stripeBillingService = createStripeBillingService({
   onDebtPaymentEvent: (event) => bankDebtService.paymentEvent(event),
 });
 const bankDebtService = createBankDebtService({
+  extractor: createDebtExtractor({recordUsage: async (usage, auth) => {if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'debt_statement_extraction',...usage});}}),
   getDb: () => ({ pool, dbReady }),
   checkout: (auth, proposal) => stripeBillingService.createDebtCheckoutSession(auth, proposal),
 });

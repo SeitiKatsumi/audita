@@ -2,6 +2,7 @@ import {z} from 'zod';
 import {debtParse,debtRequire,debtMoney} from './bank-debt-domain.mjs';
 
 export const DEBT_SERIES={
+  pjOverdraft:{code:25446,label:'Pessoa jurídica — cheque especial'},
   overdraft:{code:25463,label:'Pessoa física — cheque especial'},
   loan:{code:25464,label:'Pessoa física — crédito pessoal não consignado'},
   vehicle:{code:25471,label:'Pessoa física — aquisição de veículos'},

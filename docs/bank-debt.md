@@ -1,3 +1,35 @@
+# Dívidas bancárias — entrada por documentos
+
+Atualização local em 15/09/2026. O cliente começa enviando PDFs, imagens ou prints e autorizando a leitura. Não responde à triagem ou ao formulário técnico de taxas. O servidor salva os arquivos privados, lê todas as páginas com a integração OpenAI existente e exige nova revisão se os arquivos mudarem durante a análise. Documento é dado não confiável; a IA não escolhe preço, taxa BACEN ou decisão judicial.
+
+A extração valida datas, centavos, sinal, categoria, saldo e referência à página. A conferência aritmética bloqueia a oferta em caso de lacunas, contas divergentes, mora não decomposta, transferências, duplicatas possíveis ou valores não reconciliados. A tela apresenta os achados e pede complementos. Contas e documentos históricos continuam preservados.
+
+A leitura ocorre página a página: a IA transcreve a coluna numérica literal e todos os saldos intermediários; o código converte centavos e classifica depois. O sinal impresso prevalece sobre a descrição da rubrica. Cada página com divergência aritmética recebe uma releitura, aceita somente se reduzir divergências sem aumentar pendências. A análise privada conserva linhas, páginas, saldos e tentativas para conferência. Não inventa saldo inicial nem presume quitação a partir de um crédito. O processamento continua em segundo plano; após reinício do servidor, uma leitura interrompida pode ser repetida depois de 15 minutos, sem retomada automática.
+
+Usa `AUDITA_DEBT_MODEL` (padrão `gpt-5.4`, raciocínio médio), separado do modelo do chat geral. Complementos sem coluna de valor não constituem novos lançamentos. Releituras não podem remover linhas financeiras ou saldos para aparentar reconciliação. Mantém as chaves e o registro de consumo da integração existente; não adiciona dependências.
+
+## Comparação e contratação
+
+O cálculo automático inicial cobre cheque especial PF/MEI e PJ identificado. Consulta SGS 25463 ou 25446 para cada mês do período. Mantém IOF, tarifas e movimentações, substitui apenas juros remuneratórios no cenário comparativo. Usa dias/30, movimentações ao fim do dia, arredondamento diário e apresenta faixa entre simples diário e composto diário. A média BACEN é referência comparativa, não taxa máxima legal nem determinação do valor judicialmente devido. Outras modalidades exigem metodologia própria; não são enquadradas como cheque especial.
+
+Sem diferença positiva nos dois cenários, não libera contratação automática. A porcentagem é (cobrança menos saldo estimado)/cobrança, nunca maior que 100%. Exibe a data da cobrança documentada. Nenhuma faixa artificial é adicionada ao resultado.
+
+Preços reutilizados do catálogo Itaú por autorização do usuário: R$ 199,00, R$ 399,99 e R$ 599,00. Seleção pela redução conservadora: até R$ 10 mil; até R$ 20 mil; acima. Os limites de elegibilidade de restituição do Itaú não são aplicados às dívidas. Checkout e confirmação permanecem vinculados ao usuário, organização, análise, moeda, preço e webhook Stripe.
+
+## Após o pagamento
+
+Disponibiliza PDF com relatório comparativo, referências e passo a passo para negociar com canal oficial do cobrador. O próprio cliente conduz a negociação. Pode solicitar o advogado se não resolver; isso registra a solicitação, sem criar processo nem afirmar acordo. A equipe confere dados e publica a revisão jurídica com advogado identificado. Depois seguem cadastro, procuração, assinatura e fila de protocolo manual existentes. Pessoa jurídica requer avaliação da representação e documentação específica antes dessa etapa.
+
+## Limites de validação
+
+PDFs reais nunca são versionados, colocados em rotas públicas ou usados como fixtures. Testes automatizados usam documentos fictícios e cobrem fechamento de saldo, tarifas, ambiguidades, isolamento, contratação, webhook e download após pagamento. Não há cobrança ou protocolo real nos testes.
+
+Fonte PJ: https://dadosabertos.bcb.gov.br/dataset/groups/25446-taxa-media-mensal-de-juros-das-operacoes-de-credito-com-recursos-livres---pessoas-juridicas--
+O limite legal de cheque especial não se aplica indistintamente a PJ: https://www.bcb.gov.br/meubc/faqs/s/cheque-especial
+
+---
+Documentação do fluxo anterior (para compatibilidade dos atendimentos existentes):
+
 # Dívidas Bancárias Abusivas
 
 Entrada na aplicação: `/#dividas-bancarias`. Implementação local, sem publicação automática.

@@ -16,7 +16,7 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
     Intl, URL, URLSearchParams,
   });
   vm.runInContext((await readFile(new URL('../audita-chat-motion.js', import.meta.url), 'utf8')).replace('export function','function'), context);
-  vm.runInContext((await readFile(new URL('../ir-exemption.js', import.meta.url), 'utf8')).replace(/^import .*;\n/,''), context);
+  vm.runInContext((await readFile(new URL('../ir-exemption.js', import.meta.url), 'utf8')).replace(/^import .*;\r?\n/,''), context);
   vm.runInContext(`
     state.config = { statuses: { triage: 'Triagem' } };
     const role = { key:'role', type:'choice', title:'Para quem?', options:[{ value:'self', label:'Para mim' }] };

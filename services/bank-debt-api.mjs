@@ -15,7 +15,7 @@ export function createBankDebtHandler({service,getAuth,readJson,readBuffer,sendJ
         const match=path.match(/^\/cases\/([0-9a-f-]{36})(?:\/(actions|checkout|documents)(?:\/([a-zA-Z0-9-]+))?)?$/i);debtRequire(match,'Rota não encontrada.',404);
         const [,id,action,doc]=match;
         if(!action&&method==='GET')result={case:await service.get(auth,id)};
-        else if(action==='actions'&&method==='POST')result={case:await service.command(auth,id,await readJson(request),{ip:request.socket.remoteAddress,userAgent:request.headers['user-agent']})};
+        else if(action==='actions'&&method==='POST'){const input=await readJson(request);result={case:input.action==='analyze'?await service.startAnalysis(auth,id,input):await service.command(auth,id,input,{ip:request.socket.remoteAddress,userAgent:request.headers['user-agent']})};}
         else if(action==='checkout'&&method==='POST')result=await service.createCheckout(auth,id,await readJson(request));
         else if(action==='documents'&&!doc&&method==='POST')result={case:await service.upload(auth,id,{bytes:await readBuffer(request,10*1024*1024),name:url.searchParams.get('name'),kind:url.searchParams.get('kind')})};
         else if(action==='documents'&&doc&&method==='GET'){const f=await service.download(auth,id,doc);response.writeHead(200,{'content-type':f.mime,'content-disposition':`attachment; filename*=UTF-8''${encodeURIComponent(f.name)}`,'content-length':f.bytes.length});response.end(f.bytes);return true;}
