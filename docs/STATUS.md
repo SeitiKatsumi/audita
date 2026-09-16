@@ -236,3 +236,4 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 ### 2026-09-16 — Publicação de velocidade e fluxo consolidado
 - Codex; publicação completa autorizada pelo usuário. Inclui leitura paralela/cache/progresso e fluxo direto integrado. 386 testes passaram no conjunto, diff verificado. Coluna extraction_cache aditiva e idempotente; documentos e configurações privadas preservados. Push e deploy em andamento; rollback de código disponível na release 112.
+- Publicado: GitHub/main d25e627, CI 35132696243 aprovado, CapRover audita:113. Saúde HTTP 200 com banco pronto e autenticação obrigatória; smoke-production aprovado. bank-debt.js e bank-debt.css servidos em produção conferem com o checkout consolidado. Nenhum documento de cliente, pagamento ou nova análise real foi enviado nesta publicação.
