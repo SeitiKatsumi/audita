@@ -67,6 +67,10 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  release();for(let i=0;i<100&&c.analysisPending;i++){await new Promise(resolve=>setTimeout(resolve,10));c=await service.get(auth,c.id);}assert.equal(c.analysisPending,null);assert.equal(c.status,'offer');assert.equal(c.docOffer.priceCents,19900);assert.equal(c.review,null);assert.equal(calls,1);assert.equal(c.analysis.documentHashes.length,1);assert.equal(c.analysisProgress.percent,100);
  assert.match(c.analysis.rateFallbackNotice,/7,4%/);assert.equal(c.analysis.rates[0].fallback,true);
  await assert.rejects(service.download(auth,c.id,'negotiation'),{status:403});
+ const freeService=createBankDebtService({getDb:()=>({pool,dbReady:true}),paymentRequired:false,extractor:async()=>data,rateProvider:async()=>{throw Error('offline');},checkout:async()=>{throw Error('Stripe não deve ser chamada');}});
+ let free=await freeService.create(auth);free=await freeService.upload(auth,free.id,{bytes,kind:'evidence',name:'gratuito.pdf'});free=await freeService.command(auth,free.id,{action:'analyze',revision:free.revision,consent:true});
+ await assert.rejects(freeService.createCheckout(auth,free.id,{accepted:false,reviewId:free.docOffer.id}));
+ const unlocked=await freeService.createCheckout(auth,free.id,{accepted:true,reviewId:free.docOffer.id});assert.equal(unlocked.case.status,'paid');assert.equal(unlocked.case.paid.amountCents,0);assert.equal(unlocked.case.paid.method,'waived');assert.ok((await freeService.download(auth,free.id,'negotiation')).bytes.length);
  await service.createCheckout(auth,c.id,{accepted:true,reviewId:c.docOffer.id});
  await assert.rejects(service.upload(auth,c.id,{bytes,kind:'evidence',name:'durante-pagamento.pdf'}),{status:409});
  let extra=await service.create(auth);

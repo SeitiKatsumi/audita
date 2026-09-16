@@ -6,7 +6,7 @@ import {DEBT_VERSION,DEBT_TERMS,DEBT_QUESTIONS,debtDetails,debtClaimant,debtRevi
 import {debtHash,debtDocuments,debtPdf} from './bank-debt-pdf.mjs';
 import {createLawyerQueueService} from './lawyer-queue.service.mjs';
 
-export function createBankDebtService({getDb,checkout,rateProvider,extractor,now=()=>new Date()}) {
+export function createBankDebtService({getDb,checkout,paymentRequired=true,rateProvider,extractor,now=()=>new Date()}) {
   function db(){const d=getDb();debtRequire(d.pool&&d.dbReady,'Seu atendimento está temporariamente indisponível. Tente novamente.',503);return d.pool;}
   const analyzing=new Set();
   const operator=auth=>auth?.user?.role==='super_admin';
@@ -157,6 +157,12 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     debtRequire(['offer','payment_pending'].includes(r.status)&&(p.review||p.docOffer),'O cálculo Audita precisa ser validado antes da contratação.',409);
     debtRequire(input.accepted===true&&input.reviewId===(p.review||p.docOffer).id,'Confirme a análise e as condições atuais.');
     debtRequire(!p.paymentProcessing,'Seu pagamento está em processamento. Aguarde a confirmação antes de tentar novamente.',409);
+    if(!paymentRequired){
+      debtRequire(!p.checkout,'Existe uma sessão de pagamento anterior. Aguarde sua expiração antes de continuar sem cobrança.',409);
+      p.paid={amountCents:0,at:now().toISOString(),method:'waived'};
+      p.purchaseAcceptance={version:DEBT_VERSION,at:now().toISOString(),reviewId:(p.review||p.docOffer).id,terms:DEBT_TERMS};
+      r.status='paid';await save(c,r,auth,'contracted_without_payment');return {case:await view(c,r,auth)};
+    }
     if(p.checkout?.url&&p.checkout.expiresAt*1000>now().getTime())return p.checkout;
     p.attempt=(p.attempt||0)+1;
     const session=await checkout(auth,{caseId:id,reviewId:(p.review||p.docOffer).id,amountCents:(p.review||p.docOffer).priceCents,attempt:p.attempt});

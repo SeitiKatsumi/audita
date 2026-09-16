@@ -1690,6 +1690,7 @@ const stripeBillingService = createStripeBillingService({
   onDebtPaymentEvent: (event) => bankDebtService.paymentEvent(event),
 });
 const bankDebtService = createBankDebtService({
+  paymentRequired: false,
   extractor: createDebtExtractor({recordUsage: async (usage, auth) => {if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'debt_statement_extraction',...usage});}}),
   getDb: () => ({ pool, dbReady }),
   checkout: (auth, proposal) => stripeBillingService.createDebtCheckoutSession(auth, proposal),

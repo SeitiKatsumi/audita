@@ -128,3 +128,6 @@ A documentação técnica e os testes não substituem a validação da metodolog
 
 ### Retorno aos documentos
 A contratação, negociação e assinatura permitem voltar aos documentos do mesmo atendimento. Um novo extrato antes da contratação preserva os anexos e invalida a oferta para recalcular. Arquivos duplicados mantêm a oferta existente. Análise inconclusiva preserva o atendimento para complementação. Durante pagamento pendente, os anexos ficam somente para consulta; após pagamento, documentos complementares não alteram a oferta contratada.
+
+### Contratação sem cobrança (16/09/2026)
+O servidor configura paymentRequired=false apenas para dívidas bancárias. A contratação exige oferta válida e aceite e libera a negociação diretamente, com evento contracted_without_payment e paid.method=waived, amountCents=0. Não chama Stripe nem declara pagamento recebido. Sessões Stripe anteriores permanecem protegidas até expiração. Para restabelecer cobrança, configurar paymentRequired=true na criação do serviço. Extração pages-3 preserva saldo explicitamente devedor e reconhece utilização do cheque especial como débito; caches antigos são relidos.

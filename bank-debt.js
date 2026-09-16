@@ -123,7 +123,7 @@ root.addEventListener('submit',e=>{const f=e.target;if(!f.dataset.form)return;e.
   if(f.dataset.form==='claimant'){delete v.conciliation;await command('claimant',{claimant:v,conciliation:d.has('conciliation')});}
   if(f.dataset.form==='sign')await command('sign',{name:v.name,accepted:d.has('accepted'),version:current.version,termsHash:current.termsHash});
   if(f.dataset.form==='upload')await uploadFiles([...f.querySelector('[name=file]').files],v.kind);
-  if(f.dataset.form==='checkout'){const r=await post(`/cases/${current.id}/checkout`,{accepted:d.has('accepted'),reviewId:(current.review||current.docOffer).id});const url=new URL(r.url);if(url.protocol!=='https:')throw new Error('Endereço de pagamento inválido.');location.assign(url.href);}
+  if(f.dataset.form==='checkout'){const r=await post(`/cases/${current.id}/checkout`,{accepted:d.has('accepted'),reviewId:(current.review||current.docOffer).id});if(r.case){current=r.case;viewDocuments=false;render();await refreshList();return;}const url=new URL(r.url);if(url.protocol!=='https:')throw new Error('Endereço de pagamento inválido.');location.assign(url.href);}
 });});
 async function init(){config=await api('/config');const id=new URLSearchParams(location.search).get('debt_case');if(config.authenticated&&config.ready&&id)await load(id);else{current=null;render();await refreshList();}}
 function activate(){if(document.body.dataset.activePage!=='dividas-bancarias'){clearTimeout(poll);return;}if(!initialized){initialized=true;run(async()=>{try{await init();}catch(e){initialized=false;throw e;}});}else render();}
@@ -166,7 +166,7 @@ function documentOffer(){
      <header class="charge-tier-heading"><h3>${esc(offer.planName)}</h3><em>Sua faixa</em></header>
      <p class="debt-checkout-price-label">Seu plano de atendimento</p>
      <strong class="charge-tier-price">${money(offer.priceCents)}</strong>
-     <p class="charge-tier-installments">Pagamento único</p>
+     <p class="charge-tier-installments">Sem cobrança nesta etapa</p>
      <ul class="charge-tier-inclusions" aria-label="Itens incluídos na contratação">
       <li><strong>Relatório de análise da dívida</strong><span>Conferência dos juros e da evolução do saldo com memória do cálculo.</span></li>
       <li><strong>Documento e passo a passo para negociar</strong><span>Orientações para apresentar a proposta ao banco ou à empresa de cobrança.</span></li>

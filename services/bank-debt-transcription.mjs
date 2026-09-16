@@ -28,6 +28,7 @@ function category(description,amount){
  if(/ESTORNO|CH DEV|RESGATE|APL[ .]INVEST/.test(d))return 'transfer';
  if(/PIX|DEP DIN|DEPOSITO/.test(d))return amount>=0?'payment':'debit';
  if(/SAQ|CHQ COMPENSADO|COMPRA|GASTO C CREDITO/.test(d))return amount<0?'debit':'transfer';
+ if(/UTILIZA[ÇC][ÃA]O CHEQUE ESPECIAL|UTILIZACAO CHEQUE ESPECIAL/.test(d))return amount<0?'debit':'unknown';
  return 'unknown';
 }
 export function transcribePages(pages){
@@ -38,6 +39,10 @@ export function transcribePages(pages){
   for(const [line,row] of page.rows.entries()){
    rawRows.push({...row,page:physical,line:line+1});
    let value;try{value=printedCents(row.amountText);}catch{issues.push(`Página ${physical}, linha ${line+1}: confira o valor impresso.`);continue;}
+   if(row.type!=='transaction'&&/\bSALDO\b.*\bDEVEDOR\b/i.test(row.description)){
+    if(/^\s*\+|[+C]\s*$/i.test(row.amountText)){issues.push(`Página ${physical}, linha ${line+1}: saldo devedor com sinal credor contraditório.`);continue;}
+    value=-Math.abs(value);
+   }
    if(!row.date){issues.push(`Página ${physical}, linha ${line+1}: data não identificada.`);continue;}
    if(row.type==='opening'){
     if(first){opening={date:row.date,balanceCents:value,evidence:`Página ${physical}: ${row.amountText}`};balance=value;first=false;}
