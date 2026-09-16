@@ -1,7 +1,7 @@
 # Coordenação e passagem de trabalho
 
 ### 2026-09-16 — Publicação da contratação e retorno aos documentos
-- Publicação autorizada pelo usuário. Codex; origem codex/debt-back-documents e codex/debt-checkout-layout, integradas na main local. Suíte completa: 387 testes aprovados; diff verificado. Sem migrações ou mudanças de configuração privada; rollback para audita:114 / b3ad461. GitHub e deploy em andamento.
+- Publicação autorizada pelo usuário. Codex; origem codex/debt-back-documents e codex/debt-checkout-layout, integradas na main local. Suíte completa: 387 testes aprovados; diff verificado. Sem migrações ou mudanças de configuração privada; rollback para audita:114 / b3ad461. Publicado: commit 0878549 em GitHub/main, CI 35138954591 aprovado e CapRover audita:115. Health 200, banco pronto, autenticação obrigatória e smoke aprovados; JS/CSS servidos conferidos contra o checkout. Interface de produção com atendimento fictício: novo paywall, Voltar aos documentos, arquivo original preservado e retorno à contratação com mesmos valores. Nenhum pagamento efetuado.
 
 ### 2026-09-16 — Voltar aos documentos
 - Codex, codex/debt-back-documents, main com layout local preservado. Escopo: navegação de anexos no mesmo atendimento e upload antes da contratação; preservar documentos, invalidar oferta após complemento e manter bloqueios durante análise/pagamento. Concluído e integrado ao main local, disponível na porta 3000. Seis testes pertinentes passaram (navegação, preservação de arquivos, duplicados, invalidação de oferta e bloqueio durante pagamento), sintaxe e diff verificados. Servidor reiniciado e JS servido conferido. Sem push ou deploy nesta tarefa.
