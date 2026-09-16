@@ -41,6 +41,10 @@ testes usam respostas sintéticas, sem enviar extratos de clientes ou consumir I
 
 ## Comparação e contratação
 
+Quando a consulta BACEN falha, a análise usa a última taxa válida da mesma modalidade obtida nessa execução. Para cheque especial PF/MEI, há também uma reserva de 7,4% a.m., SGS 25463 de janeiro/2025, consultada em 16/09/2026. Após a primeira falha não repete chamadas nos demais meses dessa análise. Uma nova análise tenta a fonte oficial novamente. PJ sem nenhuma referência consultada permanece bloqueado: a reserva PF não é aplicada a PJ.
+
+O fallback é uma hipótese provisória, não a taxa oficial dos meses ausentes. A oferta mostra o aviso, valor e mês de origem antes da contratação; a memória e o PDF registram os meses substituídos. A contratação pode avançar com estimativa positiva e documentos reconciliados, sem afirmar abusividade nem redução garantida. Divergências documentais continuam bloqueando o cálculo. Não altera a estimativa manual legada.
+
 O cálculo automático inicial cobre cheque especial PF/MEI e PJ identificado. Consulta SGS 25463 ou 25446 para cada mês do período. Mantém IOF, tarifas e movimentações, substitui apenas juros remuneratórios no cenário comparativo. Usa dias/30, movimentações ao fim do dia, arredondamento diário e apresenta faixa entre simples diário e composto diário. A média BACEN é referência comparativa, não taxa máxima legal nem determinação do valor judicialmente devido. Outras modalidades exigem metodologia própria; não são enquadradas como cheque especial.
 
 Sem diferença positiva nos dois cenários, não libera contratação automática. A porcentagem é (cobrança menos saldo estimado)/cobrança, nunca maior que 100%. Exibe a data da cobrança documentada. Nenhuma faixa artificial é adicionada ao resultado.

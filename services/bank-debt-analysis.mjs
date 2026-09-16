@@ -56,9 +56,22 @@ export async function analyzeStatements(documents,{rateProvider=fetchDebtRate}={
  if(!totals.interestCents&&!totals.lateCents)add('Não encontramos juros identificados nos arquivos enviados.');
  const result={version:'statement-analysis-3',createdAt:new Date().toISOString(),reconciliations,documents:files.map(f=>({id:f.id,pages:f.data.pages,rawRows:f.data.rawRows||[],checkpoints:f.data.checkpoints||[],extractionAudit:f.data.extractionAudit||[]})),bank:files[0].data.bank,person,modality,totals,rows,issues,opening,closing,range:null,rates:[],assumptions:['Comparação preliminar com a taxa média BACEN de cada mês, não promessa de acordo ou valor judicialmente devido.','Tarifas e IOF são mantidos; não se presume que sejam indevidos.','Movimentações no fim do dia; referência de 30 dias. Faixa entre cenários simples diário e composto diário.']};
  if(issues.length)return result;
- const series=person==='pj'?'pjOverdraft':'overdraft';let day=opening.date;
- try{while(day<=closing.date){const month=day.slice(0,7);if(!result.rates.some(r=>r.month===month)){const rate=await rateProvider(series,month);debtRequire(rate.code===DEBT_SERIES[series].code&&rate.month===month&&Number.isFinite(rate.monthlyPercent)&&rate.monthlyPercent>=0&&rate.monthlyPercent<=100,'Referência BACEN incompatível.',503);result.rates.push(rate);}day=new Date(Date.parse(day)+86400000).toISOString().slice(0,10);}}
+ const series=person==='pj'?'pjOverdraft':'overdraft';let day=opening.date,unavailable=false;
+ // ponytail: reserva PF verificada; nunca aplicar taxa PF a PJ. Ampliar reservas quando houver fonte verificada.
+ let reference=series==='overdraft'?{...DEBT_SERIES.overdraft,month:'2025-01',monthlyPercent:7.4,url:'https://api.bcb.gov.br/dados/serie/bcdata.sgs.25463/dados?formato=json&dataInicial=01/01/2025&dataFinal=31/01/2025',retrievedAt:'2026-09-16',observation:{data:'01/01/2025',valor:'7.40'}}:null;
+ try{while(day<=closing.date){const month=day.slice(0,7);if(!result.rates.some(r=>r.month===month)){
+  let rate;
+  if(!unavailable){try{rate=await rateProvider(series,month);}catch{unavailable=true;}}
+  if(unavailable){debtRequire(reference,'Referência substituta indisponível.',503);rate={...reference,month,fallback:true,sourceMonth:reference.month};}
+  debtRequire(rate.code===DEBT_SERIES[series].code&&rate.month===month&&Number.isFinite(rate.monthlyPercent)&&rate.monthlyPercent>=0&&rate.monthlyPercent<=100,'Referência BACEN incompatível.',503);
+  result.rates.push(rate);if(!rate.fallback)reference=rate;
+ }day=new Date(Date.parse(day)+86400000).toISOString().slice(0,10);}}
  catch{add('A referência do Banco Central está indisponível. Tente analisar novamente.');return result;}
+ if(unavailable){
+  result.rateFallbackNotice=`Consulta ao Banco Central indisponível. Para continuar, usamos provisoriamente ${reference.monthlyPercent.toLocaleString('pt-BR')}% ao mês, referência de ${reference.month}. A redução é uma estimativa e será conferida na perícia; essa não é a taxa oficial dos meses sem consulta.`;
+  result.assumptions[0]='Comparação preliminar com taxas BACEN e referência substituta nos meses indisponíveis, não promessa de acordo ou valor judicialmente devido.';
+  result.assumptions.push(result.rateFallbackNotice);
+ }
  // ponytail: comparação diária de cheque especial até dez anos; outras modalidades exigem metodologia própria.
  const scenario=compound=>{let balance=opening.balanceCents,accrued=0,day=opening.date;const byDate=new Map();for(const r of rows){if(!byDate.has(r.date))byDate.set(r.date,[]);byDate.get(r.date).push(r);}
   while(day<=closing.date){if(day>opening.date&&balance<0){const rate=result.rates.find(r=>r.month===day.slice(0,7)).monthlyPercent/100;const interest=Math.round(-balance*(compound?Math.pow(1+rate,1/30)-1:rate/30));if(compound)balance-=interest;else accrued+=interest;}

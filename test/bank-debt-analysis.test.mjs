@@ -16,6 +16,25 @@ import {PGlite} from '@electric-sql/pglite';
 import {PDFDocument} from 'pdf-lib';
 import {createBankDebtService} from '../services/bank-debt.service.mjs';
 
+test('falha BACEN usa referência provisória auditável sem ignorar dados inválidos',async()=>{
+ let calls=0;const offline=async()=>{calls++;throw Error('timeout');};
+ const extended=structuredClone(data);extended.closing.date='2024-03-31';extended.entries[0].amountCents=-50000;extended.entries[0].balanceCents=-150000;extended.closing.balanceCents=-150000;
+ const result=await analyzeStatements([{id:'doc',data:extended}],{rateProvider:offline});
+ assert.ok(result.range);assert.equal(calls,1);assert.equal(result.rates.length,3);
+ assert.ok(result.rates.every(r=>r.fallback&&r.monthlyPercent===7.4&&r.sourceMonth==='2025-01'));
+ assert.match(result.rateFallbackNotice,/7,4%/);assert.ok(result.assumptions.includes(result.rateFallbackNotice));
+ const recovered=await analyzeStatements([{id:'doc',data:extended}],{rateProvider});
+ assert.equal(recovered.rateFallbackNotice,undefined);assert.ok(recovered.rates.every(r=>!r.fallback));
+ const partial=await analyzeStatements([{id:'doc',data:extended}],{rateProvider:async(s,m)=>m==='2024-01'?rateProvider(s,m):offline()});
+ assert.equal(partial.rates[1].monthlyPercent,2);assert.equal(partial.rates[1].sourceMonth,'2024-01');
+ const pj=await analyzeStatements([{id:'doc',data:{...data,person:'pj'}}],{rateProvider:offline});
+ assert.equal(pj.range,null); // Não emprestar taxa PF para PJ sem referência da modalidade.
+ const invalid=await analyzeStatements([{id:'doc',data:{...data,opening:null}}],{rateProvider:offline});
+ assert.equal(invalid.range,null);
+ const wrong=await analyzeStatements([{id:'doc',data}],{rateProvider:async()=>({code:25446,month:'2024-01',monthlyPercent:2})});
+ assert.equal(wrong.range,null);
+});
+
 test('concilia saldo comprovado entre extratos sem inventar principal nem ignorar outras divergências',async()=>{
  const next={...structuredClone(data),opening:{date:'2024-01-31',balanceCents:0,evidence:'0,00-'},entries:[{...data.entries[0],date:'2024-02-29',balanceCents:-140000}],closing:{date:'2024-02-29',balanceCents:-140000,evidence:'Saldo final'},issues:['Página 1, linha 3: os movimentos não fecham com o saldo impresso.'],checkpoints:[{page:1,line:3,expectedCents:-20000,printedCents:-140000}]};
  const run=d=>analyzeStatements([{id:'first',data},{id:'next',data:d}],{rateProvider});
@@ -32,7 +51,7 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,role,password_hash) VALUES(801,1,'example@example.test','Teste','member','test')");
  const auth={tenantId:1,user:{id:801}},pool={query:(...a)=>pg.query(...a),connect:async()=>({query:(...a)=>pg.query(...a),release(){}})};
  let calls=0,release,started,extracted=data;const hold=new Promise(r=>release=r),reading=new Promise(r=>started=r);
- const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async(doc,auth,hooks)=>{calls++;assert.equal(hooks.cache,null);await hooks.saveCache({fixtureCache:'private'});await hooks.onProgress({completed:1,total:1,stage:'checking'});started();await hold;return extracted;},rateProvider,checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
+ const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async(doc,auth,hooks)=>{calls++;assert.equal(hooks.cache,null);await hooks.saveCache({fixtureCache:'private'});await hooks.onProgress({completed:1,total:1,stage:'checking'});started();await hold;return extracted;},rateProvider:async()=>{throw Error('BACEN offline');},checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
  let c=await service.create(auth);const doc=await PDFDocument.create();doc.addPage();const bytes=Buffer.from(await doc.save());
  c=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio.pdf'});assert.equal(c.status,'calculation_pending');
  const duplicate=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio (1).pdf'});assert.equal(duplicate.documents.length,1);assert.equal(duplicate.revision,c.revision);
@@ -46,6 +65,7 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  const unchanged=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'novamente.pdf'});assert.equal(unchanged.revision,c.revision);assert.equal(unchanged.analysisPending,c.analysisPending);
  await assert.rejects(service.upload(auth,c.id,{bytes:Buffer.concat([bytes,Buffer.from('\n')]),kind:'evidence',name:'outro.pdf'}),{status:409});
  release();for(let i=0;i<100&&c.analysisPending;i++){await new Promise(resolve=>setTimeout(resolve,10));c=await service.get(auth,c.id);}assert.equal(c.analysisPending,null);assert.equal(c.status,'offer');assert.equal(c.docOffer.priceCents,19900);assert.equal(c.review,null);assert.equal(calls,1);assert.equal(c.analysis.documentHashes.length,1);assert.equal(c.analysisProgress.percent,100);
+ assert.match(c.analysis.rateFallbackNotice,/7,4%/);assert.equal(c.analysis.rates[0].fallback,true);
  await assert.rejects(service.download(auth,c.id,'negotiation'),{status:403});
  await service.createCheckout(auth,c.id,{accepted:true,reviewId:c.docOffer.id});
  const event={id:'evt_test_docs',type:'checkout.session.completed',data:{object:{id:'cs_test_docs',payment_status:'paid',currency:'brl',amount_total:19900,metadata:{debt_case_id:c.id,debt_review_id:c.docOffer.id,audita_user_id:'801',audita_tenant_id:'1'}}}};

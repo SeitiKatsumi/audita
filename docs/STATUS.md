@@ -1,5 +1,10 @@
 # Coordenação e passagem de trabalho
 
+### 2026-09-16 — Fallback de taxa na análise de extratos
+- Publicação e teste via interface autorizados. Suíte completa: 387 testes aprovados, nenhum ignorado. Sem migração, alteração de configuração privada ou dados existentes; rollback para release 113 / d25e627. Backup anterior registrado em 14/09; esta entrega altera apenas código. Deploy e teste com extrato fictício em andamento.
+- Codex, branch codex/debt-rate-fallback, base main. Escopo: análise de extratos, aviso na oferta e referência no relatório. Usar última referência da mesma modalidade disponível na análise; reserva PF de janeiro/2025 (7,4% a.m.). Preservar validações financeiras e distinguir taxa substituta de taxa oficial do mês. Em andamento; sem publicação.
+- Concluído localmente: fallback auditável na oferta e no PDF, sem consultas repetidas após falha nessa execução; uma nova análise tenta BACEN novamente. Nove testes passaram, incluindo contratação fictícia com BACEN offline, recuperação, modalidade incompatível e bloqueios documentais. Extração já salva do extrato fictício completo concluiu com faixa de R$ 12.195,63 a R$ 12.358,98 e redução estimada de 1,89% a 3,18%, sem nova chamada de IA. Integrado na main local; porta 3000 reiniciada e saúde/JS servido conferidos. Banco principal local não configurado; persistência validada com PGlite. Sem commit, push ou deploy. PJ sem taxa válida consultada continua sem reserva; não se aplica taxa PF a PJ.
+
 Registro compartilhado, não histórico de conversas nem bloqueio de arquivos. Cada pessoa deve buscar a versão remota antes de iniciar e publicar sua atualização pelo fluxo de branch/PR. Trabalho não enviado ainda é invisível no outro computador. Para acompanhar trabalho simultâneo, use também a issue/PR ou canal da equipe.
 
 ## Em andamento
