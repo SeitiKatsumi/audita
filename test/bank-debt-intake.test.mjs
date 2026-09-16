@@ -26,15 +26,21 @@ test('extratos preservam atendimento ao complementar e permitem voltar da oferta
   assert.match(html(),/Envie seus extratos bancários/);assert.match(html(),/type="file"/);
  }
  vm.runInContext(`current=JSON.parse(${JSON.stringify(pending)});current.analysisPending=new Date(Date.now()-16*60*1000).toISOString();delete current.documentConsent;render();`,context);
- assert.match(html(),/Tentar novamente/);assert.match(html(),/name="consent"/);assert.doesNotMatch(html(),/type="file"/);
+ assert.match(html(),/Tentar novamente/);assert.doesNotMatch(html(),/name="consent"/);assert.match(html(),/Ao solicitar a análise/);assert.doesNotMatch(html(),/type="file"/);
  vm.runInContext("current.analysis={totals:{interestCents:10000},assumptions:[],issues:[],rows:[]}",context);
  vm.runInContext(`viewDocuments=false;current.analysisPending=null;current.status='offer';current.analysis.assumptions=[];current.docOffer={id:'offer',priceCents:19900,planName:'Plano de teste',range:{asOf:'2024-01-31',minCents:100000,maxCents:102000,chargedCents:120000,minReductionPercent:15,maxReductionPercent:16}};render();`,context);
  assert.doesNotMatch(html(),/debt-analysis-loader/);assert.match(html(),/Plano de teste/);assert.match(html(),/Juros identificados nos extratos/);assert.match(html(),/100,00/);assert.match(html(),/Contratar e continuar/);assert.doesNotMatch(html(),/type="file"|Enviar complemento/);
- assert.match(html(),/Voltar aos documentos/);
+ assert.match(html(),/class="secondary-action" data-debt="back-documents"/);
  listeners.click({target:{closest:()=>({dataset:{debt:'back-documents'}})}});
- assert.equal(vm.runInContext('current.id',context),'qa');assert.match(html(),/type="file"/);assert.match(html(),/Voltar à etapa anterior/);
+ assert.equal(vm.runInContext('current.id',context),'qa');assert.match(html(),/type="file"/);assert.match(html(),/class="secondary-action" data-debt="return-stage"/);
  listeners.click({target:{closest:()=>({dataset:{debt:'return-stage'}})}});
  assert.match(html(),/Contratar e continuar/);assert.doesNotMatch(html(),/type="file"/);
  vm.runInContext("current.status='payment_pending';viewDocuments=true;render()",context);
  assert.match(html(),/pagamento pendente/);assert.doesNotMatch(html(),/type="file"/);
+ vm.runInContext("current.status='calculation_pending';globalThis.FormData=class extends Map{constructor(){super();}};run=fn=>fn();command=async(action,input)=>{globalThis.sent={action,input};};",context);
+ for(const form of ['documents','retry-analysis']){
+  listeners.submit({preventDefault(){},target:{dataset:{form},querySelector:()=>({files:[]})}});
+  assert.equal(vm.runInContext('sent.action',context),'analyze');
+  assert.equal(vm.runInContext('sent.input.consent',context),true);
+ }
 });

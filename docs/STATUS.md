@@ -1,5 +1,20 @@
 # Coordenação e passagem de trabalho
 
+### 2026-09-16 — Publicação dos ajustes de interface
+- Codex. Publicação autorizada dos textos, envio sem checkbox, retorno no padrão Itaú e filtros alfabéticos. 387 testes aprovados. Sem migrações/configurações; rollback audita:115 / 0878549. Envio e deploy em andamento.
+
+### 2026-09-16 — Ordem dos filtros da Central
+- Codex, codex/service-filter-order, base main. Categorias em ordem alfabética, mantendo Todos primeiro; somente ordem dos botões em index.html. Integrado localmente e conferido na porta 3000. Sem publicação.
+
+### 2026-09-16 — Envio sem checkbox e botão de voltar
+- Codex, codex/debt-upload-ui, base main com texto local preservado. Escopo: bank-debt.js e teste da interface. Remover checkbox do envio, vincular autorização à ação explícita de analisar e usar secondary-action do Itaú no retorno. Concluído e integrado na porta 3000. Teste da interface validou ausência da checkbox, envio/reenvio da autorização pela ação de analisar e classes de retorno do Itaú; sintaxe e diff aprovados. Sem publicação.
+
+### 2026-09-16 — Explicação do relatório
+- Codex, codex/debt-audit-copy, base main. Troca do parágrafo de envio pelo texto solicitado sobre perícia e Relatório Técnico, corrigindo Perdas e destacando o título. Integrado localmente na porta 3000; sintaxe e texto servido verificados. Sem push/deploy.
+
+### 2026-09-16 — Texto dos extratos
+- Codex, codex/debt-account-opening, base main. Alteração cancelada pelo usuário: restaurado o texto desde o início do saldo devedor até a presente data. Main local e worktree conciliados; texto confirmado na porta 3000. Produção já mantinha o texto original.
+
 ### 2026-09-16 — Publicação da contratação e retorno aos documentos
 - Publicação autorizada pelo usuário. Codex; origem codex/debt-back-documents e codex/debt-checkout-layout, integradas na main local. Suíte completa: 387 testes aprovados; diff verificado. Sem migrações ou mudanças de configuração privada; rollback para audita:114 / b3ad461. Publicado: commit 0878549 em GitHub/main, CI 35138954591 aprovado e CapRover audita:115. Health 200, banco pronto, autenticação obrigatória e smoke aprovados; JS/CSS servidos conferidos contra o checkout. Interface de produção com atendimento fictício: novo paywall, Voltar aos documentos, arquivo original preservado e retorno à contratação com mesmos valores. Nenhum pagamento efetuado.
 
@@ -14,7 +29,7 @@
 - Publicação e teste via interface autorizados. Suíte completa: 387 testes aprovados, nenhum ignorado. Sem migração, alteração de configuração privada ou dados existentes; rollback para release 113 / d25e627. Backup anterior registrado em 14/09; esta entrega altera apenas código. Deploy e teste com extrato fictício em andamento.
 - Publicado e verificado: GitHub/main b3ad461, CI 35135302392 aprovado, CapRover audita:114. Smoke aprovado, health 200/banco pronto/autenticação obrigatória e JS servido idêntico. Pela interface de produção, upload do extrato fictício completo, IA real, progresso 95% e conclusão 100%; juros R$ 2.597,12, saldo entre R$ 12.205,23 e R$ 12.370,32, redução 1,80–3,11%, plano R$ 199 e botão Contratar e continuar. Resultado preservado após reload. BACEN respondeu nessa execução; não foi necessário fallback.
 - Interface isolada com o mesmo código: upload do PDF fictício, extração fictícia previamente salva, BACEN offline e aviso de 7,4%; contratação pelo botão, webhook simulado, download do laudo, pedido de advogado, revisão fictícia, cadastro, anexos de identificação/residência, assinatura e conclusão na fila. Downloads de petição, procuração e contrato disparados com sucesso. Não houve pagamento real, aceitação de contratação em produção nem protocolo judicial. Servidor temporário de QA encerrado após validação; versão principal mantida na porta 3000.
-- Codex, branch codex/debt-rate-fallback, base main. Escopo: análise de extratos, aviso na oferta e referência no relatório. Usar última referência da mesma modalidade disponível na análise; reserva PF de janeiro/2025 (7,4% a.m.). Preservar validações financeiras e distinguir taxa substituta de taxa oficial do mês. Em andamento; sem publicação.
+- Codex, branch codex/debt-rate-fallback, base main. Escopo: análise de extratos, aviso na oferta e referência no relatório. Usar última referência da mesma modalidade disponível na análise; reserva PF de janeiro/2025 (7,4% a.m.). Preservar validações financeiras e distinguir taxa substituta de taxa oficial do mês. Concluído e integrado na porta 3000. Teste da interface validou ausência da checkbox, envio/reenvio da autorização pela ação de analisar e classes de retorno do Itaú; sintaxe e diff aprovados. Sem publicação.
 - Concluído localmente: fallback auditável na oferta e no PDF, sem consultas repetidas após falha nessa execução; uma nova análise tenta BACEN novamente. Nove testes passaram, incluindo contratação fictícia com BACEN offline, recuperação, modalidade incompatível e bloqueios documentais. Extração já salva do extrato fictício completo concluiu com faixa de R$ 12.195,63 a R$ 12.358,98 e redução estimada de 1,89% a 3,18%, sem nova chamada de IA. Integrado na main local; porta 3000 reiniciada e saúde/JS servido conferidos. Banco principal local não configurado; persistência validada com PGlite. Sem commit, push ou deploy. PJ sem taxa válida consultada continua sem reserva; não se aplica taxa PF a PJ.
 
 Registro compartilhado, não histórico de conversas nem bloqueio de arquivos. Cada pessoa deve buscar a versão remota antes de iniciar e publicar sua atualização pelo fluxo de branch/PR. Trabalho não enviado ainda é invisível no outro computador. Para acompanhar trabalho simultâneo, use também a issue/PR ou canal da equipe.
