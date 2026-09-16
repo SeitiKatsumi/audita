@@ -134,9 +134,9 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
   });}
   function pInvalidate(r){r.payload.analysis=null;r.payload.docOffer=null;r.payload.estimate=null;r.payload.review=null;r.payload.analysisPending=null;r.payload.analysisProgress=null;r.payload.analysisError=null;}
   async function upload(auth,id,{bytes,name,kind}){return tx(async c=>{
-    const r=await access(c,auth,id,true);owner(r,auth);debtRequire(['triage','details','calculation_pending','paid','signature'].includes(r.status),'Anexos não podem ser alterados nesta etapa.',409);
+    const r=await access(c,auth,id,true);owner(r,auth);debtRequire(['triage','details','calculation_pending','offer','paid','signature'].includes(r.status),'Anexos não podem ser alterados nesta etapa.',409);
     debtRequire(['identity','address','evidence'].includes(kind),'Tipo de documento inválido.');
-    if(['triage','details','calculation_pending'].includes(r.status))debtRequire(kind==='evidence','Envie agora os documentos da dívida.');
+    if(['triage','details','calculation_pending','offer'].includes(r.status))debtRequire(kind==='evidence','Envie agora os documentos da dívida.');
     debtRequire(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=10*1024*1024,'Envie um arquivo de até 10 MB.');
     const hash=debtHash(bytes);
     if((await c.query('SELECT id FROM audita_debt_documents WHERE case_id=$1 AND kind=$2 AND sha256=$3',[id,kind,hash])).rows.length)return view(c,r,auth);
@@ -150,7 +150,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     debtRequire(count.total<15&&Number(count.size)+bytes.length<=40*1024*1024,'Limite de 15 documentos ou 40 MB por atendimento.');
     const filename=String(name||'documento').replace(/[\x00-\x1f/\\]/g,'_').slice(0,160);
     await c.query('INSERT INTO audita_debt_documents(id,case_id,kind,name,mime,bytes,sha256) VALUES($1,$2,$3,$4,$5,$6,$7)',[randomUUID(),id,kind,filename,mime,bytes,hash]);
-    if(['triage','details','calculation_pending'].includes(r.status)){pInvalidate(r);r.status='calculation_pending';}await save(c,r,auth,'document_uploaded');return view(c,r,auth);
+    if(['triage','details','calculation_pending','offer'].includes(r.status)){pInvalidate(r);r.status='calculation_pending';}await save(c,r,auth,'document_uploaded');return view(c,r,auth);
   });}
   async function createCheckout(auth,id,input){return tx(async c=>{
     const r=await access(c,auth,id,true),p=r.payload;owner(r,auth);

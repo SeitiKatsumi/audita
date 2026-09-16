@@ -1,5 +1,15 @@
 # Coordenação e passagem de trabalho
 
+### 2026-09-16 — Publicação da contratação e retorno aos documentos
+- Publicação autorizada pelo usuário. Codex; origem codex/debt-back-documents e codex/debt-checkout-layout, integradas na main local. Suíte completa: 387 testes aprovados; diff verificado. Sem migrações ou mudanças de configuração privada; rollback para audita:114 / b3ad461. GitHub e deploy em andamento.
+
+### 2026-09-16 — Voltar aos documentos
+- Codex, codex/debt-back-documents, main com layout local preservado. Escopo: navegação de anexos no mesmo atendimento e upload antes da contratação; preservar documentos, invalidar oferta após complemento e manter bloqueios durante análise/pagamento. Concluído e integrado ao main local, disponível na porta 3000. Seis testes pertinentes passaram (navegação, preservação de arquivos, duplicados, invalidação de oferta e bloqueio durante pagamento), sintaxe e diff verificados. Servidor reiniciado e JS servido conferido. Sem push ou deploy nesta tarefa.
+
+### 2026-09-16 — Layout da contratação de dívidas
+- Codex, codex/debt-checkout-layout, continuidade main. Escopo: bank-debt.js/css, apresentação da oferta por documentos com classes existentes do paywall Itaú; preservar cálculo, fallback, aceite e checkout. Validação desktop/mobile e integração na porta 3000 pendentes. Sem publicação solicitada nesta tarefa.
+- Concluído localmente: resumo separado com saldo cobrado, saldo estimado, economia em reais e data legível; card/faixa/preço/entregas/CTA reutilizam o paywall Itaú. Fallback e condições preservados, sem copiar promoção/parcelamento ou liberação de pagamento do Itaú. Cinco testes pertinentes passaram; navegador isolado validou desktop e 390 px, ausência de overflow, aceite obrigatório e criação do checkout fictício. Integrado na main e porta 3000 reiniciada, JS/CSS e saúde conferidos; banco local continua sem configuração, persistência validada no ambiente isolado. Sem commit/push/deploy.
+
 ### 2026-09-16 — Fallback de taxa na análise de extratos
 - Publicação e teste via interface autorizados. Suíte completa: 387 testes aprovados, nenhum ignorado. Sem migração, alteração de configuração privada ou dados existentes; rollback para release 113 / d25e627. Backup anterior registrado em 14/09; esta entrega altera apenas código. Deploy e teste com extrato fictício em andamento.
 - Publicado e verificado: GitHub/main b3ad461, CI 35135302392 aprovado, CapRover audita:114. Smoke aprovado, health 200/banco pronto/autenticação obrigatória e JS servido idêntico. Pela interface de produção, upload do extrato fictício completo, IA real, progresso 95% e conclusão 100%; juros R$ 2.597,12, saldo entre R$ 12.205,23 e R$ 12.370,32, redução 1,80–3,11%, plano R$ 199 e botão Contratar e continuar. Resultado preservado após reload. BACEN respondeu nessa execução; não foi necessário fallback.

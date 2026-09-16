@@ -38,3 +38,16 @@
 .debt-analysis-progress progress::-moz-progress-bar{background:var(--lime);border-radius:8px}
 .debt-analysis-progress small{color:#a8bfd0;font-size:.8rem}
 @media(prefers-reduced-motion:reduce){.debt-analysis-loader{animation:none}}
+
+/* Reuse the Itaú paywall; only debt-specific summary and form spacing differ. */
+#dividas-bancarias .debt-checkout h2{font-size:clamp(1.2rem,2vw,1.65rem);line-height:1.35;margin:4px 0 8px}
+.debt-checkout-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin:0}
+.debt-checkout-values dt{font-size:.85rem;color:#b8cee0;margin-bottom:10px}
+.debt-checkout-values dd{margin:0;font-size:clamp(1.15rem,2vw,1.5rem);font-weight:700;line-height:1.45;overflow-wrap:anywhere}
+.debt-checkout-values>div:last-child dd{color:#63f3af}
+.debt-checkout-notice{margin:0;padding:16px 20px;border:1px solid #315b75;border-radius:8px;background:#092033;color:#c5d2dc;line-height:1.6}
+.debt-checkout-price-label{margin:24px 0 10px}
+.debt-checkout-form{margin:0;gap:18px}
+.debt-checkout-form .primary-action{width:100%;min-height:52px;white-space:normal}
+#dividas-bancarias .debt-checkout-terms{margin-top:0;font-size:.85rem}
+@media(max-width:700px){.debt-checkout-values{grid-template-columns:1fr;gap:18px}.debt-checkout .charge-paywall-result{padding:18px;gap:12px}.debt-checkout .charge-tier-heading{flex-wrap:wrap}.debt-checkout .charge-paywall-value{padding:18px}}

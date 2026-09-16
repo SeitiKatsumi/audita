@@ -6,7 +6,7 @@ function maskCurrency(input){const digits=input.value.replace(/\D/g,'');input.va
 const questions=[['open','Você tem alguma dívida bancária em aberto?','Sim, tenho uma dívida em aberto','Não tenho dívida em aberto']];
 const statuses={triage:'Triagem',not_eligible:'Fora do foco inicial',details:'Detalhes da dívida',calculation_pending:'Aguardando cálculo',offer:'Contratação disponível',payment_pending:'Pagamento pendente',paid:'Cadastro',signature:'Documentos e assinatura',submitted:'Com o advogado'};
 const ufs='AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ');
-let current=null,config=null,busy=false,edit=false,initialized=false,poll,intakeNotice='';
+let current=null,config=null,busy=false,edit=false,viewDocuments=false,initialized=false,poll,intakeNotice='';
 async function api(path,options={}){const res=await fetch('/api/bank-debt'+path,{...options,headers:{...(typeof options.body==='string'?{'content-type':'application/json'}:{}),...options.headers}});const data=await res.json();if(!res.ok)throw Object.assign(new Error(data.message||'Não foi possível continuar.'),{status:res.status});return data;}
 const post=(path,body={})=>api(path,{method:'POST',body:JSON.stringify(body)});
 function error(message=''){$('#debtError').hidden=!message;$('#debtError').textContent=message;}
@@ -56,21 +56,26 @@ function documentIntake(){
  const explanation='';
  const request='<p><strong>Anexe abaixo os extratos bancários desde o início do saldo devedor até a presente data.</strong></p><p>Com esse histórico, vou conferir os juros, os pagamentos e o saldo da dívida para dar início à perícia e emissão de relatório, demonstrando a evolução real da dívida cobrada com juros abusivos.</p>';
  const label=analyzed?'Enviar complemento e atualizar análise':hasFiles?'Analisar extratos enviados':'Enviar extratos e analisar';
- return bubble((intakeNotice?'<p role="alert">'+esc(intakeNotice)+'</p>':'')+'<h2>'+title+'</h2>'+explanation+request+(current?.analysisError?'<p role="alert">Não foi possível concluir a leitura. Seus arquivos estão salvos. Tente analisar novamente.</p>':'')+(hasFiles?'<p class="debt-note">Os arquivos enviados já estão salvos. Não é necessário anexá-los outra vez.</p>':'')+(current&&!current.owner?'':form('documents',fileInput('files',analyzed||!hasFiles)+analysisConsent(),label))+documentList()+analysisResult()+ (current?reviewer():''));
+ return bubble((intakeNotice?'<p role="alert">'+esc(intakeNotice)+'</p>':'')+'<h2>'+title+'</h2>'+explanation+request+(current?.analysisError?'<p role="alert">Não foi possível concluir a leitura. Seus arquivos estão salvos. Tente analisar novamente.</p>':'')+(hasFiles?'<p class="debt-note">Os arquivos enviados já estão salvos. Não é necessário anexá-los outra vez.</p>':'')+(current&&!current.owner?'':form('documents',fileInput('files',current?.status==='offer'||!hasFiles)+analysisConsent(),label))+documentList()+analysisResult()+ (current?reviewer():''));
 }
 function summary(){const d=current.details;return d?`<dl class="debt-summary"><div><dt>Banco / cobrador</dt><dd>${esc(d.creditor)}</dd></div><div><dt>Dívida original informada</dt><dd>${money(d.originalCents)}</dd></div><div><dt>Cobrança atual</dt><dd>${money(d.chargedCents)}</dd></div></dl>`:'';}
 function reviewer(){if(current.operator&&!current.details)return '<details><summary>Equipe Audita · conferir dados extraídos</summary>'+detailsForm()+'</details>';if(!current.operator||!['calculation_pending','offer','paid'].includes(current.status))return '';const r=current.review||{};return `<details class="debt-review"><summary>Equipe Audita · publicar análise validada</summary><p>A estimativa BACEN é preliminar. Confira contrato, histórico, encargos e fundamentação antes de publicar a análise validada que libera a contratação.</p>${form('review',field('reviewed','Saldo recalculado (R$)',r.reviewedCents!=null?r.reviewedCents/100:'','number','min="0" step="0.01" max="100000000"')+field('price','Preço do serviço (R$)',r.priceCents?r.priceCents/100:'','number','min="1" step="0.01" max="100000000"')+area('methodology','Memória de cálculo: períodos, taxas, valores e fontes',r.methodology||current.estimateText||'','required minlength="30" maxlength="12000"')+area('legalBasis','Fundamentação jurídica específica revisada',r.legalBasis||'','required minlength="30" maxlength="12000"')+field('creditorLegalName','Razão social do credor',r.creditorLegalName||'')+field('creditorDocument','CNPJ do credor (14 dígitos)',r.creditorDocument||'','text','pattern="[0-9]{14}"')+field('creditorAddress','Endereço do credor',r.creditorAddress||'')+field('lawyerName','Nome do advogado outorgado',r.lawyerName||'')+field('lawyerOab','OAB e UF do advogado',r.lawyerOab||'')+'<label class="debt-check"><input name="confirmed" type="checkbox" required> Confirmei documentos, cálculo, fundamentação e condições do serviço.</label>','Publicar análise e contratação')}</details>`;}
 function claimantForm(){const c=current.claimant||{};return form('claimant',field('fullName','Nome completo',c.fullName||'')+field('document','CPF',c.document||'')+field('email','E-mail',c.email||'','email')+field('phone','Telefone',c.phone||'','tel')+field('nationality','Nacionalidade',c.nationality||'Brasileiro(a)')+field('maritalStatus','Estado civil',c.maritalStatus||'')+field('profession','Profissão',c.profession||'')+field('postalCode','CEP',c.postalCode||'','text','pattern="[0-9]{5}-?[0-9]{3}"')+field('street','Rua / avenida',c.street||'')+field('number','Número',c.number||'')+`<label>Complemento (opcional)<input name="complement" value="${esc(c.complement)}" maxlength="200"></label>`+field('neighborhood','Bairro',c.neighborhood||'')+field('city','Cidade',c.city||'')+select('uf','Estado',ufs.map(v=>[v,v]),c.uf||'SP')+'<label class="debt-check"><input type="checkbox" name="conciliation" required> Tenho interesse na tentativa de conciliação com o credor.</label>','Conferir procuração e contrato');}
 function render(){
   if(current?.owner&&current.status==='calculation_pending'&&!current.analysisPending&&(current.analysis||current.analysisError||current.manualReview)){
-    intakeNotice=current.analysis?.issues?.some(i=>i.message.includes('Banco Central'))?'O Banco Central está indisponível agora. Tente começar novamente em alguns minutos.':current.analysisError?'Não foi possível ler seus extratos. Envie arquivos legíveis para começar novamente.':'Os extratos enviados não permitiram concluir o cálculo para contratação. Envie extratos completos, com saldo inicial, movimentações, juros e saldo final, para começar novamente.';
-    current=null;edit=false;
-    const url=new URL(location.href);url.searchParams.delete('debt_case');history.replaceState(null,'',url);
+    viewDocuments=true;edit=false;
+    intakeNotice='Não foi possível concluir a análise. Seus arquivos estão salvos neste atendimento. Anexe documentos complementares ou tente analisar novamente.';
   }
   const s=current?.status||'triage',step=({triage:0,not_eligible:0,details:0,calculation_pending:1,offer:2,payment_pending:2,paid:3,signature:4,submitted:4})[s];
   $('#debtProgress').innerHTML=['Documentos','Análise','Contratação','Negociação','Advogado'].map((label,i)=>`<li ${i===step?'aria-current="step"':''} class="${i<step?'done':''}"><span>${i<step?'✓':i+1}</span>${label}</li>`).join('');
   let html='';
   if(!current){html=documentIntake();}
+  else if(viewDocuments&&['offer','payment_pending','paid','signature'].includes(s)){
+    html=button('return-stage','Voltar à etapa anterior');
+    if(s==='payment_pending')html+=bubble('<h2>Documentos do atendimento</h2><p>Há um pagamento pendente. Aguarde sua confirmação ou expiração antes de alterar os arquivos usados no cálculo.</p>'+documentList()+button('refresh','Consultar pagamento'));
+    else if(['paid','signature'].includes(s))html+=bubble('<h2>Anexar documentos ao atendimento</h2><p>Os arquivos anteriores estão preservados.</p>'+uploads());
+    else html+=documentIntake();
+  }
   else if(edit){html=bubble('<h2>Confira os dados da dívida</h2><p>Alterações exigem uma nova análise.</p>'+detailsForm()+button('cancel-edit','Cancelar',true));}
   else if(['triage','not_eligible','details','calculation_pending'].includes(s))html=documentIntake();
   else if(['offer','payment_pending'].includes(s)&&current.docOffer&&!current.review){html=documentOffer();}
@@ -79,7 +84,8 @@ function render(){
   else if(s==='paid')html=negotiationPanel()+bubble('<h2>Pagamento confirmado. Vamos preparar seus documentos.</h2><p>Precisamos dos seus dados para a petição e a procuração. O advogado fará o protocolo no tribunal do seu estado.</p>'+claimantForm()+uploads());
   else if(s==='signature'){html=bubble(`<h2>Confira e assine seus documentos</h2><p>Advogado indicado: ${esc(current.review.lawyerName)} · OAB ${esc(current.review.lawyerOab)}.</p><details open><summary>Procuração</summary><p class="debt-pre">${esc(current.legalTexts.powerOfAttorney)}</p></details><details><summary>Contrato do serviço</summary><p class="debt-pre">${esc(current.legalTexts.agreement)}</p></details>`+uploads()+(current.acceptance?`<p class="debt-success">Assinado por ${esc(current.acceptance.name)} em ${new Date(current.acceptance.at).toLocaleString('pt-BR')}.</p>`+button('submit','Concluir e enviar ao advogado'):form('sign',field('name','Digite seu nome completo para assinar',current.claimant.fullName)+'<label class="debt-check"><input name="accepted" type="checkbox" required> Li a procuração e o contrato e confirmo minha assinatura eletrônica.</label>','Assinar digitalmente'))+`<details><summary>Corrigir meus dados</summary><p>Após alterar, será necessário assinar novamente.</p>${claimantForm()}</details>`);}
   else if(s==='submitted')html=bubble(`<p class="debt-eyebrow">SOLICITAÇÃO CONCLUÍDA</p><h2>${current.job?.status==='filed'?'Protocolo registrado pelo advogado':'Tudo pronto para o advogado responsável'}</h2><p>Sua solicitação está completa. O advogado responsável da Audita dará início ao protocolo da sua petição no tribunal da sua região.</p><p>${current.job?.status==='filed'?`Protocolo: <strong>${esc(current.job.protocol_number)}</strong>`:current.job?.status==='claimed'?'O advogado já assumiu seu atendimento.':'Seu atendimento está na fila do advogado.'}</p><div class="charge-analysis-actions">${[['report','Baixar petição completa'],['powerOfAttorney','Baixar procuração'],['agreement','Baixar contrato']].map(([key,label])=>`<a class="secondary-action" href="/api/bank-debt/cases/${current.id}/documents/${key}">${label}</a>`).join('')}</div>${button('refresh','Atualizar acompanhamento',true)}`);
-  if(current?.analysisProgress?.stage==='completed'&&!current.analysisPending&&!current.analysisError&&['calculation_pending','offer'].includes(s)&&!edit)html=html.replace('<h2>','<p class="debt-note" role="status">Leitura concluída · 100%</p><h2>');
+  if(current?.analysisProgress?.stage==='completed'&&!current.analysisPending&&!current.analysisError&&['calculation_pending','offer'].includes(s)&&!edit)html=html.replace(/<h2\b/,'<p class="debt-note" role="status">Leitura concluída · 100%</p><h2');
+  if(current?.owner&&!viewDocuments&&['offer','payment_pending','paid','signature'].includes(s))html=button('back-documents','Voltar aos documentos')+html;
   $('#debtStage').innerHTML=html;
   const reviewForm=$('#debtStage form[data-form=review]');if(reviewForm)reviewForm.insertAdjacentHTML('afterbegin',select('lawyerUserId','Advogado responsável cadastrado',(config?.lawyers||[]).map(u=>[String(u.id),esc(u.name)]),String(current.review?.lawyerUserId||'')));
   if(current&&!current.owner)$('#debtStage').querySelectorAll('form:not([data-form="review"]):not([data-form="details"]),[data-debt="submit"],[data-answer]').forEach(e=>e.hidden=true);
@@ -87,8 +93,8 @@ function render(){
 }
 function schedulePaymentCheck(){clearTimeout(poll);if((current?.status!=='payment_pending'&&!current?.analysisPending)||document.body.dataset.activePage!=='dividas-bancarias')return;poll=setTimeout(async()=>{try{if(!busy){const id=current.id,fresh=(await api('/cases/'+id)).case;if(current?.id!==id)return;if(fresh.revision!==current.revision||(fresh.analysisPending&&Date.now()-Date.parse(fresh.analysisPending)>15*60*1000&&!$('#debtStage [data-debt=refresh]'))){current=fresh;render();await refreshList();}else if(JSON.stringify(fresh.analysisProgress)!==JSON.stringify(current.analysisProgress)){current=fresh;const progress=$('.debt-analysis-progress');if(progress)progress.outerHTML=analysisProgress();}}}catch{}finally{schedulePaymentCheck();}},current?.analysisPending?3000:10000);}
 async function refreshList(){const cases=config?.authenticated&&config.ready?(await api('/cases')).cases:[];$('#debtCases').innerHTML=cases.map(c=>`<button type="button" data-case="${c.id}" class="${c.id===current?.id?'selected':''}"><strong>${esc(c.creditor||'Nova análise')}</strong><small>${c.status==='calculation_pending'&&c.manual_review_requested?(config?.operator?'Revisão solicitada':'Envie novos extratos'):statuses[c.status]} · ${new Date(c.updated_at).toLocaleDateString('pt-BR')}</small></button>`).join('')||'<p>Nenhum atendimento salvo.</p>';if(config?.operator&&cases.some(c=>c.status==='calculation_pending'&&c.manual_review_requested))$('#debtCases').closest('details')?.setAttribute('open','');}
-async function load(id){current=(await api('/cases/'+id)).case;edit=false;const url=new URL(location.href);url.searchParams.set('debt_case',id);history.replaceState(null,'',url);render();await refreshList();}
-async function command(action,extra={}){current=(await post(`/cases/${current.id}/actions`,{action,revision:current.revision,...extra})).case;edit=false;render();await refreshList();$('#debtQuestion')?.focus();}
+async function load(id){current=(await api('/cases/'+id)).case;edit=false;viewDocuments=false;const url=new URL(location.href);url.searchParams.set('debt_case',id);history.replaceState(null,'',url);render();await refreshList();}
+async function command(action,extra={}){current=(await post(`/cases/${current.id}/actions`,{action,revision:current.revision,...extra})).case;edit=false;viewDocuments=false;intakeNotice='';render();await refreshList();$('#debtQuestion')?.focus();}
 async function start(){intakeNotice='';if(!config?.authenticated){document.querySelector('#loginButton')?.click();return;}current=(await post('/cases')).case;await load(current.id);}
 root.addEventListener('input',e=>{if(e.target.matches('[data-currency]'))maskCurrency(e.target);});
 root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
@@ -96,6 +102,8 @@ root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)retur
   if(b.dataset.case){run(()=>load(b.dataset.case));return;}
   if(b.dataset.answer){run(()=>command('answer',{key:b.dataset.answer,value:b.dataset.value==='true'}));return;}
   const action=b.dataset.debt;
+  if(action==='back-documents'){viewDocuments=true;edit=false;render();$('#debtStage').scrollIntoView?.({block:'start'});return;}
+  if(action==='return-stage'){viewDocuments=false;render();$('#debtStage').scrollIntoView?.({block:'start'});return;}
   if(action==='add-payment'){const list=$('[data-payments]');if(list.children.length<120)list.insertAdjacentHTML('beforeend',paymentRow());return;}
   if(action==='remove-payment'){b.closest('[data-payment]').remove();return;}
   if(action==='start'||action==='new')run(start);
@@ -107,7 +115,7 @@ root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)retur
   if(action==='help')error('Envie os extratos desde o início da dívida até o saldo devedor atualizado. A análise começa após o envio. Se os documentos forem insuficientes, você verá um aviso e voltará ao envio inicial. Depois da contratação, você recebe o relatório para negociar e pode solicitar a avaliação do advogado.');
 });
 root.addEventListener('submit',e=>{const f=e.target;if(!f.dataset.form)return;e.preventDefault();run(async()=>{const d=new FormData(f),v=Object.fromEntries(d),cents=k=>currencyCents(v[k]);
-  if(f.dataset.form==='documents'){const files=[...f.querySelector('[name=files]').files],consent=d.has('consent')||!!current?.documentConsent;if(!current)await start();if(!current)return;if(files.length)await uploadFiles(files);await command('analyze',{consent});}
+  if(f.dataset.form==='documents'){const files=[...f.querySelector('[name=files]').files],consent=d.has('consent')||!!current?.documentConsent;if(!current)await start();if(!current)return;if(files.length)await uploadFiles(files);if(current.status==='offer'){viewDocuments=false;render();return;}await command('analyze',{consent});}
   if(f.dataset.form==='retry-analysis')await command('analyze',{consent:d.has('consent')||!!current?.documentConsent});
   if(f.dataset.form==='estimate')await command('estimate',{scenario:{modality:v.modality,contractDate:v.contractDate,baseDate:v.baseDate,asOf:v.asOf,baseCents:cents('base'),contractMonthlyRate:v.contractRate===''?null:Number(v.contractRate),capitalization:v.capitalization,payments:[...f.querySelectorAll('[data-payment]')].map(row=>({date:row.querySelector('[name=paymentDate]').value,amountCents:currencyCents(row.querySelector('[name=paymentAmount]').value)})),confirmed:d.has('confirmed')}});
   if(f.dataset.form==='details')await command('details',{details:{creditor:v.creditor,kind:v.kind,since:v.since,originalCents:cents('original'),chargedCents:cents('charged'),description:current.details?.description||'',consent:d.has('consent')}});
@@ -120,7 +128,7 @@ root.addEventListener('submit',e=>{const f=e.target;if(!f.dataset.form)return;e.
 async function init(){config=await api('/config');const id=new URLSearchParams(location.search).get('debt_case');if(config.authenticated&&config.ready&&id)await load(id);else{current=null;render();await refreshList();}}
 function activate(){if(document.body.dataset.activePage!=='dividas-bancarias'){clearTimeout(poll);return;}if(!initialized){initialized=true;run(async()=>{try{await init();}catch(e){initialized=false;throw e;}});}else render();}
 document.addEventListener('audita:pagechange',activate);
-window.addEventListener('audita:auth-changed',()=>{clearTimeout(poll);current=null;config=null;initialized=false;render();activate();});
+window.addEventListener('audita:auth-changed',()=>{clearTimeout(poll);current=null;config=null;viewDocuments=false;initialized=false;render();activate();});
 render();activate();
 
 async function uploadFiles(files,kind='evidence'){
@@ -128,5 +136,50 @@ async function uploadFiles(files,kind='evidence'){
  for(const file of files){current=(await api(`/cases/${current.id}/documents?kind=${encodeURIComponent(kind)}&name=${encodeURIComponent(file.name)}`,{method:'POST',body:file,headers:{'content-type':'application/octet-stream'}})).case;}render();
 }
 function analysisResult(){const a=current?.analysis;if(!a)return '';const source=id=>current.documents.find(d=>d.id===id)?.name||'Conferência geral';return '<details><summary>O que encontramos nos arquivos</summary><dl class="debt-summary"><div><dt>Banco identificado</dt><dd>'+esc(a.bank)+'</dd></div><div><dt>Total de juros identificados nos extratos</dt><dd>'+money(a.totals.interestCents)+'</dd></div><div><dt>Encargos de atraso (mora)</dt><dd>'+money(a.totals.lateCents)+'</dd></div></dl>'+((a.reconciliations||[]).map(r=>'<p>Saldo inicial conciliado com o extrato anterior: '+money(r.openingBalanceCents)+'. Arquivo: '+esc(source(r.documentId))+'.</p>').join(''))+'<p>Esses valores são cobranças encontradas nos documentos. Ainda não representam juros abusivos confirmados nem o valor de redução da dívida.</p><h3>O que precisa ser conferido</h3><ul>'+a.issues.map(i=>'<li><strong>'+esc(source(i.documentId))+':</strong> '+esc(i.message)+'</li>').join('')+'</ul><details><summary>Ver lançamentos encontrados</summary><div style="overflow-x:auto"><table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Arquivo / página</th></tr></thead><tbody>'+a.rows.map(r=>'<tr><td>'+esc(r.date)+'</td><td>'+esc(r.description)+'</td><td>'+money(r.amountCents)+'</td><td>'+esc(source(r.documentId))+' · '+r.page+'</td></tr>').join('')+'</tbody></table></div></details></details>';}
-function documentOffer(){const offer=current.docOffer,r=offer.range;return bubble(`<h2>Sua análise está disponível</h2>${current.analysis.rateFallbackNotice?`<p role="status">${esc(current.analysis.rateFallbackNotice)}</p>`:''}<dl class="debt-summary"><div><dt>Juros identificados nos extratos</dt><dd>${money(current.analysis.totals.interestCents)}</dd></div></dl><div class="debt-result"><p>Saldo estimado em ${esc(r.asOf)}</p><strong>Entre ${money(r.minCents)} e ${money(r.maxCents)}</strong><p>Redução estimada de ${r.minReductionPercent.toLocaleString('pt-BR')}% a ${r.maxReductionPercent.toLocaleString('pt-BR')}%</p><p>Comparado à cobrança de ${money(r.chargedCents)} documentada nessa data. O acordo depende do credor; o resultado não é garantido.</p></div><details><summary>Como calculamos</summary>${current.analysis.assumptions.map(v=>'<p>'+esc(v)+'</p>').join('')}</details><section class="debt-plan"><h3>${esc(offer.planName)} · ${money(offer.priceCents)}</h3><p>Pagamento único. Relatório e passo a passo para negociar. Se não resolver, encaminhamento para avaliação do advogado Audita.</p><p>${esc(current.terms)}</p>${form('checkout','<label class="debt-check"><input name="accepted" type="checkbox" required> Li a análise e as condições do serviço.</label>','Contratar e continuar')}</section>`);}
+function documentOffer(){
+ const offer=current.docOffer,r=offer.range,a=current.analysis,date=r.asOf.split('-').reverse().join('/');
+ const reductionMin=r.chargedCents-r.maxCents,reductionMax=r.chargedCents-r.minCents;
+ return `<div class="charge-paywall debt-checkout">
+  <section class="charge-paywall-result" aria-labelledby="debtOfferTitle">
+   <span class="charge-analysis-mark" aria-hidden="true"><img src="/assets/audita-logo-original.png" alt=""></span>
+   <div><p class="eyebrow">Análise preliminar concluída</p>
+    <h2 id="debtOfferTitle">Sua dívida pode ter uma redução de ${r.minReductionPercent.toLocaleString('pt-BR')}% a ${r.maxReductionPercent.toLocaleString('pt-BR')}%</h2>
+    <p>Confira a estimativa e o serviço indicado para o seu atendimento.</p>
+   </div>
+  </section>
+  ${a.rateFallbackNotice?`<p class="debt-checkout-notice" role="status">${esc(a.rateFallbackNotice)}</p>`:''}
+  <section class="charge-paywall-value" aria-label="Resumo do cálculo">
+   <dl class="debt-checkout-values">
+    <div><dt>Saldo cobrado no extrato</dt><dd>${money(r.chargedCents)}</dd></div>
+    <div><dt>Saldo estimado pela Audita</dt><dd>${money(r.minCents)} a ${money(r.maxCents)}</dd></div>
+    <div><dt>Redução estimada em reais</dt><dd>${money(reductionMin)} a ${money(reductionMax)}</dd></div>
+   </dl>
+   <p class="debt-note">Valores em ${esc(date)}. Estimativa antes do custo do serviço. O acordo depende do credor; a redução não é garantida.</p>
+   <details><summary>Como calculamos</summary>
+    <p>Juros identificados nos extratos: <strong>${money(a.totals.interestCents)}</strong>. Esse total não corresponde automaticamente a juros abusivos.</p>
+    ${a.assumptions.map(v=>'<p>'+esc(v)+'</p>').join('')}
+   </details>
+  </section>
+  <section class="charge-paywall-plans charge-paywall-tiers" aria-label="Oferta do serviço de dívidas bancárias">
+   <article class="charge-tier-card recommended selected">
+    <div class="charge-tier-content">
+     <header class="charge-tier-heading"><h3>${esc(offer.planName)}</h3><em>Sua faixa</em></header>
+     <p class="debt-checkout-price-label">Seu plano de atendimento</p>
+     <strong class="charge-tier-price">${money(offer.priceCents)}</strong>
+     <p class="charge-tier-installments">Pagamento único</p>
+     <ul class="charge-tier-inclusions" aria-label="Itens incluídos na contratação">
+      <li><strong>Relatório de análise da dívida</strong><span>Conferência dos juros e da evolução do saldo com memória do cálculo.</span></li>
+      <li><strong>Documento e passo a passo para negociar</strong><span>Orientações para apresentar a proposta ao banco ou à empresa de cobrança.</span></li>
+      <li><strong>Avaliação do advogado Audita</strong><span>Se a negociação não resolver, encaminhamento para avaliar a medida judicial.</span></li>
+     </ul>
+    </div>
+    <details class="debt-checkout-terms"><summary>Condições do serviço</summary><p>${esc(current.terms)}</p></details>
+    <form data-form="checkout" class="debt-form debt-checkout-form">
+     <label class="debt-check"><input name="accepted" type="checkbox" required> Li a análise e as condições do serviço.</label>
+     <button type="submit" class="primary-action">Contratar e continuar</button>
+    </form>
+   </article>
+  </section>
+ </div>`;
+}
 function negotiationPanel(){return bubble(`<h2>Primeiro, vamos tentar resolver por negociação</h2><p>Baixe o documento e siga os passos. Guarde as respostas para o advogado, caso seja necessário.</p><div class="charge-analysis-actions"><a href="/api/bank-debt/cases/${current.id}/documents/negotiation">Baixar laudo de renegociação</a></div><ol><li>Confirme com o banco o canal oficial da empresa de cobrança.</li><li>Envie o relatório e peça a memória de evolução da dívida.</li><li>Solicite uma proposta por escrito e guarde o protocolo.</li><li>Confira condições, beneficiário e quitação antes de pagar.</li><li>Se não resolver, solicite o advogado responsável pela Audita.</li></ol>`);}

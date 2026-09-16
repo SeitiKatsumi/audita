@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 
-test('extratos suficientes contratam; insuficientes e revisões antigas voltam ao início',async()=>{
+test('extratos preservam atendimento ao complementar e permitem voltar da oferta',async()=>{
  const elements=new Map(),listeners={};
  const element=s=>{if(!elements.has(s))elements.set(s,{innerHTML:'',setAttribute(){},insertAdjacentHTML(){}});return elements.get(s);};
  const root={querySelector:s=>s.includes('form[')?null:element(s),querySelectorAll:()=>[],setAttribute(){},addEventListener:(name,fn)=>listeners[name]=fn};
@@ -21,14 +21,20 @@ test('extratos suficientes contratam; insuficientes e revisões antigas voltam a
  const pending=vm.runInContext('JSON.stringify(current)',context);
  for(const state of ["analysis={bank:'Banco teste',totals:{interestCents:10000,lateCents:0},issues:[],rows:[]}","manualReview={requestedAt:'2024-01-01'}","analysisError='Falha temporária'"]){
   vm.runInContext(`current=JSON.parse(${JSON.stringify(pending)});current.analysisPending=null;current.${state};render();`,context);
-  assert.equal(vm.runInContext('current',context),null);
-  assert.match(html(),/role="alert"/);assert.match(html(),/começar novamente/);
-  assert.match(html(),/Envie seus extratos bancários/);assert.match(html(),/Enviar extratos e analisar/);
-  assert.doesNotMatch(html(),/revisão|Consultar revisão|complementares/);
+  assert.equal(vm.runInContext('current.id',context),'qa');
+  assert.match(html(),/role="alert"/);assert.match(html(),/arquivos estão salvos/);
+  assert.match(html(),/Envie seus extratos bancários/);assert.match(html(),/type="file"/);
  }
  vm.runInContext(`current=JSON.parse(${JSON.stringify(pending)});current.analysisPending=new Date(Date.now()-16*60*1000).toISOString();delete current.documentConsent;render();`,context);
  assert.match(html(),/Tentar novamente/);assert.match(html(),/name="consent"/);assert.doesNotMatch(html(),/type="file"/);
- vm.runInContext("current.analysis={totals:{interestCents:10000},assumptions:[]}",context);
- vm.runInContext(`current.analysisPending=null;current.status='offer';current.analysis.assumptions=[];current.docOffer={id:'offer',priceCents:19900,planName:'Plano de teste',range:{asOf:'2024-01-31',minCents:100000,maxCents:102000,chargedCents:120000,minReductionPercent:15,maxReductionPercent:16}};render();`,context);
+ vm.runInContext("current.analysis={totals:{interestCents:10000},assumptions:[],issues:[],rows:[]}",context);
+ vm.runInContext(`viewDocuments=false;current.analysisPending=null;current.status='offer';current.analysis.assumptions=[];current.docOffer={id:'offer',priceCents:19900,planName:'Plano de teste',range:{asOf:'2024-01-31',minCents:100000,maxCents:102000,chargedCents:120000,minReductionPercent:15,maxReductionPercent:16}};render();`,context);
  assert.doesNotMatch(html(),/debt-analysis-loader/);assert.match(html(),/Plano de teste/);assert.match(html(),/Juros identificados nos extratos/);assert.match(html(),/100,00/);assert.match(html(),/Contratar e continuar/);assert.doesNotMatch(html(),/type="file"|Enviar complemento/);
+ assert.match(html(),/Voltar aos documentos/);
+ listeners.click({target:{closest:()=>({dataset:{debt:'back-documents'}})}});
+ assert.equal(vm.runInContext('current.id',context),'qa');assert.match(html(),/type="file"/);assert.match(html(),/Voltar à etapa anterior/);
+ listeners.click({target:{closest:()=>({dataset:{debt:'return-stage'}})}});
+ assert.match(html(),/Contratar e continuar/);assert.doesNotMatch(html(),/type="file"/);
+ vm.runInContext("current.status='payment_pending';viewDocuments=true;render()",context);
+ assert.match(html(),/pagamento pendente/);assert.doesNotMatch(html(),/type="file"/);
 });

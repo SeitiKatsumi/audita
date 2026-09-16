@@ -68,6 +68,17 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  assert.match(c.analysis.rateFallbackNotice,/7,4%/);assert.equal(c.analysis.rates[0].fallback,true);
  await assert.rejects(service.download(auth,c.id,'negotiation'),{status:403});
  await service.createCheckout(auth,c.id,{accepted:true,reviewId:c.docOffer.id});
+ await assert.rejects(service.upload(auth,c.id,{bytes,kind:'evidence',name:'durante-pagamento.pdf'}),{status:409});
+ let extra=await service.create(auth);
+ extra=await service.upload(auth,extra.id,{bytes,kind:'evidence',name:'original.pdf'});
+ extra=await service.command(auth,extra.id,{action:'analyze',revision:extra.revision,consent:true});
+ assert.equal(extra.status,'offer');const oldOffer=extra.docOffer.id;
+ const repeated=await service.upload(auth,extra.id,{bytes,kind:'evidence',name:'repetido.pdf'});
+ assert.equal(repeated.docOffer.id,oldOffer);assert.equal(repeated.documents.length,1);
+ await assert.rejects(service.upload({tenantId:2,user:{id:802}},extra.id,{bytes,kind:'evidence',name:'outro.pdf'}),{status:404});
+ extra=await service.upload(auth,extra.id,{bytes:Buffer.concat([bytes,Buffer.from('\n')]),kind:'evidence',name:'complemento.pdf'});
+ assert.equal(extra.status,'calculation_pending');assert.equal(extra.documents.length,2);assert.equal(extra.docOffer,null);assert.ok(extra.documentConsent);
+ await assert.rejects(service.createCheckout(auth,extra.id,{accepted:true,reviewId:oldOffer}),{status:409});
  const event={id:'evt_test_docs',type:'checkout.session.completed',data:{object:{id:'cs_test_docs',payment_status:'paid',currency:'brl',amount_total:19900,metadata:{debt_case_id:c.id,debt_review_id:c.docOffer.id,audita_user_id:'801',audita_tenant_id:'1'}}}};
  await service.paymentEvent(event);assert.equal((await service.paymentEvent(event)).duplicate,true);
  c=await service.get(auth,c.id);assert.equal(c.status,'paid');const report=await service.download(auth,c.id,'negotiation');assert.ok((await PDFDocument.load(report.bytes)).getPageCount()>0);

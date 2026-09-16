@@ -125,3 +125,6 @@ O preço é publicado pela equipe por atendimento; não se inferiu uma tabela de
 - [Código de Processo Civil — requisitos da inicial e consignação](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2015/lei/l13105.htm).
 
 A documentação técnica e os testes não substituem a validação da metodologia financeira e dos modelos pelo responsável jurídico.
+
+### Retorno aos documentos
+A contratação, negociação e assinatura permitem voltar aos documentos do mesmo atendimento. Um novo extrato antes da contratação preserva os anexos e invalida a oferta para recalcular. Arquivos duplicados mantêm a oferta existente. Análise inconclusiva preserva o atendimento para complementação. Durante pagamento pendente, os anexos ficam somente para consulta; após pagamento, documentos complementares não alteram a oferta contratada.
