@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS audita_debt_documents (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS audita_debt_documents_case ON audita_debt_documents(case_id);
+ALTER TABLE audita_debt_documents ADD COLUMN IF NOT EXISTS extraction_cache JSONB;
 CREATE TABLE IF NOT EXISTS audita_debt_events (
   id TEXT PRIMARY KEY,
   case_id UUID NOT NULL REFERENCES audita_debt_cases(id),

@@ -4,17 +4,40 @@ Atualização local em 15/09/2026. O cliente começa enviando PDFs, imagens ou p
 
 O envio usa uma única área, orientada por: “Anexe abaixo os extratos bancários desde o início do saldo devedor até a presente data.” Enviar e analisar é uma só ação. Durante a leitura, a tela mostra o andamento e os arquivos salvos; novos anexos ficam bloqueados até terminar. Complementos reutilizam a autorização registrada. Arquivos idênticos do mesmo tipo não são inseridos novamente nem invalidam a análise; cópias históricas continuam armazenadas, mas apenas uma participa da lista, leitura e pacote documental. Os achados ficam recolhidos e distinguem juros identificados de redução confirmada.
 
-A extração valida datas, centavos, sinal, categoria, saldo e referência à página. A conferência aritmética bloqueia a oferta em caso de lacunas, contas divergentes, mora não decomposta, transferências, duplicatas possíveis ou valores não reconciliados. A tela apresenta os achados e pede complementos. Contas e documentos históricos continuam preservados.
+A extração valida datas, centavos, sinal, categoria, saldo e referência à página. A conferência aritmética bloqueia a oferta em caso de lacunas, contas divergentes, mora não decomposta, transferências, duplicatas possíveis ou valores não reconciliados. A tela apresenta um aviso e retorna ao envio inicial. Contas e documentos históricos continuam preservados.
 
-## Revisão assistida quando a análise não conclui
+## Extrato insuficiente
 
-O cliente pode escolher **Avançar para revisão da Audita**, sem novo anexo e sem cobrança. O pedido fica persistido no atendimento (`manualReview`) e ganha prioridade e identificação na lista existente do módulo para a equipe `super_admin`. Não envia mensagem externa nem abre processo judicial. A equipe abre o atendimento, confere os documentos e os achados, preenche os dados necessários e publica a revisão pelo formulário existente. A edição dos dados nessa etapa preserva a extração para conferência. Só a revisão validada libera contratação; a tela do cliente consulta atualizações automaticamente. Complementos permanecem opcionais, em área recolhida. Falha da leitura também permite solicitar revisão com arquivos já salvos.
+O cliente retorna ao envio inicial com aviso quando a leitura falha ou não permite calcular a oferta. Não há pedido de revisão nem espera pela equipe. Novo envio cria outro atendimento, preservando documentos e histórico anteriores. Pedidos antigos de revisão também retornam ao início ao serem abertos pelo proprietário. Com dados suficientes, a oferta mostra os juros extraídos e a contratação; pagamento confirmado libera o laudo de renegociação.
 
 A análise versão 3 concilia saldo anterior zero com o fechamento impresso do documento anterior apenas quando banco, conta, modalidade, titularidade PF/PJ/MEI e data de fronteira coincidem, não há sobreposição e todos os saldos intermediários e o fechamento do documento seguinte conferem. Registra o saldo original e a origem da conciliação; mantém linhas e auditoria. Não infere o primeiro principal ausente. Aplicações/resgates explicitamente identificados de investimento automático são mantidos como movimentações; outros créditos/transferências e mora continuam exigindo conferência. A diferença inicial é quantificada, sem presumir que seja dívida ou juros. Extratos antigos não são tratados como saldo atual.
 
 A leitura ocorre página a página: a IA transcreve a coluna numérica literal e todos os saldos intermediários; o código converte centavos e classifica depois. O sinal impresso prevalece sobre a descrição da rubrica. Cada página com divergência aritmética recebe uma releitura, aceita somente se reduzir divergências sem aumentar pendências. A análise privada conserva linhas, páginas, saldos e tentativas para conferência. Não inventa saldo inicial nem presume quitação a partir de um crédito. O processamento continua em segundo plano; após reinício do servidor, uma leitura interrompida pode ser repetida depois de 15 minutos, sem retomada automática.
 
 Usa `AUDITA_DEBT_MODEL` (padrão `gpt-5.4`, raciocínio médio), separado do modelo do chat geral. Complementos sem coluna de valor não constituem novos lançamentos. Releituras não podem remover linhas financeiras ou saldos para aparentar reconciliação. Mantém as chaves e o registro de consumo da integração existente; não adiciona dependências.
+
+## Leitura paralela, reaproveitamento e progresso
+
+Até três páginas são lidas simultaneamente por instância do extrator, inclusive
+entre atendimentos concorrentes. A ordem física é preservada na conferência.
+Datas ausentes recebem releitura com contexto da página anterior; só são aceitas
+se os valores, tipos, descrições e datas já conhecidas permanecerem iguais.
+As releituras aritméticas e os bloqueios financeiros continuam ativos.
+
+`audita_debt_documents.extraction_cache` guarda páginas concluídas e extração final
+no banco privado, vinculadas ao arquivo (SHA-256), versão da leitura e modelo.
+Tentativas após falha e documentos complementares reaproveitam essas páginas.
+Não compartilha cache entre atendimentos nem retorna seu conteúdo pela API do
+cliente. Mudança de arquivo, modelo ou versão exige nova leitura. A comparação
+financeira é refeita; o cache não confirma redução nem reaproveita uma oferta.
+A coluna é adicionada de forma idempotente, sem alterar documentos existentes.
+
+`analysisProgress` persiste páginas concluídas, total e etapa sem mudar a revisão
+otimista do atendimento. A UI consulta a cada 3 segundos durante a análise e
+preserva a área de documentos aberta. Até 90% representa páginas lidas; 95% é a
+conferência final/cálculo; 100% só aparece depois de salvar o resultado. A barra
+não avança por tempo decorrido. Não há percentual de aceleração real prometido:
+testes usam respostas sintéticas, sem enviar extratos de clientes ou consumir IA.
 
 ## Comparação e contratação
 

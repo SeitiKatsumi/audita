@@ -25,7 +25,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
       debtRequire(input.consent===true,'Autorize a leitura dos documentos.');
       debtRequire(['triage','details','calculation_pending'].includes(r.status)&&r.revision===input.revision,'Atualize antes de analisar.',409);
       debtRequire(!analyzing.has(id)&&(!r.payload.analysisPending||Date.now()-Date.parse(r.payload.analysisPending)>15*60*1000),'A leitura já está em andamento.',409);
-      r.payload.analysisPending=new Date().toISOString();r.payload.documentConsent={at:now().toISOString()};r.payload.analysisError=null;await save(c,r,auth,'analysis_started');return view(c,r,auth);});
+      r.payload.analysisPending=new Date().toISOString();r.payload.analysisProgress={percent:0,completed:0,total:0,stage:'preparing'};r.payload.documentConsent={at:now().toISOString()};r.payload.analysisError=null;await save(c,r,auth,'analysis_started');return view(c,r,auth);});
     // Trabalho externo fora da transação; revisão otimista impede publicar sobre arquivos alterados.
     void command(auth,id,{...input,revision:snapshot.revision}).catch(async()=>{
       try{await tx(async c=>{const r=await access(c,auth,id,true);if(r.payload.analysisPending===snapshot.analysisPending){r.payload.analysisPending=null;r.payload.analysisError='Não foi possível concluir a leitura. Tente novamente ou envie arquivos menores.';await save(c,r,auth,'analysis_failed');}});}catch{}
@@ -39,9 +39,35 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
       debtRequire(['triage','details','calculation_pending'].includes(snapshot.status)&&snapshot.revision===input.revision,'Atualize antes de analisar.',409);
       debtRequire(input.consent===true,'Autorize a leitura dos documentos.');
       debtRequire(extractor,'Leitura por IA indisponível.',503);
-      const docs=uniqueDocuments((await db().query("SELECT id,kind,mime,bytes,sha256 FROM audita_debt_documents WHERE case_id=$1 AND kind='evidence' ORDER BY created_at,id",[id])).rows);
+      const docs=uniqueDocuments((await db().query("SELECT id,kind,mime,bytes,sha256,extraction_cache FROM audita_debt_documents WHERE case_id=$1 AND kind='evidence' ORDER BY created_at,id",[id])).rows);
       debtRequire(docs.length,'Envie seus extratos primeiro.');
-      debtRequire(!analyzing.has(id),'A análise deste atendimento já está em andamento.',409);analyzing.add(id);try{const parsed=[];for(const doc of docs)parsed.push({id:doc.id,data:await extractor({...doc,bytes:Buffer.from(doc.bytes)},auth)});analysis=await analyzeStatements(parsed,{rateProvider});}finally{analyzing.delete(id);}
+      debtRequire(!analyzing.has(id),'A análise deste atendimento já está em andamento.',409);analyzing.add(id);
+      try{
+        let total=0,completed=0,progressWrite=Promise.resolve();
+        for(const doc of docs){doc.bytes=Buffer.from(doc.bytes);doc.pages=doc.mime==='application/pdf'?(await PDFDocument.load(doc.bytes)).getPageCount():1;total+=doc.pages;}
+        function progress(state){
+          const value={...state,total,updatedAt:new Date().toISOString()};
+          progressWrite=progressWrite.then(async()=>{
+            const saved=await db().query("UPDATE audita_debt_cases SET payload=jsonb_set(payload,'{analysisProgress}',$2::jsonb) WHERE id=$1 AND revision=$3 RETURNING id",[id,value,input.revision]);
+            debtRequire(saved.rows.length,'Este atendimento foi atualizado. Atualize a tela.',409);
+          });return progressWrite;
+        }
+        await progress({percent:0,completed:0,stage:'reading'});
+        const parsed=[];
+        for(const [index,doc] of docs.entries()){
+          const data=await extractor(doc,auth,{
+            cache:doc.extraction_cache,
+            saveCache:async cache=>{
+              const saved=await db().query('UPDATE audita_debt_documents SET extraction_cache=$3 WHERE id=$1 AND case_id=$2 AND sha256=$4 AND EXISTS (SELECT 1 FROM audita_debt_cases WHERE id=$2 AND revision=$5) RETURNING id',[doc.id,id,cache,doc.sha256,input.revision]);
+              debtRequire(saved.rows.length,'Este atendimento foi atualizado. Atualize a tela.',409);
+            },
+            onProgress:p=>progress({completed:completed+p.completed,percent:Math.floor((completed+p.completed)/total*90),stage:p.stage,document:index+1,documents:docs.length}),
+          });
+          parsed.push({id:doc.id,data});completed+=doc.pages;
+        }
+        await progress({percent:95,completed:total,stage:'calculating'});
+        analysis=await analyzeStatements(parsed,{rateProvider});
+      }finally{analyzing.delete(id);}
       analysis.documentHashes=docs.map(d=>({id:d.id,sha256:d.sha256}));
     }
     if(input.action==='estimate'){
@@ -54,7 +80,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     debtRequire(r.revision===input.revision,'Este atendimento foi atualizado. Atualize a tela antes de continuar.',409);
     const action=input.action;
     if(action==='analyze'){
-      owner(r,auth);p.analysisPending=null;p.analysisError=null;p.analysis=analysis;p.review=null;p.docOffer=null;p.estimate=null;p.documentConsent={at:now().toISOString()};r.status='calculation_pending';
+      owner(r,auth);p.analysisPending=null;p.analysisProgress={...p.analysisProgress,percent:100,stage:'completed'};p.analysisError=null;p.analysis=analysis;p.review=null;p.docOffer=null;p.estimate=null;p.documentConsent={at:now().toISOString()};r.status='calculation_pending';
       if(analysis.range){const range=analysis.range,plan=debtPlan(range.chargedCents-range.maxCents);p.docOffer={id:randomUUID(),priceCents:plan.price.cents,planName:plan.name,range};r.status='offer';}
      }else if(action==='request-review'){
       owner(r,auth);debtRequire(r.status==='calculation_pending'&&!p.analysisPending&&(p.analysis||p.analysisError),'Aguarde a leitura terminar antes de solicitar revisão.',409);
@@ -106,7 +132,7 @@ export function createBankDebtService({getDb,checkout,rateProvider,extractor,now
     }else debtRequire(false,'Ação inválida.',400);
     await save(c,r,auth,action);return view(c,r,auth);
   });}
-  function pInvalidate(r){r.payload.analysis=null;r.payload.docOffer=null;r.payload.estimate=null;r.payload.review=null;r.payload.analysisPending=null;r.payload.analysisError=null;}
+  function pInvalidate(r){r.payload.analysis=null;r.payload.docOffer=null;r.payload.estimate=null;r.payload.review=null;r.payload.analysisPending=null;r.payload.analysisProgress=null;r.payload.analysisError=null;}
   async function upload(auth,id,{bytes,name,kind}){return tx(async c=>{
     const r=await access(c,auth,id,true);owner(r,auth);debtRequire(['triage','details','calculation_pending','paid','signature'].includes(r.status),'Anexos não podem ser alterados nesta etapa.',409);
     debtRequire(['identity','address','evidence'].includes(kind),'Tipo de documento inválido.');

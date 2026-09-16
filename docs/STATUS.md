@@ -218,3 +218,21 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Produção: CapRover audita release 112, versão 2834f28748567b6fa3d4d966c31b6ce05b276564; health 200 com database.ready=true, auth obrigatória e smoke-production aprovado.
 - A restauração inicial por reinício somente da aplicação confirmou que o banco já estava disponível. Nenhum volume, dado ou credencial alterado. Motivo do reinício externo do PostgreSQL não identificado pelos logs disponíveis.
 - Local: main conciliada e servidor reiniciado em localhost:3000; configuração local continua sem DATABASE_URL. Interface de produção carrega e solicita login; fluxo autenticado de envio não foi repetido nesta correção.
+
+## 2026-09-16 — Velocidade e progresso da análise (concluído localmente)
+- Responsável: Codex; branch codex/debt-analysis-speed, continuidade da versão main do módulo.
+- Escopo: extração com concorrência limitada, cache privado por documento/página, progresso persistido e porcentagem na UI; arquivos bank-debt e testes do módulo.
+- Preservar datas entre páginas, sinais, reconciliação e bloqueios financeiros. Validar em documentos fictícios e conciliar na main local/porta 3000. Publicação separada.
+- Implementado: três chamadas simultâneas por instância, prompt reduzido, cache privado de páginas/resultados por SHA/modelo/versão e progresso persistido. Datas dependentes de outra página recebem releitura restrita. UI mostra páginas, porcentagem e conferência, atualizando a cada 3 segundos.
+- Validação: 386 testes passaram. Concorrência global limitada a três, ordem preservada, zero chamadas extras com cache completo e somente página faltante após falha. Cache não aparece na API do cliente; isolamento e revisão otimista mantidos. Navegador com documento/IA fictícios confirmou conclusão e contratação, sem consumo de tokens reais.
+- Interface: porcentagens intermediárias 20% e 40% confirmadas com a barra visível; recarregar preserva o progresso. Alterações conciliadas na main local, preservando mudanças dos coletores. Sem commit, push ou deploy desta melhoria. Migração aditiva pendente em produção; banco local principal continua sem DATABASE_URL.
+- Porta 3000 reiniciada; JavaScript e CSS servidos conferem com os arquivos integrados. Fluxo persistente validado em PostgreSQL isolado com dados fictícios, não com atendimentos reais.
+
+### 2026-09-16 — Fluxo direto de extratos
+- Codex, codex/dividas-fluxo-direto: retirada a tela de revisão do cliente. Insuficiência retorna ao envio inicial com aviso; históricos preservados. Oferta exibe juros extraídos. Integração local preserva o progresso da análise da tarefa paralela. Validação em andamento.
+
+- Concluído na main local/porta 3000: aviso e retorno automático ao envio inicial, juros visíveis na oferta e laudo após pagamento. Alterações de progresso/cache da tarefa paralela preservadas. Nove testes passaram; navegador isolado com API fictícia validou os três estados usando o JS servido pela porta 3000. Arquivo servido confere com o checkout; diff sem erros.
+- PDFs fictícios completo/incompleto em output/pdf, renderizados e conferidos. Leitor OpenAI real extraiu R$ 2.597,12 em juros; extrato completo conciliou, incompleto bloqueou. BACEN real retornou HTTP 503; comparação positiva validada apenas com taxa fictícia de teste. Local segue sem banco configurado; nenhum pagamento real, push ou deploy.
+
+### 2026-09-16 — Publicação de velocidade e fluxo consolidado
+- Codex; publicação completa autorizada pelo usuário. Inclui leitura paralela/cache/progresso e fluxo direto integrado. 386 testes passaram no conjunto, diff verificado. Coluna extraction_cache aditiva e idempotente; documentos e configurações privadas preservados. Push e deploy em andamento; rollback de código disponível na release 112.

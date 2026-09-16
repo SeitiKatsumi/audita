@@ -29,4 +29,12 @@
 @media(max-width:600px){.debt-summary{grid-template-columns:1fr}.debt-history{margin-left:0}.debt-plan{padding:14px}}
 
 .debt-analysis-loader{margin-top:16px}
+.debt-analysis-progress{margin:20px 0;display:grid;gap:10px}
+.debt-progress-label{display:flex;justify-content:space-between;align-items:baseline;gap:16px}
+.debt-progress-label strong{color:var(--lime);font-size:1.3rem;white-space:nowrap}
+.debt-analysis-progress progress{display:block;width:100%;height:10px;border:0;border-radius:8px;overflow:hidden;background:#163b52;accent-color:var(--lime)}
+.debt-analysis-progress progress::-webkit-progress-bar{background:#163b52;border-radius:8px}
+.debt-analysis-progress progress::-webkit-progress-value{background:var(--lime);border-radius:8px}
+.debt-analysis-progress progress::-moz-progress-bar{background:var(--lime);border-radius:8px}
+.debt-analysis-progress small{color:#a8bfd0;font-size:.8rem}
 @media(prefers-reduced-motion:reduce){.debt-analysis-loader{animation:none}}

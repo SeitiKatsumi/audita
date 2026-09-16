@@ -32,7 +32,7 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,role,password_hash) VALUES(801,1,'example@example.test','Teste','member','test')");
  const auth={tenantId:1,user:{id:801}},pool={query:(...a)=>pg.query(...a),connect:async()=>({query:(...a)=>pg.query(...a),release(){}})};
  let calls=0,release,started,extracted=data;const hold=new Promise(r=>release=r),reading=new Promise(r=>started=r);
- const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async()=>{calls++;started();await hold;return extracted;},rateProvider,checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
+ const service=createBankDebtService({getDb:()=>({pool,dbReady:true}),extractor:async(doc,auth,hooks)=>{calls++;assert.equal(hooks.cache,null);await hooks.saveCache({fixtureCache:'private'});await hooks.onProgress({completed:1,total:1,stage:'checking'});started();await hold;return extracted;},rateProvider,checkout:async()=>({id:'cs_test_docs',url:'https://checkout.stripe.com/test',expiresAt:9999999999})});
  let c=await service.create(auth);const doc=await PDFDocument.create();doc.addPage();const bytes=Buffer.from(await doc.save());
  c=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio.pdf'});assert.equal(c.status,'calculation_pending');
  const duplicate=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio (1).pdf'});assert.equal(duplicate.documents.length,1);assert.equal(duplicate.revision,c.revision);
@@ -40,9 +40,12 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  assert.equal((await service.get(auth,c.id)).documents.length,1);
  await assert.rejects(service.command(auth,c.id,{action:'analyze',revision:c.revision,consent:false}));
  c=await service.startAnalysis(auth,c.id,{action:'analyze',revision:c.revision,consent:true});await reading;assert.ok(c.analysisPending);assert.ok(c.documentConsent);
+ const fresh=await service.get(auth,c.id);assert.equal(fresh.revision,c.revision);assert.equal(fresh.analysisProgress.percent,90);assert.equal(fresh.analysisProgress.completed,1);assert.doesNotMatch(JSON.stringify(fresh),/fixtureCache/);
+ assert.equal((await pg.query('SELECT extraction_cache FROM audita_debt_documents WHERE case_id=$1 AND extraction_cache IS NOT NULL',[c.id])).rows[0].extraction_cache.fixtureCache,'private');
+ await assert.rejects(service.get({tenantId:2,user:{id:802}},c.id),{status:404});
  const unchanged=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'novamente.pdf'});assert.equal(unchanged.revision,c.revision);assert.equal(unchanged.analysisPending,c.analysisPending);
  await assert.rejects(service.upload(auth,c.id,{bytes:Buffer.concat([bytes,Buffer.from('\n')]),kind:'evidence',name:'outro.pdf'}),{status:409});
- release();for(let i=0;i<100&&c.analysisPending;i++){await new Promise(resolve=>setTimeout(resolve,10));c=await service.get(auth,c.id);}assert.equal(c.analysisPending,null);assert.equal(c.status,'offer');assert.equal(c.docOffer.priceCents,19900);assert.equal(c.review,null);assert.equal(calls,1);assert.equal(c.analysis.documentHashes.length,1);
+ release();for(let i=0;i<100&&c.analysisPending;i++){await new Promise(resolve=>setTimeout(resolve,10));c=await service.get(auth,c.id);}assert.equal(c.analysisPending,null);assert.equal(c.status,'offer');assert.equal(c.docOffer.priceCents,19900);assert.equal(c.review,null);assert.equal(calls,1);assert.equal(c.analysis.documentHashes.length,1);assert.equal(c.analysisProgress.percent,100);
  await assert.rejects(service.download(auth,c.id,'negotiation'),{status:403});
  await service.createCheckout(auth,c.id,{accepted:true,reviewId:c.docOffer.id});
  const event={id:'evt_test_docs',type:'checkout.session.completed',data:{object:{id:'cs_test_docs',payment_status:'paid',currency:'brl',amount_total:19900,metadata:{debt_case_id:c.id,debt_review_id:c.docOffer.id,audita_user_id:'801',audita_tenant_id:'1'}}}};
