@@ -1,7 +1,7 @@
 # Coordenação e passagem de trabalho
 
 ### 2026-09-16 — Publicação dos ajustes de interface
-- Codex. Publicação autorizada dos textos, envio sem checkbox, retorno no padrão Itaú e filtros alfabéticos. 387 testes aprovados. Sem migrações/configurações; rollback audita:115 / 0878549. Envio e deploy em andamento.
+- Codex. Publicação autorizada dos textos, envio sem checkbox, retorno no padrão Itaú e filtros alfabéticos. 387 testes aprovados. Sem migrações/configurações; rollback audita:115 / 0878549. Publicado em GitHub/main d3a3bc6, CI 35140589642 aprovado, CapRover audita:116. Smoke de produção aprovado, versão servida d3a3bc6; JS idêntico ao local e ordem dos filtros conferida no HTML servido.
 
 ### 2026-09-16 — Ordem dos filtros da Central
 - Codex, codex/service-filter-order, base main. Categorias em ordem alfabética, mantendo Todos primeiro; somente ordem dos botões em index.html. Integrado localmente e conferido na porta 3000. Sem publicação.
