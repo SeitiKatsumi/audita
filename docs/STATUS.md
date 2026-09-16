@@ -207,3 +207,10 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 ### 2026-09-15 — Publicação consolidada de catálogo e revisão
 - Codex; publicação de todas as alterações funcionais pendentes autorizada pelo usuário. Inclui cards alfabéticos e dois laudos em desenvolvimento, texto de perícia, loading, conciliação e revisão assistida. 382 testes aprovados, nenhum ignorado. Sem migração ou mudança de configuração privada. Rollback para código 3698f7e; backup recente registrado em 14/09. Push e deploy em andamento.
 - Publicado e verificado: código 7a25f62 no GitHub/main, CI 35031308599 concluído com sucesso e CapRover audita:111. Smoke aprovado com banco pronto e autenticação exigida; index.html, bank-debt.js, bank-debt.css e services-catalog.js conferidos contra os arquivos publicados. Navegador autenticado confirmou nove cards alfabéticos, dois laudos em desenvolvimento, texto novo e botão Avançar para revisão da Audita no atendimento existente. Nenhuma cobrança, reanálise ou solicitação real foi criada como teste. Versão consolidada continua disponível na porta 3000. Backup anterior preservado e sem migração.
+
+## 2026-09-16 — Recuperação do banco (em andamento)
+- Responsável: Codex; branch: codex/database-recovery; base: main (correção de produção).
+- Escopo: server.mjs, teste de recuperação e saúde; investigar DNS do banco sem alterar dados.
+- Evidência: produção retornava ENOTFOUND no banco e health 200 incorreto. Nenhuma publicação desta correção ainda.
+- Validação local: 383 testes passaram (incluindo queda DNS, recuperação, nova queda e health 503/200).
+- Logs do PostgreSQL: reinício 2026-09-16 00:29 UTC, aceitando conexões em seguida; causa externa do reinício ainda não identificada.

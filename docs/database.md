@@ -28,6 +28,18 @@ postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:5432/audita_s
 
 Nao expor a porta do PostgreSQL publicamente.
 
+## Recuperação de conexão
+
+O servidor verifica o PostgreSQL a cada 10 segundos e repete a inicialização
+quando o banco volta após falha de DNS/conexão. Reutiliza um único pool e não
+repete migrações após uma inicialização concluída. A conexão e a consulta de
+saúde têm limite de 5 segundos. Erros em conexões ociosas também marcam o banco
+como indisponível; os logs e a saúde expõem apenas o código do erro.
+
+`/api/health` retorna HTTP 503 enquanto o banco está indisponível (ou ausente
+fora do ambiente local), permitindo que o healthcheck existente detecte a falha.
+Não é necessário reiniciar manualmente após uma interrupção temporária do banco.
+
 ## Multi-tenancy
 
 O schema inicial cria:

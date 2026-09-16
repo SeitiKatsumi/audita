@@ -149,6 +149,8 @@ let profileEncryptionKey = resolveProfileEncryptionKey(
 let pool;
 let dbReady = false;
 let dbError = null;
+let dbInitialized = false;
+let dbChecking = false;
 let defaultTenantId = null;
 const fallbackAudits = [];
 const fallbackAuthPath = join(root, "storage", "local-auth.json");
@@ -522,20 +524,24 @@ const builtinAssistantSources = [
 ];
 
 async function initializeDatabase() {
-  if (!databaseUrl) {
+  if (!databaseUrl || dbChecking) {
     return;
   }
-
+  dbChecking = true;
   try {
-    const pg = await import("pg");
-    const { Pool } = pg.default || pg;
-    pool = new Pool({
-      connectionString: databaseUrl,
-      max: Number(process.env.DB_POOL_MAX || 5),
-      ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
-    });
+    if (!pool) {
+      const pg = await import("pg");
+      const { Pool } = pg.default || pg;
+      pool = new Pool({
+        connectionString: databaseUrl,
+        max: Number(process.env.DB_POOL_MAX || 5),
+        connectionTimeoutMillis: 5000,
+        ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+      });
+      pool.on("error", databaseUnavailable);
+    }
 
-    if (autoMigrate) {
+    if (!dbInitialized && autoMigrate) {
       const schema = await readFile(join(root, "db", "schema.sql"), "utf8");
       await pool.query(schema);
       await pool.query(await readFile(join(root, "db", "ir-exemption.sql"), "utf8"));
@@ -544,15 +550,28 @@ async function initializeDatabase() {
       await pool.query(await readFile(join(root, "db", "energy-audit.sql"), "utf8"));
     }
 
-    await pool.query("SELECT 1");
-    await cacheDefaultTenant();
-    await bootstrapAdminUser();
+    await pool.query({ text: "SELECT 1", query_timeout: 5000 });
+    if (!dbInitialized) {
+      await cacheDefaultTenant();
+      await bootstrapAdminUser();
+      dbInitialized = true;
+    }
+    if (!dbReady) console.info("[audita] database ready");
     dbReady = true;
+    dbError = null;
   } catch (error) {
-    dbReady = false;
-    dbError = error instanceof Error ? error.message : "Unknown database error";
-    console.error("[audita] database initialization failed:", dbError);
+    databaseUnavailable(error);
+  } finally {
+    dbChecking = false;
   }
+}
+
+function databaseUnavailable(error) {
+  dbReady = false;
+  // Keep driver messages (which can contain connection details) out of public health/logs.
+  const code = /^[A-Z0-9_]{2,40}$/.test(error?.code || "") ? error.code : "DATABASE_UNAVAILABLE";
+  if (dbError !== code) console.error("[audita] database unavailable:", code);
+  dbError = code;
 }
 
 async function cacheDefaultTenant() {
@@ -5224,8 +5243,9 @@ async function handleApi(request, response, pathname) {
   }
 
   if (pathname === "/api/health") {
-    sendJson(response, 200, {
-      status: "ok",
+    const healthy = dbReady || (!databaseUrl && appEnv === "local");
+    sendJson(response, healthy ? 200 : 503, {
+      status: healthy ? "ok" : "unavailable",
       version: appVersion,
       environment: appEnv,
       database: {
@@ -6134,6 +6154,9 @@ server.on("upgrade", async (request, socket, head) => {
 
 await initializeProfileEncryptionKey();
 await initializeDatabase();
+const databaseTimer = setInterval(initializeDatabase, 10000);
+databaseTimer.unref();
+server.on("close", () => clearInterval(databaseTimer));
 
 let irJobRunning = false;
 const irJobTimer = setInterval(async () => {
