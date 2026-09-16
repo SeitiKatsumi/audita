@@ -214,3 +214,7 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Evidência: produção retornava ENOTFOUND no banco e health 200 incorreto. Nenhuma publicação desta correção ainda.
 - Validação local: 383 testes passaram (incluindo queda DNS, recuperação, nova queda e health 503/200).
 - Logs do PostgreSQL: reinício 2026-09-16 00:29 UTC, aceitando conexões em seguida; causa externa do reinício ainda não identificada.
+- Concluído: correção 2834f28 enviada ao GitHub/main; CI 35129132422 concluído com sucesso.
+- Produção: CapRover audita release 112, versão 2834f28748567b6fa3d4d966c31b6ce05b276564; health 200 com database.ready=true, auth obrigatória e smoke-production aprovado.
+- A restauração inicial por reinício somente da aplicação confirmou que o banco já estava disponível. Nenhum volume, dado ou credencial alterado. Motivo do reinício externo do PostgreSQL não identificado pelos logs disponíveis.
+- Local: main conciliada e servidor reiniciado em localhost:3000; configuração local continua sem DATABASE_URL. Interface de produção carrega e solicita login; fluxo autenticado de envio não foi repetido nesta correção.
