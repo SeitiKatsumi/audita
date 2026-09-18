@@ -1135,9 +1135,17 @@ if (stage) {
         </header>
         <ol class="charge-no-documents-channels">
           <li>
-            <strong>App Itaú, app Itaú Cartões ou Itaú na internet</strong>
-            <span>Consulte e baixe as faturas disponíveis na área de cartões.</span>
+            <strong>Aplicativo Itaú ou Itaú Cartões</strong>
+            <span>Abra a área da conta ou do cartão, procure Extrato ou Faturas, escolha o período e baixe ou exporte em PDF. Os nomes das opções podem variar conforme o aplicativo.</span>
             <a href="${ITAU_INVOICE_CHANNELS_URL}" target="_blank" rel="noreferrer">Ver orientação oficial do Itaú</a>
+          </li>
+          <li>
+            <strong>Internet banking do Itaú</strong>
+            <span>Acesse o site oficial do banco e consulte os extratos ou faturas mês a mês, na área de Conta corrente ou Cartões. Baixe todos os meses do período que deseja analisar, com os lançamentos completos.</span>
+          </li>
+          <li>
+            <strong>Agência bancária</strong>
+            <span>Solicite ao gerente os extratos históricos completos. Para uma conta encerrada, informe a agência, a conta e o período desejado. Se usar o caixa eletrônico, confira o período disponível; peça ao gerente os meses que faltarem. Guarde o protocolo e o prazo informado pelo banco.</span>
           </li>
           <li>
             <strong>WhatsApp Itaú: 11 4004-4828</strong>

@@ -10,6 +10,11 @@ test('extratos preservam atendimento ao complementar e permitem voltar da oferta
  const context=vm.createContext({document:{querySelector:()=>root,body:{dataset:{activePage:'home'}},addEventListener(){}},window:{addEventListener(){}},clearTimeout(){},setTimeout(){},location:{href:"http://localhost:3000/?debt_case=qa"},history:{replaceState(){}},URL,URLSearchParams,Intl,Date});
  vm.runInContext(await readFile(new URL('../bank-debt.js',import.meta.url),'utf8'),context);
  const html=()=>element('#debtStage').innerHTML;
+ assert.match(html(), /<details class="charge-no-documents">/);
+ assert.match(html(), /Não tenho os extratos completos/);
+ assert.match(html(), /Internet banking/);
+ assert.match(html(), /conta encerrada/);
+ assert.doesNotMatch(html(), /0800|Itaú/);
  assert.match(html(),/Anexe abaixo os extratos bancários desde o início do saldo devedor até a presente data/);
  assert.equal((html().match(/type="file"/g)||[]).length,1);assert.match(html(),/Enviar extratos e analisar/);assert.doesNotMatch(html(),/Que documento você vai enviar/);
  vm.runInContext(`current={id:'qa',status:'calculation_pending',owner:true,documents:[{id:'a',kind:'evidence',name:'extrato.pdf',sha256:'same'},{id:'b',kind:'evidence',name:'copia.pdf',sha256:'same'}],documentConsent:{at:'2024-01-01'},analysisPending:new Date().toISOString()};render();`,context);

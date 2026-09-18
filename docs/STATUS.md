@@ -1,3 +1,9 @@
+# 2026-09-18 — Publicação das orientações de extratos
+- Publicação autorizada. 389 testes aprovados. Escopo: orientação Itaú e ajuda em dívidas; sem migrações/configuração. Rollback: audita:118 / 1d6603e. Deploy e verificação em andamento.
+
+# 2026-09-18 — Orientações para obter extratos
+- Codex, codex/statement-guidance, continuidade main. Itaú: aplicativo, internet banking mês a mês e agência/conta encerrada; carta e retorno existentes preservados. Dívidas: ajuda nativa expansível junto ao envio, com canais do banco do cliente e preservação dos arquivos selecionados. 44 testes pertinentes aprovados, sintaxe e diff verificados. Navegador isolado em 3012 com APIs simuladas validou ambos os caminhos em 390 px, retorno ao upload e preservação do arquivo selecionado ao abrir/fechar ajuda; capturas conferidas. Nenhum documento enviado ou dado real alterado. Integrado na main local; sem commit, push ou deploy. Verificação na porta 3000 bloqueada: ela está servindo o site institucional (Next.js), não este app; processo preservado. Falta disponibilizar e conferir a interface nessa porta.
+
 # 2026-09-18 — Publicação das alterações de 17/09
 - Codex. Publicação autorizada de agrupamento, navegação mobile, configurações recolhidas, login sem menu e opção de desativar jobs locais (padrão de produção mantido). 389 testes passaram; sem migrações ou alteração de secrets remotos. Rollback: audita:117 / 9743a96. Publicado: GitHub/main 1d6603e, CI 35374272493 aprovado, CapRover audita:118. Backup verificado antes do deploy. Smoke aprovado, banco pronto/autenticação obrigatória e HTML/JS/CSS servidos conferidos. Navegador em produção a 390px confirmou login sem menu e sem overflow; fluxo autenticado previamente validado localmente, não repetido em produção.
 
