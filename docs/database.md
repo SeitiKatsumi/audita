@@ -111,3 +111,6 @@ Rotina minima recomendada:
 ## LGPD
 
 O projeto pode lidar com dados sensiveis. Qualquer dado pessoal deve ter base legal, finalidade documentada, controle de acesso, retencao definida e rastreabilidade.
+
+## Teste local conectado à produção (17/09/2026)
+Por solicitação explícita do usuário, a configuração privada local usa um túnel SSH temporário em loopback para o banco efetivamente usado pelo app publicado. Não há porta PostgreSQL pública. AUDITA_AUTO_MIGRATE=false, AUDITA_BACKGROUND_JOBS_ENABLED=false e bootstrap vazio impedem alterações automáticas; autenticação permanece obrigatória. Ações do usuário gravam no banco compartilhado. Os volumes de arquivos continuam separados. A configuração anterior está em arquivo privado ignorado pelo Git. O túnel precisa estar ativo durante os testes.

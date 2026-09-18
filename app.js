@@ -79,7 +79,7 @@ const apiPricingActive = document.querySelector("#apiPricingActive");
 const apiPricingClear = document.querySelector("#apiPricingClear");
 const navList = document.querySelector(".nav-list");
 const navGroups = document.querySelectorAll("details.nav-group");
-const navLinks = document.querySelectorAll(".nav-list a[href^='#'], .nav-list a[data-app-route]");
+const navLinks = document.querySelectorAll(".nav-list a[href^='#'], .nav-list a[data-app-route], .mobile-bottom-nav a");
 const pageBlocks = document.querySelectorAll("[data-page]");
 const chatThreadList = document.querySelector("#chatThreadList");
 const chatNewButton = document.querySelector("#chatNewButton");
@@ -1010,6 +1010,7 @@ function setActivePage(page) {
     const groupedPages = (link.dataset.navPages || "").split(/\s+/).filter(Boolean);
     const isActive = linkedPage === activePage || groupedPages.includes(activePage);
     link.classList.toggle("active", isActive);
+    if (isActive) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current");
     if (isActive) {
       const parentGroup = link.closest("details.nav-group");
       if (parentGroup) {
@@ -1019,6 +1020,8 @@ function setActivePage(page) {
     }
   });
 
+  document.querySelector('#mobileSettings')?.close();
+  document.querySelector('#mobileSettingsButton')?.classList.toggle('active', [...navLinks].some(link => link.classList.contains('active') && !link.closest('.mobile-bottom-nav') && (link.classList.contains('nav-child') || link.hasAttribute('data-lawyer-entry'))));
   applyAuditRouteDefaults(activePage);
   setMobileMenu(false);
   // Hashes select pages; keep the page header above the content after anchor scrolling.
@@ -7709,8 +7712,30 @@ function setMobileMenu(open) {
   mobileMenuButton?.setAttribute("aria-expanded", String(open));
 }
 
+const mobileSettings = document.querySelector('#mobileSettings');
+const mobileSettingsButton = document.querySelector('#mobileSettingsButton');
+const mobileSettingsLinks = document.querySelector('#mobileSettingsLinks');
+const mobileSettingsItems = [...navGroups, document.querySelector('[data-lawyer-entry]'), logoutButton].filter(Boolean).map(node => {
+  const marker = document.createComment('mobile settings return');
+  node.before(marker);
+  return { node, marker };
+});
+mobileSettingsButton?.addEventListener('click', () => {
+  mobileSettingsItems.forEach(({node}) => mobileSettingsLinks.append(node));
+  mobileSettings.showModal();
+});
+mobileSettings?.addEventListener('close', () => {
+  mobileSettingsItems.forEach(({node, marker}) => marker.after(node));
+  mobileSettingsButton.focus();
+});
+mobileSettings?.querySelector('[data-close-settings]').addEventListener('click', () => mobileSettings.close());
+mobileSettingsLinks?.addEventListener('click', event => {
+  if (event.target.closest('a, #logoutButton')) mobileSettings.close();
+});
+window.matchMedia('(max-width: 960px)').addEventListener('change', () => mobileSettings?.close());
+
 function keepNavGroupVisible(group) {
-  if (!group.open || !navList) {
+  if (!group.open || !navList || group.closest("dialog")) {
     return;
   }
 

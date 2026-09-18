@@ -10,7 +10,7 @@ test('login and registration refresh navigation identity; logout clears it',asyn
   const c=vm.createContext({loginMode:mode,loginError:{},loginEmail:node(),loginPassword:node(),loginName:node(),loginButton:node(),logoutButton:{...node(),addEventListener:(e,f)=>logout=f},loginForm:{addEventListener:(e,f)=>submit=f},
    fetch:async()=>({ok:true}),loadAuthState:async()=>({authRequired:true,user:{id:'test'}}),renderProfile(){},configureApiUsageAdmin:s=>c.currentAuthState=s,loadCurrentUserProfile:async()=>{},hideLogin(){},showLogin(){shown++;},
    currentAuthState:{authRequired:true,user:null},currentUserProfile:{},activeChatBrowserSession:null,
-   pageMeta:{home:{},'central-servicos':{}},document:{body:{dataset:{}},dispatchEvent(){}},pageTitle:{},pageEyebrow:{},pageBlocks:[],operationsPages:null,navGroups:[],navLinks:[],applyAuditRouteDefaults(){},setMobileMenu(){},requestAnimationFrame(){},CustomEvent:class{},
+   pageMeta:{home:{},'central-servicos':{}},document:{body:{dataset:{}},dispatchEvent(){},querySelector(){return null;}},pageTitle:{},pageEyebrow:{},pageBlocks:[],operationsPages:null,navGroups:[],navLinks:[],applyAuditRouteDefaults(){},setMobileMenu(){},requestAnimationFrame(){},CustomEvent:class{},
   });
   for(const name of ['loadDashboard','loadAudits','loadAuditHistory','loadPropertyModule','loadConsultations','loadSources','loadAgentSettings','loadAssistantSources'])c[name]=async()=>{};
   vm.runInContext(source.slice(source.indexOf('function setActivePage('),source.indexOf('function finishAppBoot(')),c);

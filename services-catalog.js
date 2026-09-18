@@ -17,6 +17,9 @@ export function initServicesCatalog(root = document.querySelector('#central-serv
         categories: card.dataset.categories.split(' '), enabled: (!card.hasAttribute('data-service-pis') || pisEnabled) && (!card.hasAttribute('data-service-energy') || energyEnabled)}, input.value, category);
       if (!card.hidden) count++;
     }
+    root.querySelectorAll('[data-service-group]').forEach(group => {
+      group.hidden = ![...group.querySelectorAll('[data-service-card]')].some(card => !card.hidden);
+    });
     buttons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.serviceCategory === category)));
     root.querySelector('[data-service-count]').textContent = `${count} ${count === 1 ? 'serviço encontrado' : 'serviços encontrados'}`;
     root.querySelector('[data-service-empty]').hidden = count !== 0;

@@ -9,7 +9,7 @@ test('entering AI starts blank while history selection survives renders', () => 
   const old = { id: 'old', messages: [{ role: 'user', content: 'Histórico' }] };
   const context = vm.createContext({
     chatState: { currentThreadId: 'old', threads: [old] },
-    pageMeta: { chat: {}, home: {} }, document: { body: { dataset: {} }, dispatchEvent() {} },
+    pageMeta: { chat: {}, home: {} }, document: { body: { dataset: {} }, dispatchEvent() {}, querySelector() { return null; } },
     pageTitle: {}, pageEyebrow: {}, pageBlocks: [], operationsPages: null, navGroups: [], navLinks: [],
     applyAuditRouteDefaults() {}, setMobileMenu() {}, renderChatWorkspace() {},
     requestAnimationFrame() {}, CustomEvent: class {}, chatInput: { focus() {} },

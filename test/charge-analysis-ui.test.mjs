@@ -40,7 +40,7 @@ test("sidebar groups service modules and preserves adaptive navigation", () => {
     /<a href="#central-servicos"[\s\S]*?Central de Serviços[\s\S]*?<\/a>/,
   )?.[0];
   const settingsGroup = indexHtml.match(
-    /<details class="nav-group" open>\s*<summary>[\s\S]*?Configura&ccedil;&otilde;es[\s\S]*?<\/summary>[\s\S]*?<\/details>/,
+    /<details class="nav-group">\s*<summary>[\s\S]*?Configura&ccedil;&otilde;es[\s\S]*?<\/summary>[\s\S]*?<\/details>/,
   )?.[0];
   const developmentSummaryIndex = indexHtml.indexOf("Ferramentas de Consulta (Dev)");
   const developmentStart = indexHtml.lastIndexOf('<details class="nav-group">', developmentSummaryIndex);
@@ -50,7 +50,7 @@ test("sidebar groups service modules and preserves adaptive navigation", () => {
   assert.ok(chargeMainLink);
   assert.match(chargeMainLink, /assets\/nav-icons\/tool\.svg/);
   assert.ok(settingsGroup);
-  assert.match(settingsGroup, /\sopen(?:\s|>)/);
+  assert.doesNotMatch(settingsGroup, /\sopen(?:\s|>)/);
   assert.match(settingsGroup, /#historico/);
   assert.match(settingsGroup, /#meu-painel/);
   assert.match(settingsGroup, /id="adminBillingNav"/);
@@ -117,7 +117,7 @@ test("sidebar stays in compact desktop mode until the true mobile breakpoint", (
     /@media \(min-width: 961px\) and \(max-width: 1280px\)\s*\{[\s\S]*?--sidebar-width:\s*300px/,
   );
   assert.match(stylesCss, /@media \(max-width: 1120px\)\s*\{[\s\S]*?\.hero-grid/);
-  assert.equal((appJs.match(/max-width: 960px/g) || []).length, 2);
+  assert.ok((appJs.match(/max-width: 960px/g) || []).length >= 2);
   assert.doesNotMatch(appJs, /max-width: 1120px/);
 });
 

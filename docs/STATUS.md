@@ -1,3 +1,21 @@
+# 2026-09-18 — Publicação das alterações de 17/09
+- Codex. Publicação autorizada de agrupamento, navegação mobile, configurações recolhidas, login sem menu e opção de desativar jobs locais (padrão de produção mantido). 389 testes passaram; sem migrações ou alteração de secrets remotos. Rollback: audita:117 / 9743a96. Publicação em andamento.
+
+# 2026-09-17 — Login sem menu inferior
+- Codex, codex/login-hide-nav. CSS oculta a navegação mobile enquanto login/cadastro estiver visível; mantém a navegação após fechar a autenticação. Integrado na main local, sem publicação.
+
+# 2026-09-17 — Banco compartilhado para teste local
+- Codex, codex/local-production-db. A pedido explícito do usuário, localhost:3000 conectado ao mesmo banco usado pelo app publicado (nome interno audita_staging), por túnel SSH somente em 127.0.0.1:15432. Configuração privada anterior preservada fora do Git. Autenticação exigida; migrações, bootstrap e jobs automáticos locais desativados. Dois testes passaram e health confirmou database.ready=true; auth/me exige login. Arquivos dos volumes remotos não foram copiados/montados. Túnel temporário precisa estar ativo. Nenhum deploy ou alteração de configuração remota.
+
+# 2026-09-17 — Configurações recolhidas
+- Codex, codex/settings-collapsed, continuidade da main local. Removido open inicial do grupo Configurações; demais alterações preservadas. Integrado localmente; sem publicação.
+
+# 2026-09-17 — Navegação inferior mobile
+- Codex, codex/mobile-bottom-nav, continuidade da main local com agrupamento preservado. Escopo: index.html, app.js e styles.css; barra inferior mobile, configurações e margens. Concluído na main local e localhost:3000, sem publicação. 56 testes pertinentes aprovados. Navegador conferiu larguras 390/620/845, margem lateral zero mesmo com sidebar recolhida, configurações/histórico, Escape, restauração do desktop 1440, IA e campo de mensagem acima da barra. Ícones e capturas conferidos. Fetch confirmou main local=origin/main 67b8519; nenhuma atualização remota pendente.
+
+# 2026-09-17 — Agrupamento da Central de Serviços
+- Codex, codex/service-groups, base origin/develop conciliada com main. Escopo: index.html, styles.css e services-catalog.js; grupos por categoria preservando busca, filtros e disponibilidade. Concluído e integrado na main local/localhost:3000. Três testes do catálogo, sintaxe e diff aprovados; navegador validou agrupamento, filtro cruzado Imóveis, busca, estado vazio, limpar filtros e layout 390 px sem overflow. Disponibilidade de Energia/PIS preservada conforme configuração local. Sem commit, push ou deploy.
+
 # Coordenação e passagem de trabalho
 
 ### 2026-09-16 — Publicação dos ajustes de interface

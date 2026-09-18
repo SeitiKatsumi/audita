@@ -6161,7 +6161,7 @@ server.on("close", () => clearInterval(databaseTimer));
 
 let irJobRunning = false;
 const irJobTimer = setInterval(async () => {
-  if (irJobRunning) return;
+  if (irJobRunning || process.env.AUDITA_BACKGROUND_JOBS_ENABLED === "false") return;
   irJobRunning = true;
   try { await irExemptionService.runJobs(); } catch { console.error("[audita] IR scheduler unavailable"); }
   finally { irJobRunning = false; }
@@ -6169,12 +6169,12 @@ const irJobTimer = setInterval(async () => {
 irJobTimer.unref();
 server.on("close", () => clearInterval(irJobTimer));
 let energyRunning=false;
-const energyTimer=setInterval(async()=>{if(energyRunning||process.env.AUDITA_ENERGY_ENABLED!=='true')return;energyRunning=true;try{await energyService.runJobs();}catch{console.error('[audita] energy scheduler unavailable');}finally{energyRunning=false;}},5000);
+const energyTimer=setInterval(async()=>{if(process.env.AUDITA_BACKGROUND_JOBS_ENABLED==='false'||energyRunning||process.env.AUDITA_ENERGY_ENABLED!=='true')return;energyRunning=true;try{await energyService.runJobs();}catch{console.error('[audita] energy scheduler unavailable');}finally{energyRunning=false;}},5000);
 energyTimer.unref();server.on('close',()=>clearInterval(energyTimer));
 server.listen(port, host, () => {
   console.log(`Audita web app running at http://${host}:${port}/`);
 });
 
 let energyReferencesRunning=false;
-const energyReferencesTimer=setInterval(async()=>{if(energyReferencesRunning||!dbReady||process.env.AUDITA_ENERGY_ENABLED!=='true')return;energyReferencesRunning=true;try{await refreshReferences(pool);}catch{console.error('[audita] energy references unavailable');}finally{energyReferencesRunning=false;}},60000);
+const energyReferencesTimer=setInterval(async()=>{if(process.env.AUDITA_BACKGROUND_JOBS_ENABLED==='false'||energyReferencesRunning||!dbReady||process.env.AUDITA_ENERGY_ENABLED!=='true')return;energyReferencesRunning=true;try{await refreshReferences(pool);}catch{console.error('[audita] energy references unavailable');}finally{energyReferencesRunning=false;}},60000);
 energyReferencesTimer.unref();server.on('close',()=>clearInterval(energyReferencesTimer));

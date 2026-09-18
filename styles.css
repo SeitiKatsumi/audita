@@ -12092,6 +12092,10 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 .services-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .services-heading h2 { margin: 0; font-size: 1.25rem; }
 .services-heading p { margin: 0; color: var(--muted); font-size: .85rem; }
+.services-groups { display: grid; gap: 28px; }
+.services-group { min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7, 27, 43, .35); }
+.services-group h3 { margin: 0 0 18px; color: var(--text); font-size: 1.1rem; }
+@media (max-width: 600px) { .services-group { padding: 16px; } .services-groups { gap: 20px; } }
 .services-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
 .service-card { min-height: 172px; align-items: start; padding: 20px; }
 .service-card .home-module-copy { gap: 12px; }
@@ -12123,3 +12127,36 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 }
 
 [data-lawyer-entry][hidden] { display: none !important; }
+
+/* Mobile tabs replace the desktop sidebar without changing its saved state. */
+.mobile-bottom-nav { display: none; }
+.mobile-settings { width: min(100% - 24px, 520px); max-height: 75dvh; margin: auto auto calc(80px + env(safe-area-inset-bottom)); padding: 20px; color: var(--text); background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 20px; }
+.mobile-settings::backdrop { background: rgba(0, 8, 18, .7); }
+.mobile-settings > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.mobile-settings h2 { margin: 0; font-size: 1.2rem; }
+.mobile-settings .nav-list { overflow: visible; max-height: none; }
+.mobile-settings .nav-label { position: static !important; opacity: 1 !important; width: auto !important; height: auto !important; transform: none !important; pointer-events: auto !important; }
+.mobile-settings .sidebar-logout:not(.hidden) { display: flex; }
+@media (max-width: 960px) {
+  :root { --mobile-nav-height: calc(68px + env(safe-area-inset-bottom)); }
+  html { scroll-padding-top: 16px; scroll-padding-bottom: calc(var(--mobile-nav-height) + 48px); }
+  body .sidebar, body.sidebar-collapsed .sidebar, .mobile-menu-button, .sidebar-scrim { display: none !important; }
+  body .workspace, body.sidebar-collapsed .workspace { width: 100%; min-width: 0; margin-left: 0; padding: 24px 16px calc(var(--mobile-nav-height) + 24px); }
+  .mobile-bottom-nav { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); position: fixed; z-index: 30; inset: auto 0 0; height: var(--mobile-nav-height); padding: 4px 8px calc(4px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #071b2b; }
+  .mobile-bottom-nav a, .mobile-bottom-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 44px; padding: 4px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: .7rem; text-decoration: none; cursor: pointer; }
+  .mobile-bottom-nav img { width: 24px; height: 24px; object-fit: contain; }
+  .mobile-bottom-nav .active { color: var(--lime); background: var(--lime-soft); }
+  .mobile-bottom-nav :focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
+  .service-return { padding-top: 0; }
+  .charge-analysis-header { top: 0; margin-inline: 0; padding-left: 0; }
+  .charge-analysis-conversation > .charge-analysis-message { scroll-margin-bottom: calc(var(--mobile-nav-height) + 48px); }
+  body[data-active-page="chat"] .workspace { height: calc(100dvh - var(--mobile-nav-height)); padding: 0; }
+  body[data-active-page="chat"] :is(.chat-page, .chat-main, .chat-browser-pane) { height: 100%; min-height: 0; }
+}
+
+@media (max-width: 960px) {
+  body:has(.mobile-settings[open]) { overflow: hidden; }
+  .mobile-bottom-nav .active .nav-icon { filter: brightness(0) saturate(100%) invert(82%) sepia(52%) saturate(1086%) hue-rotate(85deg); }
+}
+
+body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
