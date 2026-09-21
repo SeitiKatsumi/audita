@@ -192,18 +192,21 @@
               <button class="chat-icon-button" id="chatNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
             </div>
             <div class="chat-thread-list" id="chatThreadList"></div>
+            <a class="chat-icon-button chat-back-home chat-back-sidebar" href="/#home" aria-label="Voltar para a Home" title="Voltar para a Home"><img src="assets/nav-icons/chevron-left.svg" alt="" /><span>Voltar</span></a>
             <p class="chat-privacy-note">Dados pessoais devem ser informados somente nos formul&aacute;rios seguros de consulta.</p>
           </aside>
 
           <div class="chat-main">
             <header class="chat-header">
+              <div class="chat-header-start">
+                <a class="chat-icon-button chat-back-home" href="/#home" aria-label="Voltar para a Home" title="Voltar para a Home"><img src="assets/nav-icons/chevron-left.svg" alt="" /><span>Voltar</span></a>
               <a class="chat-assistant-identity" href="/#home" aria-label="Voltar à IA AUDITA">
                 <span class="chat-logo-frame"><img src="assets/audita-logo-original.png" alt="" /></span>
                 <div>
                   <strong>IA AUDITA</strong>
-                  <small><span class="chat-online-dot" aria-hidden="true"></span>Especialista jur&iacute;dica</small>
                 </div>
               </a>
+              </div>
               <div class="chat-header-actions">
                 <a class="chat-tools-button chat-plans-link" href="/planos">Planos</a>
                 <button class="chat-browser-mobile-open hidden" id="chatBrowserMobileOpen" type="button">
@@ -230,27 +233,9 @@
             <main class="chat-messages" id="chatMessages" tabindex="-1" aria-live="polite">
               <section class="chat-empty-state" id="chatEmptyState">
                 <span class="chat-welcome-logo"><img src="assets/audita-logo-original.png" alt="IA AUDITA" /></span>
-                <p class="eyebrow">Intelig&ecirc;ncia jur&iacute;dica</p>
+                <p class="eyebrow">Intelig&ecirc;ncia artificial</p>
                 <h2>Como posso ajudar?</h2>
                 <p>Conte o que voc&ecirc; precisa verificar. Eu organizo o caminho e aciono as fontes adequadas.</p>
-                <div class="chat-suggestions" aria-label="Sugest&otilde;es de consulta">
-                  <button type="button" data-chat-prompt="Desconfio de uma cobranca do Itau e quero entender se faz sentido investigar.">
-                    <strong>Revisar cobran&ccedil;as Ita&uacute;</strong>
-                    <small>Come&ccedil;ar por uma cobran&ccedil;a recente</small>
-                  </button>
-                  <button type="button" data-chat-prompt="Preciso emitir certidoes estaduais para uma pessoa fisica. Por onde comecamos?">
-                    <strong>Emitir certid&otilde;es estaduais</strong>
-                    <small>Organizar documentos e tribunal</small>
-                  </button>
-                  <button type="button" data-chat-prompt="Quero verificar a indisponibilidade de bens de um vendedor. Explique o fluxo atual.">
-                    <strong>Verificar indisponibilidade</strong>
-                    <small>Entender fonte, risco e pr&oacute;xima a&ccedil;&atilde;o</small>
-                  </button>
-                  <button type="button" data-chat-prompt="Quais consultas e análises a IA AUDITA consegue fazer hoje?">
-                    <strong>Explorar capacidades</strong>
-                    <small>Ver ferramentas ativas e em evolu&ccedil;&atilde;o</small>
-                  </button>
-                </div>
               </section>
             </main>
 
@@ -383,12 +368,13 @@
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="bancario" data-keywords="itau itaucard seguros tarifas cartão conta extrato fatura parceiros">
                   <a class="service-card-entry" href="#analise-cobrancas">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Bancário</small><strong>Cobranças indevidas</strong><small>Confira seguros, tarifas e serviços cobrados em cartões e contas Itaú.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Bancário</small><strong>Cobranças indevidas <span class="service-copy-highlight">debitadas em 133 bandeiras de cartões de crédito de 2011 até 2026</span></strong><small class="service-copy-invitation">Veja se você tem valores a receber.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
                     <div class="service-expanded">
                       <span class="service-detail"><b>Para quem é</b><span>Clientes que têm ou já tiveram conta, cartão Itaú, Itaucard ou cartão de marca parceira e querem entender cobranças que não reconhecem.</span></span>
+                      <a class="service-action" href="?bandeiras=1#analise-cobrancas">Confira as 133 bandeiras no chat<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                       <span class="service-detail"><b>Como podemos ajudar</b><span>Orientamos a obtenção dos documentos e analisamos extratos e faturas para identificar cobranças que mereçam conferência e organizar os próximos passos.</span></span>
                       <small class="service-note">Uma cobrança identificada não comprova irregularidade. A conclusão depende dos documentos e da análise do caso.</small>
                       <a class="service-action" href="#analise-cobrancas">Analisar minhas cobranças<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
@@ -398,7 +384,7 @@
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="bancario" data-keywords="divida juros contrato banco extrato saldo devedor renegociação">
                   <a class="service-card-entry" href="#dividas-bancarias">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Bancário</small><strong>Dívidas bancárias</strong><small>Analise seus extratos para entender juros e possíveis caminhos de renegociação.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Bancário</small><strong>Dívidas bancárias de inadimplentes</strong><small>Efetua uma auditoria técnica e análise pericial automatizada para promover o expurgo de encargos abusivos e readequar seu saldo devedor aos limites legais.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
@@ -418,7 +404,7 @@
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios" data-keywords="pis pasep cotas beneficio herdeiros carteira assinada servidor público" data-service-pis hidden>
                   <a class="service-card-entry" href="#pis-pasep">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Benefícios e tributos</small><strong>PIS/Pasep: valores de cotas antigas</strong><small>Orientação sobre cotas de 1971 a 1988 para trabalhadores e herdeiros.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Benefícios e tributos</small><strong>PIS/Pasep: valores de cotas antigas</strong><small>Você ou seus herdeiros podem ter direito a sacar uma fatia dos R$ 26 bilhões esquecidos no PIS/PASEP caso tenha trabalhado com carteira assinada ou como servidor público entre 1971 e 1988.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
@@ -433,7 +419,7 @@
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios" data-keywords="imposto renda aposentadoria aposentado pensionista herdeiros doença grave">
                   <a class="service-card-entry" href="#isencao-ir">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Benefícios e tributos</small><strong>Imposto de Renda: isenção e restituição</strong><small>Avaliação de possível isenção e restituição para quem tem histórico de doença grave.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Benefícios e tributos</small><strong>Imposto de Renda: isenção e restituição</strong><small>A Lei nº 7.713/88 garante a aposentados, pensionistas e militares reformados diagnosticados com alguma das 18 doenças graves previstas na legislação (como o câncer) a isenção do Imposto de Renda e a restituição de tudo o que foi descontado indevidamente nos últimos 5 anos.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
@@ -453,7 +439,7 @@
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes imoveis" data-keywords="vendedor compra venda certidao pessoa física distrito federal df tjdft">
                   <a class="service-card-entry" href="#analise-vendedor">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Certidões · Imóveis</small><strong>Certidões do vendedor</strong><small>Reúna certidões de pessoa física no Distrito Federal antes de comprar um imóvel.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Certidões · Imóveis</small><strong>Certidões do vendedor</strong><small>Assinar a escritura em cartório não evita fraudes ou processos ocultos, tornando indispensável uma investigação jurídica completa ( Due diligencia) para proteger a compra do seu imóvel diante dos milhões de ações que surgem todos os anos.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
@@ -473,7 +459,7 @@
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="energia" data-keywords="fatura tarifa ICMS solar restituição energia conta de energia cobrança" data-service-energy hidden>
                   <a class="service-card-entry" href="#contas-de-luz">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Energia</small><strong>Conta de luz: revisão de cobranças</strong><small>Confira possíveis erros nas faturas e prepare um pedido de revisão.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Energia</small><strong>Conta de luz: revisão de cobranças</strong><small>A Lei nº 14.385/2022 e a recente decisão do STF garantem a empresas e residências com contas de luz acima de R$ 1.500,00 o direito de resgatar individualmente a restituição do ICMS pago a maior nos últimos 10 anos.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
@@ -555,29 +541,10 @@
                 <em>an&aacute;lise inteligente</em>, laudos completos e uma linguagem simples para
                 <em>decis&otilde;es mais seguras</em>.
               </h2>
-              <a class="secondary-action services-home-link" href="#central-servicos">Explorar a Central de Serviços</a>
-              <nav class="home-module-actions" aria-label="M&oacute;dulos dispon&iacute;veis">
-                <a class="home-module-action" href="#analise-cobrancas">
-                  <span class="home-module-icon" aria-hidden="true">
-                    <img src="assets/nav-icons/file-dollar.svg" alt="" />
-                  </span>
-                  <span class="home-module-copy">
-                    <strong>Cobran&ccedil;as indevidas</strong>
-                    <small>Analise documentos e organize os pr&oacute;ximos passos.</small>
-                  </span>
-                  <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-                </a>
-                <a class="home-module-action" href="#analise-vendedor">
-                  <span class="home-module-icon" aria-hidden="true">
-                    <img src="assets/nav-icons/building.svg" alt="" />
-                  </span>
-                  <span class="home-module-copy">
-                    <strong>Compra e venda de im&oacute;veis</strong>
-                    <small>Consulte as certid&otilde;es do vendedor em um s&oacute; lugar.</small>
-                  </span>
-                  <img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-                </a>
-              </nav>
+              <div class="home-destination-actions">
+                <a class="secondary-action services-home-link" href="/chat">Conversar com a IA AUDITA</a>
+                <a class="secondary-action services-home-link" href="#central-servicos">Explorar a Central de Serviços</a>
+              </div>
             </div>
             <canvas id="signalCanvas" width="760" height="360" aria-label="Visualiza&ccedil;&atilde;o de sinais anal&iacute;ticos"></canvas>
           </article>

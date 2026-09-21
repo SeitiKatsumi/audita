@@ -2080,8 +2080,18 @@ if (stage) {
   }
 
   function startTriageWhenOpened() {
-    if (triageStarted || state.screen !== "triage") return;
     if (document.body.dataset.activePage !== "analise-cobrancas") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("bandeiras") === "1") {
+      url.searchParams.delete("bandeiras");
+      window.history.replaceState(window.history.state, "", url);
+      state.route = "consumer";
+      state.authorizationAnswer = "uncertain";
+      state.screen = "brands";
+      render();
+      return;
+    }
+    if (triageStarted || state.screen !== "triage") return;
     triageStarted = true;
     render();
   }

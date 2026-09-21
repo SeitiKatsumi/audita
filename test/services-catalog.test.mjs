@@ -90,3 +90,12 @@ test('all catalog cards have details and preserve destinations and searchable au
   assert.equal(matchesService(service,query,'bancario'),false);
  }
 });
+
+test('charge card highlights the requested period without removing the qualification', async () => {
+ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+ const card=[...html.matchAll(/<article class="home-module-action service-card service-card-explained"[^]*?<\/article>/g)].map(m=>m[0]).find(c=>c.includes('href="#analise-cobrancas"'));
+ for(const text of ['debitadas em 133 bandeiras de cartões','2011 até 2026','Veja se você tem valores a receber.','Uma cobrança identificada não comprova irregularidade.','Mais informações']) assert.ok(card.includes(text));
+ assert.ok(card.includes('href="?bandeiras=1#analise-cobrancas"'));
+ assert.ok(card.indexOf('Confira as 133 bandeiras no chat') > card.indexOf('Para quem é'));
+ assert.ok(card.indexOf('Confira as 133 bandeiras no chat') < card.indexOf('Como podemos ajudar'));
+});

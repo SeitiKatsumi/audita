@@ -121,17 +121,15 @@ test("sidebar stays in compact desktop mode until the true mobile breakpoint", (
   assert.doesNotMatch(appJs, /max-width: 1120px/);
 });
 
-test("home exposes the two real product modules without mock indicators", () => {
+test("home links to the service catalog without duplicate module shortcuts", () => {
   const homeStart = indexHtml.indexOf('<section class="home-hero"');
   const homeEnd = indexHtml.indexOf('<section class="seller-analysis-page"', homeStart);
   const homeMarkup = indexHtml.slice(homeStart, homeEnd);
 
   assert.ok(homeStart >= 0 && homeEnd > homeStart);
-  assert.equal((homeMarkup.match(/class="home-module-action"/g) || []).length, 2);
-  assert.match(homeMarkup, /href="#analise-cobrancas"/);
-  assert.match(homeMarkup, /Cobran&ccedil;as indevidas/);
-  assert.match(homeMarkup, /href="#analise-vendedor"/);
-  assert.match(homeMarkup, /Compra e venda de im&oacute;veis/);
+  assert.doesNotMatch(homeMarkup, /class="home-module-action"|href="#analise-cobrancas"|href="#analise-vendedor"/);
+  assert.match(homeMarkup, /href="#central-servicos"/);
+  assert.match(homeMarkup, /href="\/chat">Conversar com a IA AUDITA<\/a>/);
   assert.doesNotMatch(homeMarkup, /Consultas hoje|Fontes conectadas|Alertas cr&iacute;ticos|Tempo m&eacute;dio/);
   assert.doesNotMatch(homeMarkup, /home-hero-features|class="metrics"/);
   assert.match(stylesCss, /\.home-module-actions\s*\{/);

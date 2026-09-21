@@ -3,6 +3,16 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
 
+test('chat welcome keeps the composer without suggestion shortcuts', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const welcome = html.match(/<section class="chat-empty-state"[^]*?<\/section>/)[0];
+  assert.ok(welcome.includes('Como posso ajudar?'));
+  assert.ok(!welcome.includes('data-chat-prompt'));
+  assert.ok(!welcome.includes('chat-suggestions'));
+  assert.ok(html.includes('id="chatInput"'));
+  assert.match(html, /class="chat-icon-button chat-back-home" href="\/#home" aria-label="Voltar para a Home"/);
+});
+
 test('entering AI starts blank while history selection survives renders', () => {
   const source = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
   const extract = (name, next) => source.slice(source.indexOf(`function ${name}(`), source.indexOf(`function ${next}(`));

@@ -4998,7 +4998,7 @@ body[data-active-page="chat"] .workspace {
   display: grid;
   min-width: 0;
   height: 100vh;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
   gap: 16px;
   overflow: hidden;
   padding: 18px 14px;
@@ -5013,6 +5013,16 @@ body[data-active-page="chat"] .workspace {
   color: var(--text);
   text-decoration: none;
 }
+
+.chat-header { flex-wrap: wrap; }
+.chat-header-start { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.chat-back-home { display: grid; grid-template-columns: 20px auto; align-items: center; justify-content: center; gap: 8px; width: auto; min-width: 104px; height: 44px; padding: 0 14px; flex: 0 0 auto; font-size: .78rem; font-weight: 400; text-decoration: none; }
+.chat-back-home img { width: 20px; height: 20px; filter: brightness(0) invert(1); }
+.chat-icon-button.chat-back-home { font-size: .78rem; font-weight: 400; }
+.chat-back-home:focus-visible { outline: 2px solid var(--aqua); outline-offset: 3px; }
+.chat-header .chat-back-home { display: none; }
+.chat-page.browser-open .chat-header .chat-back-home { display: grid; }
+.chat-header-actions { margin-left: auto; }
 
 .chat-home-link {
   min-height: 46px;
@@ -7227,6 +7237,8 @@ body[data-active-page="chat"] .workspace {
   .chat-threads {
     display: none;
   }
+
+  .chat-header .chat-back-home { display: grid; }
 
   .chat-page.browser-open .chat-browser-splitter {
     display: none;
@@ -12111,6 +12123,8 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 .service-card-explained summary::-webkit-details-marker { display: none; }
 .service-card-explained summary:focus-visible, .service-card-explained a:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; }
 .service-card-explained .home-module-copy { overflow-wrap: anywhere; }
+.service-card-explained .service-copy-highlight { color: var(--aqua); }
+.service-card-explained .home-module-copy .service-copy-invitation { color: var(--text); }
 .service-card-explained .service-expanded { display: grid; gap: 16px; padding-top: 20px; overflow-wrap: anywhere; }
 .service-card-explained .service-toggle { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 24px; color: var(--lime); font-size: .875rem; }
 .service-disclosure:not([open]) .service-less, .service-disclosure[open] .service-more { display: none; }
@@ -12122,6 +12136,9 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 .services-empty { padding: 24px 0; color: var(--muted); }
 .services-empty h3 { color: var(--text); }
 .services-home-link { display: inline-flex; align-items: center; justify-content: center; text-align: center; margin-top: 24px; text-decoration: none; }
+.home-destination-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.home-destination-actions .services-home-link { margin-top: 0; min-height: 44px; max-width: 100%; white-space: normal; }
+@media (max-width: 600px) { .home-destination-actions { flex-direction: column; align-items: stretch; } }
 .services-page [hidden] { display: none !important; }
 @media (max-width: 1350px) { .services-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @media (max-width: 600px) { .services-grid { grid-template-columns: minmax(0,1fr); } .service-card { min-height: 144px; } .services-categories { gap: 8px; } }
