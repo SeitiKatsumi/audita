@@ -1,3 +1,19 @@
+# 2026-09-22 - Publicacao GitHub autorizada
+- Codex; consolidacao na main local de Meus Dados, perfil editavel, troca de senha, assinatura simplificada e navegacao da Central. npm test: 396 aprovados, um teste opcional ignorado, zero falhas; diff verificado. Remoto sincronizado antes do commit. Commit e push solicitados pelo usuario; sem deploy ou mudanca de banco/secrets. Os registros abaixo descrevem as validacoes locais anteriores.
+
+# 2026-09-22 - Edicao de conta
+- Codex; continuidade em codex/meus-dados, integrada na main local. app.js, index.html, plans.css e server.mjs: edicao do perfil pelo armazenamento criptografado existente, validacao, salvar/cancelar e troca de senha com senha atual, limite de tentativas e revogacao de sessoes. E-mail de contato separado do login; bootstrap nao sobrescreve mais contas existentes. Documentacao de seguranca e README atualizados; nenhuma migracao ou nova dependencia.
+- Validacao: 71 testes pertinentes passaram, incluindo PostgreSQL embarcado, isolamento, concorrencia, falhas, limites e endpoint. scripts/check-account-ui.mjs passou em 3012 e 3000 com APIs simuladas (perfil, senha, assinatura, teclado e celular); capturas conferidas. Servidores 3000/3002 atualizados, endpoint sem sessao retorna 401 e formulario real visivel na aba do usuario. Nenhuma credencial ou dado real foi alterado nos testes; sem commit, push ou deploy.
+
+# 2026-09-22 - Meus Dados
+- Codex; branch codex/meus-dados, continuidade da main local com ajustes da Central preservados. Navegacao desktop/mobile direta para Meus Dados; perfil cadastral real e assinatura Standard mensal/anual na mesma tela. Historico e consumo de APIs retirados dos acessos comuns; dados, rotas administrativas e permissoes do servidor preservados.
+- /planos conserva os retornos de checkout e portal e encaminha para Meus Dados. Oferta mostra beneficios, valor recorrente e total anual, assinatura existente, pendencia, cancelamento e tentativa apos falha. Sem alteracao de precos, backend, banco ou configuracao de pagamentos.
+- Validacao: 98 testes pertinentes aprovados; scripts/check-account-ui.mjs verifica perfil, precos, checkout/portal simulados, assinatura ativa/pendente, erro/repeticao, permissoes, desktop/celular, teclado e logout. Capturas conferidas; nenhum pagamento real. Integrado e verificado na main local (portas 3000/3002), com Meus Dados aberto no navegador. Checkout real permanece indisponivel na configuracao local existente; sem commit, push ou deploy.
+
+# 2026-09-22 - Navegacao centralizada
+- Removido o campo Buscar servico da Central; botoes de categoria e limpeza preservados sem dependencia do input. Seis testes passaram; Playwright na porta 3000 confirmou ausencia da busca e filtros Bancario/Todos. Apenas local.
+- Removido o grupo Ferramentas de Consulta (Dev) da lateral. Certidoes estaduais e indisponibilidade de bens adicionadas a Central; consulta de imoveis existente preservada. Rotas, provedores e permissoes inalterados. 49 testes passaram; Playwright validou links e retorno na porta 3000 em desktop e celular. Alteracao local, sem publicacao.
+
 # 2026-09-21 - Catalogo local
 - Publicacao GitHub autorizada: textos fornecidos pelo usuario nos cards, acesso direto a bandeiras, simplificacao do chat, retorno a Home e dois destinos na Home. Suite final: 392 aprovados, um ignorado. Primeira execucao teve falso positivo preexistente em chat-assistant (UUID com 11 digitos); repeticao sem alteracoes passou. Textos promocionais foram transcritos, sem validacao juridica. Sem migracoes ou deploy CapRover nesta entrega.
 - Home sem atalhos individuais: duas acoes, Conversar com a IA AUDITA (/chat) e Explorar a Central de Servicos. Botoes responsivos; 43 testes de interface passaram e Playwright validou ambos os destinos em desktop/celular. Botao Voltar no chat mantido no rodape lateral, com seta, fonte normal e tamanho de Conversas; topo como alternativa mobile. Apenas local.

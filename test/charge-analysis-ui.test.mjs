@@ -39,30 +39,22 @@ test("sidebar groups service modules and preserves adaptive navigation", () => {
   const chargeMainLink = indexHtml.match(
     /<a href="#central-servicos"[\s\S]*?Central de Serviços[\s\S]*?<\/a>/,
   )?.[0];
-  const settingsGroup = indexHtml.match(
-    /<details class="nav-group">\s*<summary>[\s\S]*?Configura&ccedil;&otilde;es[\s\S]*?<\/summary>[\s\S]*?<\/details>/,
+  const accountLink = indexHtml.match(
+    /<a href="#meus-dados">[\s\S]*?<\/a>/,
   )?.[0];
-  const developmentSummaryIndex = indexHtml.indexOf("Ferramentas de Consulta (Dev)");
-  const developmentStart = indexHtml.lastIndexOf('<details class="nav-group">', developmentSummaryIndex);
-  const developmentEnd = indexHtml.indexOf("</details>", developmentSummaryIndex);
-  const developmentGroup = indexHtml.slice(developmentStart, developmentEnd + "</details>".length);
 
   assert.ok(chargeMainLink);
   assert.match(chargeMainLink, /assets\/nav-icons\/tool\.svg/);
-  assert.ok(settingsGroup);
-  assert.doesNotMatch(settingsGroup, /\sopen(?:\s|>)/);
-  assert.match(settingsGroup, /#historico/);
-  assert.match(settingsGroup, /#meu-painel/);
-  assert.match(settingsGroup, /id="adminBillingNav"/);
-  assert.match(settingsGroup, /id="adminUsageNav"/);
-  assert.ok(developmentGroup);
-  assert.doesNotMatch(developmentGroup, /\sopen(?:\s|>)/);
-  assert.doesNotMatch(developmentGroup, /#analise-cobrancas/);
-  assert.match(developmentGroup, /#consulta-tjdft-pf/);
-  assert.match(developmentGroup, /#consulta-imoveis/);
-  assert.match(developmentGroup, /#consulta-cnib/);
-  assert.ok(indexHtml.indexOf(settingsGroup) > indexHtml.indexOf("#central-servicos"));
-  assert.ok(indexHtml.indexOf(developmentGroup) > indexHtml.indexOf(settingsGroup));
+  assert.ok(accountLink);
+  assert.match(accountLink, /Meus Dados/);
+  const sidebar = indexHtml.slice(indexHtml.indexOf('<nav class="nav-list">'), indexHtml.indexOf('</nav>'));
+  assert.doesNotMatch(sidebar, /#historico|#meu-painel|#admin-planos|#admin-consumo/);
+  assert.doesNotMatch(indexHtml, /Ferramentas de Consulta \(Dev\)/);
+  for (const route of ["consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]) {
+    assert.ok(chargeMainLink.includes(route));
+    assert.ok(indexHtml.includes(`class="service-card-entry" href="#${route === "consulta-tjdft" || route === "consulta-tjdft-pj" ? "consulta-tjdft-pf" : route}"`));
+  }
+  assert.ok(indexHtml.indexOf(accountLink) > indexHtml.indexOf("#central-servicos"));
   assert.match(indexHtml, /id="sidebarToggleIcon"[\s\S]*?assets\/nav-icons\/chevron-left\.svg/);
   assert.match(indexHtml, /id="sidebarScrim"/);
   assert.match(appJs, /classList\.add\("has-active-child"\)/);
@@ -722,7 +714,7 @@ test("app hides the one-page shell until the initial route is ready", () => {
   );
   assert.match(indexHtml, /styles\.css\?v=[\w-]+/);
   assert.match(indexHtml, /charge-analysis\.js\?v=20260828-legal-documents-1/);
-  assert.match(indexHtml, /app\.js\?v=20260828-legal-documents-1/);
+  assert.match(indexHtml, /app\.js\?v=[^"\s]+/);
 });
 
 test("recovery uses one electronic acceptance for the contract and power of attorney", () => {

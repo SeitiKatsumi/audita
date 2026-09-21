@@ -61,7 +61,7 @@ test('every service destination includes the shared return navigation', async ()
 test('all catalog cards have details and preserve destinations and searchable audiences', async () => {
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
  const cards=[...html.matchAll(/<article class="home-module-action service-card service-card-explained"[^]*?<\/article>/g)].map(m=>m[0]);
- assert.equal(cards.length,9);
+ assert.equal(cards.length,11);
  for(const card of cards) {
   assert.ok(card.includes('<summary class="service-toggle">'));
   assert.ok(card.includes('Para quem é'));

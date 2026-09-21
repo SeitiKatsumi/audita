@@ -76,6 +76,15 @@ Checklist inicial:
 
 ## Autenticacao
 
+- Meus Dados permite trocar a propria senha com confirmacao da senha atual,
+  nova senha de 8 a 128 caracteres e repeticao no formulario. A API exige sessao,
+  JSON de mesma origem e limita tentativas por usuario (5 a cada 15 minutos por processo).
+- A troca grava o hash e revoga todas as sessoes atomicamente no PostgreSQL;
+  o usuario precisa entrar novamente. Banco configurado mas indisponivel nao usa fallback.
+- Bootstrap cria a conta inicial somente se ausente: nao restaura senhas antigas.
+- Edicao do perfil mantem CPF/RG/contato/endereco criptografados e validacao existente.
+  E-mail de contato nao altera o e-mail usado para entrar.
+
 - Habilitar `AUDITA_AUTH_REQUIRED=true` em staging/producao.
 - Criar o primeiro admin apenas por variaveis de ambiente seguras.
 - Usar senha forte para `AUDITA_BOOTSTRAP_ADMIN_PASSWORD`.

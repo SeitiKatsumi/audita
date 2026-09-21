@@ -159,6 +159,8 @@ let fallbackUserId = 1;
 const fallbackUsers = new Map();
 const fallbackUsersByEmail = new Map();
 const fallbackSessions = new Map();
+// ponytail: limite por processo; usar armazenamento compartilhado ao escalar replicas.
+const passwordChangeAttempts = new Map();
 
 function loadLocalEnvFiles() {
   for (const fileName of [".env.local", ".env"]) {
@@ -1196,14 +1198,7 @@ async function bootstrapAdminUser() {
   await pool.query(
     `INSERT INTO audita_users (tenant_id, email, name, role, password_hash)
      VALUES ($1, LOWER($2), $3, 'super_admin', $4)
-     ON CONFLICT (email)
-     DO UPDATE SET
-       tenant_id = EXCLUDED.tenant_id,
-       name = EXCLUDED.name,
-       role = 'super_admin',
-       status = 'active',
-       password_hash = EXCLUDED.password_hash,
-       updated_at = NOW()`,
+     ON CONFLICT (email) DO NOTHING`,
     [defaultTenantId, email, name, hashPassword(password)],
   );
 }
@@ -1223,12 +1218,7 @@ async function ensureBootstrapUserForLogin(email, password) {
     }
     await loadFallbackAuth();
     const existing = getFallbackUserByEmail(email);
-    if (existing) {
-      existing.role = "super_admin";
-      existing.status = "active";
-      existing.name = String(process.env.AUDITA_BOOTSTRAP_ADMIN_NAME || "Audita Super Admin").trim();
-      existing.password_hash = hashPassword(password);
-    } else {
+    if (!existing) {
       createFallbackUser({
         email,
         password,
@@ -1653,6 +1643,55 @@ async function createSession(response, request, userId) {
   );
 
   setSessionCookie(request, response, token);
+}
+
+async function changeUserPassword(user, currentPassword, newPassword) {
+  const fail = (code, status) => { throw Object.assign(new Error(code), { code, status }); };
+  if (databaseUrl && (!pool || !dbReady)) fail("database_unavailable", 503);
+  if (typeof currentPassword !== "string" || !currentPassword || currentPassword.length > 1024 ||
+      typeof newPassword !== "string" || newPassword.length < 8 || newPassword.length > 128) {
+    fail("invalid_password", 400);
+  }
+  const now = Date.now();
+  for (const [key, attempt] of passwordChangeAttempts) {
+    if (attempt.expires <= now) passwordChangeAttempts.delete(key);
+  }
+  const key = `${user.tenant_id}:${user.id}`;
+  const attempt = passwordChangeAttempts.get(key) || { count: 0, expires: now + 15 * 60 * 1000 };
+  if (attempt.count >= 5) fail("too_many_attempts", 429);
+  attempt.count++;
+  passwordChangeAttempts.set(key, attempt);
+  const stored = pool && dbReady
+    ? (await pool.query("SELECT password_hash FROM audita_users WHERE id = $1 AND tenant_id = $2 AND status = 'active'", [user.id, user.tenant_id])).rows[0]
+    : fallbackUsers.get(user.id);
+  if (!(pool && dbReady) && (stored?.tenant_id !== user.tenant_id || stored?.status !== "active")) fail("incorrect_password", 400);
+  if (!stored || !verifyPassword(currentPassword, stored.password_hash)) fail("incorrect_password", 400);
+  if (currentPassword === newPassword) fail("password_unchanged", 400);
+  const nextHash = hashPassword(newPassword);
+  if (pool && dbReady) {
+    const result = await pool.query(
+      `WITH updated AS (
+         UPDATE audita_users SET password_hash = $3, updated_at = NOW()
+         WHERE id = $1 AND tenant_id = $2 AND password_hash = $4 AND status = 'active'
+         RETURNING id
+       ), revoked AS (DELETE FROM audita_sessions WHERE user_id IN (SELECT id FROM updated))
+       SELECT id FROM updated`,
+      [user.id, user.tenant_id, nextHash, stored.password_hash],
+    );
+    if (!result.rows.length) fail("password_changed_retry", 409);
+  } else {
+    const previousHash = stored.password_hash;
+    const revoked = [...fallbackSessions].filter(([, session]) => session.userId === user.id);
+    stored.password_hash = nextHash;
+    for (const [token] of revoked) fallbackSessions.delete(token);
+    try { await saveFallbackAuth(); }
+    catch (error) {
+      stored.password_hash = previousHash;
+      for (const [token, session] of revoked) fallbackSessions.set(token, session);
+      throw error;
+    }
+  }
+  passwordChangeAttempts.delete(key);
 }
 
 async function getTenantIdForRequest(request) {
@@ -5325,6 +5364,38 @@ async function handleApi(request, response, pathname) {
         error: "user_profile_save_failed",
         message: "Não foi possível salvar o perfil cadastral.",
       });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/auth/password" && request.method === "POST") {
+    try {
+      if (request.headers["sec-fetch-site"] === "cross-site" ||
+          (request.headers.origin && new URL(request.headers.origin).host !== request.headers.host)) {
+        sendJson(response, 403, { error: "invalid_origin" });
+        return true;
+      }
+      if (!/^application\/json(?:\s*;|$)/i.test(request.headers["content-type"] || "")) {
+        sendJson(response, 415, { error: "json_required" });
+        return true;
+      }
+      if (databaseUrl && (!pool || !dbReady)) {
+        sendJson(response, 503, { error: "database_unavailable" });
+        return true;
+      }
+      const user = await getSessionUser(request);
+      if (!user) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const body = JSON.parse((await readBufferBody(request, 8192)).toString("utf8"));
+      await changeUserPassword(user, body?.currentPassword, body?.newPassword);
+      clearSessionCookie(request, response);
+      sendJson(response, 200, { ok: true });
+    } catch (error) {
+      const expected = ["invalid_password", "too_many_attempts", "incorrect_password", "password_unchanged", "password_changed_retry", "database_unavailable"].includes(error.code);
+      sendJson(response, expected ? error.status : error instanceof SyntaxError || error.code === "BODY_TOO_LARGE" ? 400 : 500,
+        { error: expected ? error.code : "password_change_failed" });
     }
     return true;
   }

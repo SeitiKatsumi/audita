@@ -1,493 +1,191 @@
-const planGrid = document.querySelector("#planGrid");
-const creditPackList = document.querySelector("#creditPackList");
-const monthlyButton = document.querySelector("#monthlyButton");
-const annualButton = document.querySelector("#annualButton");
-const pageStatus = document.querySelector("#pageStatus");
-const accountButton = document.querySelector("#accountButton");
-const manageSubscriptionButton = document.querySelector("#manageSubscriptionButton");
-const accountSummary = document.querySelector("#accountSummary");
-const currentPlanValue = document.querySelector("#currentPlanValue");
-const subscriptionStatusValue = document.querySelector("#subscriptionStatusValue");
-const creditBalanceValue = document.querySelector("#creditBalanceValue");
-const renewalValue = document.querySelector("#renewalValue");
-const authDialog = document.querySelector("#authDialog");
-const loginTab = document.querySelector("#loginTab");
-const registerTab = document.querySelector("#registerTab");
-const authTitle = document.querySelector("#authTitle");
-const authForm = document.querySelector("#authForm");
-const authName = document.querySelector("#authName");
-const authEmail = document.querySelector("#authEmail");
-const authPassword = document.querySelector("#authPassword");
-const nameField = document.querySelector("#nameField");
-const authError = document.querySelector("#authError");
-const authSubmitButton = document.querySelector("#authSubmitButton");
-
-const state = {
-  interval: "monthly",
-  catalog: null,
-  user: null,
-  billing: null,
-  authMode: "login",
-  pendingPurchase: null,
-  busy: false,
-};
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+// Preserve existing checkout and portal return URLs.
+if (typeof document !== "undefined" && !document.querySelector("#meus-dados")) {
+  window.location.replace(`/${window.location.search}#meus-dados`);
 }
 
-function formatMoney(price) {
-  if (!price) return "Sob consulta";
-  if (!price.cents) return "Gr\u00e1tis";
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: price.currency || "BRL",
-    minimumFractionDigits: 2,
-  }).format(price.cents / 100);
-}
+export function initAccountPlans({ getAuthState, showLogin }) {
+  const root = document.querySelector("#meus-dados");
+  if (!root) return;
+  const offer = root.querySelector("#subscriptionOffer");
+  const summary = root.querySelector("#subscriptionSummary");
+  const message = root.querySelector("#subscriptionMessage");
+  const retry = root.querySelector("#subscriptionRetry");
+  const cycle = root.querySelector("#subscriptionCycle");
+  const savings = root.querySelector("#subscriptionSavings");
+  const cycleButtons = [...root.querySelectorAll("[data-subscription-interval]")];
+  let catalog = null;
+  let billing = null;
+  let interval = "monthly";
+  let busy = false;
+  let revision = 0;
 
-function formatDate(value) {
-  if (!value) return "N\u00e3o se aplica";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "N\u00e3o informado"
-    : new Intl.DateTimeFormat("pt-BR").format(date);
-}
+  const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char]);
+  const money = cents => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+  const date = value => value && Number.isFinite(new Date(value).getTime())
+    ? new Intl.DateTimeFormat("pt-BR").format(new Date(value)) : "";
 
-function statusLabel(status) {
-  return {
-    active: "Ativa",
-    trialing: "Em teste",
-    past_due: "Pagamento pendente",
-    canceled: "Cancelada",
-    incomplete: "Incompleta",
-    unpaid: "N\u00e3o paga",
-  }[status] || "Sem assinatura";
-}
-
-async function fetchJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      ...(options.body ? { "content-type": "application/json" } : {}),
-      ...(options.headers || {}),
-    },
-  });
-  let payload = {};
-  try {
-    payload = await response.json();
-  } catch {
-    payload = {};
-  }
-  if (!response.ok) {
-    const error = new Error(payload.message || payload.error || "N\u00e3o foi poss\u00edvel concluir a opera\u00e7\u00e3o.");
-    error.status = response.status;
-    error.payload = payload;
-    throw error;
-  }
-  return payload;
-}
-
-function showStatus(message, type = "") {
-  pageStatus.textContent = message;
-  pageStatus.className = `page-status ${type}`.trim();
-}
-
-function clearStatus() {
-  pageStatus.textContent = "";
-  pageStatus.className = "page-status hidden";
-}
-
-function setBusy(busy) {
-  state.busy = busy;
-  document.querySelectorAll("[data-purchase]").forEach((button) => {
-    if (!button.dataset.permanentDisabled) button.disabled = busy;
-  });
-  manageSubscriptionButton.disabled = busy;
-}
-
-function billingConfigured() {
-  return Boolean(
-    state.catalog?.billing?.checkoutReady || state.catalog?.billing?.demoMode,
-  );
-}
-
-function currentSubscription() {
-  return state.billing?.subscription || null;
-}
-
-function currentPlanId() {
-  if (state.billing?.access?.entitled) return state.billing.access.planId || "standard";
-  return currentSubscription()?.active ? currentSubscription().planId : "";
-}
-
-function planPriceMarkup(plan) {
-  if (plan.kind === "contact") {
-    return `<div class="plan-price"><strong>Sob consulta</strong><span>Contrato personalizado</span></div>`;
-  }
-  const selectedPrice = plan.prices?.[state.interval];
-  if (!selectedPrice?.cents) {
-    return `<div class="plan-price"><strong>Gr\u00e1tis</strong><span>Para come\u00e7ar</span></div>`;
-  }
-  const annual = state.interval === "annual";
-  const displayAmount = annual
-    ? { ...selectedPrice, cents: Math.round(selectedPrice.cents / 12) }
-    : selectedPrice;
-  return `
-    <div class="plan-price">
-      <strong>${escapeHtml(formatMoney(displayAmount))}</strong>
-      <span>${annual ? `por m\u00eas; ${formatMoney(selectedPrice)} cobrados anualmente` : "por m\u00eas"}</span>
-    </div>
-  `;
-}
-
-function planButton(plan) {
-  const selectedPrice = plan.prices?.[state.interval];
-  const isCurrent = plan.id === currentPlanId();
-  if (plan.kind === "contact") {
-    return `
-      <a class="plan-action" href="mailto:elevenmindbusiness@gmail.com?subject=IA%20AUDITA%20Enterprise">
-        Falar com o comercial
-      </a>
-    `;
-  }
-  if (plan.kind === "free") {
-    return `
-      <button
-        class="plan-action"
-        type="button"
-        data-auth-action
-        ${state.user ? "disabled data-permanent-disabled=\"true\"" : ""}
-      >
-        ${state.user ? (isCurrent ? "Plano atual" : "Inclu\u00eddo na conta") : "Criar conta gr\u00e1tis"}
-      </button>
-    `;
+  function notice(text = "", error = false) {
+    message.textContent = text;
+    message.classList.toggle("hidden", !text);
+    message.classList.toggle("is-error", error);
   }
 
-  let label = isCurrent ? "Plano atual" : `Assinar ${plan.name}`;
-  let disabled = isCurrent;
-  if (!billingConfigured() || !selectedPrice?.checkoutAvailable) {
-    label = "Contrata\u00e7\u00e3o em configura\u00e7\u00e3o";
-    disabled = true;
-  } else if (state.user && state.billing && !state.billing.canManage) {
-    label = "Solicite ao administrador";
-    disabled = true;
-  }
-  return `
-    <button
-      class="plan-action"
-      type="button"
-      data-purchase="subscription"
-      data-plan-id="${escapeHtml(plan.id)}"
-      ${disabled ? "disabled data-permanent-disabled=\"true\"" : ""}
-    >
-      ${escapeHtml(label)}
-    </button>
-  `;
-}
-
-function renderPlans() {
-  if (!state.catalog) {
-    planGrid.innerHTML = "<p>Carregando planos...</p>";
-    return;
-  }
-  planGrid.innerHTML = state.catalog.plans
-    .map(
-      (plan) => `
-        <article class="plan-card ${plan.recommended ? "recommended" : ""}">
-          ${plan.recommended ? '<span class="plan-badge">Mais escolhido</span>' : ""}
-          <h3>${escapeHtml(plan.name)}</h3>
-          <p class="plan-audience">${escapeHtml(plan.audience)}</p>
-          ${planPriceMarkup(plan)}
-          <p class="plan-description">${escapeHtml(plan.description)}</p>
-          <ul>
-            ${plan.features.map((feature) => `<li>${escapeHtml(feature)}</li>`).join("")}
-            ${state.interval === "annual" ? (plan.annualBenefits || []).map((feature) => `<li class="annual-benefit">${escapeHtml(feature)}</li>`).join("") : ""}
-          </ul>
-          ${planButton(plan)}
-        </article>
-      `,
-    )
-    .join("");
-
-  planGrid.querySelectorAll("[data-purchase]").forEach((button) => {
-    button.addEventListener("click", () => {
-      beginPurchase({
-        kind: "subscription",
-        planId: button.dataset.planId,
-        interval: state.interval,
-      });
+  async function request(url, options = {}) {
+    const response = await fetch(url, {
+      ...options,
+      headers: { accept: "application/json", ...(options.body ? { "content-type": "application/json" } : {}) },
     });
-  });
-  planGrid.querySelector("[data-auth-action]")?.addEventListener("click", () => {
-    openAuth("register");
-  });
-}
-
-function renderCreditPacks() {
-  if (!state.catalog) {
-    creditPackList.innerHTML = "";
-    return;
-  }
-  creditPackList.innerHTML = state.catalog.creditPacks
-    .map((pack) => {
-      let label = `Comprar por ${formatMoney(pack.price)}`;
-      let disabled = false;
-      if (!billingConfigured() || !pack.checkoutAvailable) {
-        label = "Em configura\u00e7\u00e3o";
-        disabled = true;
-      } else if (state.user && state.billing && !state.billing.canManage) {
-        label = "Apenas administrador";
-        disabled = true;
-      }
-      return `
-        <article class="credit-pack">
-          <h3>${escapeHtml(pack.name)}</h3>
-          <p>Uso adicional na carteira da organiza\u00e7\u00e3o</p>
-          <button
-            class="pack-action"
-            type="button"
-            data-purchase="credit_pack"
-            data-pack-id="${escapeHtml(pack.id)}"
-            ${disabled ? "disabled data-permanent-disabled=\"true\"" : ""}
-          >
-            ${escapeHtml(label)}
-          </button>
-        </article>
-      `;
-    })
-    .join("");
-  creditPackList.querySelectorAll("[data-purchase]").forEach((button) => {
-    button.addEventListener("click", () => {
-      beginPurchase({
-        kind: "credit_pack",
-        packId: button.dataset.packId,
-      });
-    });
-  });
-}
-
-function renderAccount() {
-  accountButton.textContent = state.user ? state.user.name || "Minha conta" : "Entrar";
-  accountSummary.classList.toggle("hidden", !state.user);
-  const subscription = currentSubscription();
-  const plan = state.catalog?.plans?.find((item) => item.id === currentPlanId());
-  currentPlanValue.textContent = plan?.name || "Sem plano";
-  subscriptionStatusValue.textContent = state.billing?.access?.source === "tester"
-    ? "Tester liberado"
-    : statusLabel(subscription?.status);
-  creditBalanceValue.textContent = String(state.billing?.wallet?.balance || 0);
-  renewalValue.textContent = formatDate(subscription?.currentPeriodEnd);
-  manageSubscriptionButton.classList.toggle(
-    "hidden",
-    !state.user || !state.billing?.canManage || !subscription,
-  );
-}
-
-function render() {
-  monthlyButton.classList.toggle("active", state.interval === "monthly");
-  annualButton.classList.toggle("active", state.interval === "annual");
-  monthlyButton.setAttribute("aria-pressed", String(state.interval === "monthly"));
-  annualButton.setAttribute("aria-pressed", String(state.interval === "annual"));
-  renderAccount();
-  renderPlans();
-  renderCreditPacks();
-}
-
-function setAuthMode(mode) {
-  state.authMode = mode;
-  const registering = mode === "register";
-  loginTab.classList.toggle("active", !registering);
-  registerTab.classList.toggle("active", registering);
-  loginTab.setAttribute("aria-selected", String(!registering));
-  registerTab.setAttribute("aria-selected", String(registering));
-  nameField.classList.toggle("hidden", !registering);
-  authName.required = registering;
-  authPassword.autocomplete = registering ? "new-password" : "current-password";
-  authTitle.textContent = registering ? "Crie sua conta" : "Entre para continuar";
-  authSubmitButton.textContent = registering ? "Criar conta" : "Entrar";
-  authError.classList.add("hidden");
-}
-
-function openAuth(mode = "login") {
-  setAuthMode(mode);
-  if (!authDialog.open) authDialog.showModal();
-  window.setTimeout(() => {
-    (mode === "register" ? authName : authEmail).focus();
-  }, 0);
-}
-
-async function submitAuth(event) {
-  event.preventDefault();
-  authError.classList.add("hidden");
-  authSubmitButton.disabled = true;
-  authSubmitButton.textContent =
-    state.authMode === "register" ? "Criando conta..." : "Entrando...";
-  try {
-    const payload = {
-      email: authEmail.value.trim(),
-      password: authPassword.value,
-      ...(state.authMode === "register" ? { name: authName.value.trim() } : {}),
-    };
-    await fetchJson(
-      state.authMode === "register" ? "/api/auth/register" : "/api/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      },
-    );
-    authForm.reset();
-    authDialog.close();
-    await loadAccount();
-    render();
-    if (state.pendingPurchase) {
-      const pending = state.pendingPurchase;
-      state.pendingPurchase = null;
-      await beginPurchase(pending);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(response.status === 403
+        ? "Sua conta não tem permissão para gerenciar a assinatura. Fale com o responsável pela sua organização."
+        : response.status === 401 ? "Entre novamente para continuar."
+          : "Não foi possível carregar ou atualizar sua assinatura. Tente novamente.");
+      error.status = response.status;
+      throw error;
     }
-  } catch (error) {
-    authError.textContent =
-      error.status === 401
-        ? "E-mail ou senha incorretos."
-        : error.payload?.error === "email_already_registered"
-          ? "Este e-mail j\u00e1 possui uma conta."
-          : error.message;
-    authError.classList.remove("hidden");
-  } finally {
-    authSubmitButton.disabled = false;
-    authSubmitButton.textContent =
-      state.authMode === "register" ? "Criar conta" : "Entrar";
+    return data;
   }
-}
 
-async function beginPurchase(selection) {
-  if (state.busy) return;
-  if (!state.user) {
-    state.pendingPurchase = selection;
-    openAuth("register");
-    return;
+  function existingSubscription() {
+    const subscription = billing?.subscription;
+    return subscription && (subscription.provider !== "demo" || catalog?.billing?.demoMode)
+      && !["canceled", "incomplete_expired", "inactive"].includes(subscription.status)
+      ? subscription : null;
   }
-  setBusy(true);
-  clearStatus();
-  try {
-    const demoMode = Boolean(state.catalog?.billing?.demoMode);
-    const payload = await fetchJson(
-      demoMode ? "/api/billing/demo-subscription" : "/api/billing/checkout",
-      {
-      method: "POST",
-      body: JSON.stringify(demoMode
-        ? { interval: selection.interval }
-        : { ...selection, requestId: crypto.randomUUID() }),
-      },
-    );
-    if (demoMode) {
-      await loadAccount();
-      render();
-      showStatus("Demonstração ativada. Nenhuma cobrança foi realizada.", "success");
-      setBusy(false);
-      return;
-    }
-    if (!payload.url) throw new Error("Checkout indispon\u00edvel.");
-    window.location.assign(payload.url);
-  } catch (error) {
-    const message =
-      error.status === 403
-        ? "Somente o administrador da organiza\u00e7\u00e3o pode alterar a assinatura."
-        : error.message;
-    showStatus(message, "error");
-    setBusy(false);
-  }
-}
 
-async function openBillingPortal() {
-  if (state.busy) return;
-  setBusy(true);
-  clearStatus();
-  try {
-    const payload = await fetchJson("/api/billing/portal", {
-      method: "POST",
-      body: JSON.stringify({}),
+  function render() {
+    const plan = catalog?.plans?.find(item => item.id === "standard");
+    if (!plan) throw new Error("O plano está indisponível no momento. Tente novamente mais tarde.");
+    const subscription = existingSubscription();
+    const selectedInterval = subscription?.interval || interval;
+    const price = plan.prices?.[selectedInterval];
+    if (!Number.isFinite(price?.cents) || price.cents <= 0) throw new Error("O valor da assinatura está indisponível. Tente novamente mais tarde.");
+    const annual = selectedInterval === "annual";
+    const demo = Boolean(catalog.billing?.demoMode);
+    const user = getAuthState().user;
+    const canManage = Boolean(billing?.canManage);
+    const checkoutReady = Boolean((catalog.billing?.checkoutReady || demo) && price.checkoutAvailable);
+    const canUsePortal = canManage && billing?.subscription?.provider === "stripe";
+    const disabled = busy || (user && (!billing || !canManage)) || (subscription ? !canUsePortal : !checkoutReady);
+    const yearlySavings = plan.prices?.monthly?.cents * 12 - plan.prices?.annual?.cents;
+    savings.textContent = yearlySavings > 0 ? `Economize ${money(yearlySavings)}/ano` : "";
+    cycle.hidden = Boolean(subscription);
+    cycleButtons.forEach(button => {
+      button.setAttribute("aria-pressed", String(button.dataset.subscriptionInterval === selectedInterval));
+      button.disabled = busy;
     });
-    if (!payload.url) throw new Error("Portal de assinatura indispon\u00edvel.");
-    window.location.assign(payload.url);
-  } catch (error) {
-    showStatus(error.message, "error");
-    setBusy(false);
+    const labels = { active: "Assinatura ativa", trialing: "Período de teste", past_due: "Pagamento pendente", unpaid: "Pagamento pendente", incomplete: "Pagamento não concluído", paused: "Assinatura pausada" };
+    const renewal = date(subscription?.currentPeriodEnd);
+    summary.textContent = subscription
+      ? `${labels[subscription.status] || "Sua assinatura"}${renewal ? ` · ${subscription.cancelAtPeriodEnd ? "Acesso até" : "Próxima renovação em"} ${renewal}` : ""}.`
+      : billing?.access?.source === "tester" && billing.access.entitled
+        ? "Você tem um acesso temporário. Conheça também a assinatura Standard."
+        : "Escolha o período e conheça os benefícios do Standard.";
+    let label = subscription ? "Gerenciar assinatura" : `Assinar ${annual ? "anual" : "mensal"}`;
+    if (!user) label = "Entrar para assinar";
+    else if (!canManage) label = "Fale com o responsável pela conta";
+    else if (subscription && !canUsePortal) label = demo ? "Demonstração ativa" : "Assinatura atual";
+    else if (!subscription && !checkoutReady) label = "Assinatura indisponível no momento";
+    else if (demo && !subscription) label = "Experimentar demonstração";
+    if (busy) label = "Aguarde...";
+    offer.innerHTML = `
+      <div class="account-plan">
+        <div class="account-benefits">
+          <h3>${escape(plan.name)}</h3>
+          <p>${escape(plan.description)}</p>
+          <ul>${[...(plan.features || []), ...(annual ? plan.annualBenefits || [] : [])].map(feature => `<li>${escape(feature)}</li>`).join("")}</ul>
+        </div>
+        <div class="account-checkout">
+          <span>${annual ? "Assinatura anual" : "Assinatura mensal"}</span>
+          <p class="account-price"><strong>${escape(money(annual ? price.cents / 12 : price.cents))}</strong><span>/mês</span></p>
+          <p class="account-charge">${annual ? `${escape(money(price.cents))} cobrados uma vez por ano.` : `${escape(money(price.cents))} cobrados a cada mês.`}</p>
+          <button class="primary-action" type="button" data-subscription-action ${disabled ? "disabled" : ""}>${escape(label)}</button>
+          <small>${demo ? "Ambiente de demonstração. Nenhuma cobrança real." : "Renovação automática. Gerencie ou cancele sua assinatura no portal de pagamento."}</small>
+          ${!subscription && canUsePortal ? '<button class="secondary-action" type="button" data-subscription-portal>Gerenciar pagamentos anteriores</button>' : ""}
+        </div>
+      </div>`;
+    offer.querySelector("[data-subscription-action]").addEventListener("click", () => purchaseOrManage(Boolean(subscription)));
+    offer.querySelector("[data-subscription-portal]")?.addEventListener("click", () => purchaseOrManage(true));
   }
-}
 
-async function loadAccount() {
-  const auth = await fetchJson("/api/auth/me");
-  state.user = auth.user || null;
-  state.billing = null;
-  if (state.user) {
+  async function load() {
+    const currentRevision = ++revision;
+    billing = null;
+    offer.innerHTML = "<p>Carregando assinatura...</p>";
+    cycle.hidden = true;
+    retry.classList.add("hidden");
+    notice();
     try {
-      state.billing = await fetchJson("/api/billing/subscription");
+      const [nextCatalog, nextBilling] = await Promise.all([
+        request("/api/billing/plans"),
+        getAuthState().user ? request("/api/billing/subscription") : null,
+      ]);
+      if (currentRevision !== revision) return;
+      catalog = nextCatalog;
+      billing = nextBilling;
+      render();
+      const checkout = new URLSearchParams(window.location.search).get("checkout");
+      if (checkout === "success") notice(existingSubscription()?.active
+        ? "Sua assinatura está ativa. Aproveite os benefícios!"
+        : "Recebemos seu retorno do pagamento. A assinatura será liberada após a confirmação. Use Tentar novamente para atualizar.");
+      if (checkout === "success" && !existingSubscription()?.active) retry.classList.remove("hidden");
+      if (checkout === "cancelled") notice("Você voltou sem concluir a contratação. Pode escolher seu plano quando quiser.");
     } catch (error) {
-      if (error.status !== 401) throw error;
+      if (currentRevision !== revision) return;
+      offer.replaceChildren();
+      cycle.hidden = true;
+      summary.textContent = "Não foi possível consultar sua assinatura agora.";
+      notice(error.message, true);
+      retry.classList.remove("hidden");
     }
   }
-}
 
-function checkoutMessage() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("checkout") === "success") {
-    showStatus(
-      "Pagamento recebido. A assinatura e os cr\u00e9ditos ser\u00e3o atualizados assim que a Stripe confirmar o evento.",
-      "success",
-    );
-  } else if (params.get("checkout") === "cancelled") {
-    showStatus("Checkout cancelado. Nenhuma cobran\u00e7a foi conclu\u00edda.");
-  }
-}
-
-async function initialize() {
-  planGrid.innerHTML = "<p>Carregando planos...</p>";
-  try {
-    const [catalog] = await Promise.all([
-      fetchJson("/api/billing/plans"),
-      loadAccount(),
-    ]);
-    state.catalog = catalog;
+  async function purchaseOrManage(portal) {
+    if (busy) return;
+    if (!getAuthState().user) { showLogin("Entre para escolher sua assinatura."); return; }
+    if (!billing?.canManage) return;
+    const currentRevision = revision;
+    busy = true;
+    notice();
     render();
-    checkoutMessage();
-    if (!catalog.billing.checkoutReady && !catalog.billing.demoMode) {
-      showStatus(
-        "Os planos est\u00e3o definidos, mas o checkout ainda aguarda a configura\u00e7\u00e3o segura da Stripe.",
-      );
+    try {
+      const demo = !portal && catalog.billing?.demoMode;
+      const data = await request(portal ? "/api/billing/portal" : demo ? "/api/billing/demo-subscription" : "/api/billing/checkout", {
+        method: "POST",
+        body: JSON.stringify(portal ? {} : demo ? { interval } : { kind: "subscription", planId: "standard", interval, requestId: crypto.randomUUID() }),
+      });
+      if (currentRevision !== revision) return;
+      if (demo) {
+        await load();
+        notice("Demonstração ativada. Nenhuma cobrança foi realizada.");
+      } else {
+        const url = new URL(data.url);
+        if (url.protocol !== "https:") throw new Error("O pagamento está indisponível no momento. Tente novamente.");
+        window.location.assign(url.href);
+      }
+    } catch (error) {
+      if (currentRevision === revision) notice(error.message, true);
+      if (error.status === 401) showLogin("Entre novamente para continuar.");
+    } finally {
+      busy = false;
+      if (billing && catalog) render();
     }
-  } catch (error) {
-    showStatus(error.message, "error");
-    planGrid.innerHTML = "";
   }
+
+  cycleButtons.forEach(button => button.addEventListener("click", () => {
+    if (busy || !catalog) return;
+    interval = button.dataset.subscriptionInterval;
+    render();
+  }));
+  retry.addEventListener("click", load);
+  document.addEventListener("audita:pagechange", event => { if (event.detail.page === "meus-dados") void load(); });
+  window.addEventListener("audita:auth-changed", () => {
+    revision++;
+    billing = null;
+    offer.replaceChildren();
+    if (document.body.dataset.activePage === "meus-dados") void load();
+  });
 }
-
-monthlyButton.addEventListener("click", () => {
-  state.interval = "monthly";
-  render();
-});
-
-annualButton.addEventListener("click", () => {
-  state.interval = "annual";
-  render();
-});
-
-accountButton.addEventListener("click", () => {
-  if (state.user) {
-    window.location.assign("/chat");
-  } else {
-    openAuth("login");
-  }
-});
-
-manageSubscriptionButton.addEventListener("click", openBillingPortal);
-loginTab.addEventListener("click", () => setAuthMode("login"));
-registerTab.addEventListener("click", () => setAuthMode("register"));
-authForm.addEventListener("submit", submitAuth);
-
-initialize();

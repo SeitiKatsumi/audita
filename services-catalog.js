@@ -6,7 +6,6 @@ export function matchesService(service, query, category) {
 
 export function initServicesCatalog(root = document.querySelector('#central-servicos')) {
   if (!root) return;
-  const input = root.querySelector('input[type="search"]');
   const buttons = [...root.querySelectorAll('[data-service-category]')];
   const cards = [...root.querySelectorAll('[data-service-card]')];
   let category = 'all';
@@ -14,7 +13,7 @@ export function initServicesCatalog(root = document.querySelector('#central-serv
     let count = 0;
     for (const card of cards) {
       card.hidden = !matchesService({text: card.textContent + ' ' + (card.dataset.keywords || ''),
-        categories: card.dataset.categories.split(' ')}, input.value, category);
+        categories: card.dataset.categories.split(' ')}, '', category);
       if (!card.hidden) count++;
     }
     root.querySelectorAll('[data-service-group]').forEach(group => {
@@ -24,8 +23,7 @@ export function initServicesCatalog(root = document.querySelector('#central-serv
     root.querySelector('[data-service-count]').textContent = `${count} ${count === 1 ? 'serviço encontrado' : 'serviços encontrados'}`;
     root.querySelector('[data-service-empty]').hidden = count !== 0;
   }
-  input.addEventListener('input', render);
   buttons.forEach(button => button.addEventListener('click', () => { category = button.dataset.serviceCategory; render(); }));
-  root.querySelector('[data-service-clear]').addEventListener('click', () => { input.value = ''; category = 'all'; render(); input.focus(); });
+  root.querySelector('[data-service-clear]').addEventListener('click', () => { category = 'all'; render(); buttons.find(button => button.dataset.serviceCategory === 'all')?.focus(); });
   render();
 }

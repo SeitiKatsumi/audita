@@ -6,6 +6,7 @@
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
     <link rel="stylesheet" href="styles.css?v=20260911-chat-spacing" />
+    <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260911-chat-spacing" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
   <link rel="stylesheet" href="/advogados.css?v=3" />
@@ -80,57 +81,15 @@
             <span class="nav-label">IA AUDITA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
           </a>
-          <a href="#central-servicos" data-nav-pages="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz">
+          <a href="#central-servicos" data-nav-pages="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
             <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
             <span class="nav-label">Central de Serviços</span>
           </a>
           <a href="#advogados" data-lawyer-entry hidden><img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" /><span class="nav-label">Área dos Advogados</span></a>
-          <details class="nav-group">
-            <summary>
-              <img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" aria-hidden="true" />
-              <span class="nav-label">Configura&ccedil;&otilde;es</span>
-              <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-            </summary>
-            <div class="nav-children">
-              <a class="nav-child" href="#historico">
-                <span class="nav-label">Hist&oacute;rico de consultas</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-              <a class="nav-child" href="#meu-painel">
-                <span class="nav-label">Meu painel</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-              <a class="nav-child hidden" href="#admin-planos" id="adminBillingNav">
-                <span class="nav-label">Planos e assinaturas</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-              <a class="nav-child hidden" href="#admin-consumo" id="adminUsageNav">
-                <span class="nav-label">Consumo de APIs</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-            </div>
-          </details>
-          <details class="nav-group">
-            <summary>
-              <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
-              <span class="nav-label">Ferramentas de Consulta (Dev)</span>
-              <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-            </summary>
-            <div class="nav-children">
-              <a class="nav-child" href="#consulta-tjdft-pf" data-nav-pages="consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj">
-                <span class="nav-label">Certid&otilde;es estaduais</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-              <a class="nav-child" href="#consulta-imoveis">
-                <span class="nav-label">Busca de im&oacute;veis</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-              <a class="nav-child" href="#consulta-cnib">
-                <span class="nav-label">Indisponibilidade de bens</span>
-                <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
-              </a>
-            </div>
-          </details>
+          <a href="#meus-dados">
+            <img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" aria-hidden="true" />
+            <span class="nav-label">Meus Dados</span>
+          </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -151,13 +110,9 @@
       <nav class="mobile-bottom-nav" aria-label="Navegação principal mobile">
         <a href="#home"><img src="assets/audita-logo-original.png" alt="" /><span>Home</span></a>
         <a href="/chat" data-app-route="chat"><img class="nav-icon" src="assets/nav-icons/sparkles.svg" alt="" /><span>IA</span></a>
-        <a href="#central-servicos" data-nav-pages="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
-        <button id="mobileSettingsButton" type="button" aria-haspopup="dialog" aria-controls="mobileSettings"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Configurações</span></button>
+        <a href="#central-servicos" data-nav-pages="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
+        <a href="#meus-dados"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Meus Dados</span></a>
       </nav>
-      <dialog id="mobileSettings" class="mobile-settings" aria-labelledby="mobileSettingsTitle">
-        <header><h2 id="mobileSettingsTitle">Configurações</h2><button type="button" class="secondary-action" data-close-settings aria-label="Fechar configurações">Fechar</button></header>
-        <nav class="nav-list" aria-label="Configurações e outros acessos" id="mobileSettingsLinks"></nav>
-      </dialog>
       <main class="workspace">
         <header class="topbar">
           <div>
@@ -177,7 +132,7 @@
 <div class="module list-panel"><table><thead><tr><th>Atendimento</th><th>Serviço</th><th>Situação</th><th>Próximo passo</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="lawyer-caseRows"></tbody></table><p id="lawyer-empty" hidden>Nenhum atendimento nesta lista.</p></div>
 <section id="lawyer-details" class="panel" hidden tabindex="-1"><button class="secondary-action" id="lawyer-closeDetails">Voltar à lista</button><div id="lawyer-detailBody"></div></section></div>
 <aside class="activity"><section class="panel"><h2>Pendências de atenção</h2><div id="lawyer-attention"></div></section><section class="panel"><h2>Atualizações recentes</h2><div id="lawyer-recent"></div></section><p class="muted">Os prazos oficiais devem ser conferidos pela equipe nos canais responsáveis.</p></aside></div></div></section>
-        <nav class="service-return page-hidden" data-page="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz" aria-label="Voltar ao catálogo de serviços">
+        <nav class="service-return page-hidden" data-page="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
           <a href="#central-servicos"><img src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />Voltar à Central de Serviços</a>
         </nav>
 
@@ -208,7 +163,7 @@
               </a>
               </div>
               <div class="chat-header-actions">
-                <a class="chat-tools-button chat-plans-link" href="/planos">Planos</a>
+                <a class="chat-tools-button chat-plans-link" href="/#meus-dados">Meus Dados</a>
                 <button class="chat-browser-mobile-open hidden" id="chatBrowserMobileOpen" type="button">
                   Navegador <span aria-hidden="true"></span>
                 </button>
@@ -226,7 +181,6 @@
                 <a href="#pis-pasep" data-pis-entry hidden><span class="tool-status review"></span><strong>PIS/PASEP</strong><small>Consulta assistida de cotas antigas</small></a>
                 <a href="#isencao-ir"><span class="tool-status review"></span><strong>Isenção de IR</strong><small>Triagem e acompanhamento</small></a>
                 <a href="/chat?tool=itau-refund"><span class="tool-status active"></span><strong>Revis&atilde;o Ita&uacute;</strong><small>An&aacute;lise de faturas ativa</small></a>
-                <a href="/#historico"><span class="tool-status active"></span><strong>Hist&oacute;rico</strong><small>Consultas do usu&aacute;rio</small></a>
               </div>
             </header>
 
@@ -348,9 +302,6 @@
         <section id="contas-de-luz" data-page="contas-de-luz" class="page-hidden"><div id="energyApp" aria-label="Auditoria de contas de luz"></div></section>
         <section class="services-page page-hidden" id="central-servicos" data-page="central-servicos" aria-label="Central de Serviços">
           <p class="services-intro">Encontre a consulta ou análise de que você precisa.</p>
-          <label class="services-search">Buscar serviço
-            <input type="search" placeholder="Busque por serviço, documento ou assunto" aria-controls="servicesGrid" />
-          </label>
           <div class="services-categories" role="group" aria-label="Filtrar por categoria">
             <button class="secondary-action" type="button" data-service-category="all" aria-pressed="true">Todos</button>
             <button class="secondary-action" type="button" data-service-category="bancario" aria-pressed="false">Bancário</button>
@@ -436,6 +387,36 @@
             <section class="services-group" data-service-group aria-labelledby="services-certidoes">
               <h3 id="services-certidoes">Certidões</h3>
               <div class="services-grid">
+                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="certidao tribunal estado uf cpf cnpj pessoa física jurídica">
+                  <a class="service-card-entry" href="#consulta-tjdft-pf">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Certidões</small><strong>Certidões estaduais</strong><small>Escolha o estado e consulte as opções de certidões judiciais disponíveis.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam reunir certidões dos tribunais estaduais.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Acesse os formulários por estado e acompanhe a emissão pelos canais disponíveis.</span></span>
+                      <small class="service-note">A disponibilidade varia por tribunal; algumas etapas exigem validação humana.</small>
+                      <a class="service-action" href="#consulta-tjdft-pf">Consultar certidões<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
+                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="cnib cpf cnpj vendedor restricao indisponibilidade">
+                  <a class="service-card-entry" href="#consulta-cnib">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Certidões</small><strong>Indisponibilidade de bens</strong><small>Consulte registros de indisponibilidade de bens pelo CPF ou CNPJ do vendedor.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Quem precisa verificar possíveis restrições relacionadas ao vendedor de um imóvel.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Consulte os dados pelo provedor integrado e confira o resultado na plataforma.</span></span>
+                      <small class="service-note">Depende de provedor habilitado. O resultado não substitui automaticamente uma certidão oficial CNIB.</small>
+                      <a class="service-action" href="#consulta-cnib">Consultar indisponibilidade<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes imoveis" data-keywords="vendedor compra venda certidao pessoa física distrito federal df tjdft">
                   <a class="service-card-entry" href="#analise-vendedor">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
@@ -1351,42 +1332,102 @@
           </article>
         </section>
 
-        <section class="profile-grid" id="meu-painel" data-page="meu-painel">
+        <section class="account-page" id="meus-dados" data-page="meus-dados" aria-label="Dados da conta e assinatura">
+          <p class="account-intro">Seus dados e sua assinatura, em um só lugar.</p>
           <article class="module profile-card">
             <div class="module-header">
               <div>
                 <p class="eyebrow">Conta</p>
-                <h2>Meu painel</h2>
+                <h2>Dados pessoais</h2>
               </div>
-              <span class="live" id="profileRole">Super admin</span>
+              <span class="live" id="profileRole">Minha conta</span>
             </div>
             <div class="profile-fields">
               <div>
                 <small>Nome</small>
-                <strong id="profileName">Super Admin</strong>
+                <strong id="profileName">Não informado</strong>
               </div>
               <div>
-                <small>E-mail</small>
+                <small>E-mail de contato</small>
                 <strong id="profileEmail">N&atilde;o informado</strong>
               </div>
               <div>
                 <small>CPF</small>
-                <strong>N&atilde;o informado</strong>
+                <strong id="profileDocument">N&atilde;o informado</strong>
               </div>
               <div>
                 <small>RG</small>
-                <strong>N&atilde;o informado</strong>
+                <strong id="profileRg">N&atilde;o informado</strong>
               </div>
               <div class="wide-profile-field">
                 <small>Endere&ccedil;o</small>
-                <strong>N&atilde;o informado</strong>
+                <strong id="profileAddress">N&atilde;o informado</strong>
               </div>
               <div>
-                <small>Plano</small>
-                <strong id="profilePlan">Ilimitado</strong>
+                <small>Telefone</small>
+                <strong id="profilePhone">N&atilde;o informado</strong>
               </div>
             </div>
+            <p class="account-intro">E-mail de acesso: <span id="accountLoginEmail">Não informado</span>. Editar o contato não altera seu login.</p>
+            <button class="secondary-action" id="editProfileButton" type="button" aria-expanded="false" aria-controls="accountProfileForm">Editar dados</button>
+            <form id="accountProfileForm" class="account-form hidden">
+              <fieldset>
+                <legend>Editar dados pessoais</legend>
+                <div class="account-form-grid">
+                  <label class="account-field-wide">Nome completo<input name="fullName" autocomplete="name" required minlength="2" maxlength="160" /></label>
+                  <label class="account-field-wide">E-mail de contato<input name="email" type="email" autocomplete="email" required maxlength="160" /></label>
+                  <label>CPF<input name="document" inputmode="numeric" maxlength="14" /></label>
+                  <label>RG<input name="rg" maxlength="20" /></label>
+                  <label>Telefone<input name="phone" type="tel" autocomplete="tel-national" maxlength="16" /></label>
+                  <label>CEP<input name="postalCode" inputmode="numeric" autocomplete="postal-code" maxlength="9" /></label>
+                  <label class="account-field-wide">Rua / avenida<input name="street" autocomplete="address-line1" maxlength="160" /></label>
+                  <label>Número<input name="addressNumber" maxlength="20" /></label>
+                  <label>Complemento<input name="addressComplement" autocomplete="address-line2" maxlength="80" /></label>
+                  <label>Bairro<input name="district" maxlength="80" /></label>
+                  <label>Cidade<input name="city" autocomplete="address-level2" maxlength="100" /></label>
+                  <label>UF<select name="uf" autocomplete="address-level1"><option value="">Selecione</option><option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option><option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option><option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option><option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option><option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option><option>SE</option><option>TO</option></select></label>
+                </div>
+                <div class="account-form-actions"><button class="primary-action" type="submit">Salvar dados</button><button class="secondary-action" type="button" id="cancelProfileButton">Cancelar</button></div>
+              </fieldset>
+            </form>
+            <p id="profileEditMessage" class="account-message hidden" role="status" aria-live="polite"></p>
           </article>
+          <article class="module account-security">
+            <div class="module-header"><div><p class="eyebrow">Segurança</p><h2>Senha de acesso</h2></div></div>
+            <p class="account-intro">Troque sua senha quando precisar. Após a alteração, entre novamente em seus dispositivos.</p>
+            <button class="secondary-action" id="editPasswordButton" type="button" aria-expanded="false" aria-controls="accountPasswordForm">Alterar senha</button>
+            <form id="accountPasswordForm" class="account-form hidden">
+              <fieldset>
+                <legend>Alterar senha de acesso</legend>
+                <div class="account-password-fields">
+                  <label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" required maxlength="1024" /></label>
+                  <label>Nova senha<input name="newPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="128" aria-describedby="passwordHint" /></label>
+                  <small id="passwordHint">Use de 8 a 128 caracteres e uma senha diferente da atual.</small>
+                  <label>Confirmar nova senha<input name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="128" /></label>
+                </div>
+                <div class="account-form-actions"><button class="primary-action" type="submit">Salvar nova senha</button><button class="secondary-action" type="button" id="cancelPasswordButton">Cancelar</button></div>
+              </fieldset>
+            </form>
+            <p id="passwordEditMessage" class="account-message hidden" role="status" aria-live="polite"></p>
+          </article>
+          <article class="module account-subscription" aria-labelledby="subscriptionTitle">
+            <div class="module-header">
+              <div><p class="eyebrow">Sua assinatura</p><h2 id="subscriptionTitle">Mais possibilidades com a IA AUDITA</h2></div>
+            </div>
+            <p id="subscriptionSummary" class="account-intro">Escolha o período e conheça os benefícios do Standard.</p>
+            <p id="subscriptionMessage" class="account-message hidden" role="status" aria-live="polite"></p>
+            <button class="secondary-action hidden" id="subscriptionRetry" type="button">Tentar novamente</button>
+            <div class="account-cycle" id="subscriptionCycle" role="group" aria-label="Período da assinatura">
+              <button type="button" data-subscription-interval="monthly" aria-pressed="true">Mensal</button>
+              <button type="button" data-subscription-interval="annual" aria-pressed="false">Anual <span id="subscriptionSavings"></span></button>
+            </div>
+            <div id="subscriptionOffer" aria-live="polite"><p>Carregando assinatura...</p></div>
+            <p class="account-terms">Serviços e consultas cobrados à parte são informados antes da contratação. O suporte de advogado parceiro do plano anual se refere ao caso Itaú; representação, custas e protocolo dependem de contratação específica, sem garantia de resultado.</p>
+          </article>
+          <div class="account-actions">
+            <a href="#advogados" data-lawyer-entry hidden>Área dos Advogados</a>
+            <button class="secondary-action hidden" id="accountLogoutButton" type="button">Sair da conta</button>
+          </div>
         </section>
 
         <section class="api-usage-admin" id="admin-consumo" data-page="admin-consumo">
@@ -2047,7 +2088,7 @@
     <script type="module" src="/ir-exemption.js?v=20260910-reintegrated"></script>
     <script type="module" src="/bank-debt.js?v=20260914-triagem"></script>
     <script type="module" src="charge-analysis.js?v=20260828-legal-documents-1"></script>
-    <script type="module" src="app.js?v=20260828-legal-documents-1-ir-20260910"></script>
+    <script type="module" src="app.js?v=20260922-editar-conta"></script>
       <script type="module" src="/pis-pasep.js?v=20260911"></script>
   <script type="module" src="energy-audit.js"></script>
 </body>

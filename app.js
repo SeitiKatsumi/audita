@@ -1,4 +1,5 @@
 import { initServicesCatalog } from "./services-catalog.js";
+import { initAccountPlans } from "./plans.js?v=20260922-meus-dados";
 const canvas = document.querySelector("#signalCanvas");
 const ctx = canvas?.getContext("2d");
 const riskScore = document.querySelector("#riskScore");
@@ -30,8 +31,11 @@ const pageTitle = document.querySelector("#pageTitle");
 const pageEyebrow = document.querySelector("#pageEyebrow");
 const profileName = document.querySelector("#profileName");
 const profileEmail = document.querySelector("#profileEmail");
-const profilePlan = document.querySelector("#profilePlan");
 const profileRole = document.querySelector("#profileRole");
+const accountProfileForm = document.querySelector("#accountProfileForm");
+const accountPasswordForm = document.querySelector("#accountPasswordForm");
+const editProfileButton = document.querySelector("#editProfileButton");
+const editPasswordButton = document.querySelector("#editPasswordButton");
 const adminBillingNav = document.querySelector("#adminBillingNav");
 const adminUsageNav = document.querySelector("#adminUsageNav");
 const apiUsageDays = document.querySelector("#apiUsageDays");
@@ -896,7 +900,7 @@ const pageMeta = {
   },
   home: {
     title: "IA AUDITA",
-    eyebrow: "Plataforma de certidões inteligentes",
+    eyebrow: "",
   },
   consultas: {
     title: "Assistente de Consultas",
@@ -954,9 +958,9 @@ const pageMeta = {
     title: "Histórico de consultas",
     eyebrow: "Execuções anteriores do usuário",
   },
-  "meu-painel": {
-    title: "Meu painel",
-    eyebrow: "Dados da conta",
+  "meus-dados": {
+    title: "Meus Dados",
+    eyebrow: "Minha conta",
   },
   "admin-consumo": {
     title: "Consumo de APIs",
@@ -970,6 +974,7 @@ const pageMeta = {
 
 function getActivePage() {
   const hash = window.location.hash.replace("#", "");
+  if (hash === "meu-painel") return "meus-dados";
   if (hash === "overview") {
     return "home";
   }
@@ -991,6 +996,7 @@ function setActivePage(page) {
 
   pageTitle.textContent = activeMeta.title;
   pageEyebrow.textContent = activeMeta.eyebrow;
+  pageEyebrow.hidden = !activeMeta.eyebrow;
 
   pageBlocks.forEach((block) => {
     const pages = (block.dataset.page || "").split(/\s+/).filter(Boolean);
@@ -1020,8 +1026,6 @@ function setActivePage(page) {
     }
   });
 
-  document.querySelector('#mobileSettings')?.close();
-  document.querySelector('#mobileSettingsButton')?.classList.toggle('active', [...navLinks].some(link => link.classList.contains('active') && !link.closest('.mobile-bottom-nav') && (link.classList.contains('nav-child') || link.hasAttribute('data-lawyer-entry'))));
   applyAuditRouteDefaults(activePage);
   setMobileMenu(false);
   // Hashes select pages; keep the page header above the content after anchor scrolling.
@@ -1930,6 +1934,7 @@ const jecCaseStates = new Map();
 let pendingJecFocusCaseId = "";
 let currentUserProfile = null;
 let userProfileStorageConfigured = false;
+let userProfileLoaded = false;
 let directDataCourtConfiguration = null;
 let directDataCourtConfigurationLoading = false;
 
@@ -2017,6 +2022,8 @@ async function loadDirectDataCourtConfiguration({ force = false } = {}) {
 }
 
 async function loadCurrentUserProfile() {
+  const userId = currentAuthState?.user?.id;
+  userProfileLoaded = false;
   currentUserProfile = currentAuthState?.user
     ? {
         fullName: currentAuthState.user.name || "",
@@ -2032,18 +2039,23 @@ async function loadCurrentUserProfile() {
     });
     if (!response.ok) return currentUserProfile;
     const data = await response.json();
+    if (currentAuthState?.user?.id !== userId) return currentUserProfile;
     currentUserProfile = {
       ...currentUserProfile,
       ...(data.profile || {}),
     };
     userProfileStorageConfigured = data.storageConfigured === true;
+    userProfileLoaded = true;
   } catch {
     // Nome e e-mail da sessão ainda permanecem disponíveis como preenchimento básico.
+  } finally {
+    renderProfile(currentAuthState.user);
   }
   return currentUserProfile;
 }
 
 async function saveCurrentUserProfile(claimant) {
+  const userId = currentAuthState?.user?.id;
   const response = await fetch("/api/user/profile", {
     method: "PUT",
     headers: { "content-type": "application/json", accept: "application/json" },
@@ -2064,10 +2076,12 @@ async function saveCurrentUserProfile(claimant) {
         district: claimant.district,
         city: claimant.city,
         uf: claimant.uf,
+        address: claimant.address,
       },
     }),
   });
   const data = await response.json().catch(() => ({}));
+  if (currentAuthState?.user?.id !== userId) throw new Error("A sessão mudou. Entre novamente.");
   if (!response.ok) {
     const fieldMessage = data.fields
       ? Object.values(data.fields).filter(Boolean).join(" ")
@@ -2078,6 +2092,7 @@ async function saveCurrentUserProfile(claimant) {
   }
   currentUserProfile = data.profile || currentUserProfile;
   userProfileStorageConfigured = data.storageConfigured === true;
+  renderProfile(currentAuthState.user);
   return data.profile;
 }
 
@@ -7114,16 +7129,133 @@ async function loadAuthState() {
   }
 }
 
+function accountMessage(id, message = "", error = false) {
+  const element = document.getElementById(id);
+  element.textContent = message;
+  element.classList.toggle("hidden", !message);
+  element.classList.toggle("is-error", error);
+}
+
+function closeAccountForm(form, button, focus = true) {
+  form.reset();
+  form.classList.add("hidden");
+  button.setAttribute("aria-expanded", "false");
+  if (focus) button.focus();
+}
+
+editProfileButton?.addEventListener("click", async () => {
+  if (!accountProfileForm.classList.contains("hidden")) return;
+  editProfileButton.disabled = true;
+  accountMessage("profileEditMessage", "Carregando seus dados...");
+  try {
+    await loadCurrentUserProfile();
+    if (!currentAuthState?.user) return showLogin("Entre para editar seus dados.");
+    if (!userProfileLoaded) throw new Error("Não foi possível carregar seus dados. Tente novamente.");
+    if (!userProfileStorageConfigured) throw new Error("A edição dos dados está indisponível no momento. Tente novamente mais tarde.");
+    for (const input of accountProfileForm.querySelectorAll("[name]")) input.value = currentUserProfile?.[input.name] || "";
+    // Perfis antigos podem ter apenas o endereco livre; preserve-o ao editar.
+    if (!currentUserProfile?.street) accountProfileForm.elements.street.value = currentUserProfile?.address || "";
+    accountProfileForm.classList.remove("hidden");
+    editProfileButton.setAttribute("aria-expanded", "true");
+    accountMessage("profileEditMessage");
+    accountProfileForm.elements.fullName.focus();
+  } catch (error) { accountMessage("profileEditMessage", error.message, true); }
+  finally { editProfileButton.disabled = !currentAuthState?.user; }
+});
+
+document.querySelector("#cancelProfileButton")?.addEventListener("click", () => {
+  closeAccountForm(accountProfileForm, editProfileButton);
+  accountMessage("profileEditMessage");
+});
+
+accountProfileForm?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const fieldset = accountProfileForm.querySelector("fieldset");
+  if (fieldset.disabled) return;
+  const profile = { ...currentUserProfile, ...Object.fromEntries(new FormData(accountProfileForm)), address: "" };
+  fieldset.disabled = true;
+  accountMessage("profileEditMessage", "Salvando dados...");
+  try {
+    await saveCurrentUserProfile(profile);
+    closeAccountForm(accountProfileForm, editProfileButton);
+    accountMessage("profileEditMessage", "Dados pessoais atualizados.");
+  } catch (error) { accountMessage("profileEditMessage", error.message, true); }
+  finally { fieldset.disabled = false; }
+});
+
+editPasswordButton?.addEventListener("click", () => {
+  if (!currentAuthState?.user) return showLogin("Entre para alterar sua senha.");
+  accountPasswordForm.classList.remove("hidden");
+  editPasswordButton.setAttribute("aria-expanded", "true");
+  accountMessage("passwordEditMessage");
+  accountPasswordForm.elements.currentPassword.focus();
+});
+document.querySelector("#cancelPasswordButton")?.addEventListener("click", () => {
+  closeAccountForm(accountPasswordForm, editPasswordButton);
+  accountMessage("passwordEditMessage");
+});
+accountPasswordForm?.addEventListener("submit", async event => {
+  event.preventDefault();
+  const fieldset = accountPasswordForm.querySelector("fieldset");
+  if (fieldset.disabled) return;
+  const { currentPassword, newPassword, confirmPassword } = Object.fromEntries(new FormData(accountPasswordForm));
+  if (newPassword !== confirmPassword) {
+    accountMessage("passwordEditMessage", "A confirmação deve ser igual à nova senha.", true);
+    accountPasswordForm.elements.confirmPassword.focus();
+    return;
+  }
+  if (newPassword === currentPassword) return accountMessage("passwordEditMessage", "Escolha uma senha diferente da atual.", true);
+  const userId = currentAuthState.user?.id;
+  fieldset.disabled = true;
+  accountMessage("passwordEditMessage", "Alterando senha...");
+  try {
+    const response = await fetch("/api/auth/password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ currentPassword, newPassword }) });
+    const data = await response.json().catch(() => ({}));
+    if (currentAuthState.user?.id !== userId) return;
+    if (!response.ok) {
+      const messages = { incorrect_password: "A senha atual está incorreta.", invalid_password: "Use uma nova senha de 8 a 128 caracteres.", password_unchanged: "Escolha uma senha diferente da atual.", too_many_attempts: "Muitas tentativas. Aguarde 15 minutos e tente novamente.", authentication_required: "Sua sessão expirou. Entre novamente.", password_changed_retry: "A senha já foi alterada. Entre novamente." };
+      throw new Error(messages[data.error] || "Não foi possível alterar a senha. Tente novamente.");
+    }
+    currentUserProfile = null;
+    configureApiUsageAdmin({ ...currentAuthState, user: null });
+    renderProfile(null);
+    loginPassword.value = "";
+    showLogin("Senha alterada. Entre novamente com sua nova senha.");
+  } catch (error) { accountMessage("passwordEditMessage", error.message, true); }
+  finally {
+    accountPasswordForm.reset();
+    fieldset.disabled = false;
+  }
+});
+document.addEventListener("audita:pagechange", event => {
+  if (event.detail.page !== "meus-dados" && accountPasswordForm) {
+    closeAccountForm(accountPasswordForm, editPasswordButton, false);
+    accountMessage("passwordEditMessage");
+  }
+});
+
 function renderProfile(user) {
   if (profileName) {
-    profileName.textContent = user?.name || "Super Admin";
+    profileName.textContent = (user && currentUserProfile?.fullName) || user?.name || "Não informado";
   }
   if (profileEmail) {
-    profileEmail.textContent = user?.email || "Não informado";
+    profileEmail.textContent = (user && currentUserProfile?.email) || user?.email || "Não informado";
   }
-  if (profilePlan) {
-    profilePlan.textContent = "Ilimitado";
+  const loginEmailDisplay = document.querySelector("#accountLoginEmail");
+  if (loginEmailDisplay) loginEmailDisplay.textContent = user?.email || "Não informado";
+  if (editProfileButton) editProfileButton.disabled = !user;
+  if (editPasswordButton) editPasswordButton.disabled = !user;
+  if (!user && accountProfileForm) {
+    closeAccountForm(accountProfileForm, editProfileButton, false);
+    closeAccountForm(accountPasswordForm, editPasswordButton, false);
+    accountMessage("profileEditMessage");
+    accountMessage("passwordEditMessage");
   }
+  for (const [id, field] of Object.entries({ profileDocument: "document", profileRg: "rg", profileAddress: "address", profilePhone: "phone" })) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = (user && currentUserProfile?.[field]) || "Não informado";
+  }
+  document.querySelector("#accountLogoutButton")?.classList.toggle("hidden", !user);
   if (profileRole) {
     const roleLabels = {
       super_admin: "Super admin",
@@ -7712,27 +7844,7 @@ function setMobileMenu(open) {
   mobileMenuButton?.setAttribute("aria-expanded", String(open));
 }
 
-const mobileSettings = document.querySelector('#mobileSettings');
-const mobileSettingsButton = document.querySelector('#mobileSettingsButton');
-const mobileSettingsLinks = document.querySelector('#mobileSettingsLinks');
-const mobileSettingsItems = [...navGroups, document.querySelector('[data-lawyer-entry]'), logoutButton].filter(Boolean).map(node => {
-  const marker = document.createComment('mobile settings return');
-  node.before(marker);
-  return { node, marker };
-});
-mobileSettingsButton?.addEventListener('click', () => {
-  mobileSettingsItems.forEach(({node}) => mobileSettingsLinks.append(node));
-  mobileSettings.showModal();
-});
-mobileSettings?.addEventListener('close', () => {
-  mobileSettingsItems.forEach(({node, marker}) => marker.after(node));
-  mobileSettingsButton.focus();
-});
-mobileSettings?.querySelector('[data-close-settings]').addEventListener('click', () => mobileSettings.close());
-mobileSettingsLinks?.addEventListener('click', event => {
-  if (event.target.closest('a, #logoutButton')) mobileSettings.close();
-});
-window.matchMedia('(max-width: 960px)').addEventListener('change', () => mobileSettings?.close());
+document.querySelector("#accountLogoutButton")?.addEventListener("click", () => logoutButton.click());
 
 function keepNavGroupVisible(group) {
   if (!group.open || !navList || group.closest("dialog")) {
@@ -9154,6 +9266,7 @@ setInterval(rotateRisk, 1400);
 drawSignal();
 
 moveEcosystemModules();
+initAccountPlans({ getAuthState: () => currentAuthState, showLogin });
 setActivePage(getActivePage());
 await loadStateCourtCatalog();
 populateStateCourtSelect();

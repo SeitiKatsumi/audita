@@ -110,7 +110,7 @@ AUDITA_BASE_URL=https://audita.seudominio.com.br npm run smoke:production
 
 Nao commite valores reais de `DATABASE_URL`.
 
-O usuario admin inicial e criado/atualizado automaticamente quando `AUDITA_BOOTSTRAP_ADMIN_EMAIL` e `AUDITA_BOOTSTRAP_ADMIN_PASSWORD` estao configurados. Depois do primeiro acesso em producao, troque a senha e remova ou rotacione essas variaveis conforme a politica de seguranca do ambiente.
+O usuario admin inicial e criado quando ausente e `AUDITA_BOOTSTRAP_ADMIN_EMAIL` e `AUDITA_BOOTSTRAP_ADMIN_PASSWORD` estao configurados. Contas existentes nao sao sobrescritas. Depois do primeiro acesso em producao, troque a senha em Meus Dados e remova essas variaveis conforme a politica de seguranca do ambiente.
 
 ## Isenção e restituição de IR
 
