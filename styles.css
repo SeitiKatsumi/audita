@@ -12103,6 +12103,22 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 .service-card .home-module-copy small { font-size: .875rem; line-height: 1.5; }
 .service-card .home-module-copy .service-category-label { color: var(--aqua); font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; }
 .service-card .home-module-chevron { align-self: end; }
+.service-card-explained { display: block; height: auto; align-self: start; position: relative; }
+.service-card-explained a.service-card-entry::after { content: ""; position: absolute; inset: 0; }
+.service-card-explained .service-card-entry { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; color: inherit; text-decoration: none; }
+.service-card-explained summary { cursor: pointer; list-style: none; }
+.service-card-explained .service-disclosure { margin-top: 12px; position: relative; z-index: 1; }
+.service-card-explained summary::-webkit-details-marker { display: none; }
+.service-card-explained summary:focus-visible, .service-card-explained a:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; }
+.service-card-explained .home-module-copy { overflow-wrap: anywhere; }
+.service-card-explained .service-expanded { display: grid; gap: 16px; padding-top: 20px; overflow-wrap: anywhere; }
+.service-card-explained .service-toggle { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 24px; color: var(--lime); font-size: .875rem; }
+.service-disclosure:not([open]) .service-less, .service-disclosure[open] .service-more { display: none; }
+.service-disclosure[open] summary .home-module-chevron { transform: rotate(90deg); }
+.service-card-explained .service-detail { display: grid; gap: 4px; color: var(--muted); font-size: .875rem; line-height: 1.6; }
+.service-card-explained .service-detail b { color: var(--text); font-weight: 600; }
+.service-card-explained .service-note { border-top: 1px solid var(--line); padding-top: 12px; }
+.service-card-explained .service-action { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 8px; color: var(--lime); font-size: .875rem; font-weight: 600; }
 .services-empty { padding: 24px 0; color: var(--muted); }
 .services-empty h3 { color: var(--text); }
 .services-home-link { display: inline-flex; align-items: center; justify-content: center; text-align: center; margin-top: 24px; text-decoration: none; }

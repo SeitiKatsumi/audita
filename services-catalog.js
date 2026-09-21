@@ -9,12 +9,12 @@ export function initServicesCatalog(root = document.querySelector('#central-serv
   const input = root.querySelector('input[type="search"]');
   const buttons = [...root.querySelectorAll('[data-service-category]')];
   const cards = [...root.querySelectorAll('[data-service-card]')];
-  let category = 'all', pisEnabled = false, energyEnabled = false;
+  let category = 'all';
   function render() {
     let count = 0;
     for (const card of cards) {
       card.hidden = !matchesService({text: card.textContent + ' ' + (card.dataset.keywords || ''),
-        categories: card.dataset.categories.split(' '), enabled: (!card.hasAttribute('data-service-pis') || pisEnabled) && (!card.hasAttribute('data-service-energy') || energyEnabled)}, input.value, category);
+        categories: card.dataset.categories.split(' ')}, input.value, category);
       if (!card.hidden) count++;
     }
     root.querySelectorAll('[data-service-group]').forEach(group => {
@@ -28,9 +28,4 @@ export function initServicesCatalog(root = document.querySelector('#central-serv
   buttons.forEach(button => button.addEventListener('click', () => { category = button.dataset.serviceCategory; render(); }));
   root.querySelector('[data-service-clear]').addEventListener('click', () => { input.value = ''; category = 'all'; render(); input.focus(); });
   render();
-  fetch('/api/energy-audit/config', {credentials: 'same-origin'}).then(r => r.ok ? r.json() : {}).then(c => { energyEnabled = c.enabled === true; render(); }).catch(() => {});
-  fetch('/api/pis-pasep/config', {credentials: 'same-origin'}).then(response => {
-    if (!response.ok) throw new Error('Configuração indisponível');
-    return response.json();
-  }).then(config => { pisEnabled = config.enabled === true; render(); }).catch(() => {});
 }
