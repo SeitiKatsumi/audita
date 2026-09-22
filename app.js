@@ -964,6 +964,10 @@ const pageMeta = {
     eyebrow: "Execuções anteriores do usuário",
   },
   "meus-dados": {
+    title: "Meus Dados",
+    eyebrow: "Minha conta",
+  },
+  "planos": {
     title: "Planos",
     eyebrow: "Minha conta",
   },

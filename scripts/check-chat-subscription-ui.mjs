@@ -151,6 +151,11 @@ await context.route("**/*", async route => {
     import {initChatSubscription} from '/chat-subscription.js';
     window.auth = {user:null}; window.loginCalls=0; window.sent=0; window.attached=0;
     window.chat = initChatSubscription({getAuthState:()=>window.auth,requestLogin:(message,resume)=>{window.loginCalls++;window.resume=resume}});
+    const subscriptionButton = document.createElement('button');
+    subscriptionButton.id = 'chatSubscriptionButton';
+    subscriptionButton.textContent = 'Assinatura IA';
+    subscriptionButton.addEventListener('click', () => window.chat.open());
+    document.body.prepend(subscriptionButton);
     document.querySelector('#chatForm').addEventListener('submit',event=>{event.preventDefault();window.sent++});
     document.querySelector('#chatAttachmentButton').addEventListener('click',()=>window.attached++);
     window.ready=true;
@@ -220,7 +225,8 @@ try {
     assert.equal(await page.evaluate(() => window.loginCalls + window.sent + window.attached), 0);
     await close();
   }
-  await page.locator(".chat-subscription-usage").click();
+  assert.equal(await page.locator(".chat-subscription-usage").count(), 0);
+  await page.locator("#chatSubscriptionButton").click();
   assert.equal(await modal.locator("article").count(), 4);
   assert.match(await modal.innerText(), /9,90[\s\S]*49,90[\s\S]*99,90[\s\S]*199,90/);
   assert.match(await modal.innerText(), /sem renova/);
@@ -237,7 +243,7 @@ try {
   }
   await page.keyboard.press("Escape");
   assert.equal(await modal.evaluate(el => el.open), false);
-  assert.ok(await page.locator(".chat-subscription-usage").evaluate(el => el === document.activeElement));
+  assert.ok(await page.locator("#chatSubscriptionButton").evaluate(el => el === document.activeElement));
   await page.evaluate(() => window.chat.open());
   await choose("experiment").click();
   assert.equal(await page.evaluate(() => window.loginCalls), 1);
@@ -262,8 +268,17 @@ try {
   access.limits = { messages: 100, pages: 20 };
   access.remaining = { messages: 88, pages: 17 };
   await page.evaluate(() => window.chat.refresh());
+  for (const selector of [".chat-quota-inline", "#chatSubscriptionDialog [data-quota]"]) {
+    assert.match(await page.locator(selector).textContent(), /88% restante.*88 de 100 restantes.*85% restante.*17 de 20 restantes/);
+    assert.equal(await page.locator(`${selector} meter`).first().getAttribute("value"), "88");
+  }
+  access.remaining = { messages: 0, pages: 20 };
+  await page.evaluate(() => window.chat.refresh());
+  assert.match(await page.locator(".chat-quota-inline").textContent(), /0% restante.*100% restante/);
+  access.remaining = { messages: 88, pages: 17 };
+  await page.evaluate(() => window.chat.refresh());
   assert.match(await modal.locator("[data-access]").textContent(), /88 mensagens e 17 p\u00e1ginas restantes.*Mensagens: 12\/100 usadas.*P\u00e1ginas: 3\/20 usadas/);
-  assert.ok(await page.locator('.chat-subscription-usage').evaluate(el => el.scrollWidth <= el.clientWidth + 1));
+  assert.equal(await page.locator('.chat-subscription-usage').count(), 0);
   await page.locator("#chatInput").fill("Pode conversar");
   await page.locator("#chatSendButton").click();
   assert.equal(await page.evaluate(() => window.sent), 1);
@@ -299,6 +314,7 @@ try {
   await close();
   access = { active: true, planId: "standard", remaining: null, periodEnd: null, legacy: true };
   assert.equal(await page.evaluate(() => window.chat.ensureAccess()), true, "Server-confirmed legacy access is retained");
+  assert.equal(await page.locator(".chat-quota-inline").isVisible(), false, "Unknown legacy limits must not invent percentages");
   await active();
   access.remaining.pages = 2;
   await page.evaluate(() => window.chat.refresh());

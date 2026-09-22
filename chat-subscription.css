@@ -15,6 +15,13 @@
   overscroll-behavior: contain;
 }
 .chat-subscription-dialog::backdrop { background: rgb(12 24 28 / 60%); }
+.chat-quota { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; margin: 12px 0; font-size: 12px; color: var(--muted, #99b9d4); }
+.chat-quota[hidden] { display: none; }
+.chat-quota-inline { width: min(900px, 100%); margin: 0 auto 10px; flex-shrink: 0; }
+.chat-quota-item { min-width: 0; }
+.chat-quota-item > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 8px; }
+.chat-quota meter { display: block; width: 100%; height: 12px; accent-color: #60dfb0; }
+.chat-quota small { font-size: 11px; }
 @media (prefers-reduced-motion: no-preference) {
   #chatSubscriptionDialog[open] { animation: subscription-enter 240ms ease-out; }
   #chatSubscriptionDialog[open]::backdrop { animation: subscription-backdrop-enter 240ms ease-out; }
@@ -27,14 +34,14 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
-.chat-subscription-dialog *, .chat-subscription-usage { box-sizing: border-box; letter-spacing: 0; }
+.chat-subscription-dialog * { box-sizing: border-box; letter-spacing: 0; }
 .chat-subscription-dialog header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .chat-subscription-dialog h2 { margin: 0; font-size: 24px; line-height: 1.25; }
 .chat-subscription-eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: var(--muted, #99b9d4); }
 .chat-subscription-dialog button { font: inherit; min-height: 44px; padding: 9px 14px; color: var(--text, #edf8ff); background: var(--panel, #081f37); border: 1px solid var(--line-strong, #446785); border-radius: 6px; cursor: pointer; white-space: normal; }
 .chat-subscription-dialog [data-close] { flex: 0 0 44px; width: 44px; height: 44px; padding: 0; font-size: 25px; line-height: 1; }
 .chat-subscription-dialog button:disabled { cursor: not-allowed; color: var(--muted, #99b9d4); background: var(--bg, #06111f); border-color: var(--line, #294256); }
-.chat-subscription-dialog button:focus-visible, .chat-subscription-usage:focus-visible { outline: 3px solid var(--aqua, #8fd7ff); outline-offset: 3px; }
+.chat-subscription-dialog button:focus-visible { outline: 3px solid var(--aqua, #8fd7ff); outline-offset: 3px; }
 .chat-subscription-dialog [data-notice]:empty, .chat-subscription-dialog [data-document-error]:empty { display: none; }
 .chat-subscription-dialog [data-notice], .chat-subscription-dialog [data-document-error], .chat-subscription-dialog [data-payment-status] { color: var(--warning, #ffd166); }
 .chat-subscription-dialog [data-payment-status]:empty { display: none; }
@@ -55,7 +62,6 @@
 .chat-subscription-plan.is-recommended button:not(:disabled), .chat-document-dialog [data-analyze]:not(:disabled) { background: #116b61; color: white; border-color: #116b61; }
 .chat-subscription-dialog footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .chat-subscription-dialog [hidden] { display: none; }
-.chat-subscription-usage { display: block; max-width: 100%; min-height: 36px; padding: 6px 8px; margin: 0 auto 8px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; white-space: normal; overflow-wrap: anywhere; }
 .chat-document-dialog { width: min(540px, calc(100% - 32px)); }
 .chat-document-dialog [data-document-name] { overflow-wrap: anywhere; font-weight: 600; }
 .account-subscription-content { min-width: 0; font-size: 15px; line-height: 1.5; container-type: inline-size; }

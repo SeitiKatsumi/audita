@@ -46,7 +46,8 @@ test("sidebar groups service modules and preserves adaptive navigation", () => {
   assert.ok(chargeMainLink);
   assert.match(chargeMainLink, /assets\/nav-icons\/tool\.svg/);
   assert.ok(accountLink);
-  assert.match(accountLink, /Planos/);
+  assert.match(accountLink, /Meus Dados/);
+  assert.match(indexHtml, /href="#planos"/);
   const sidebar = indexHtml.slice(indexHtml.indexOf('<nav class="nav-list">'), indexHtml.indexOf('</nav>'));
   assert.doesNotMatch(sidebar, /#historico|#meu-painel|#admin-planos|#admin-consumo/);
   assert.doesNotMatch(indexHtml, /Ferramentas de Consulta \(Dev\)/);

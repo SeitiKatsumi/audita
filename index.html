@@ -94,9 +94,13 @@
             <span class="nav-label">Central de Serviços</span>
           </a>
           <a href="#advogados" data-lawyer-entry hidden><img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" /><span class="nav-label">Área dos Advogados</span></a>
+          <a href="#planos">
+            <img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" aria-hidden="true" />
+            <span class="nav-label">Planos</span>
+          </a>
           <a href="#meus-dados">
             <img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" aria-hidden="true" />
-            <span class="nav-label">Planos</span>
+            <span class="nav-label">Meus Dados</span>
           </a>
         </nav>
 
@@ -119,7 +123,8 @@
         <a href="#home"><img src="assets/audita-logo-original.png" alt="" /><span>Home</span></a>
         <a href="/chat" data-app-route="chat"><img class="nav-icon" src="assets/nav-icons/sparkles.svg" alt="" /><span>IA</span></a>
         <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
-        <a href="#meus-dados"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Planos</span></a>
+        <a href="#planos"><img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" /><span>Planos</span></a>
+        <a href="#meus-dados"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Meus Dados</span></a>
       </nav>
       <main class="workspace">
         <header class="topbar">
@@ -175,7 +180,7 @@
                   Navegador <span aria-hidden="true"></span>
                 </button>
                 <a class="chat-tools-button" href="/#central-servicos">Central de Serviços</a>
-                <button class="chat-tools-button" id="chatSubscriptionButton" type="button" aria-haspopup="dialog">Assinatura</button>
+                <button class="chat-tools-button" id="chatSubscriptionButton" type="button" aria-haspopup="dialog">Assinatura IA</button>
                 <button class="chat-icon-button chat-mobile-new" id="chatMobileNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
               </div>
             </header>
@@ -1394,8 +1399,7 @@
           </article>
         </section>
 
-        <section class="account-page" id="meus-dados" data-page="meus-dados" aria-label="Dados da conta e assinatura">
-          <p class="account-intro">Seus dados e sua assinatura, em um só lugar.</p>
+        <section class="account-page" id="meus-dados" data-page="meus-dados" aria-label="Dados pessoais e segurança">
           <article class="module profile-card">
             <div class="module-header">
               <div>
@@ -1472,16 +1476,27 @@
             </form>
             <p id="passwordEditMessage" class="account-message hidden" role="status" aria-live="polite"></p>
           </article>
-          <article class="module account-subscription" aria-labelledby="subscriptionTitle">
-            <div class="module-header">
-              <div><p class="eyebrow">Sua assinatura</p><h2 id="subscriptionTitle">Mais possibilidades com a IA AUDITA</h2></div>
-            </div>
-            <div id="accountSubscription" class="account-subscription-content"><p>Carregando assinatura...</p></div>
-          </article>
           <div class="account-actions">
             <a href="#advogados" data-lawyer-entry hidden>Área dos Advogados</a>
             <button class="secondary-action hidden" id="accountLogoutButton" type="button">Sair da conta</button>
           </div>
+        </section>
+
+        <section class="account-page" id="planos" data-page="planos" aria-label="Planos e assinatura">
+          <article class="module account-subscription" aria-labelledby="subscriptionTitle">
+            <div class="module-header">
+              <div><p class="eyebrow">Chat e documentos</p><h2 id="subscriptionTitle">Assinaturas de IA</h2></div>
+            </div>
+            <div id="accountSubscription" class="account-subscription-content"><p>Carregando assinatura...</p></div>
+          </article>
+          <article class="module account-subscription" aria-labelledby="serviceSubscriptionTitle">
+            <div class="module-header">
+              <div><p class="eyebrow">Consultas e serviços especializados</p><h2 id="serviceSubscriptionTitle">Assinaturas da Central de Serviços</h2></div>
+            </div>
+            <p>Ainda não há assinaturas específicas da Central de Serviços disponíveis para contratação.</p>
+            <p class="account-intro">Os serviços são contratados separadamente, conforme as condições apresentadas em cada serviço. Não estão incluídos nos planos de IA.</p>
+            <a class="secondary-action" href="#central-servicos">Ver Central de Serviços</a>
+          </article>
         </section>
 
         <section class="api-usage-admin" id="admin-consumo" data-page="admin-consumo">

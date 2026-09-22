@@ -1,3 +1,22 @@
+# 2026-09-23 - Envio autorizado dos ajustes de assinatura e conta
+- Usuario solicitou commit/push: cotas percentuais, Assinatura IA, remocao do atalho antigo, separacao Planos/Meus Dados e categorias IA/Central. Origin atualizado sem divergencia. Check-account-ui e 43 testes de charge-analysis-ui passaram; check-chat-subscription-ui reexecutado com sucesso antes do commit. Deploy nao verificado.
+
+# 2026-09-23 - Categorias de assinatura
+- Planos dividido em Assinaturas de IA (catalogo atual) e Assinaturas da Central de Servicos (estado explicito de indisponibilidade, link para Central). Nenhum preco/plano inventado; contratos Standard e cobranca preservados.
+- Check-account-ui passou na porta 3000, incluindo os dois titulos, navegacao, desktop/celular e fluxos existentes. Diff check sem erros; apenas local, sem push/deploy.
+
+# 2026-09-23 - Separacao de Planos e Meus Dados
+- Codex, main local consolidado: #planos contem assinatura/cotas; #meus-dados mantem perfil, seguranca e saida da conta. Menu desktop e celular com Meus Dados apos Planos. Retorno /planos de checkout/portal aponta para #planos preservando parametros. Autenticacao e formularios existentes preservados.
+- Validacao na porta 3000: check-account-ui passou com navegacao separada, perfil/senha, checkout simulado, desktop/celular e ausencia de overflow; 43 testes de charge-analysis-ui passaram. Sem commit/push ou deploy.
+
+# 2026-09-23 - Porcentagem de cotas restantes
+- Codex, main local consolidado: indicadores de mensagens e paginas no chat, modal e Planos, usando limites/saldo do servidor. Sem percentuais inventados para visitantes, contratos sem limites ou acesso inativo. Atualizacao pelo fluxo existente, sem novas APIs.
+- Validacao: check-chat-subscription-ui passou, incluindo 88%/85%, cotas 0%/100% e contrato legado sem limite; git diff --check passou. Asset confirmado na porta 3000. Sem commit/push ou cobranca real.
+
+# 2026-09-23 - Rotulo Assinatura IA
+- Removido atalho Planos e acesso ao chat acima do compositor. Consumo permanece no modal e na pagina Planos; botao do topo e bloqueios de acesso preservados.
+- Botao do topo do chat renomeado de Assinatura para Assinatura IA, mantendo identificador, acessibilidade e abertura do modal. Alteracao local, sem commit/push.
+
 # 2026-09-23 - Commit e push consolidado autorizado
 - Usuario solicitou envio da versao local consolidada: assinatura unificada, animacao acessivel, rotulo Planos e conferencia documental de importacao. Referencias origin atualizadas, main sem divergencia antes do commit. Configuracoes privadas Stripe permanecem fora do Git.
 - Validacao pre-envio: 452 testes passaram, zero ignorados, PGlite isolado; checks de chat-subscription, account (localhost:3000) e importacao desktop/celular passaram com APIs simuladas. Sem pagamento real. Push da main aciona deploy automatico; conclusao do deploy exige verificacao separada.

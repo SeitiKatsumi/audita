@@ -21,7 +21,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   dialog.className = "chat-subscription-dialog";
   dialog.setAttribute("aria-labelledby", "chatSubscriptionTitle");
   dialog.innerHTML = `<header><div><p class="chat-subscription-eyebrow">IA AUDITA</p><h2 id="chatSubscriptionTitle">Planos do chat</h2></div><button type="button" data-close aria-label="Fechar planos" title="Fechar">&#215;</button></header>
-    <p data-access role="status"></p><p data-notice role="status" aria-live="polite"></p>
+    <p data-access role="status"></p><section class="chat-quota" data-quota hidden aria-label="Cotas restantes"></section><p data-notice role="status" aria-live="polite"></p>
     <p data-payment-status role="status"></p><section data-legacy hidden></section><div class="chat-subscription-plans"></div>
     <section class="chat-subscription-rules" aria-label="O que o plano inclui e regras de uso">
       <p><strong>Inclui:</strong> conversa com a IA e leitura de PDF, PNG e JPEG. A an\u00e1lise inicial gera um resumo e consome p\u00e1ginas; perguntas posteriores consomem mensagens.</p>
@@ -37,15 +37,15 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     <p data-document-name></p><p data-document-pages></p><p data-document-error role="alert"></p>
     <footer><button type="button" data-cancel>Cancelar</button><button type="button" data-analyze>Analisar documento</button></footer>`;
   document.body.append(dialog, documentDialog);
+  const quota = document.createElement("section");
+  quota.className = "chat-quota chat-quota-inline";
+  quota.setAttribute("aria-label", "Cotas restantes");
+  quota.hidden = true;
+  form.before(quota);
   const accountView = document.querySelector("#accountSubscription");
   if (accountView) {
     accountView.replaceChildren(...[...dialog.children].filter(node => node.tagName !== "HEADER").map(node => node.cloneNode(true)));
   }
-  const usage = document.createElement("button");
-  usage.type = "button";
-  usage.className = "chat-subscription-usage";
-  usage.setAttribute("aria-haspopup", "dialog");
-  form.before(usage);
   const notice = dialog.querySelector("[data-notice]");
   const manage = dialog.querySelector("[data-manage]");
   const cards = dialog.querySelector(".chat-subscription-plans");
@@ -103,8 +103,18 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   function render() {
     const focusedPlan = cards.contains(document.activeElement) ? document.activeElement.dataset.plan : null;
     const text = accessText();
-    usage.textContent = owner && access?.active ? text : "Planos e acesso ao chat";
     dialog.querySelector("[data-access]").textContent = text;
+    const quotaHtml = owner && owner === userId() && loaded && access?.active ? [["messages", "Mensagens"], ["pages", "P\u00e1ginas"]].map(([kind, label]) => {
+      const limit = access.limits?.[kind], remaining = access.remaining?.[kind];
+      if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(remaining)) return "";
+      const balance = Math.max(0, Math.min(limit, remaining));
+      const percent = Math.floor(balance / limit * 100);
+      return `<div class="chat-quota-item" data-quota-kind="${kind}"><div><span>${label}</span><span>${percent}% restante</span></div><meter min="0" max="${limit}" value="${balance}" aria-label="${label} restantes">${percent}%</meter><small>${balance} de ${limit} restantes</small></div>`;
+    }).join("") : "";
+    for (const target of [quota, dialog.querySelector("[data-quota]")]) {
+      target.innerHTML = quotaHtml;
+      target.hidden = !quotaHtml;
+    }
     dialog.querySelector("[data-payment-status]").textContent = !catalog
       ? loaded ? "Pagamentos indispon\u00edveis: n\u00e3o foi poss\u00edvel verificar a configura\u00e7\u00e3o deste ambiente." : "Consultando disponibilidade dos pagamentos."
       : `${catalog.billing?.demoMode || catalog.billing?.mode === "test" ? "Ambiente de testes: sem cobran\u00e7a real. " : ""}${!PLANS.some(plan => available(plan.id)) ? "Pagamentos indispon\u00edveis neste ambiente: a configura\u00e7\u00e3o de cobran\u00e7a n\u00e3o est\u00e1 habilitada. Nenhuma compra pode ser conclu\u00edda." : ""}`;
@@ -135,7 +145,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     if (accountView) {
       const focused = accountView.contains(document.activeElement) ? document.activeElement.dataset.plan : null;
       accountView.querySelector(".chat-subscription-plans").innerHTML = cards.innerHTML;
-      for (const selector of ["[data-access]", "[data-notice]", "[data-payment-status]", "[data-legacy]"]) {
+      for (const selector of ["[data-access]", "[data-quota]", "[data-notice]", "[data-payment-status]", "[data-legacy]"]) {
         const source = dialog.querySelector(selector), target = accountView.querySelector(selector);
         target.innerHTML = source.innerHTML;
         target.hidden = source.hidden;
@@ -393,7 +403,6 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     }
   });
   for (const name of ["beforeinput", "paste", "keydown", "submit", "click"]) listen(window, name, gate, true);
-  listen(usage, "click", open);
   if (accountView) listen(accountView, "click", event => {
     const button = event.target.closest("button");
     if (!button || button.disabled) return;
@@ -418,6 +427,6 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   void refresh();
   return { open, refresh, ensureAccess, onAuthChanged, handleAccessError, prepareDocument, analyzeDocument: prepareDocument,
     getAccess: () => owner === userId() ? access : null,
-    destroy() { destroyed = true; revision++; events.abort(); finishDocument(null); dialog.remove(); documentDialog.remove(); usage.remove(); },
+    destroy() { destroyed = true; revision++; events.abort(); finishDocument(null); dialog.remove(); documentDialog.remove(); quota.remove(); },
   };
 }

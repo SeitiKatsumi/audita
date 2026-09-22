@@ -80,6 +80,14 @@ try {
   await sidebar.getByRole('link', { name: 'Planos' }).click();
   await waitOffer();
   assert.equal(await page.locator('#pageTitle').innerText(), 'Planos');
+  assert.equal(await page.getByRole('heading', { name: 'Assinaturas de IA', exact: true }).isVisible(), true);
+  assert.equal(await page.getByRole('heading', { name: 'Assinaturas da Central de Serviços', exact: true }).isVisible(), true);
+  assert.equal(await page.getByRole('link', { name: 'Ver Central de Serviços', exact: true }).getAttribute('href'), '#central-servicos');
+  assert.equal(await page.locator('#editProfileButton').isVisible(), false);
+  await sidebar.getByRole('link', { name: 'Meus Dados' }).click();
+  await page.waitForFunction(() => document.body.dataset.activePage === 'meus-dados');
+  assert.equal(await page.locator('#pageTitle').innerText(), 'Meus Dados');
+  assert.equal(await account.isVisible(), false);
   await page.waitForFunction(() => document.querySelector('#profileDocument').textContent === '529.982.247-25');
   assert.equal(await page.locator('#profileName').innerText(), 'Pessoa de Teste');
   const profileForm = page.locator('#accountProfileForm');
@@ -116,6 +124,7 @@ try {
   assert.equal(await account.locator('.chat-subscription-plans').innerHTML(),
     await page.locator('#chatSubscriptionDialog .chat-subscription-plans').innerHTML());
   assert.equal(await page.locator('#subscriptionCycle').count(), 0);
+  await sidebar.getByRole('link', { name: 'Planos' }).click();
   await noOverflow();
   await mkdir(new URL('../output/account/', import.meta.url), { recursive: true });
   await account.screenshot({ path: fileURLToPath(new URL('../output/account/desktop.png', import.meta.url)) });
@@ -127,7 +136,7 @@ try {
   assert.equal(purchase.data.interval, 'monthly');
   subscription = { provider: 'stripe', planId: 'standard', interval: 'annual', status: 'active', active: true, currentPeriodEnd: '2027-09-22T12:00:00Z', cancelAtPeriodEnd: true };
   await page.goto(`${base}/planos?checkout=success`);
-  await page.waitForURL(`${base}/?checkout=success#meus-dados`);
+  await page.waitForURL(`${base}/?checkout=success#planos`);
   await page.locator('html:not(.app-booting)').waitFor();
   await waitOffer();
   await account.locator('[data-legacy]:not([hidden])').waitFor();
@@ -137,7 +146,7 @@ try {
   await page.waitForURL('https://billing.stripe.com/fixture');
   assert.deepEqual(posts.find(item => item.path === '/api/billing/portal').data, {});
   subscription = { ...subscription, status: 'past_due', active: false };
-  await page.goto(`${base}/#meus-dados`);
+  await page.goto(`${base}/#planos`);
   await account.locator('[data-legacy]:not([hidden])').waitFor();
   assert.match(await account.locator('[data-legacy]').innerText(), /Pagamento pendente/);
   subscription = null;
@@ -166,6 +175,7 @@ try {
   assert.equal(await account.locator('[data-plan]').count(), 4);
   await noOverflow();
   await page.screenshot({ path: fileURLToPath(new URL('../output/account/mobile.png', import.meta.url)), fullPage: true });
+  await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Meus Dados' }).click();
   await page.getByRole('button', { name: 'Editar dados', exact: true }).click();
   await profileForm.getByLabel('Nome completo').waitFor();
   await noOverflow();
@@ -187,7 +197,7 @@ try {
   await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Home', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#accountPasswordForm').classList.contains('hidden'));
   assert.equal(await passwordForm.getByLabel('Senha atual', { exact: true }).inputValue(), '');
-  await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Planos' }).click();
+  await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Meus Dados' }).click();
   await page.getByRole('button', { name: 'Alterar senha', exact: true }).click();
   await passwordForm.getByLabel('Senha atual', { exact: true }).fill('Senha-atual-ficticia!');
   await passwordForm.getByLabel('Nova senha', { exact: true }).fill('Senha-nova-ficticia!');
