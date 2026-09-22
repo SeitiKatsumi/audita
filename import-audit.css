@@ -27,6 +27,15 @@
 .import-module details > summary { cursor: pointer; margin: 12px 0; color: var(--aqua); }
 .import-findings > section { display: grid; gap: 12px; margin-top: 16px; }
 .import-module button:disabled { opacity: .55; cursor: not-allowed; }
+.import-document-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.import-source { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.import-source dl { margin: 12px 0; }
+.import-source dl > div { padding: 6px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.import-source dt { color: var(--muted); font-size: .8rem; }
+.import-source dd { margin: 2px 0 0; white-space: pre-wrap; }
+.import-source details[open] { display: grid; gap: 10px; }
+.import-comparison { border-bottom: 1px solid var(--line); padding: 10px 0; overflow-wrap: anywhere; }
+@media(max-width:700px) { .import-document-columns { grid-template-columns: 1fr; } }
 @media(max-width:600px) { .import-product { grid-template-columns: 1fr; padding: 12px; } }
 @media(prefers-reduced-motion:reduce) { .import-new-message { animation: none; } }
 

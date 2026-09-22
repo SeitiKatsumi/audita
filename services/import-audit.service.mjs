@@ -2,6 +2,7 @@ import {randomUUID,createHash} from 'node:crypto';
 import {PDFDocument,StandardFonts} from 'pdf-lib';
 import {requireIr as check,sealIr,openIr,irKey,IrError} from './ir-exemption-domain.mjs';
 import {productsSchema,reviewSchema,simulate,loadNcm,NOTICE} from './import-audit-domain.mjs';
+import {documentExtractionSchema,initialCheck,evaluateCheck,documentReport} from './import-document-check.mjs';
 
 export function createImportService({getDb,env=process.env,ai,ncm=loadNcm,now=()=>new Date()}){
  const key=()=>irKey(env.AUDITA_IMPORT_ENCRYPTION_KEY||env.AUDITA_IR_ENCRYPTION_KEY);
@@ -18,6 +19,8 @@ export function createImportService({getDb,env=process.env,ai,ncm=loadNcm,now=()
  }
  function event(x,a,label){x.p.events=[...(x.p.events||[]),{at:now().toISOString(),by:String(a.user.id),label}];}
  function invalidate(x){if(x.p.review){x.p.previousReviews=[...(x.p.previousReviews||[]),x.p.review];x.p.review=null;}x.r.status='documents';}
+ function archiveDocuments(x){if(x.p.extraction)x.p.previousDocumentChecks=[...(x.p.previousDocumentChecks||[]),{at:now().toISOString(),extraction:x.p.extraction,documentCheck:x.p.documentCheck}];else if(x.p.products.length)x.p.previousLegacyProducts=[...(x.p.previousLegacyProducts||[]),{at:now().toISOString(),products:x.p.products}];}
+ function archiveResearch(x){if(x.p.suggestions||x.p.research)x.p.previousResearch=[...(x.p.previousResearch||[]),{at:now().toISOString(),suggestions:x.p.suggestions,research:x.p.research,researchError:x.p.researchError}];}
  async function save(c,x){await c.query('UPDATE audita_import_cases SET encrypted_payload=$2,status=$3,revision=revision+1,updated_at=NOW() WHERE id=$1',[x.r.id,seal(x.r.id,x.p),x.r.status]);x.r.revision++;}
  function idle(x){check(!x.p.busy||Date.parse(x.p.busy.until)<=now().getTime(),'busy','Uma leitura está em andamento. Aguarde ou atualize o atendimento.',409);}
  async function documents(c,id,files=false){return (await c.query(`SELECT id,encrypted_payload${files?',encrypted_file':''} FROM audita_import_documents WHERE case_id=$1 ORDER BY created_at,id`,[id])).rows.map(r=>({...open(r.id,r.encrypted_payload),id:r.id,...(files?{buffer:open(r.id+':file',r.encrypted_file,true)}:{})}));}
@@ -29,7 +32,7 @@ export function createImportService({getDb,env=process.env,ai,ncm=loadNcm,now=()
   return {storageReady,aiReady:!!ai?.available(),ready:storageReady&&!!ai?.available(),reviewer:reviewer(a),notice:NOTICE};
  }
  async function list(a,queue=false){signed(a);if(queue)check(reviewer(a),'forbidden','Revisão restrita à equipe autorizada.',403);return (await db().query(queue?"SELECT id,status,revision,updated_at FROM audita_import_cases WHERE status='review' ORDER BY updated_at DESC LIMIT 100":'SELECT id,status,revision,updated_at FROM audita_import_cases WHERE tenant_id=$1 AND user_id=$2 ORDER BY updated_at DESC LIMIT 100',queue?[]:[a.tenantId,a.user.id])).rows;}
- async function create(a,i){signed(a);check(i?.consent===true,'consent_required','Confirme a autorização para leitura dos documentos.');check((await configuration(a)).storageReady,'unavailable','Atendimento ainda não configurado neste ambiente.',503);return tx(async c=>{const id=randomUUID(),p={consentAt:now().toISOString(),products:[],confirmed:false,suggestions:null,research:null,review:null,events:[]};await c.query('INSERT INTO audita_import_cases(id,tenant_id,user_id,encrypted_payload) VALUES($1,$2,$3,$4)',[id,a.tenantId,a.user.id,seal(id,p)]);const x=await access(c,a,id);event(x,a,'Atendimento iniciado com autorização para processamento OpenAI.');await save(c,x);return view(c,x,a);});}
+ async function create(a,i){signed(a);check(i?.consent===true,'consent_required','Confirme a autorização para leitura dos documentos.');check((await configuration(a)).storageReady,'unavailable','Atendimento ainda não configurado neste ambiente.',503);return tx(async c=>{const id=randomUUID(),p={payloadVersion:2,consentAt:now().toISOString(),products:[],confirmed:false,suggestions:null,research:null,review:null,events:[]};await c.query('INSERT INTO audita_import_cases(id,tenant_id,user_id,encrypted_payload) VALUES($1,$2,$3,$4)',[id,a.tenantId,a.user.id,seal(id,p)]);const x=await access(c,a,id);event(x,a,'Atendimento iniciado com autorização para processamento OpenAI.');await save(c,x);return view(c,x,a);});}
  async function get(a,id){return tx(async c=>view(c,await access(c,a,id),a));}
  async function upload(a,id,{buffer,name,type,revision}){
   check(['invoice','packing','technical'].includes(type)&&Buffer.isBuffer(buffer)&&buffer.length>0&&buffer.length<=10*1024*1024,'invalid_file','Envie Invoice, Packing List ou ficha técnica de até 10 MB.');
@@ -41,7 +44,7 @@ export function createImportService({getDb,env=process.env,ai,ncm=loadNcm,now=()
    const limits=(await c.query('SELECT COUNT(*) AS count,COALESCE(SUM(size),0) AS total FROM audita_import_documents WHERE case_id=$1',[id])).rows[0];check(Number(limits.count)<4&&Number(limits.total)+buffer.length<=20*1024*1024,'file_limit','Limite desta versão: quatro documentos e 20 MB por atendimento.');
    // ponytail: ciphertext in PostgreSQL, capped at 20 MB/case; use private object storage if volume grows.
    const did=randomUUID();await c.query('INSERT INTO audita_import_documents(id,case_id,hash,size,encrypted_payload,encrypted_file) VALUES($1,$2,$3,$4,$5,$6)',[did,id,hash,buffer.length,seal(did,{name:String(name||'documento').slice(0,150),type,mime}),seal(did+':file',buffer)]);
-   invalidate(x);x.p.products=[];x.p.confirmed=false;x.p.suggestions=null;x.p.research=null;x.p.busy=null;event(x,a,'Documento recebido; resultados anteriores invalidados.');await save(c,x);return view(c,x,a);
+   archiveDocuments(x);archiveResearch(x);invalidate(x);x.p.extraction=null;x.p.documentCheck=null;x.p.products=[];x.p.confirmed=false;x.p.suggestions=null;x.p.research=null;x.p.researchError=null;x.p.busy=null;event(x,a,'Documento recebido; resultados anteriores invalidados.');await save(c,x);return view(c,x,a);
   });
  }
  async function download(a,id,did){return tx(async c=>{await access(c,a,id);const row=(await c.query('SELECT encrypted_payload,encrypted_file FROM audita_import_documents WHERE case_id=$1 AND id=$2',[id,did])).rows[0];check(row,'not_found','Documento não encontrado.',404);return {...open(did,row.encrypted_payload),buffer:open(did+':file',row.encrypted_file,true)};});}
@@ -49,15 +52,18 @@ export function createImportService({getDb,env=process.env,ai,ncm=loadNcm,now=()
   const token=randomUUID();
   const snapshot=await tx(async c=>{const x=await access(c,a,id,true);check(x.owner,'forbidden','Ação do solicitante.',403);idle(x);check(i.revision===x.r.revision,'conflict','Atendimento atualizado. Recarregue.',409);check(ai.available(),'ai_unavailable','Integração OpenAI indisponível.',503);
    const files=await documents(c,id,true);check(files.length,'documents_required','Envie os documentos.');
-   if(i.action==='suggest')check(x.p.confirmed&&x.p.products.length,'confirmation_required','Confira os produtos antes de pesquisar.');
+   if(i.action==='suggest')check(x.p.confirmed&&x.p.products.length&&(!x.p.extraction||x.p.documentCheck?.confirmed),'confirmation_required','Confira os produtos e as pendências documentais antes de pesquisar.');
    x.p.busy={token,action:i.action,until:new Date(now().getTime()+15*60*1000).toISOString()};x.p.error=null;event(x,a,i.action==='extract'?'Leitura solicitada.':'Pesquisa fiscal solicitada.');await save(c,x);return {products:x.p.products,files};
   });
   let result,error;
   try{
    if(i.action==='extract'){
-    const products=[],warnings=[];
-    for(const d of snapshot.files){const r=await ai.extract(d,a);products.push(...r.products.map(p=>({...p,documentId:d.id})));warnings.push(...r.warnings);}
-    result={products:productsSchema.parse(products),warnings,confirmed:false,suggestions:null,research:null};
+    const lines=[],totals=[],warnings=[];
+    for(const d of snapshot.files){const r=documentExtractionSchema.parse(await ai.extract(d,a));if(!r.products.length)warnings.push(`${d.name}: nenhuma linha de produto identificada.`);lines.push(...r.products.map(p=>({...p,id:randomUUID(),documentId:d.id})));totals.push(...r.totals.map(t=>({...t,documentId:d.id})));warnings.push(...r.warnings);}
+    check(lines.length>0&&lines.length<=30,'product_limit','A leitura precisa conter entre 1 e 30 linhas de produto.');
+    const extraction={version:2,at:now().toISOString(),lines,totals};
+    const documentCheck=evaluateCheck(initialCheck(lines,snapshot.files),extraction,snapshot.files);
+    result={payloadVersion:2,extraction,documentCheck,products:documentCheck.products,warnings,confirmed:false,suggestions:null,research:null,researchError:null};
    }else{
     const catalog=await ncm(),proposed=await ai.suggest(snapshot.products,a);
     const items=snapshot.products.map((p,index)=>{const item=proposed.items.find(v=>v.index===index);return {index,missing:item?.missing||['Revisão técnica necessária.'],candidates:(item?.candidates||[]).filter(v=>catalog.rows.has(v.code)).map(v=>({...v,official:catalog.rows.get(v.code)}))};});
@@ -68,18 +74,25 @@ export function createImportService({getDb,env=process.env,ai,ncm=loadNcm,now=()
    }
   }catch{error='Não foi possível concluir. Documentos e dados anteriores foram preservados. Confira os arquivos/configuração e tente novamente.';}
   return tx(async c=>{const x=await access(c,a,id,true);check(x.p.busy?.token===token,'conflict','Uma operação mais recente substituiu esta leitura.',409);x.p.busy=null;x.p.error=error||null;
-   if(result){invalidate(x);Object.assign(x.p,result);x.r.status=i.action==='extract'?'products':'review';}
+   if(result){if(i.action==='extract')archiveDocuments(x);archiveResearch(x);invalidate(x);Object.assign(x.p,result);x.r.status=i.action==='extract'?'products':'review';}
    event(x,a,error?'Processamento não concluído.':'Processamento concluído; revisão humana necessária.');await save(c,x);return view(c,x,a);
   });
  }
  async function command(a,id,i){
   if(['extract','suggest'].includes(i?.action))return work(a,id,i);
   return tx(async c=>{const x=await access(c,a,id,true);idle(x);check(i?.revision===x.r.revision,'conflict','Atendimento atualizado. Recarregue.',409);
-   if(i.action==='products'){
+   if(i.action==='products'&&x.p.extraction){
+    check(x.owner,'forbidden','Conferência restrita ao solicitante.',403);check(x.p.extraction,'extraction_required','Refaça a leitura para usar a conferência documental.');
+    check(typeof i.confirmed==='boolean','confirmation_required','Informe se a conferência está concluída.');
+    const files=await documents(c,id),documentCheck=evaluateCheck(i.documentCheck,x.p.extraction,files,i.confirmed);
+    archiveDocuments(x);archiveResearch(x);invalidate(x);x.p.documentCheck=documentCheck;x.p.products=documentCheck.products;x.p.confirmed=i.confirmed;x.p.suggestions=null;x.p.research=null;x.p.researchError=null;x.r.status='products';
+    event(x,a,i.confirmed?'Conferência documental confirmada com reconhecimento das pendências.':'Conferência documental salva; pesquisa e revisão anteriores invalidadas.');
+   }else if(i.action==='products'){
+    check(!x.p.extraction&&x.p.payloadVersion!==2,'document_check_required','Leia os documentos e use a conferência documental para alterar estes produtos.');
     check(x.owner&&i.confirmed===true,'confirmation_required','Solicitante deve conferir os produtos.',403);
     const products=productsSchema.parse(i.products),files=await documents(c,id);
     check(products.every(p=>files.some(d=>d.id===p.documentId)),'invalid_document','Referência documental inválida.');
-    invalidate(x);x.p.products=products;x.p.confirmed=true;x.p.suggestions=null;x.p.research=null;x.r.status='products';event(x,a,'Produtos conferidos; sugestões e revisão anteriores invalidadas.');
+    archiveDocuments(x);archiveResearch(x);invalidate(x);x.p.products=products;x.p.confirmed=true;x.p.suggestions=null;x.p.research=null;x.r.status='products';event(x,a,'Produtos conferidos; sugestões e revisão anteriores invalidadas.');
    }else if(i.action==='review'){
     check(reviewer(a),'forbidden','Revisão fiscal restrita à equipe autorizada.',403);check(x.p.confirmed&&x.p.suggestions,'analysis_required','Conclua a conferência e a pesquisa antes da revisão.');
     const review=reviewSchema.parse(i.review);
@@ -94,7 +107,7 @@ export function createImportService({getDb,env=process.env,ai,ncm=loadNcm,now=()
   const x=await get(a,id);check(x.products.length,'products_required','Leia ou confira os produtos antes de gerar o relatório.');
   const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v/100);
   const lines=['AUDITA - AUDITORIA ASSISTIDA DE IMPORTAÇÃO',`Referência: ${id} | Revisão ${x.revision}`,x.review?'Premissas revisadas por pessoa; não é decisão da Receita.':'PRELIMINAR - SEM REVISÃO FISCAL',NOTICE,
-   ...x.documents.map(d=>`Documento ${d.id}: ${d.name} (${d.type})`),
+   ...x.documents.map(d=>`Documento ${d.id}: ${d.name} (${d.type})`),...documentReport(x),
    ...x.products.flatMap((p,index)=>[`Produto ${index+1}: ${p.description}`,`Original: ${p.original}`,`Quantidade: ${p.quantity||'não informada'} | Valor: ${p.value||'não informado'} ${p.currency||''}`,`Características: ${p.specifications}`,`Documento: ${p.documentId}; página: ${p.page||'não identificada'}`,...(x.suggestions?.items.find(v=>v.index===index)?.candidates||[]).map(c=>`NCM candidata ${c.code}: ${c.official.description}. Motivo sugerido: ${c.reason}`),...(x.suggestions?.items.find(v=>v.index===index)?.missing||[]).map(m=>'Pendente: '+m)]),
    x.suggestions?`Fonte NCM: ${x.suggestions.source} | Consultada: ${x.suggestions.fetchedAt}. ${x.suggestions.notice}`:'NCM não consultada.',
    x.research?.notice||x.researchError||'Benefícios não pesquisados.',x.research?.text||'',...(x.research?.sources||[]).map(s=>`${s.title}: ${s.url}`),

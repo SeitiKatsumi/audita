@@ -4,12 +4,14 @@ Entrada pública: `/#auditoria-importacao`, na Central de Serviços. Login sob d
 retomada pelo identificador `?importCase=UUID#auditoria-importacao`.
 
 Interface em chat guiado: mensagens da assistente, respostas do solicitante e
-somente a etapa atual aberta. Produtos conferidos um por vez, com anterior,
-próximo e remoção de duplicidades; confirmação final salva todos em conjunto.
+somente a etapa atual aberta. Produtos conferidos um por vez, com Invoice e
+Packing List lado a lado (empilhados no celular), associação explícita,
+correções e exclusão justificada de itens não pertinentes.
 NCMs/fontes ficam em detalhes, com revisão fiscal e relatório preservados.
 Não é conversa livre: as respostas usam os campos e ações da etapa, sem nova
-chamada de IA para mensagens de navegação. Rascunhos não confirmados ficam
-apenas na tela; recarregar recupera a última versão salva do atendimento.
+chamada de IA para mensagens de navegação. Salvar, anterior e próximo persistem
+o rascunho documental. Recarregar recupera a última gravação; edições ainda não
+salvas ficam somente na tela. A confirmação final reconhece as pendências.
 
 Somente a mensagem atual fica no chat principal. “Ver conversa anterior” abre
 um dialog nativo com respostas, documentos e fontes anteriores (Escape fecha
@@ -23,8 +25,17 @@ permitida para nao cortar campos; a barra nao e simplesmente escondida.
 1. Solicitante autoriza o processamento pela OpenAI/equipe e envia Invoice,
    Packing List ou ficha técnica (PDF, PNG, JPEG, XML). Limite: quatro arquivos,
    10 MB cada, 20 MB por atendimento e 30 produtos na leitura conjunta.
-2. A integração existente transcreve/traduz dados. O solicitante confere os
-   produtos, referências documentais e duplicidades antes de pesquisar.
+2. A integração existente transcreve/traduz cada linha com documento, página e
+   linha quando identificáveis. Originais são imutáveis; correções ficam à parte.
+   Código único coincidente, sem fabricante/modelo conflitante, apenas sugere
+   um vínculo; o usuário confirma ou associa manualmente. Não há busca por
+   semelhança, soma de embalagens ou conversão de unidades/moedas. Ausências e
+   separadores ambíguos são não verificáveis. Decimais são comparados como strings
+   canônicas, sem ponto flutuante. O formato confirmado é por linha, sem separador
+   de milhares. Totais do documento nunca são distribuídos entre produtos.
+   Valores conflitantes exigem escolha de origem e justificativa; ausência de
+   preço no Packing List não é erro. Ficha técnica só complementa características.
+   O resumo antecede a pesquisa e não chama pendências reconhecidas de verificadas.
 3. NCMs sugeridas são confrontadas com o download público do Classif/Siscomex.
    A descrição inclui a hierarquia; a tabela é a vigente na consulta, não uma
    validação histórica. Pesquisa de benefícios usa fontes oficiais citadas;
@@ -44,7 +55,7 @@ PDF preliminar/revisado, fontes e histórico são recuperados do atendimento.
 Descrições originais permanecem no atendimento/documentos; o PDF com fonte
 padrão substitui caracteres não latinos por `?` e informa essa limitação.
 Alteração de produtos/documentos invalida sugestões e revisão atuais, preservando
-o histórico das revisões. Não há registro DI/Duimp, monitoramento diário,
+o histórico das extrações, conferências, pesquisas e revisões. Não há registro DI/Duimp, monitoramento diário,
 pagamento, integração Siscomex autenticada ou classificação fiscal definitiva.
 
 ## Configuração e persistência
@@ -61,6 +72,14 @@ pagamento, integração Siscomex autenticada ou classificação fiscal definitiv
 - Duas tabelas: `audita_import_cases` e `audita_import_documents`. Payload e
   arquivos criptografados no PostgreSQL, sem diretório público de documentos.
   IDs, titular, tenant, status, tamanho, hash e datas são metadados em claro.
+- Conferência documental usa `payloadVersion: 2`, `extraction` (originais e totais),
+  `documentCheck` (linhas corrigidas, vínculos, exclusões, comparações, escolhas e
+  justificativas), `previousDocumentChecks` e `previousResearch` no mesmo payload
+  criptografado. A ação existente `products` recebe `documentCheck` e `confirmed`.
+  Não há rota paralela, tabela nova ou migração nesta etapa. Atendimentos antigos
+  mantêm a ação/formulário anterior e são identificados como “sem comparação
+  documental”; `value` legado não vira preço unitário. Só uma nova extração
+  explícita habilita comparação documental em um atendimento anterior.
 - `/api/import-audit/config` informa disponibilidade sem expor segredos.
   Interface bloqueia recebimento se o armazenamento seguro não estiver pronto;
   leitura e pesquisa requerem também a configuração OpenAI no processo.
@@ -82,11 +101,15 @@ de uso real. Exclusão deve ser controlada e incluir documentos, caso e backups.
 
 ## Verificação isolada
 
-`node --test test/import-audit.test.mjs` usa PostgreSQL embarcado e IA simulada,
+`node --test test/import-audit.test.mjs test/import-document-check.test.mjs` usa PostgreSQL embarcado e IA simulada,
 sem credenciais ou documentos reais. Com o servidor local ativo,
 `node scripts/check-import-ui.mjs` testa visitante/login/retomada, upload,
 conferência, pesquisa, revisão, relatório e layout 1440/390 com o serviço real
 em banco isolado e IA simulada. `AUDITA_BASE_URL` seleciona a porta local.
+Inclui precisão decimal, códigos duplicados, campos ausentes, vínculos manuais,
+origens inválidas, falha de IA sem perda, isolamento e compatibilidade legada.
+A precisão da extração real não é validada por mocks: requer amostras autorizadas
+e configuração privada existente. Os testes não chamam OpenAI nem banco compartilhado.
 
 Fontes de referência: [download oficial NCM](https://www.gov.br/receitafederal/pt-br/assuntos/aduana-e-comercio-exterior/classificacao-fiscal-de-mercadorias/download-ncm-nomenclatura-comum-do-mercosul),
 [legislação Ex-tarifário](https://www.gov.br/mdic/pt-br/assuntos/sdic/ex-tarifario/legislacao).

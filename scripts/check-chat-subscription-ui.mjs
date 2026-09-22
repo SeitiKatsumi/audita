@@ -194,6 +194,19 @@ async function prepare() {
 
 try {
   await boot();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  for (let opening = 0; opening < 2; opening++) {
+    await page.evaluate(() => window.chat.open());
+    assert.equal(await modal.evaluate(el => getComputedStyle(el).animationName), "subscription-enter");
+    assert.equal(await modal.evaluate(el => getComputedStyle(el, "::backdrop").animationName), "subscription-backdrop-enter");
+    await close();
+  }
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => window.chat.open());
+  assert.equal(await modal.evaluate(el => getComputedStyle(el).animationName), "none");
+  assert.equal(await modal.evaluate(el => getComputedStyle(el, "::backdrop").animationName), "none");
+  await close();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   for (const trigger of [
     () => page.locator("#chatInput").dispatchEvent("beforeinput", { inputType: "insertText", data: "x", cancelable: true }),
     () => page.locator("#chatInput").dispatchEvent("paste", { cancelable: true }),

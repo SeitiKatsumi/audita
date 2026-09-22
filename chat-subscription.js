@@ -22,7 +22,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   dialog.setAttribute("aria-labelledby", "chatSubscriptionTitle");
   dialog.innerHTML = `<header><div><p class="chat-subscription-eyebrow">IA AUDITA</p><h2 id="chatSubscriptionTitle">Planos do chat</h2></div><button type="button" data-close aria-label="Fechar planos" title="Fechar">&#215;</button></header>
     <p data-access role="status"></p><p data-notice role="status" aria-live="polite"></p>
-    <p data-payment-status role="status"></p><div class="chat-subscription-plans"></div>
+    <p data-payment-status role="status"></p><section data-legacy hidden></section><div class="chat-subscription-plans"></div>
     <section class="chat-subscription-rules" aria-label="O que o plano inclui e regras de uso">
       <p><strong>Inclui:</strong> conversa com a IA e leitura de PDF, PNG e JPEG. A an\u00e1lise inicial gera um resumo e consome p\u00e1ginas; perguntas posteriores consomem mensagens.</p>
       <p><strong>N\u00e3o inclui:</strong> consultas externas, certid\u00f5es, servi\u00e7os especializados ou honor\u00e1rios profissionais.</p>
@@ -37,6 +37,10 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     <p data-document-name></p><p data-document-pages></p><p data-document-error role="alert"></p>
     <footer><button type="button" data-cancel>Cancelar</button><button type="button" data-analyze>Analisar documento</button></footer>`;
   document.body.append(dialog, documentDialog);
+  const accountView = document.querySelector("#accountSubscription");
+  if (accountView) {
+    accountView.replaceChildren(...[...dialog.children].filter(node => node.tagName !== "HEADER").map(node => node.cloneNode(true)));
+  }
   const usage = document.createElement("button");
   usage.type = "button";
   usage.className = "chat-subscription-usage";
@@ -106,6 +110,13 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       : `${catalog.billing?.demoMode || catalog.billing?.mode === "test" ? "Ambiente de testes: sem cobran\u00e7a real. " : ""}${!PLANS.some(plan => available(plan.id)) ? "Pagamentos indispon\u00edveis neste ambiente: a configura\u00e7\u00e3o de cobran\u00e7a n\u00e3o est\u00e1 habilitada. Nenhuma compra pode ser conclu\u00edda." : ""}`;
     manage.hidden = !(owner && (access?.active && !access.legacy || billing?.canManage && billing?.subscription?.provider === "stripe"));
     manage.disabled = busy;
+    const legacy = billing?.subscription?.planId === "standard" ? billing.subscription : null;
+    const legacyPlan = catalog?.plans?.find(plan => plan.id === "standard");
+    const legacyView = dialog.querySelector("[data-legacy]");
+    legacyView.hidden = !legacy;
+    const legacyPrice = legacyPlan?.prices?.[legacy?.interval];
+    const legacyStatus = { active: "Ativo", past_due: "Pagamento pendente", unpaid: "Pagamento pendente", canceled: "Cancelado", trialing: "Em teste" }[legacy?.status] || "Verifique o contrato";
+    legacyView.innerHTML = legacy ? `<h3>Seu contrato Standard</h3><p>${legacyStatus} · ${legacy.interval === "annual" ? "Anual" : "Mensal"}${legacyPrice ? ` · ${escape(money(legacyPrice.cents))}` : ""}. Contrato existente, sem migra\u00e7\u00e3o autom\u00e1tica.</p><ul>${[...(legacyPlan?.features || []), ...(legacy.interval === "annual" ? legacyPlan?.annualBenefits || [] : [])].map(feature => `<li>${escape(feature)}</li>`).join("")}</ul>` : "";
     dialog.querySelector("[data-refresh]").disabled = busy || Boolean(loading);
     cards.innerHTML = PLANS.map(plan => {
       const experiment = plan.id === "chat-experiment";
@@ -113,7 +124,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       const price = priceFor(plan.id);
       const cents = Number.isFinite(price?.cents) && price.cents > 0 ? price.cents : plan.cents;
       const current = access?.active && access.planId === plan.id;
-      const disabled = busy || !available(plan.id) || current;
+      const disabled = busy || !available(plan.id) || current || (experiment && access?.trialUsed);
       return `<article class="chat-subscription-plan${recommended ? " is-recommended" : ""}">
         <span class="chat-subscription-badge">${recommended ? "Recomendado" : current ? "Plano atual" : "&nbsp;"}</span>
         <h3>${plan.name}</h3><p class="chat-subscription-price"><strong>${escape(money(cents))}</strong><span>${experiment ? " / 30 dias" : " / m\u00eas"}</span></p>
@@ -121,6 +132,24 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
         <p class="chat-subscription-terms">${experiment ? "Compra \u00fanica por conta. V\u00e1lido por 30 dias, sem renova\u00e7\u00e3o autom\u00e1tica." : "Renova\u00e7\u00e3o mensal autom\u00e1tica. Gerencie ou cancele no portal de pagamento."}</p>
         <button type="button" data-plan="${plan.id}" ${disabled ? "disabled" : ""}>${current ? "Plano atual" : busy ? "Aguarde..." : !available(plan.id) ? "Indispon\u00edvel" : experiment ? "Experimentar" : `Escolher ${plan.name}`}</button></article>`;
     }).join("");
+    if (accountView) {
+      const focused = accountView.contains(document.activeElement) ? document.activeElement.dataset.plan : null;
+      accountView.querySelector(".chat-subscription-plans").innerHTML = cards.innerHTML;
+      for (const selector of ["[data-access]", "[data-notice]", "[data-payment-status]", "[data-legacy]"]) {
+        const source = dialog.querySelector(selector), target = accountView.querySelector(selector);
+        target.innerHTML = source.innerHTML;
+        target.hidden = source.hidden;
+      }
+      for (const selector of ["[data-manage]", "[data-refresh]"]) {
+        const source = dialog.querySelector(selector), target = accountView.querySelector(selector);
+        target.hidden = source.hidden;
+        target.disabled = source.disabled;
+      }
+      if (focused) {
+        const button = [...accountView.querySelectorAll("[data-plan]")].find(item => item.dataset.plan === focused);
+        (button && !button.disabled ? button : accountView.querySelector("[data-refresh]")).focus();
+      }
+    }
     if (focusedPlan && dialog.open) {
       const button = [...cards.querySelectorAll("[data-plan]")].find(item => item.dataset.plan === focusedPlan);
       (button && !button.disabled ? button : dialog.querySelector("[data-close]")).focus();
@@ -242,7 +271,8 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     render();
     try {
       if (!checkoutRequest || checkoutRequest.planId !== planId) checkoutRequest = { planId, requestId: crypto.randomUUID() };
-      const data = await request(portal ? "/api/billing/portal" : "/api/billing/checkout", portal ? (access?.legacy ? {} : { kind: "chat" }) : {
+      const legacyPortal = access?.legacy || (!access?.active && billing?.subscription?.planId === "standard");
+      const data = await request(portal ? "/api/billing/portal" : "/api/billing/checkout", portal ? (legacyPortal ? {} : { kind: "chat" }) : {
         kind: planId === "chat-experiment" ? "chat_experiment" : "chat_subscription", planId,
         interval: planId === "chat-experiment" ? "once" : "monthly", requestId: checkoutRequest.requestId,
       });
@@ -364,6 +394,14 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   });
   for (const name of ["beforeinput", "paste", "keydown", "submit", "click"]) listen(window, name, gate, true);
   listen(usage, "click", open);
+  if (accountView) listen(accountView, "click", event => {
+    const button = event.target.closest("button");
+    if (!button || button.disabled) return;
+    if (button.matches("[data-refresh]")) { void refresh(); return; }
+    open();
+    if (button.dataset.plan) void checkout(button.dataset.plan);
+    else if (button.matches("[data-manage]")) void checkout(null, true);
+  });
   listen(dialog.querySelector("[data-close]"), "click", () => dialog.close());
   listen(dialog.querySelector("[data-refresh]"), "click", () => void refresh());
   listen(manage, "click", () => void checkout(null, true));

@@ -13,6 +13,8 @@ const catalog = getPublicBillingCatalog({
   APP_URL: base, AUDITA_BILLING_ENABLED: 'true',
   STRIPE_SECRET_KEY: 'sk_test_fixture', STRIPE_WEBHOOK_SECRET: 'whsec_fixture',
   STRIPE_PRICE_STANDARD_MONTHLY: 'price_monthly', STRIPE_PRICE_STANDARD_ANNUAL: 'price_annual',
+  STRIPE_PRICE_CHAT_EXPERIMENT: 'price_experiment', STRIPE_PRICE_CHAT_ESSENTIAL: 'price_essential',
+  STRIPE_PRICE_CHAT_PROFESSIONAL: 'price_professional', STRIPE_PRICE_CHAT_PREMIUM: 'price_premium',
 });
 let user = { id: 'fixture', name: 'Pessoa de Teste', email: 'teste@example.com', role: 'owner' };
 let subscription = null;
@@ -48,6 +50,10 @@ await context.route('**/*', async route => {
       status = request.postDataJSON().currentPassword === 'Senha-atual-ficticia!' ? 200 : 400;
       body = status === 200 ? { ok: true } : { error: 'incorrect_password' }; break;
     case '/api/billing/plans': body = catalog; break;
+    case '/api/chat/access':
+      status = billingFailure ? 503 : 200;
+      body = { access: { active: Boolean(subscription?.active), legacy: Boolean(subscription?.active),
+        planId: subscription?.planId, periodEnd: subscription?.currentPeriodEnd, trialUsed: false } }; break;
     case '/api/billing/subscription':
       status = billingFailure ? 503 : 200;
       body = { subscription, canManage, access: { entitled: Boolean(subscription?.active) } }; break;
@@ -56,7 +62,8 @@ await context.route('**/*', async route => {
   }
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 });
-const waitOffer = () => page.locator('[data-subscription-action]').waitFor();
+const account = page.locator('#accountSubscription');
+const waitOffer = () => account.locator('[data-plan="chat-professional"]').waitFor();
 const normalized = text => text.replace(/\s+/g, ' ');
 const noOverflow = async () => {
   const sizes = await page.evaluate(() => ({ width: innerWidth, html: document.documentElement.scrollWidth, body: document.body.scrollWidth,
@@ -70,9 +77,9 @@ try {
   await page.locator('html:not(.app-booting)').waitFor();
   const sidebar = page.locator('.sidebar .nav-list');
   assert.doesNotMatch(await sidebar.innerText(), /Configurações|Histórico|Planos e assinaturas|Consumo de APIs/);
-  await sidebar.getByRole('link', { name: 'Meus Dados' }).click();
+  await sidebar.getByRole('link', { name: 'Planos' }).click();
   await waitOffer();
-  assert.equal(await page.locator('#pageTitle').innerText(), 'Meus Dados');
+  assert.equal(await page.locator('#pageTitle').innerText(), 'Planos');
   await page.waitForFunction(() => document.querySelector('#profileDocument').textContent === '529.982.247-25');
   assert.equal(await page.locator('#profileName').innerText(), 'Pessoa de Teste');
   const profileForm = page.locator('#accountProfileForm');
@@ -105,56 +112,46 @@ try {
   profileFailure = false;
   await page.getByRole('button', { name: 'Editar dados', exact: true }).click();
   await profileForm.getByRole('button', { name: 'Cancelar', exact: true }).click();
-  assert.match(normalized(await page.locator('.account-charge').innerText()), /199,00.*cada mês/);
+  assert.equal(await account.locator('[data-plan]').count(), 4);
+  assert.equal(await account.locator('.chat-subscription-plans').innerHTML(),
+    await page.locator('#chatSubscriptionDialog .chat-subscription-plans').innerHTML());
+  assert.equal(await page.locator('#subscriptionCycle').count(), 0);
   await noOverflow();
-  await page.getByRole('button', { name: /^Anual/ }).click();
-  assert.match(normalized(await page.locator('.account-price').innerText()), /99,00/);
-  assert.match(normalized(await page.locator('.account-charge').innerText()), /1\.188,00.*uma vez por ano/);
-  assert.match(await page.locator('.account-benefits').innerText(), /advogado parceiro/);
   await mkdir(new URL('../output/account/', import.meta.url), { recursive: true });
-  await page.screenshot({ path: fileURLToPath(new URL('../output/account/desktop.png', import.meta.url)), fullPage: true });
-  await page.getByRole('button', { name: 'Assinar anual', exact: true }).click();
+  await account.screenshot({ path: fileURLToPath(new URL('../output/account/desktop.png', import.meta.url)) });
+  await account.locator('[data-plan="chat-professional"]').click();
   await page.waitForURL('https://checkout.stripe.com/fixture');
   const purchase = posts.find(item => item.path === '/api/billing/checkout');
-  assert.equal(purchase.data.kind, 'subscription');
-  assert.equal(purchase.data.planId, 'standard');
-  assert.equal(purchase.data.interval, 'annual');
-  assert.ok(purchase.data.requestId);
-
+  assert.equal(purchase.data.kind, 'chat_subscription');
+  assert.equal(purchase.data.planId, 'chat-professional');
+  assert.equal(purchase.data.interval, 'monthly');
   subscription = { provider: 'stripe', planId: 'standard', interval: 'annual', status: 'active', active: true, currentPeriodEnd: '2027-09-22T12:00:00Z', cancelAtPeriodEnd: true };
   await page.goto(`${base}/planos?checkout=success`);
   await page.waitForURL(`${base}/?checkout=success#meus-dados`);
   await page.locator('html:not(.app-booting)').waitFor();
   await waitOffer();
-  assert.match(await page.locator('#subscriptionSummary').innerText(), /Assinatura ativa.*Acesso até/);
-  assert.equal(await page.locator('#subscriptionCycle').isVisible(), false);
-  await page.getByRole('button', { name: 'Gerenciar assinatura', exact: true }).click();
+  await account.locator('[data-legacy]:not([hidden])').waitFor();
+  assert.match(await account.locator('[data-legacy]').innerText(), /Standard.*Ativo/s);
+  assert.match(await account.locator('[data-legacy]').innerText(), /advogado parceiro/);
+  await account.getByRole('button', { name: 'Gerenciar assinatura', exact: true }).click();
   await page.waitForURL('https://billing.stripe.com/fixture');
-  assert.ok(posts.some(item => item.path === '/api/billing/portal'));
-
-  subscription = { ...subscription, status: 'past_due', active: false, cancelAtPeriodEnd: false };
+  assert.deepEqual(posts.find(item => item.path === '/api/billing/portal').data, {});
+  subscription = { ...subscription, status: 'past_due', active: false };
   await page.goto(`${base}/#meus-dados`);
-  await page.locator('html:not(.app-booting)').waitFor();
-  await waitOffer();
-  assert.match(await page.locator('#subscriptionSummary').innerText(), /Pagamento pendente/);
-  assert.equal(await page.getByRole('button', { name: /Assinar/ }).count(), 0);
-
+  await account.locator('[data-legacy]:not([hidden])').waitFor();
+  assert.match(await account.locator('[data-legacy]').innerText(), /Pagamento pendente/);
   subscription = null;
   billingFailure = true;
   await page.reload();
-  await page.locator('#subscriptionRetry:not(.hidden)').waitFor();
-  assert.equal(await page.locator('[data-subscription-action]').count(), 0);
+  await account.locator('[data-notice]').filter({ hasText: 'concluir' }).waitFor();
   billingFailure = false;
-  await page.getByRole('button', { name: 'Tentar novamente' }).click();
-  await waitOffer();
-
+  await account.getByRole('button', { name: 'Atualizar acesso' }).click();
+  await page.waitForFunction(() => !document.querySelector('#accountSubscription [data-plan="chat-professional"]').disabled);
   canManage = false;
   user.role = 'member';
   await page.reload();
-  await page.locator('html:not(.app-booting)').waitFor();
   await waitOffer();
-  assert.equal(await page.locator('[data-subscription-action]').isDisabled(), true);
-  assert.match(await page.locator('[data-subscription-action]').innerText(), /responsável/);
+  await page.waitForFunction(() => !document.querySelector('#accountSubscription [data-plan="chat-professional"]').disabled);
 
   canManage = true;
   user.role = 'owner';
@@ -162,11 +159,11 @@ try {
   await page.goto(`${base}/#home`);
   await page.reload();
   await page.locator('html:not(.app-booting)').waitFor();
-  await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Meus Dados' }).click();
+  await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Planos' }).click();
   await waitOffer();
-  await page.getByRole('button', { name: /^Anual/ }).focus();
+  await account.getByRole('button', { name: 'Atualizar acesso' }).focus();
   await page.keyboard.press('Enter');
-  assert.equal(await page.getByRole('button', { name: /^Anual/ }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await account.locator('[data-plan]').count(), 4);
   await noOverflow();
   await page.screenshot({ path: fileURLToPath(new URL('../output/account/mobile.png', import.meta.url)), fullPage: true });
   await page.getByRole('button', { name: 'Editar dados', exact: true }).click();
@@ -190,7 +187,7 @@ try {
   await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Home', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#accountPasswordForm').classList.contains('hidden'));
   assert.equal(await passwordForm.getByLabel('Senha atual', { exact: true }).inputValue(), '');
-  await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Meus Dados' }).click();
+  await page.locator('.mobile-bottom-nav').getByRole('link', { name: 'Planos' }).click();
   await page.getByRole('button', { name: 'Alterar senha', exact: true }).click();
   await passwordForm.getByLabel('Senha atual', { exact: true }).fill('Senha-atual-ficticia!');
   await passwordForm.getByLabel('Nova senha', { exact: true }).fill('Senha-nova-ficticia!');
@@ -203,7 +200,8 @@ try {
   await page.reload(); // Mock user remains signed in; real API session revocation is covered in account-password.test.mjs.
   await page.locator('html:not(.app-booting)').waitFor();
   await page.getByRole('button', { name: 'Sair da conta' }).click();
-  await page.locator('#loginScreen:not(.hidden)').waitFor();
+  await page.waitForURL(`${base}/#home`);
+  await page.waitForFunction(() => document.querySelector('#profileDocument').textContent === 'Não informado');
   assert.equal(await page.locator('#profileDocument').innerText(), 'Não informado');
   assert.equal(posts.filter(item => item.path === '/api/billing/checkout').length, 1);
   assert.deepEqual(errors, []);

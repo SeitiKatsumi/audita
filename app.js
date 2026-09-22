@@ -1,6 +1,5 @@
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js";
-import { initAccountPlans } from "./plans.js?v=20260922-meus-dados";
 const canvas = document.querySelector("#signalCanvas");
 const ctx = canvas?.getContext("2d");
 const riskScore = document.querySelector("#riskScore");
@@ -965,7 +964,7 @@ const pageMeta = {
     eyebrow: "Execuções anteriores do usuário",
   },
   "meus-dados": {
-    title: "Meus Dados",
+    title: "Planos",
     eyebrow: "Minha conta",
   },
   "admin-consumo": {
@@ -9357,7 +9356,6 @@ setInterval(rotateRisk, 1400);
 drawSignal();
 
 moveEcosystemModules();
-initAccountPlans({ getAuthState: () => currentAuthState, showLogin });
 const authState = await loadAuthState();
 currentAuthState = authState;
 chatState = loadChatState();
