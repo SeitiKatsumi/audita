@@ -341,7 +341,8 @@ test("chat UI contains a dedicated live browser pane without changing certificat
   assert.match(app, /Agora voc.*pode assumir o controle do navegador/);
   assert.match(app, /refreshActiveChatBrowserAgentStatus/);
   assert.match(app, /renderActiveJecFlow/);
-  assert.match(app, /browserSessionId:\s*activeChatBrowserSession\?\.id/);
+  assert.match(app, /const browserSessionId = activeChatBrowserSession\?\.id/);
+  assert.match(app, /browserSessionId,/);
   assert.doesNotMatch(
     app.match(/function renderItauCaseCard[\s\S]+?function getActiveJecFlow/)?.[0] || "",
     /\$\{renderJecPetitionPanel\(caseData\)\}/,

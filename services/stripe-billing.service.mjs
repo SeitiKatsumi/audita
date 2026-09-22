@@ -180,11 +180,19 @@ export function verifyStripeWebhookSignature(
 }
 
 function subscriptionIdFromObject(object = {}) {
-  return text(
+  return stripeObjectId(
     object.subscription ||
       object.parent?.subscription_details?.subscription ||
       object.subscription_details?.subscription,
   );
+}
+
+function stripeObjectId(value) {
+  return text(typeof value === "object" ? value?.id : value);
+}
+
+function isChatKind(kind) {
+  return ["chat_subscription", "chat_experiment"].includes(kind);
 }
 
 function customerIdFromObject(object = {}) {
@@ -258,6 +266,7 @@ export function createStripeBillingService({
   getDb,
   creditsService,
   accessService,
+  chatAccessService,
   onIrPaymentEvent,
   onDebtPaymentEvent,
   fetchImpl = globalThis.fetch,
@@ -291,7 +300,7 @@ export function createStripeBillingService({
     };
   }
 
-  async function stripeRequest(path, params, { idempotencyKey = "" } = {}) {
+  async function stripeRequest(path, params, { idempotencyKey = "", method = "POST" } = {}) {
     const config = configuration();
     if (!config.secretKey) {
       throw new StripeBillingError(
@@ -300,15 +309,16 @@ export function createStripeBillingService({
         503,
       );
     }
-    const response = await fetchImpl(`${config.apiBaseUrl}${path}`, {
-      method: "POST",
+    const encoded = flattenStripeParams(params).toString();
+    const response = await fetchImpl(`${config.apiBaseUrl}${path}${method === "GET" && encoded ? `?${encoded}` : ""}`, {
+      method,
       headers: {
         authorization: `Bearer ${config.secretKey}`,
         "content-type": "application/x-www-form-urlencoded",
         "stripe-version": config.apiVersion,
         ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
-      body: flattenStripeParams(params).toString(),
+      ...(method === "GET" ? {} : { body: encoded }),
     });
     let payload;
     try {
@@ -409,6 +419,92 @@ export function createStripeBillingService({
       },
     );
     return saveCustomer(authContext.tenantId, created);
+  }
+
+  function chatDatabase() {
+    const state = db();
+    if (!state.ready) throw new StripeBillingError("chat_database_unavailable", "Chat billing requires persistent storage.", 503);
+    return state.pool;
+  }
+
+  async function loadChatCustomer(auth) {
+    const result = await chatDatabase().query(
+      `SELECT c.* FROM audita_chat_customers c JOIN audita_users u ON u.id=c.user_id AND u.tenant_id=c.tenant_id
+       WHERE c.tenant_id=$1 AND c.user_id=$2`, [auth.tenantId, auth.user.id]);
+    return result.rows[0] || null;
+  }
+
+  async function ensureChatCustomer(auth) {
+    const pool = chatDatabase();
+    const identity = [text(auth.tenantId), text(auth.user.id)];
+    const params = { email: text(auth.user.email), name: text(auth.user.name),
+      metadata: { audita_tenant_id: identity[0], audita_user_id: identity[1], purchase_kind: "chat_customer" } };
+    await pool.query(`INSERT INTO audita_chat_customers(tenant_id,user_id,customer_params,created_at)
+      SELECT tenant_id,id,$3::jsonb,$4 FROM audita_users WHERE tenant_id=$1 AND id=$2
+      ON CONFLICT (tenant_id,user_id) DO NOTHING`, [...identity, JSON.stringify(params), new Date(now())]);
+    const row = await loadChatCustomer(auth);
+    if (!row) throw new StripeBillingError("chat_unauthorized", "Chat customer identity invalid.", 401);
+    if (row.stripe_customer_id) return { id: row.stripe_customer_id };
+    // Stripe may discard idempotency keys after 24 hours; uncertain older attempts need reconciliation.
+    if (now() - new Date(row.created_at).getTime() >= 23 * 3600000) {
+      throw new StripeBillingError("chat_customer_reconciliation_required", "Chat customer creation needs reconciliation.", 503);
+    }
+    const customer = await stripeRequest("/v1/customers", row.customer_params, {
+      idempotencyKey: `audita-chat-customer-${crypto.createHash("sha256").update(JSON.stringify(identity)).digest("hex")}`,
+    });
+    if (!customer.id) throw new StripeBillingError("stripe_customer_invalid", "Stripe customer missing.", 502);
+    await pool.query(`UPDATE audita_chat_customers SET stripe_customer_id=$3
+      WHERE tenant_id=$1 AND user_id=$2 AND stripe_customer_id IS NULL`, [...identity, customer.id]);
+    return { id: (await loadChatCustomer(auth)).stripe_customer_id };
+  }
+
+  async function createChatCheckout(auth, selection, params) {
+    const pool = chatDatabase();
+    const ids = [auth.tenantId, auth.user.id];
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const key = `audita-chat-checkout-${crypto.randomUUID()}`;
+      const storedParams = { ...params, expires_at: Math.floor(now() / 1000) + 3600 };
+      await pool.query(`UPDATE audita_chat_customers SET checkout_key=$3,checkout_plan=$4,checkout_params=$5::jsonb,checkout_session=NULL
+        WHERE tenant_id=$1 AND user_id=$2 AND checkout_key IS NULL`, [...ids, key, selection.id, JSON.stringify(storedParams)]);
+      const row = await loadChatCustomer(auth);
+      if (!row?.checkout_key) throw new StripeBillingError("chat_checkout_pending", "Chat checkout is being updated.", 409);
+      const session = row.checkout_session;
+      if (session?.id && Number(row.checkout_params.expires_at) <= now() / 1000) {
+        const current = await stripeRequest(`/v1/checkout/sessions/${encodeURIComponent(session.id)}`, {}, { method: "GET" });
+        let finished = current.status === "expired";
+        if (current.status === "complete") {
+          if (current.subscription) {
+            const subscription = await stripeRequest(`/v1/subscriptions/${encodeURIComponent(stripeObjectId(current.subscription))}`, {}, { method: "GET" });
+            finished = ["canceled", "incomplete_expired"].includes(subscription.status);
+          } else {
+            const access = await requireChatAccess().getAccess(auth);
+            finished = access.trialUsed === true && !access.active;
+          }
+        }
+        if (finished) {
+          await pool.query(`UPDATE audita_chat_customers SET checkout_key=NULL,checkout_plan=NULL,checkout_params=NULL,checkout_session=NULL
+            WHERE tenant_id=$1 AND user_id=$2 AND checkout_key=$3`, [...ids, row.checkout_key]);
+          continue;
+        }
+        throw new StripeBillingError("chat_checkout_pending", "Previous chat payment is still pending or subscribed.", 409);
+      }
+      if (row.checkout_plan !== selection.id) throw new StripeBillingError("chat_checkout_pending", "Another chat plan checkout is pending.", 409);
+      if (session?.id) return session;
+      // Persist the exact request before calling Stripe, including across timeouts and process restarts.
+      if (now() / 1000 >= Number(row.checkout_params.expires_at) + 22 * 3600) {
+        throw new StripeBillingError("chat_checkout_reconciliation_required", "Uncertain checkout needs reconciliation.", 503);
+      }
+      const access = await requireChatAccess().getAccess(auth);
+      if (access.active || (selection.kind === "chat_experiment" && !access.trialAvailable)) {
+        throw new StripeBillingError("chat_plan_already_active", "Chat access changed before checkout.", 409);
+      }
+      const created = await stripeRequest("/v1/checkout/sessions", row.checkout_params, { idempotencyKey: row.checkout_key });
+      if (!created.id || !created.url) throw new StripeBillingError("stripe_checkout_invalid", "Stripe checkout missing.", 502);
+      await pool.query(`UPDATE audita_chat_customers SET checkout_session=$4::jsonb
+        WHERE tenant_id=$1 AND user_id=$2 AND checkout_key=$3`, [...ids, row.checkout_key, JSON.stringify(created)]);
+      return created;
+    }
+    throw new StripeBillingError("chat_checkout_pending", "Chat checkout changed; retry shortly.", 409);
   }
 
   async function saveSubscription(tenantId, subscription = {}) {
@@ -665,6 +761,9 @@ export function createStripeBillingService({
 
   async function createDemoSubscription(authContext, input = {}) {
     if (!authContext?.tenantId || !authContext?.user) return { unauthorized: true };
+    if (isChatKind(text(input.kind)) || text(input.planId).startsWith("chat-")) {
+      return { invalid: true, reason: "chat_demo_forbidden" };
+    }
     const config = configuration();
     if (!config.demoMode) return { unavailable: true, reason: "billing_demo_disabled" };
     const interval = text(input.interval);
@@ -757,7 +856,7 @@ export function createStripeBillingService({
     }
     const requestedKind = text(input.kind, "subscription");
     if (
-      !["itau_charge_service", "itau_lawyer_kit"].includes(requestedKind) &&
+      !["itau_charge_service", "itau_lawyer_kit"].includes(requestedKind) && !isChatKind(requestedKind) &&
       !["super_admin", "owner", "admin"].includes(authContext.user.role)
     ) {
       return { forbidden: true };
@@ -772,6 +871,18 @@ export function createStripeBillingService({
     }
     const selection = resolveBillingSelection(input, env);
     if (selection.invalid || selection.unavailable) return selection;
+    const isChat = isChatKind(selection.kind);
+    const isSubscription = ["subscription", "chat_subscription"].includes(selection.kind);
+    if (isChat) {
+      if (input.demo === true) return { invalid: true, reason: "chat_demo_forbidden" };
+      if (!authContext.user.id) return { unauthorized: true };
+      if (!chatAccessService) return { unavailable: true, reason: "chat_access_unavailable" };
+      const access = await chatAccessService.getAccess(authContext);
+      if (access?.active) return { invalid: true, reason: "chat_plan_already_active" };
+      if (selection.kind === "chat_experiment" && access?.trialAvailable !== true) {
+        return { invalid: true, reason: "chat_experiment_already_used" };
+      }
+    }
     if (selection.kind === "credit_pack" && !config.creditsEnabled) {
       return {
         unavailable: true,
@@ -784,7 +895,7 @@ export function createStripeBillingService({
     if (selection.kind === "itau_lawyer_kit" && !lawyerKitUf) {
       return { invalid: true, reason: "itau_lawyer_kit_uf_required" };
     }
-    const customer = await ensureCustomer(authContext);
+    const customer = isChat ? await ensureChatCustomer(authContext) : await ensureCustomer(authContext);
     const requestId = text(input.requestId) || crypto.randomUUID();
     const caseIds = [...new Set((Array.isArray(input.caseIds) ? input.caseIds : []).map(text).filter(Boolean))]
       .slice(0, 20);
@@ -795,7 +906,7 @@ export function createStripeBillingService({
       audita_tenant_id: text(authContext.tenantId),
       audita_user_id: text(authContext.user.id),
       purchase_kind: selection.kind,
-      plan_id: selection.kind === "subscription" ? selection.id : "",
+      plan_id: isSubscription || isChat ? selection.id : "",
       credit_pack_id: selection.kind === "credit_pack" ? selection.id : "",
       interval: selection.interval || "",
       credits: String(selection.credits),
@@ -812,15 +923,15 @@ export function createStripeBillingService({
     const isItauService = selection.kind === "itau_charge_service";
     const isItauLawyerKit = selection.kind === "itau_lawyer_kit";
     const params = {
-      mode: selection.kind === "subscription" ? "subscription" : "payment",
+      mode: isSubscription ? "subscription" : "payment",
       customer: customer.id,
       client_reference_id: text(authContext.tenantId),
-      success_url: isItauService
+      success_url: isChat ? `${config.appUrl}/chat?chat_checkout=success` : isItauService
         ? `${config.appUrl}/?itau_checkout=success&session_id={CHECKOUT_SESSION_ID}#analise-cobrancas`
         : isItauLawyerKit
           ? `${config.appUrl}/?lawyer_kit_checkout=success&session_id={CHECKOUT_SESSION_ID}#analise-cobrancas`
           : `${config.appUrl}/planos?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: isItauService
+      cancel_url: isChat ? `${config.appUrl}/chat?chat_checkout=cancelled` : isItauService
         ? `${config.appUrl}/?itau_checkout=cancelled#analise-cobrancas`
         : isItauLawyerKit
           ? `${config.appUrl}/?lawyer_kit_checkout=cancelled#analise-cobrancas`
@@ -830,8 +941,8 @@ export function createStripeBillingService({
       integration_identifier: config.integrationIdentifier,
       line_items: [{ price: selection.priceId, quantity: 1 }],
       metadata: commonMetadata,
-      ...(isItauService || isItauLawyerKit ? {} : { allow_promotion_codes: true }),
-      ...(selection.kind === "subscription"
+      ...(isChat || isItauService || isItauLawyerKit ? {} : { allow_promotion_codes: true }),
+      ...(isSubscription
         ? {
             subscription_data: {
               metadata: commonMetadata,
@@ -842,9 +953,8 @@ export function createStripeBillingService({
             payment_intent_data: { metadata: commonMetadata },
           }),
     };
-    const session = await stripeRequest("/v1/checkout/sessions", params, {
-      idempotencyKey: `audita-checkout-${text(authContext.tenantId)}-${requestId}`,
-    });
+    const session = isChat ? await createChatCheckout(authContext, selection, params) :
+      await stripeRequest("/v1/checkout/sessions", params, { idempotencyKey: `audita-checkout-${text(authContext.tenantId)}-${requestId}` });
     if (!session?.url || !session?.id) {
       throw new StripeBillingError(
         "stripe_checkout_invalid",
@@ -860,21 +970,24 @@ export function createStripeBillingService({
     };
   }
 
-  async function createPortalSession(authContext) {
+  async function createPortalSession(authContext, input = {}) {
     if (!authContext?.tenantId || !authContext?.user) return { unauthorized: true };
-    if (!["super_admin", "owner", "admin"].includes(authContext.user.role)) {
+    const isChat = input.kind === "chat";
+    if (isChat && !authContext.user.id) return { unauthorized: true };
+    if (!isChat && !["super_admin", "owner", "admin"].includes(authContext.user.role)) {
       return { forbidden: true };
     }
     const config = configuration();
     if (!config.checkoutReady || !config.appUrl) {
       return { unavailable: true, reason: "billing_not_configured" };
     }
-    const customer = await loadCustomer(authContext.tenantId);
+    const row = isChat ? await loadChatCustomer(authContext) : null;
+    const customer = isChat ? { id: row?.stripe_customer_id } : await loadCustomer(authContext.tenantId);
     if (!customer?.id) return { notFound: true, reason: "billing_customer_not_found" };
 
     const session = await stripeRequest("/v1/billing_portal/sessions", {
       customer: customer.id,
-      return_url: `${config.appUrl}/planos`,
+      return_url: `${config.appUrl}/${isChat ? "chat" : "planos"}`,
     });
     return session?.url
       ? { url: session.url }
@@ -1067,6 +1180,114 @@ export function createStripeBillingService({
     return { tenantId };
   }
 
+  function requireChatAccess() {
+    if (!chatAccessService) throw new StripeBillingError("chat_access_unavailable", "Chat billing access unavailable.", 503);
+    return chatAccessService;
+  }
+
+  function chatIdentity(object) {
+    const metadata = metadataFromObject(object);
+    const tenantId = text(metadata.audita_tenant_id);
+    const userId = text(metadata.audita_user_id);
+    if (!tenantId || !userId) throw new StripeBillingError("chat_identity_missing", "Chat payment identity missing.", 400);
+    return { tenantId, userId };
+  }
+
+  async function processChatEvent(event, product) {
+    const object = event.data.object;
+    const type = text(event.type);
+    const ignored = reason => ({ ignored: true, reason });
+    if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(type)) {
+      if (type === "customer.subscription.deleted" || ["canceled", "unpaid", "incomplete_expired", "paused"].includes(object.status)) {
+        const identity = chatIdentity(object);
+        await requireChatAccess().revokeSubscription({ ...identity, subscriptionId: stripeObjectId(object.id) });
+        return identity;
+      }
+      return ignored("chat_subscription_requires_paid_invoice");
+    }
+    // Failed renewals do not extend or revoke an already-paid period; getAccess enforces expiry.
+    if (type === "invoice.payment_failed") return ignored("chat_paid_period_not_extended");
+    const recurring = type === "invoice.paid";
+    if (!recurring && !["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(type)) {
+      return ignored("event_not_used");
+    }
+    const metadata = safeMetadata(metadataFromObject(object));
+    const kind = recurring ? "chat_subscription" : "chat_experiment";
+    if (!recurring && metadata.purchaseKind !== kind) return ignored("chat_subscription_requires_paid_invoice");
+    const selection = recurring ? product : resolveBillingSelection({ kind, planId: metadata.planId, interval: "once" }, env);
+    if (!selection || selection.invalid || selection.unavailable || selection.kind !== kind ||
+        (metadata.planId && metadata.planId !== selection.id)) return ignored("chat_product_not_resolved");
+    const amount = recurring ? object.amount_paid : object.amount_total;
+    if ((recurring ? object.status !== "paid" || object.paid_out_of_band === true : object.payment_status !== "paid" || object.mode !== "payment") ||
+        !Number.isSafeInteger(amount) || amount <= 0 || amount !== selection.amount.cents ||
+        text(object.currency).toUpperCase() !== selection.amount.currency) return ignored("chat_payment_not_confirmed");
+    const identity = chatIdentity(object);
+    const subscriptionId = recurring ? subscriptionIdFromObject(object) : null;
+    const paymentId = recurring ? stripeObjectId(object.id) : stripeObjectId(object.payment_intent);
+    let period = subscriptionPeriod(object);
+    if (!recurring && paymentId) {
+      const payment = await stripeRequest(`/v1/payment_intents/${encodeURIComponent(paymentId)}`,
+        { expand: ["latest_charge"] }, { method: "GET" });
+      if (payment.status !== "succeeded") return ignored("chat_payment_not_confirmed");
+      const charge = typeof payment.latest_charge === "object" ? payment.latest_charge :
+        payment.latest_charge ? await stripeRequest(`/v1/charges/${encodeURIComponent(payment.latest_charge)}`, {}, { method: "GET" }) : null;
+      if (!charge?.paid) return ignored("chat_payment_not_confirmed");
+      period = { start: timestampToIso(charge.created), end: timestampToIso(Number(charge.created) + 30 * 86400) };
+    }
+    if (!paymentId || (recurring && !subscriptionId) || !period.start || !period.end || period.end <= period.start) {
+      return ignored("chat_payment_reference_or_period_missing");
+    }
+    let grant;
+    try {
+      grant = await requireChatAccess().grantPaidAccess({ ...identity, planId: selection.id,
+        periodStart: period.start, periodEnd: period.end, paymentId, subscriptionId });
+    } catch (error) {
+      if (error.code === "chat_access_revoked") return ignored("chat_payment_revoked");
+      throw error;
+    }
+    return { ...identity, grant };
+  }
+
+  async function processChatReversal(object, type) {
+    if (type.startsWith("refund.") && object.status !== "succeeded") return { ignored: true, reason: "refund_not_completed" };
+    if (type === "charge.refunded" && !(object.amount_refunded > 0)) return { ignored: true, reason: "refund_not_completed" };
+    let charge = object;
+    let paymentId = stripeObjectId(object.payment_intent);
+    const chargeId = stripeObjectId(object.charge);
+    if (!paymentId && chargeId) {
+      charge = await stripeRequest(`/v1/charges/${encodeURIComponent(chargeId)}`, {}, { method: "GET" });
+      paymentId = stripeObjectId(charge.payment_intent);
+    }
+    let metadata = metadataFromObject(charge);
+    if (paymentId && !isChatKind(metadata.purchase_kind)) {
+      const payment = await stripeRequest(`/v1/payment_intents/${encodeURIComponent(paymentId)}`, {}, { method: "GET" });
+      metadata = metadataFromObject(payment);
+    }
+    if (metadata.purchase_kind === "chat_experiment" && paymentId) {
+      const identity = chatIdentity({ metadata });
+      await requireChatAccess().revokePayment({ ...identity, paymentId });
+      return identity;
+    }
+    let invoiceId = stripeObjectId(charge.invoice);
+    if (!invoiceId && paymentId) {
+      const payments = await stripeRequest("/v1/invoice_payments", {
+        payment: { type: "payment_intent", payment_intent: paymentId }, limit: 100,
+      }, { method: "GET" });
+      // Checkout chat subscriptions have one invoice per payment. Never guess across multiple invoices.
+      if (payments.has_more || payments.data?.length > 1) throw new StripeBillingError("chat_payment_ambiguous", "Payment has multiple invoices.", 503);
+      invoiceId = stripeObjectId(payments.data?.[0]?.invoice);
+    }
+    if (!invoiceId) return { ignored: true, reason: "chat_payment_not_resolved" };
+    const invoice = await stripeRequest(`/v1/invoices/${encodeURIComponent(invoiceId)}`, {}, { method: "GET" });
+    const product = resolveBillingProductFromPrice(priceIdFromObject(invoice), env);
+    if (product?.kind !== "chat_subscription" && metadataFromObject(invoice).purchase_kind !== "chat_subscription") {
+      return { ignored: true, reason: "not_chat_payment" };
+    }
+    const identity = chatIdentity(invoice);
+    await requireChatAccess().revokePayment({ ...identity, paymentId: invoiceId });
+    return identity;
+  }
+
   async function processEvent(event) {
     const object = event?.data?.object || {};
     if (object.metadata?.purchase_kind === "bank_debt") {
@@ -1076,6 +1297,20 @@ export function createStripeBillingService({
     if (object.metadata?.purchase_kind === "ir_proposal") {
       if (!onIrPaymentEvent) throw new StripeBillingError("ir_handler_unavailable", "Processamento IR indisponível.", 503);
       return onIrPaymentEvent(event);
+    }
+    const product = resolveBillingProductFromPrice(priceIdFromObject(object), env);
+    if (isChatKind(metadataFromObject(object).purchase_kind) || isChatKind(product?.kind)) {
+      if (!["charge.refunded", "charge.dispute.created", "refund.created", "refund.updated"].includes(event.type)) {
+        return processChatEvent(event, product);
+      }
+    }
+    const state = db();
+    if (customerIdFromObject(object) && state.ready && !["charge.refunded", "charge.dispute.created", "refund.created", "refund.updated"].includes(event.type)) {
+      const isolated = await state.pool.query("SELECT 1 FROM audita_chat_customers WHERE stripe_customer_id=$1", [customerIdFromObject(object)]);
+      if (isolated.rows.length) return { ignored: true, reason: "chat_metadata_missing" };
+    }
+    if (["charge.refunded", "charge.dispute.created", "refund.created", "refund.updated"].includes(event.type)) {
+      return processChatReversal(object, event.type);
     }
     switch (text(event?.type)) {
       case "checkout.session.completed":

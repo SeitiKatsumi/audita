@@ -24,6 +24,20 @@ test('catalog keeps PIS, energy and IR visible without configured backends', () 
  assert.equal(empty.hidden, true);
 });
 
+test('import tax has a matching top filter, category label and searchable keywords', async () => {
+ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html, /data-service-category="importacao" aria-pressed="false">Imposto de Importação<\/button>/);
+ assert.ok(html.includes('<h3 id="services-importacao">Imposto de Importação</h3>'));
+ const cards=[...html.matchAll(/<article[^]*?<\/article>/g)].map(m=>m[0]);
+ const card=cards.find(c=>c.includes('href="#auditoria-importacao"'));
+ assert.ok(card.includes('>Imposto de Importação · Tributos</small>'));
+ const service={text:card.match(/data-keywords="([^"]+)"/)[1],categories:card.match(/data-categories="([^"]+)"/)[1].split(' ')};
+ assert.equal(matchesService(service,'imposto de importacao','importacao'),true);
+ assert.equal(matchesService(service,'','beneficios'),true);
+ assert.equal(matchesService(service,'','bancario'),false);
+ assert.equal(cards.filter(c=>/data-categories="[^"]*\bimportacao\b/.test(c)).length,1);
+});
+
 test('catalog search combines accents, words, category and feature availability', () => {
   const service={text:'Isenção e restituição de IR imposto renda',categories:['beneficios']};
   assert.equal(matchesService(service,'  ISENCAO   renda ','all'),true);

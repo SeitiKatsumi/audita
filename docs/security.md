@@ -76,6 +76,13 @@ Checklist inicial:
 
 ## Autenticacao
 
+- Opcao "Manter conectado por 30 dias" no login, desmarcada por padrao. Somente
+  rememberMe booleano true estende cookie e sessao para 30 dias a partir do login;
+  demais valores e cadastro mantem 12 horas. Sem renovacao automatica nem extensao
+  retroativa de sessoes. Logout revoga a sessao atual e troca de senha revoga todas.
+  Usar somente em dispositivo pessoal; HttpOnly, SameSite e HTTPS preservados.
+  Nao modifica o tratamento de indisponibilidade durante deploy.
+
 - Meus Dados permite trocar a propria senha com confirmacao da senha atual,
   nova senha de 8 a 128 caracteres e repeticao no formulario. A API exige sessao,
   JSON de mesma origem e limita tentativas por usuario (5 a cada 15 minutos por processo).

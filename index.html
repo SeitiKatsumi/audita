@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260922-service-intros" />
+    <link rel="stylesheet" href="styles.css?v=20260922-remember-login" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260911-chat-spacing" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
   <link rel="stylesheet" href="/advogados.css?v=3" />
   <link rel="stylesheet" href="/energy-audit.css">
   <link rel="stylesheet" href="/import-audit.css?v=20260922-fit">
+  <link rel="stylesheet" href="/chat-subscription.css">
 </head>
   <body>
     <div class="app-boot" id="appBoot" role="status" aria-live="polite" aria-label="Carregando IA AUDITA">
@@ -47,6 +48,11 @@
         <label>
           Senha
           <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+        </label>
+
+        <label class="login-remember" id="loginRememberField">
+          <input id="loginRemember" name="rememberMe" type="checkbox" />
+          <span>Manter conectado por 30 dias</span>
         </label>
 
         <div class="login-actions">
@@ -168,7 +174,8 @@
                 <button class="chat-browser-mobile-open hidden" id="chatBrowserMobileOpen" type="button">
                   Navegador <span aria-hidden="true"></span>
                 </button>
-                <a class="chat-tools-button" href="/#central-servicos">Serviços</a>
+                <a class="chat-tools-button" href="/#central-servicos">Central de Serviços</a>
+                <button class="chat-tools-button" id="chatSubscriptionButton" type="button" aria-haspopup="dialog">Assinatura</button>
                 <button class="chat-icon-button chat-mobile-new" id="chatMobileNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
               </div>
             </header>
@@ -215,7 +222,7 @@
                 class="hidden"
                 id="chatAttachment"
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,application/pdf,image/png,image/jpeg,text/csv,text/plain"
+                accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
               />
               <textarea
                 id="chatInput"
@@ -225,7 +232,7 @@
                 aria-label="Mensagem para a IA AUDITA"
               ></textarea>
               <button class="chat-send-button" id="chatSendButton" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem">&#8593;</button>
-              <small>Arquivos anexados s&atilde;o processados para esta an&aacute;lise e n&atilde;o ficam armazenados pelo m&oacute;dulo.</small>
+              <small>PDF, PNG ou JPEG. At&eacute; 12 MB e 20 p&aacute;ginas. Documentos protegidos e vinculados &agrave; sua conta.</small>
             </form>
           </div>
 
@@ -299,6 +306,7 @@
             <button class="secondary-action" type="button" data-service-category="certidoes" aria-pressed="false">Certidões</button>
             <button class="secondary-action" type="button" data-service-category="energia" aria-pressed="false">Energia</button>
             <button class="secondary-action" type="button" data-service-category="imoveis" aria-pressed="false">Imóveis</button>
+            <button class="secondary-action" type="button" data-service-category="importacao" aria-pressed="false">Imposto de Importação</button>
             <button class="secondary-action" type="button" data-service-category="laudos" aria-pressed="false">Laudos</button>
           </div>
           <div class="services-heading"><h2>Explore os serviços</h2><p data-service-count role="status" aria-live="polite"></p></div>
@@ -426,12 +434,12 @@
               </div>
             </section>
             <section class="services-group" data-service-group aria-labelledby="services-importacao">
-              <h3 id="services-importacao">Importação</h3>
+              <h3 id="services-importacao">Imposto de Importação</h3>
               <div class="services-grid">
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios" data-keywords="importação invoice packing list NCM TIPI IPI imposto importacao ex tarifário">
+                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios importacao" data-keywords="imposto de importação invoice packing list NCM TIPI IPI II imposto importacao ex tarifário">
                   <a class="service-card-entry" href="#auditoria-importacao">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Importação · Tributos</small><strong>Auditoria de importação</strong><small>Confira documentos, pesquise NCMs e possíveis benefícios e prepare uma simulação de II/IPI com revisão humana.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Imposto de Importação · Tributos</small><strong>Auditoria do Imposto de Importação</strong><small>Confira documentos, pesquise NCMs e possíveis benefícios e prepare uma simulação de II/IPI com revisão humana.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
@@ -2142,7 +2150,7 @@
     <script type="module" src="/ir-exemption.js?v=20260922-service-intros"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20260922-import-audit"></script>
+    <script type="module" src="app.js?v=20260922-remember-login"></script>
     <script type="module" src="import-audit.js?v=20260922-fit"></script>
       <script type="module" src="/pis-pasep.js?v=20260922-service-intros"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

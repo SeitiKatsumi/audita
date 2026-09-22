@@ -1,4 +1,5 @@
 import { initServicesCatalog } from "./services-catalog.js";
+import { initChatSubscription } from "./chat-subscription.js";
 import { initAccountPlans } from "./plans.js?v=20260922-meus-dados";
 const canvas = document.querySelector("#signalCanvas");
 const ctx = canvas?.getContext("2d");
@@ -12,6 +13,7 @@ const loginNameField = document.querySelector("#loginNameField");
 const loginName = document.querySelector("#loginName");
 const loginEmail = document.querySelector("#loginEmail");
 const loginPassword = document.querySelector("#loginPassword");
+const loginRemember = document.querySelector("#loginRemember");
 const loginError = document.querySelector("#loginError");
 const loginSubmitButton = document.querySelector("#loginSubmitButton");
 const loginModeToggle = document.querySelector("#loginModeToggle");
@@ -1934,7 +1936,11 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-const chatStorageKey = "audita.chat.threads.v1";
+function chatStorageKey() {
+  const user = currentAuthState.user;
+  if (!user?.id) return null;
+  return `audita.chat.threads.v2:${encodeURIComponent(user.tenant?.id || currentAuthState.tenantId || "")}:${encodeURIComponent(user.id)}`;
+}
 let chatSending = false;
 let chatSendingThreadId = "";
 let chatPendingAttachment = null;
@@ -2120,12 +2126,13 @@ function createChatThread() {
 }
 
 function loadChatState() {
-  if (isGuest()) {
+  const key = chatStorageKey();
+  if (!key) {
     const initialThread = createChatThread();
     return { currentThreadId: initialThread.id, threads: [initialThread] };
   }
   try {
-    const stored = JSON.parse(localStorage.getItem(chatStorageKey) || "{}");
+    const stored = JSON.parse(localStorage.getItem(key) || "{}");
     const threads = Array.isArray(stored.threads)
       ? stored.threads
           .filter((thread) => thread?.id && Array.isArray(thread.messages))
@@ -2147,6 +2154,7 @@ function loadChatState() {
 }
 
 let chatState = loadChatState();
+let chatStateOwner = chatStorageKey();
 
 function initializeChatEntryContext() {
   const params = new URLSearchParams(window.location.search);
@@ -2169,7 +2177,8 @@ function initializeChatEntryContext() {
 }
 
 function saveChatState() {
-  if (isGuest()) return;
+  const key = chatStorageKey();
+  if (!key || key !== chatStateOwner) return;
   try {
     const threads = [...chatState.threads]
       .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
@@ -2178,7 +2187,7 @@ function saveChatState() {
       thread.messages = thread.messages.slice(-50);
     });
     chatState = { ...chatState, threads };
-    localStorage.setItem(chatStorageKey, JSON.stringify(chatState));
+    localStorage.setItem(key, JSON.stringify(chatState));
   } catch {
     // The conversation remains available for the current page even if storage is blocked.
   }
@@ -2187,6 +2196,35 @@ function saveChatState() {
 function getCurrentChatThread() {
   return chatState.threads.find((thread) => thread.id === chatState.currentThreadId) || chatState.threads[0];
 }
+
+// Registered before the subscription listener so only its owned checkout draft is restored.
+window.addEventListener("audita:auth-changed", () => {
+  const nextOwner = chatStorageKey();
+  if (nextOwner === chatStateOwner) return;
+  chatStateOwner = nextOwner;
+  chatState = loadChatState();
+  chatPendingAttachment = null;
+  if (chatAttachment) chatAttachment.value = "";
+  if (chatInput) chatInput.value = "";
+  chatSending = false;
+  chatSendingThreadId = "";
+  sendChatMessage.activeSend = null;
+  sendChatMessage.retries = new WeakMap();
+  if (chatSendButton) chatSendButton.disabled = false;
+  activeChatBrowserSession = null;
+  activeChatBrowserAgentStatus = null;
+  stopChatBrowserMonitor();
+  assistedRemoteSessions.clear();
+  stateCourtAgentSessions.clear();
+  jecCaseStates.clear();
+  pendingJecFocusCaseId = "";
+  setChatError();
+  resizeChatInput();
+  renderPendingChatAttachment();
+  initializeChatEntryContext();
+  renderChatWorkspace();
+  syncChatBrowserUi();
+});
 
 function formatChatText(value) {
   return escapeHtml(value)
@@ -4451,148 +4489,136 @@ async function submitCourtCertificateForm(form) {
 }
 
 async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment) {
-  const content =
-    String(rawMessage || "").trim() ||
-    (attachedFile
-      ? "Analise esta fatura do Itaú e me ajude a revisar possíveis cobranças de seguros ou serviços."
-      : "");
+  const content = String(rawMessage || "").trim();
   if ((!content && !attachedFile) || chatSending) return;
-
   const thread = getCurrentChatThread();
   if (!thread) return;
-  const now = new Date().toISOString();
-  thread.messages.push({
-    id: createChatId(),
-    role: "user",
-    content,
-    attachment: attachedFile
-      ? { name: attachedFile.name, type: attachedFile.type, size: attachedFile.size }
-      : null,
-    createdAt: now,
-  });
-  if (thread.title === "Nova conversa") {
-    thread.title = attachedFile
-      ? "Revisão de fatura Itaú"
-      : content.length > 46
-        ? `${content.slice(0, 43)}...`
-        : content;
-  }
-  thread.updatedAt = now;
+  const accountId = chatStorageKey();
+  const ownsThread = () => chatStorageKey() === accountId && chatState.threads.includes(thread);
+  const isCurrentThread = () => ownsThread() && getCurrentChatThread() === thread;
+  const initialDraft = chatInput?.value || "";
+  const browserSessionId = activeChatBrowserSession?.id || null;
+  let userMessage = null;
+  let completed = false;
+  // Keep ambiguous network retries idempotent without persisting an extra draft.
+  sendChatMessage.retries ??= new WeakMap();
+  const activeSend = Symbol();
+  sendChatMessage.activeSend = activeSend;
   chatSending = true;
   chatSendingThreadId = thread.id;
   if (chatSendButton) chatSendButton.disabled = true;
   setChatError();
-  saveChatState();
-  renderChatWorkspace();
-
-  let analyzedCase = null;
   try {
+    if (!await chatSubscription.ensureAccess(attachedFile ? "pages" : "messages") || !ownsThread()) return;
+    userMessage = { id: createChatId(), role: "user", content: attachedFile ? `Documento: ${attachedFile.name}` : content,
+      createdAt: new Date().toISOString() };
+    thread.messages.push(userMessage);
+    renderChatWorkspace();
     if (attachedFile) {
-      analyzedCase = await uploadItauDocument(attachedFile);
-      chatPendingAttachment = null;
-      if (chatAttachment) chatAttachment.value = "";
-      renderPendingChatAttachment();
+      const document = await chatSubscription.analyzeDocument(attachedFile);
+      if (!document || !ownsThread()) return;
+      thread.documentId = document.id;
+      thread.messages.push({ id: createChatId(), role: "assistant", content: document.summary, createdAt: new Date().toISOString() });
+      completed = true;
+      if (thread.title === "Nova conversa") thread.title = attachedFile.name.slice(0, 46);
+      if (chatPendingAttachment === attachedFile) {
+        chatPendingAttachment = null;
+        if (chatAttachment) chatAttachment.value = "";
+        renderPendingChatAttachment();
+      }
+      return;
     }
-    const activeCase = analyzedCase || getLatestItauCase(thread);
+    const activeCase = getLatestItauCase(thread);
+    const messages = [];
+    let messageCharacters = 0;
+    for (const message of thread.messages.slice(-24).reverse()) {
+      const text = String(message.content).slice(0, 5000);
+      if (messageCharacters + text.length > 32000) break;
+      messages.unshift({ role: message.role, content: text });
+      messageCharacters += text.length;
+    }
+    const payload = {
+      messages,
+      caseContext: activeCase ? { type: "itau_refund", case: activeCase } : null,
+      browserSessionId,
+      documentId: thread.documentId || null,
+    };
+    const fingerprint = JSON.stringify(payload);
+    const retry = sendChatMessage.retries.get(thread);
+    if (retry?.accountId === accountId && retry.fingerprint === fingerprint) userMessage.id = retry.requestId;
+    sendChatMessage.retries.set(thread, { accountId, fingerprint, requestId: userMessage.id });
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({
-        requestId: thread.messages.at(-1)?.id || createChatId(),
-        messages: thread.messages.map(({ role, content: messageContent }) => ({ role, content: messageContent })),
-        caseContext: activeCase ? { type: "itau_refund", case: activeCase } : null,
-        browserSessionId: activeChatBrowserSession?.id || null,
-      }),
+      body: JSON.stringify({ ...payload, requestId: userMessage.id }),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await response.json();
+    if (!ownsThread()) return;
+    // Ambiguous server failures/conflicts retain the ID until their outcome is known.
+    if (data.quotaReleased === true || (!response.ok && response.status < 500 && data.error !== "chat_request_conflict")) sendChatMessage.retries.delete(thread);
     if (response.status === 401) {
       showLogin("Entre para conversar com a IA AUDITA.");
       return;
     }
     if (!response.ok) {
+      if (!chatSubscription.handleAccessError(response.status) && response.status === 403) chatSubscription.open();
       const errorMessages = {
         openai_not_configured: "A conexao com a IA ainda nao esta configurada neste ambiente.",
         chat_timeout: "A analise demorou mais que o esperado. Tente novamente em instantes.",
       };
-      if (analyzedCase) {
-        thread.messages.push({
-          id: createChatId(),
-          role: "assistant",
-          content: localItauAnalysisMessage(analyzedCase),
-          itauCase: analyzedCase,
-          sources: analyzedCase.sources || [],
-          createdAt: new Date().toISOString(),
-        });
-        thread.updatedAt = new Date().toISOString();
-        setChatError("A leitura da fatura foi concluída, mas a resposta conversacional ficou indisponível.");
-      } else {
-        setChatError(errorMessages[data.error] || "Nao foi possivel concluir esta resposta agora.");
-      }
+      if (isCurrentThread()) setChatError(errorMessages[data.error] || "Nao foi possivel concluir esta resposta agora.");
       return;
     }
-
+    if (typeof data.answer !== "string" || !data.answer.trim()) throw new Error("empty_chat_answer");
     if (data.itauCase?.id) {
       const synchronized = findItauCaseMessage(data.itauCase.id);
-      if (synchronized) {
-        synchronized.message.itauCase = data.itauCase;
-      }
+      if (synchronized) synchronized.message.itauCase = data.itauCase;
     }
-
     const responseActions = Array.isArray(data.actions) ? data.actions : [];
     responseActions
       .filter((action) => action?.kind === "jec_intake")
-      .forEach((action) => activateJecIntake(action));
-
+      .forEach((action) => activateJecIntake(action, { focus: isCurrentThread() }));
     thread.messages.push({
       id: createChatId(),
       role: "assistant",
-      content: data.answer || "Nao consegui concluir a resposta.",
+      content: data.answer,
       actions: responseActions,
       sources: Array.isArray(data.sources) ? data.sources : [],
-      itauCase: analyzedCase,
       createdAt: new Date().toISOString(),
     });
-    thread.updatedAt = new Date().toISOString();
-  } catch (error) {
-    if (analyzedCase && !thread.messages.some((message) => message.itauCase?.id === analyzedCase.id)) {
-      thread.messages.push({
-        id: createChatId(),
-        role: "assistant",
-        content: localItauAnalysisMessage(analyzedCase),
-        itauCase: analyzedCase,
-        sources: analyzedCase.sources || [],
-        createdAt: new Date().toISOString(),
-      });
-      thread.updatedAt = new Date().toISOString();
+    completed = true;
+    sendChatMessage.retries.delete(thread);
+    if (thread.title === "Nova conversa") thread.title = content.length > 46 ? `${content.slice(0, 43)}...` : content;
+    if (isCurrentThread() && chatInput?.value === initialDraft && initialDraft.trim() === content) {
+      chatInput.value = "";
+      resizeChatInput();
     }
+  } catch (error) {
+    if (!ownsThread()) return;
     if (error?.status === 401) {
-      showLogin("Entre para anexar e analisar sua fatura.");
-    } else {
-      const messages = {
-        document_too_large: "O arquivo excede o limite de 12 MB.",
-        unsupported_document_type: "Use PDF, PNG, JPG, CSV ou TXT.",
-        empty_document: "O arquivo está vazio.",
-      };
-      setChatError(
-        messages[error?.code] ||
-          "Falha ao processar a fatura. Verifique o arquivo e tente novamente.",
-      );
+      showLogin("Entre para continuar no chat.");
+    } else if (!chatSubscription.handleAccessError(error?.status) && isCurrentThread()) {
+      setChatError(attachedFile ? "Nao foi possivel analisar o documento. Confira seu saldo e tente novamente."
+        : "Falha de comunicacao. Sua mensagem foi mantida; tente enviar novamente.");
     }
   } finally {
-    chatSending = false;
-    chatSendingThreadId = "";
-    if (chatSendButton) chatSendButton.disabled = false;
-    saveChatState();
-    renderChatWorkspace();
-    chatInput?.focus();
+    if (!completed && userMessage) thread.messages = thread.messages.filter(message => message !== userMessage);
+    if (completed) thread.updatedAt = new Date().toISOString();
+    if (sendChatMessage.activeSend === activeSend) {
+      chatSending = false;
+      chatSendingThreadId = "";
+      if (chatSendButton) chatSendButton.disabled = false;
+      if (ownsThread()) saveChatState();
+      renderChatWorkspace();
+      void chatSubscription.refresh();
+      if (isCurrentThread() && !document.querySelector("dialog[open]")) chatInput?.focus();
+    }
   }
 }
 
 chatForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   const content = chatInput?.value || "";
-  if (chatInput) chatInput.value = "";
-  resizeChatInput();
   sendChatMessage(content);
 });
 
@@ -4607,12 +4633,10 @@ chatAttachment?.addEventListener("change", () => {
     "application/pdf",
     "image/png",
     "image/jpeg",
-    "text/csv",
-    "text/plain",
   ]);
   if (!allowedTypes.has(inferChatAttachmentType(file))) {
     chatAttachment.value = "";
-    setChatError("Use uma fatura em PDF, PNG, JPG, CSV ou TXT.");
+    setChatError("Use um documento em PDF, PNG ou JPEG.");
     return;
   }
   if (file.size > 12 * 1024 * 1024) {
@@ -7052,6 +7076,7 @@ function setLoginMode(mode) {
   loginMode = mode === "register" ? "register" : "login";
   const isRegister = loginMode === "register";
   loginNameField?.classList.toggle("hidden", !isRegister);
+  document.querySelector("#loginRememberField")?.classList.toggle("hidden", isRegister);
   if (loginName) {
     loginName.required = isRegister;
   }
@@ -7109,7 +7134,7 @@ function guardGuestInteraction(event) {
   if (["home", "central-servicos"].includes(page)) return;
   const target = event.target.closest("button, input, select, textarea, a, summary, form");
   if (!target || target.closest(".service-return, .sidebar, .mobile-bottom-nav, .chat-header, .chat-home-link, .chat-back-home")) return;
-  if (page === "chat" && target === chatInput && event.type !== "submit") return;
+  if (page === "chat") return;
   if (!target.closest('[data-page]:not(.page-hidden)')) return;
   if (target.closest("dialog") || target.id === "chargeAnalysisHelpButton") return;
   event.preventDefault();
@@ -7761,6 +7786,7 @@ loginForm.addEventListener("submit", async (event) => {
     const payload = {
       email: loginEmail.value,
       password: loginPassword.value,
+      rememberMe: loginMode === "login" && loginRemember.checked,
     };
     if (loginMode === "register") {
       payload.name = loginName.value;
@@ -7800,6 +7826,7 @@ loginForm.addEventListener("submit", async (event) => {
     await loadCurrentUserProfile();
     loginName.value = "";
     loginPassword.value = "";
+    loginRemember.checked = false;
     hideLogin();
     logoutButton.classList.remove("hidden");
     const resumeGuestAction = pendingGuestAction;
@@ -9389,4 +9416,12 @@ if (authState.authRequired && !authState.user) {
   }
 }
 
+const chatSubscription = initChatSubscription({
+  getAuthState: () => currentAuthState,
+  requestLogin: (message, resume) => {
+    pendingGuestAction = resume;
+    showLogin(message);
+  },
+});
+document.querySelector("#chatSubscriptionButton")?.addEventListener("click", () => chatSubscription.open());
 initServicesCatalog();

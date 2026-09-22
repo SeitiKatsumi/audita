@@ -32,6 +32,13 @@ function money(cents) {
   };
 }
 
+export const CHAT_PLANS = Object.freeze([
+  { id: "chat-experiment", name: "Experimente", kind: "chat_experiment", price: { currency: "BRL", cents: 990 }, messages: 20, pages: 5, days: 30, priceEnv: "STRIPE_PRICE_CHAT_EXPERIMENT" },
+  { id: "chat-essential", name: "Essencial", kind: "chat_subscription", price: { currency: "BRL", cents: 4990 }, messages: 100, pages: 20, priceEnv: "STRIPE_PRICE_CHAT_ESSENTIAL" },
+  { id: "chat-professional", name: "Profissional", kind: "chat_subscription", price: { currency: "BRL", cents: 9990 }, messages: 300, pages: 80, recommended: true, priceEnv: "STRIPE_PRICE_CHAT_PROFESSIONAL" },
+  { id: "chat-premium", name: "Premium", kind: "chat_subscription", price: { currency: "BRL", cents: 19990 }, messages: 700, pages: 200, priceEnv: "STRIPE_PRICE_CHAT_PREMIUM" },
+]);
+
 export const BILLING_PLANS = Object.freeze([
   {
     id: "standard",
@@ -279,6 +286,10 @@ export function getPublicBillingCatalog(env = process.env) {
       legalRepresentationIncluded: false,
     },
     plans: BILLING_PLANS.map((plan) => publicPlan(plan, env, configuration)),
+    chatPlans: CHAT_PLANS.map(({ priceEnv, ...plan }) => ({
+      ...plan,
+      checkoutAvailable: Boolean(configuration.checkoutReady && !configuration.demoMode && isStripePriceId(envValue(env, priceEnv))),
+    })),
     creditPacks: CREDIT_PACKS.map((pack) => publicPack(pack, env, configuration)),
     itauChargeService: {
       kind: "itau_charge_service",
@@ -294,6 +305,14 @@ export function getPublicBillingCatalog(env = process.env) {
 
 export function resolveBillingSelection(input = {}, env = process.env) {
   const kind = String(input.kind || "subscription").trim();
+  if (kind === "chat_subscription" || kind === "chat_experiment") {
+    const plan = CHAT_PLANS.find((candidate) => candidate.id === input.planId && candidate.kind === kind);
+    const interval = kind === "chat_experiment" ? "once" : "monthly";
+    if (!plan || (input.interval && input.interval !== interval)) return { invalid: true, reason: "invalid_chat_plan" };
+    const priceId = envValue(env, plan.priceEnv);
+    if (!isStripePriceId(priceId)) return { unavailable: true, reason: "stripe_price_not_configured" };
+    return { kind, id: plan.id, interval, priceId, amount: plan.price, messages: plan.messages, pages: plan.pages, days: plan.days, credits: 0, monthlyCredits: 0, memberLimit: 1 };
+  }
   if (kind === "subscription") {
     const planId = String(input.planId || "").trim();
     const interval = String(input.interval || "monthly").trim();
@@ -380,6 +399,12 @@ export function resolveBillingSelection(input = {}, env = process.env) {
 export function resolveBillingProductFromPrice(priceId, env = process.env) {
   const normalizedPriceId = String(priceId || "").trim();
   if (!normalizedPriceId) return null;
+
+  for (const plan of CHAT_PLANS) {
+    if (envValue(env, plan.priceEnv) === normalizedPriceId) {
+      return resolveBillingSelection({ kind: plan.kind, planId: plan.id }, env);
+    }
+  }
 
   for (const plan of BILLING_PLANS) {
     if (plan.kind !== "subscription") continue;

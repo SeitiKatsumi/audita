@@ -16,6 +16,7 @@ COPY plans.html plans.css plans.js ./
 COPY ir-exemption.css ir-exemption.js audita-chat-motion.js pis-pasep.js pis-pasep-panel.js ./
 COPY bank-debt.css bank-debt.js ./
 COPY import-audit.js import-audit.css ./
+COPY chat-subscription.js chat-subscription.css ./
 COPY super-admin.html super-admin.css super-admin.js ./
 COPY assets ./assets
 COPY data ./data

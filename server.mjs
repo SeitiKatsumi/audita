@@ -34,6 +34,9 @@ import {
   normalizeWebSocketCloseCode,
 } from "./services/chat-browser.service.mjs";
 import { createCreditsService } from "./services/credits.service.mjs";
+import { createChatAccessService } from "./services/chat-access.service.mjs";
+import { createChatDocumentsService } from "./services/chat-documents.service.mjs";
+import { createChatRequestService } from "./services/chat-request.service.mjs";
 import {
   createStripeBillingService,
   StripeBillingError,
@@ -554,6 +557,9 @@ async function initializeDatabase() {
       await pool.query(await readFile(join(root, "db", "bank-debt.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "energy-audit.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "import-audit.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-access.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-documents.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-customers.sql"), "utf8"));
     }
 
     await pool.query({ text: "SELECT 1", query_timeout: 5000 });
@@ -1261,10 +1267,10 @@ function cookieOptions(request, maxAgeSeconds) {
     .join("; ");
 }
 
-function setSessionCookie(request, response, token) {
+function setSessionCookie(request, response, token, maxAgeSeconds) {
   response.setHeader(
     "Set-Cookie",
-    `${sessionCookieName}=${encodeURIComponent(token)}; ${cookieOptions(request, 60 * 60 * 12)}`,
+    `${sessionCookieName}=${encodeURIComponent(token)}; ${cookieOptions(request, maxAgeSeconds)}`,
   );
 }
 
@@ -1626,7 +1632,8 @@ async function buildJecPetitionCalculation(caseData = {}) {
     : null;
 }
 
-async function createSession(response, request, userId) {
+async function createSession(response, request, userId, rememberMe = false) {
+  const maxAgeSeconds = rememberMe === true ? 30 * 24 * 60 * 60 : 12 * 60 * 60;
   const token = crypto.randomBytes(32).toString("base64url");
   const tokenHash = hashToken(token);
 
@@ -1634,19 +1641,19 @@ async function createSession(response, request, userId) {
     await loadFallbackAuth();
     fallbackSessions.set(tokenHash, {
       userId,
-      expiresAt: Date.now() + 12 * 60 * 60 * 1000,
+      expiresAt: Date.now() + maxAgeSeconds * 1000,
     });
     await saveFallbackAuth();
-    setSessionCookie(request, response, token);
+    setSessionCookie(request, response, token, maxAgeSeconds);
     return;
   }
 
   await pool.query(
-    "INSERT INTO audita_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + INTERVAL '12 hours')",
-    [userId, tokenHash],
+    "INSERT INTO audita_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, NOW() + $3::integer * INTERVAL '1 second')",
+    [userId, tokenHash, maxAgeSeconds],
   );
 
-  setSessionCookie(request, response, token);
+  setSessionCookie(request, response, token, maxAgeSeconds);
 }
 
 async function changeUserPassword(user, currentPassword, newPassword) {
@@ -1725,12 +1732,30 @@ const billingAccessService = createBillingAccessService({
   isDemoModeEnabled: () =>
     String(process.env.AUDITA_BILLING_DEMO_MODE || "").trim().toLowerCase() === "true",
 });
+const chatAccessService = createChatAccessService({
+  getDb: () => ({ pool, dbReady }),
+  getLegacyAccess: async (auth, connection) => {
+    const result = await connection.query(`SELECT 1 FROM audita_subscriptions
+      WHERE tenant_id=$1 AND provider='stripe' AND plan_id='standard'
+      AND status='active' AND current_period_end > NOW() LIMIT 1`, [auth.tenantId]);
+    return result.rows.length > 0;
+  },
+});
 const stripeBillingService = createStripeBillingService({
   getDb: () => ({ pool, dbReady }),
   creditsService,
   accessService: billingAccessService,
+  chatAccessService,
   onIrPaymentEvent: (event) => irExemptionService.paymentEvent(event),
   onDebtPaymentEvent: (event) => bankDebtService.paymentEvent(event),
+});
+const chatDocumentsService = createChatDocumentsService({
+  getDb: () => ({ pool, dbReady }), accessService: chatAccessService,
+  recordUsage: (usage, auth) => apiUsageService.record(auth, { provider: "openai", service: "responses", model: process.env.AUDITA_CHAT_MODEL || "gpt-5-mini", operation: "chat_document", ...usage }),
+});
+const chatRequestService = createChatRequestService({
+  accessService: chatAccessService,
+  getDocumentContext: async (auth, id) => (await chatDocumentsService.getContext(auth, id)).text,
 });
 const bankDebtService = createBankDebtService({
   paymentRequired: false,
@@ -3105,13 +3130,11 @@ async function runAuditaAgent(request) {
   };
 }
 
-async function runChatConversation(request) {
-  const authContext = await getTenantIdForRequest(request);
+async function runChatConversation(request, body, authContext) {
   if (authContext.unauthorized) {
     return { unauthorized: true };
   }
 
-  const body = await readJsonBody(request);
   const settings = await getAgentSettings(request);
   let effectiveCaseContext = body.caseContext;
   let synchronizedCase = null;
@@ -3272,6 +3295,7 @@ async function runChatConversation(request) {
       settings,
       userName: authContext.user?.name || "",
       caseContext: effectiveCaseContext,
+      documentContext: body.documentContext,
       browserContext,
       getItauCase: () => synchronizedCase || effectiveCaseContext?.case || null,
       onItauCaseUpdate: applyItauCaseUpdate,
@@ -3341,6 +3365,43 @@ async function runChatConversation(request) {
 const lawyerQueue = createLawyerQueueService({ getDb: () => ({ pool, dbReady }) });
 
 async function handleApi(request, response, pathname) {
+  if (pathname === "/api/chat/access" || pathname.startsWith("/api/chat/documents/")) {
+    try {
+      const auth = await getTenantIdForRequest(request);
+      if (auth.unauthorized || !auth.user?.id) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      if (pathname === "/api/chat/access" && request.method === "GET") {
+        const access = await chatAccessService.getAccess(auth);
+        sendJson(response, 200, { access: { ...access, active: access.allowed, legacy: access.source === "legacy" } });
+        return true;
+      }
+      if (pathname === "/api/chat/documents/prepare" && request.method === "POST") {
+        const raw = await readBufferBody(request, 17 * 1024 * 1024);
+        const body = JSON.parse(raw.toString("utf8"));
+        if (typeof body.contentBase64 !== "string" || body.contentBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.contentBase64)) {
+          sendJson(response, 400, { error: "invalid_file" });
+          return true;
+        }
+        const document = await chatDocumentsService.prepare(auth, {
+          buffer: Buffer.from(body.contentBase64, "base64"), fileName: body.fileName, mimeType: body.mimeType,
+        });
+        sendJson(response, 200, { document });
+        return true;
+      }
+      const match = pathname.match(/^\/api\/chat\/documents\/([0-9a-f-]{36})\/analyze$/i);
+      if (match && request.method === "POST") {
+        const document = await chatDocumentsService.analyze(auth, match[1], await readJsonBody(request));
+        sendJson(response, 200, { document });
+        return true;
+      }
+      sendJson(response, 404, { error: "not_found" });
+    } catch (error) {
+      sendJson(response, error.statusCode || error.status || 500, { error: error.code || "chat_document_failed" });
+    }
+    return true;
+  }
   if (pathname.startsWith("/api/advogados/")) {
     try {
       const user = await getSessionUser(request);
@@ -3750,7 +3811,7 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
       }
-      const result = await stripeBillingService.createPortalSession(authContext);
+      const result = await stripeBillingService.createPortalSession(authContext, await readJsonBody(request));
       if (result.forbidden) {
         sendJson(response, 403, { error: "billing_manager_required" });
         return true;
@@ -5421,7 +5482,7 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 401, { error: "invalid_credentials" });
           return true;
         }
-        await createSession(response, request, user.id);
+        await createSession(response, request, user.id, body.rememberMe === true);
         sendJson(response, 200, { ok: true, localOnly: true });
         return true;
       }
@@ -5440,7 +5501,7 @@ async function handleApi(request, response, pathname) {
         return true;
       }
 
-      await createSession(response, request, user.id);
+      await createSession(response, request, user.id, body.rememberMe === true);
       sendJson(response, 200, { ok: true });
     } catch (error) {
       sendJson(response, 400, {
@@ -5831,7 +5892,9 @@ async function handleApi(request, response, pathname) {
 
   if (pathname === "/api/chat" && request.method === "POST") {
     try {
-      const result = await runChatConversation(request);
+      const auth = await getTenantIdForRequest(request);
+      const result = await chatRequestService.execute(auth, await readJsonBody(request),
+        (body) => runChatConversation(request, body, auth));
       if (result.unauthorized) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
@@ -5843,6 +5906,7 @@ async function handleApi(request, response, pathname) {
       if (result.unavailable) {
         sendJson(response, 503, {
           error: result.reason || "chat_unavailable",
+          quotaReleased: result.quotaReleased === true,
           secretRef: result.secretRef || "AUDITA_OPENAI_API_KEY",
         });
         return true;
@@ -5850,8 +5914,9 @@ async function handleApi(request, response, pathname) {
       sendJson(response, 200, result);
     } catch (error) {
       const timedOut = error?.name === "AbortError" || /aborted|timeout/i.test(String(error?.message || ""));
-      sendJson(response, timedOut ? 504 : 500, {
-        error: timedOut ? "chat_timeout" : "chat_failed",
+      sendJson(response, error.statusCode || error.status || (timedOut ? 504 : 500), {
+        error: error.code || (timedOut ? "chat_timeout" : "chat_failed"),
+        quotaReleased: error.quotaReleased === true,
         message: timedOut
           ? "A IA AUDITA demorou mais que o esperado para responder."
           : "Nao foi possivel concluir esta conversa.",
@@ -6126,7 +6191,7 @@ const server = http.createServer(async (request, response) => {
   // Keep private storage, configuration and server implementation outside the static surface.
   const publicRootFiles = new Set(["import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
     "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
-    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css"]);
+    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");
   if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;

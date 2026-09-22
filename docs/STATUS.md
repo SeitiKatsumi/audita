@@ -1,3 +1,20 @@
+# 2026-09-22 - Assinaturas do chat (local, sem venda)
+- Quatro planos pagos separados do Standard; modal no chat, bloqueio por recurso, checkout/webhooks e reservas persistentes por usuario. Documentos PDF/PNG/JPEG com confirmacao, criptografia e resumo sem consumir mensagem. Migracoes aditivas preparadas, nao aplicadas ao banco compartilhado.
+- Testes usam PGlite e Stripe/IA simuladas. Chave de IA existente reutilizada com autorizacao, sem chamadas pagas. Catalogo local sem prices configurados permanece indisponivel para compra. Sem commit, push, cobranca ou deploy.
+- Simulador de custos em scripts/estimate-chat-plan-costs.mjs: cenario ilustrativo dentro de 25%, estresse excede. Nao equivale a medicao real; venda depende de homologacao e validacao de margem. Operacao e recuperacao documentadas em docs/chat-subscriptions.md.
+- Validacao final: 446 testes passaram, sem ignorados (PGlite isolado); checks de assinatura e visitante passaram em desktop/celular. Capturas do modal conferidas e sem overflow horizontal. Localhost:3000 reiniciado, saude/chat/assets HTTP 200; APIs privadas bloqueiam visitante. Historico local isolado por tenant/usuario e clientes Stripe individuais separados do legado.
+
+# 2026-09-22 - Categoria Imposto de Importacao
+- Continuidade: titulo do card alterado para Auditoria do Imposto de Importacao conforme solicitado. Sete testes do catalogo passaram e texto servido na porta 3000 conferido. Apenas local.
+- Codex; codex/import-category, base main, integrado na main local/3000. Grupo e rotulo alterados para Imposto de Importacao; filtro superior adicionado usando o mecanismo existente, com palavras-chave e destino preservado. Sete testes do catalogo passaram; navegador em 1440/390 validou filtro, grupo, unico card, retorno a Todos e ausencia de overflow horizontal; captura mobile conferida. Alteracoes anteriores preservadas. Sem commit, push ou deploy.
+
+# 2026-09-22 - Manter conectado
+- Codex; codex/remember-login, base main, integrado na main local/3000. Opcao Manter conectado por 30 dias no login, desmarcada por padrao; demais logins e cadastro mantem 12 horas. Cookie, PostgreSQL e armazenamento local usam o mesmo prazo; logout e troca de senha preservados. Sem renovacao automatica ou mudanca na recuperacao durante deploy.
+- Validacao: 403 testes passaram, zero ignorados, incluindo PostgreSQL isolado, validade, novo contexto de servidor, expiracao, logout, senha e booleano estrito. Check-guest-ui passou em 1440/390 com teclado, payload, erro/reenvio e cadastro; captura mobile conferida. Servidor 3000 reiniciado e saude HTTP 200; banco local continua sem configuracao. Alteracao anterior Central de Servicos preservada. Sem commit, push, deploy, migracao ou mudanca de secrets.
+
+# 2026-09-22 - Rotulo do atalho no chat
+- Codex; codex/chat-services-label, base main, integrado na main local. index.html: Servicos alterado para Central de Servicos somente no topo do chat; destino e estilos preservados. Dois testes de entrada passaram; novo rotulo e destino conferidos no HTML servido por localhost:3000/chat, diff sem erros. Sem commit, push ou deploy.
+
 # 2026-09-22 - Publicacao consolidada autorizada
 - Usuario solicitou commit e push da versao consolidada: auditoria de importacao, chat por etapas e altura compacta, apresentacoes dos servicos e navegacao/login sob demanda. Main conferida com origin/main, sem divergencia antes do commit; preservar todos os arquivos privados fora do Git.
 - Validacao imediatamente anterior: 401 testes Node aprovados, zero ignorados, PostgreSQL isolado e IA simulada; diff sem erros. Verificacoes de interface/viewport documentadas abaixo. Sem deploy ou migracao em banco compartilhado. Configuracao privada e migracao autorizada continuam necessarias para processamento real da importacao.

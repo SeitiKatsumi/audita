@@ -286,6 +286,23 @@ a {
   caret-color: var(--aqua);
 }
 
+.login-panel .login-remember {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.login-panel .login-remember input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex-shrink: 0;
+  accent-color: var(--aqua);
+}
+
 .login-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(132px, 0.64fr);
