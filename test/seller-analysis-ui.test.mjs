@@ -12,8 +12,9 @@ test("seller analysis is available in the property category of the service catal
 
 test("seller analysis route opens its introductory screen", () => {
   assert.match(indexHtml, /id="analise-vendedor" data-page="analise-vendedor"/);
-  assert.match(indexHtml, /certid&otilde;es dispon&iacute;veis para pessoa f&iacute;sica no TJDFT/);
-  assert.match(indexHtml, /organizamos os PDFs oficiais/);
+  assert.match(indexHtml, /certidões judiciais disponíveis no TJDFT para vendedor pessoa física/);
+  assert.match(indexHtml, /organiza os PDFs oficiais/);
+  assert.match(indexHtml, /não é uma investigação completa do vendedor nem uma análise de risco por IA/);
   assert.match(indexHtml, /Dispon&iacute;vel no DF/);
   assert.match(appJs, /"analise-vendedor":\s*\{/);
 });

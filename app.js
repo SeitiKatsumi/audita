@@ -258,7 +258,12 @@ const propertyHistoryList = document.querySelector("#propertyHistoryList");
 const propertyHistoryCount = document.querySelector("#propertyHistoryCount");
 let selectedAuditViews = [];
 let apiUsageDashboardData = null;
-let currentAuthState = { authRequired: false, user: null };
+let currentAuthState = { authRequired: true, user: null };
+let pendingGuestAction = null;
+const publicPages = new Set(["home", "chat", "central-servicos", "analise-vendedor",
+  "consulta-imoveis", "isencao-ir", "pis-pasep", "analise-cobrancas", "dividas-bancarias",
+  "auditoria-importacao", "contas-de-luz", "consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]);
+const isGuest = () => currentAuthState.authRequired && !currentAuthState.user;
 let currentDocumentAiContext = null;
 let currentPropertySearch = null;
 const assistedRemoteSessions = new Map();
@@ -888,6 +893,7 @@ const auditSourceLabels = {
 const pageMeta = {
   advogados: {title: "Área dos Advogados", eyebrow: "Atendimentos da equipe"},
   "contas-de-luz": { title: "Auditoria de contas de luz", eyebrow: "Energia" },
+  "auditoria-importacao": { title: "Auditoria de importação", eyebrow: "NCM · II · IPI" },
   "central-servicos": {title: "Central de Serviços", eyebrow: "Consultas e análises"},
   "pis-pasep": {title:"Cotas antigas PIS/PASEP",eyebrow:"Consulta assistida"},
   "isencao-ir": { title: "Isenção e restituição de IR", eyebrow: "Triagem guiada" },
@@ -985,11 +991,15 @@ function getActivePage() {
 
 function setActivePage(page) {
   const activePage = pageMeta[page] ? page : "home";
+  if (isGuest() && !publicPages.has(activePage)) {
+    pendingGuestAction = () => { window.location.hash = activePage; setActivePage(activePage); };
+    window.history.replaceState(null, "", "/#home");
+    setActivePage("home");
+    showLogin("Entre para acessar esta área.");
+    return;
+  }
   const enteringChat = activePage === "chat" && document.body.dataset.activePage !== "chat";
   document.body.dataset.activePage = activePage;
-  if(currentAuthState.authRequired&&!currentAuthState.user){
-    if(["pis-pasep","contas-de-luz"].includes(activePage))hideLogin();else showLogin();
-  }
   const activeMeta = pageMeta[activePage];
 
   pageTitle.textContent = activeMeta.title;
@@ -2110,6 +2120,10 @@ function createChatThread() {
 }
 
 function loadChatState() {
+  if (isGuest()) {
+    const initialThread = createChatThread();
+    return { currentThreadId: initialThread.id, threads: [initialThread] };
+  }
   try {
     const stored = JSON.parse(localStorage.getItem(chatStorageKey) || "{}");
     const threads = Array.isArray(stored.threads)
@@ -2155,6 +2169,7 @@ function initializeChatEntryContext() {
 }
 
 function saveChatState() {
+  if (isGuest()) return;
   try {
     const threads = [...chatState.threads]
       .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
@@ -7060,6 +7075,7 @@ function setLoginMode(mode) {
 function showLogin(message = "", mode = loginMode) {
   setLoginMode(mode);
   loginScreen.classList.remove("hidden");
+  if (!loginScreen.open) loginScreen.showModal();
   loginError.textContent = message;
   loginButton?.classList.add("hidden");
   logoutButton.classList.add("hidden");
@@ -7067,10 +7083,70 @@ function showLogin(message = "", mode = loginMode) {
 }
 
 function hideLogin() {
+  loginScreen.close();
   loginScreen.classList.add("hidden");
   loginError.textContent = "";
-  loginButton?.classList.add("hidden");
+  loginButton?.classList.toggle("hidden", !isGuest());
 }
+
+document.querySelector("#loginClose").addEventListener("click", () => {
+  pendingGuestAction = null;
+  loginPassword.value = "";
+  hideLogin();
+});
+loginScreen.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  document.querySelector("#loginClose").click();
+});
+document.querySelector(".login-logo-frame")?.addEventListener("click", () => {
+  document.querySelector("#loginClose").click();
+});
+
+// Gate before module handlers run; backend authorization remains mandatory.
+function guardGuestInteraction(event) {
+  if (!isGuest() || loginScreen.open || loginScreen.contains(event.target)) return;
+  const page = getActivePage();
+  if (["home", "central-servicos"].includes(page)) return;
+  const target = event.target.closest("button, input, select, textarea, a, summary, form");
+  if (!target || target.closest(".service-return, .sidebar, .mobile-bottom-nav, .chat-header, .chat-home-link, .chat-back-home")) return;
+  if (page === "chat" && target === chatInput && event.type !== "submit") return;
+  if (!target.closest('[data-page]:not(.page-hidden)')) return;
+  if (target.closest("dialog") || target.id === "chargeAnalysisHelpButton") return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const pageAtClick = page;
+  const selector = target.id ? "#" + CSS.escape(target.id) : target.tagName.toLowerCase();
+  const attributes = [...target.attributes].filter(a => a.name.startsWith("data-") || a.name === "name");
+  const label = target.textContent;
+  pendingGuestAction = async () => {
+    // Modules can rebuild their landing screen after authentication.
+    for (let attempt = 0; attempt < 80 && getActivePage() === pageAtClick; attempt++) {
+      const candidates = document.querySelectorAll(selector);
+      const element = [...candidates].find(el => el.closest('[data-page]:not(.page-hidden)') &&
+        attributes.every(a => el.getAttribute(a.name) === a.value) &&
+        (target.id || el.textContent === label) && !el.disabled &&
+        !el.closest('[aria-busy="true"]'));
+      if (element) {
+        if (event.type === "submit") element.requestSubmit();
+        else if (element.matches('input:not([type="file"]), textarea, select')) element.focus();
+        else if (element.matches('input[type="file"]') || element.id === "chatAttachmentButton") {
+          element.focus(); // File pickers require a fresh user gesture after async login.
+        } else element.click();
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  };
+  if (target.dataset.energy === "login" || target.dataset.action === "login") pendingGuestAction = null;
+  showLogin("Entre ou crie uma conta para continuar.");
+}
+document.addEventListener("click", guardGuestInteraction, true);
+document.addEventListener("submit", guardGuestInteraction, true);
+document.addEventListener("beforeinput", guardGuestInteraction, true);
+document.addEventListener("keydown", (event) => {
+  if (event.target.matches('input, select, textarea') && event.target !== chatInput &&
+      ["Enter", " ", "ArrowUp", "ArrowDown"].includes(event.key)) guardGuestInteraction(event);
+}, true);
 
 function renderAgentSettings(settings) {
   if (!settings) {
@@ -7106,11 +7182,11 @@ async function loadAuthState() {
   try {
     const response = await fetch("/api/auth/me", { headers: { accept: "application/json" } });
     if (!response.ok) {
-      return { authRequired: false, user: null };
+      return { authRequired: true, user: null };
     }
     return response.json();
   } catch {
-    return { authRequired: false, user: null };
+    return { authRequired: true, user: null };
   }
 }
 
@@ -7726,6 +7802,9 @@ loginForm.addEventListener("submit", async (event) => {
     loginPassword.value = "";
     hideLogin();
     logoutButton.classList.remove("hidden");
+    const resumeGuestAction = pendingGuestAction;
+    pendingGuestAction = null;
+    await resumeGuestAction?.();
     await loadDashboard();
     await loadAudits();
     await loadAuditHistory();
@@ -9214,7 +9293,7 @@ logoutButton.addEventListener("click", async () => {
   configureApiUsageAdmin({ ...currentAuthState, user: null });
   currentUserProfile = null;
   renderProfile(null);
-  showLogin("Sessão encerrada.");
+  window.location.assign("/#home");
 });
 
 newQueryButton?.addEventListener("click", () => {
@@ -9252,6 +9331,9 @@ drawSignal();
 
 moveEcosystemModules();
 initAccountPlans({ getAuthState: () => currentAuthState, showLogin });
+const authState = await loadAuthState();
+currentAuthState = authState;
+chatState = loadChatState();
 setActivePage(getActivePage());
 await loadStateCourtCatalog();
 populateStateCourtSelect();
@@ -9271,12 +9353,11 @@ setAuditWizardStep(1);
 await loadAppConfig();
 await loadDeployVersion();
 await loadModules();
-const authState = await loadAuthState();
 renderProfile(authState.user);
 configureApiUsageAdmin(authState);
 await loadCurrentUserProfile();
 if (authState.authRequired && !authState.user) {
-  if(getActivePage()==="pis-pasep")hideLogin();else showLogin();
+  loginButton?.classList.remove("hidden");
   finishAppBoot();
 } else {
   if (authState.user) {

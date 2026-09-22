@@ -285,7 +285,7 @@ test("charge analysis keeps identification, attachments and analysis in one cont
 test("charge analysis introduction links the historical card scope to the searchable references", () => {
   assert.match(chargeAnalysisJs, /function chargeAnalysisIntroMarkup\(\)/);
   assert.equal(
-    (chargeAnalysisJs.match(/Vou conduzir uma verifica&ccedil;&atilde;o inicial/g) || []).length,
+    (chargeAnalysisJs.match(/Entenda as cobranças de seguros e serviços no seu cartão/g) || []).length,
     1,
   );
   assert.match(chargeAnalysisJs, /133 parceiras/);
@@ -293,7 +293,7 @@ test("charge analysis introduction links the historical card scope to the search
   assert.match(chargeAnalysisJs, /data-charge-action="open-brand-references"/);
   assert.match(chargeAnalysisJs, /Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras/);
   assert.match(chargeAnalysisJs, /\$\{chargeAnalysisIntroMarkup\(\)\}/);
-  assert.match(
+  assert.doesNotMatch(
     chargeAnalysisJs,
     /assistantMessage\(chargeAnalysisIntroMarkup\(\), "IA AUDITA", "charge-analysis-intro-message"\)/,
   );
@@ -713,7 +713,7 @@ test("app hides the one-page shell until the initial route is ready", () => {
       appJs.lastIndexOf("const authState = await loadAuthState();"),
   );
   assert.match(indexHtml, /styles\.css\?v=[\w-]+/);
-  assert.match(indexHtml, /charge-analysis\.js\?v=20260828-legal-documents-1/);
+  assert.match(indexHtml, /charge-analysis\.js\?v=20260922-service-intros/);
   assert.match(indexHtml, /app\.js\?v=[^"\s]+/);
 });
 

@@ -4129,6 +4129,10 @@ h2 {
   line-height: 1.2;
 }
 
+.property-panel > .audit-step-copy {
+  margin-bottom: 18px;
+}
+
 .property-workspace {
   display: grid;
   grid-template-columns: minmax(320px, 0.82fr) minmax(440px, 1.18fr);
@@ -5013,6 +5017,35 @@ body[data-active-page="chat"] .workspace {
   color: var(--text);
   text-decoration: none;
 }
+
+dialog.login-screen {
+  width: min(474px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  overflow-y: auto;
+  backdrop-filter: none;
+}
+
+dialog.login-screen:not([open]) { display: none; }
+dialog.login-screen::backdrop { background: rgba(3, 10, 20, 0.72); }
+dialog.login-screen[open] { animation: login-enter 220ms ease-out; }
+dialog.login-screen[open]::backdrop { animation: login-backdrop-enter 220ms ease-out; }
+@keyframes login-enter {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes login-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.login-screen[open], dialog.login-screen[open]::backdrop { animation: none; }
+}
+.login-close { position: absolute; top: 10px; right: 10px; }
 
 .chat-header { flex-wrap: wrap; }
 .chat-header-start { display: flex; align-items: center; gap: 10px; min-width: 0; }

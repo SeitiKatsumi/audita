@@ -37,7 +37,7 @@ test('catalog links keep existing services and collapse only their sidebar entri
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
  const sidebar=html.slice(html.indexOf('<nav class="nav-list">'),html.indexOf('</nav>'));
  const catalog=html.slice(html.indexOf('<section class="services-page'),html.indexOf('<section class="home-hero"'));
- for(const route of ['analise-vendedor','consulta-imoveis','isencao-ir','pis-pasep','analise-cobrancas','dividas-bancarias']){
+ for(const route of ['analise-vendedor','consulta-imoveis','isencao-ir','pis-pasep','analise-cobrancas','dividas-bancarias','auditoria-importacao']){
   assert.ok(catalog.includes(`href="#${route}"`));
  }
  for(const route of ['isencao-ir','pis-pasep','analise-cobrancas','dividas-bancarias','analise-vendedor']) assert.ok(!sidebar.includes(`href="#${route}"`));
@@ -61,7 +61,7 @@ test('every service destination includes the shared return navigation', async ()
 test('all catalog cards have details and preserve destinations and searchable audiences', async () => {
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
  const cards=[...html.matchAll(/<article class="home-module-action service-card service-card-explained"[^]*?<\/article>/g)].map(m=>m[0]);
- assert.equal(cards.length,11);
+ assert.equal(cards.length,12);
  for(const card of cards) {
   assert.ok(card.includes('<summary class="service-toggle">'));
   assert.ok(card.includes('Para quem é'));

@@ -1,0 +1,63 @@
+.import-module { max-width: 1100px; min-height: 0; margin: 0 auto; padding: 0; }
+.import-module .charge-analysis-bubble { display: grid; gap: 12px; min-width: 0; width: 100%; max-width: none; }
+.import-module .charge-analysis-conversation { padding: 12px 0 16px; }
+.import-module .charge-analysis-message { scroll-margin-top: 100px; }
+.import-module p { margin: 0; line-height: 1.65; }
+.import-module h2, .import-module h3, .import-module h4 { margin: 0; font-size: 1rem; line-height: 1.55; }
+.import-module .import-question { margin-top: 6px; }
+.import-toolbar, .import-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; }
+.import-module button { white-space: normal; }
+.import-module [hidden] { display: none !important; }
+.import-module :is(button,a,input,select,textarea,summary):focus-visible { outline: 2px solid var(--aqua); outline-offset: 4px; }
+.import-new-message { animation: charge-message-in 220ms ease-out both; }
+.import-error { color: var(--danger); margin-bottom: 16px !important; }
+.import-form, .import-product { display: grid; gap: 16px; min-width: 0; }
+.import-product { grid-template-columns: repeat(2,minmax(0,1fr)); border: 1px solid var(--line); border-radius: 8px; padding: 18px; }
+.import-product legend { max-width: 100%; overflow-wrap: anywhere; font-weight: 700; }
+.import-form label { display: grid; gap: 7px; min-width: 0; }
+.import-form label { align-content: start; }
+.import-form .audit-consent { display: flex; align-items: flex-start; }
+.import-form input:not([type=checkbox]), .import-form textarea, .import-form select { width: 100%; min-width: 0; box-sizing: border-box; padding: 12px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.import-form textarea { resize: vertical; }
+.import-module a, .import-notice, .import-research { overflow-wrap: anywhere; }
+.import-module a:not(.secondary-action) { color: var(--aqua); }
+.import-research { white-space: pre-wrap; }
+.import-notice { color: var(--muted); font-size: .8rem; }
+.import-result { border-left: 3px solid var(--line-strong); padding: 12px 16px; margin: 14px 0; }
+.import-module details > summary { cursor: pointer; margin: 12px 0; color: var(--aqua); }
+.import-findings > section { display: grid; gap: 12px; margin-top: 16px; }
+.import-module button:disabled { opacity: .55; cursor: not-allowed; }
+@media(max-width:600px) { .import-product { grid-template-columns: 1fr; padding: 12px; } }
+@media(prefers-reduced-motion:reduce) { .import-new-message { animation: none; } }
+
+/* The shared shell's viewport min-height was added below the page header. */
+body[data-active-page="auditoria-importacao"] .workspace { padding-top: 16px; padding-bottom: 16px; }
+body[data-active-page="auditoria-importacao"] .topbar { margin-bottom: 12px; align-items: center; flex-direction: row; }
+body[data-active-page="auditoria-importacao"] #pageTitle { font-size: clamp(1.3rem,2.5vw,2rem); line-height: 1.2; margin: 0; }
+body[data-active-page="auditoria-importacao"] #pageEyebrow { margin-bottom: 4px; }
+body[data-active-page="auditoria-importacao"] .service-return { padding-top: 0; margin-bottom: 10px; }
+.import-module .charge-analysis-header { position: static; min-height: 0; padding: 0; background: transparent; }
+.import-module .charge-analysis-bubble { gap: 10px; }
+.import-module .charge-analysis-bubble p + p { margin-top: 0; }
+.import-module > details:not([open]) { display: inline-block; margin-right: 20px; vertical-align: top; }
+.import-module > details > summary { margin: 6px 0; }
+.import-module .import-previous { width: min(850px,calc(100% - 32px)); max-height: 85dvh; box-sizing: border-box; padding: 20px; color: var(--text); background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 12px; }
+.import-previous::backdrop { background: rgba(0,8,18,.75); }
+.import-previous > header { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 16px; }
+.import-previous-messages { display: grid; gap: 16px; }
+.import-previous-messages .charge-analysis-message { width: 100%; grid-template-columns: 1fr; }
+.import-previous-messages .charge-analysis-avatar-anchor { display: none; }
+@media(max-width:960px) {
+ body[data-active-page="auditoria-importacao"] .workspace { padding-bottom: calc(var(--mobile-nav-height) + 16px); }
+ .import-module .charge-analysis-identity p { font-size: .85rem; }
+ .import-module p { line-height: 1.5; }
+ .import-module .charge-analysis-bubble { gap: 8px; }
+}
+@media(min-width:961px) {
+ .import-product { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 10px; }
+ .import-product label { gap: 5px; font-size: .85rem; line-height: 1.4; }
+ .import-product textarea { height: 60px; }
+ .import-product input:not([type=checkbox]), .import-product select { padding: 9px; }
+ .import-product button { align-self: end; font-size: .85rem; }
+ .import-form .import-actions { margin: 0; }
+}

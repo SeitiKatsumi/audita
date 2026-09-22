@@ -64,6 +64,13 @@ por usuario. A chave fica exclusivamente no secret
 `audita_users`. Valores de pedidos, analises e respostas do chat nao fazem parte
 do perfil.
 
+## Auditoria de importação
+
+`db/import-audit.sql` adiciona casos e documentos criptografados. Atendimento
+isolado por tenant e usuário, com revisão global exclusiva de super_admin.
+Não aplicar ao banco compartilhado sem autorização. Configuração, limites,
+metadados e verificação isolada em [import-audit.md](import-audit.md).
+
 ## Usuarios
 
 Criar usuarios separados por finalidade:

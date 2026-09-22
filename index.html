@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260911-chat-spacing" />
+    <link rel="stylesheet" href="styles.css?v=20260922-service-intros" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260911-chat-spacing" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
   <link rel="stylesheet" href="/advogados.css?v=3" />
   <link rel="stylesheet" href="/energy-audit.css">
+  <link rel="stylesheet" href="/import-audit.css?v=20260922-fit">
 </head>
   <body>
     <div class="app-boot" id="appBoot" role="status" aria-live="polite" aria-label="Carregando IA AUDITA">
@@ -21,11 +22,12 @@
       </div>
       <i aria-hidden="true"></i>
     </div>
-    <section class="login-screen hidden" id="loginScreen" aria-label="Login IA AUDITA">
+    <dialog class="login-screen hidden" id="loginScreen" aria-labelledby="loginTitle">
       <form class="login-panel" id="loginForm">
-        <div class="login-logo-frame">
+        <button class="charge-faq-close login-close" id="loginClose" type="button" aria-label="Fechar login" title="Fechar"><span aria-hidden="true">&times;</span></button>
+        <a class="login-logo-frame" href="/#home" aria-label="Voltar para a Home">
           <img src="assets/audita-logo-original.png" alt="IA AUDITA" />
-        </div>
+        </a>
         <div class="login-heading">
           <p class="eyebrow" id="loginEyebrow">Acesso seguro</p>
           <h1 id="loginTitle">IA AUDITA</h1>
@@ -53,7 +55,7 @@
         </div>
         <small class="login-error" id="loginError" role="alert"></small>
       </form>
-    </section>
+    </dialog>
 
     <div class="shell">
       <aside class="sidebar" id="sidebar" aria-label="Navega&ccedil;&atilde;o principal">
@@ -81,7 +83,7 @@
             <span class="nav-label">IA AUDITA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
           </a>
-          <a href="#central-servicos" data-nav-pages="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
+          <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
             <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
             <span class="nav-label">Central de Serviços</span>
           </a>
@@ -110,7 +112,7 @@
       <nav class="mobile-bottom-nav" aria-label="Navegação principal mobile">
         <a href="#home"><img src="assets/audita-logo-original.png" alt="" /><span>Home</span></a>
         <a href="/chat" data-app-route="chat"><img class="nav-icon" src="assets/nav-icons/sparkles.svg" alt="" /><span>IA</span></a>
-        <a href="#central-servicos" data-nav-pages="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
+        <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
         <a href="#meus-dados"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Meus Dados</span></a>
       </nav>
       <main class="workspace">
@@ -132,7 +134,7 @@
 <div class="module list-panel"><table><thead><tr><th>Atendimento</th><th>Serviço</th><th>Situação</th><th>Próximo passo</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="lawyer-caseRows"></tbody></table><p id="lawyer-empty" hidden>Nenhum atendimento nesta lista.</p></div>
 <section id="lawyer-details" class="panel" hidden tabindex="-1"><button class="secondary-action" id="lawyer-closeDetails">Voltar à lista</button><div id="lawyer-detailBody"></div></section></div>
 <aside class="activity"><section class="panel"><h2>Pendências de atenção</h2><div id="lawyer-attention"></div></section><section class="panel"><h2>Atualizações recentes</h2><div id="lawyer-recent"></div></section><p class="muted">Os prazos oficiais devem ser conferidos pela equipe nos canais responsáveis.</p></aside></div></div></section>
-        <nav class="service-return page-hidden" data-page="analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
+        <nav class="service-return page-hidden" data-page="auditoria-importacao analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
           <a href="#central-servicos"><img src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />Voltar à Central de Serviços</a>
         </nav>
 
@@ -287,6 +289,7 @@
         </section>
 
         <section id="contas-de-luz" data-page="contas-de-luz" class="page-hidden"><div id="energyApp" aria-label="Auditoria de contas de luz"></div></section>
+        <section id="auditoria-importacao" data-page="auditoria-importacao" class="page-hidden"><div id="importApp" aria-label="Auditoria assistida de importação"></div></section>
         <section class="services-page page-hidden" id="central-servicos" data-page="central-servicos" aria-label="Central de Serviços">
           <p class="services-intro">Encontre a consulta ou análise de que você precisa.</p>
           <div class="services-categories" role="group" aria-label="Filtrar por categoria">
@@ -417,6 +420,26 @@
                       <span class="service-detail"><b>Como podemos ajudar</b><span>Com os dados do vendedor, consultamos as certidões disponíveis no TJDFT e reunimos os PDFs oficiais para conferência.</span></span>
                       <small class="service-note">A etapa atual não inclui análise de risco por IA nem todas as fontes necessárias para avaliar uma compra.</small>
                       <a class="service-action" href="#analise-vendedor">Consultar certidões<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
+              </div>
+            </section>
+            <section class="services-group" data-service-group aria-labelledby="services-importacao">
+              <h3 id="services-importacao">Importação</h3>
+              <div class="services-grid">
+                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios" data-keywords="importação invoice packing list NCM TIPI IPI imposto importacao ex tarifário">
+                  <a class="service-card-entry" href="#auditoria-importacao">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Importação · Tributos</small><strong>Auditoria de importação</strong><small>Confira documentos, pesquise NCMs e possíveis benefícios e prepare uma simulação de II/IPI com revisão humana.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Importadores e responsáveis fiscais que precisam organizar documentos e conferir o enquadramento dos produtos.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Leitura de Invoice, Packing List e fichas técnicas, sugestões fundamentadas, fontes oficiais e relatório para revisão.</span></span>
+                      <small class="service-note">Não registra DI/Duimp nem garante benefício, economia ou desembaraço. Ex-tarifário de II não significa IPI zero.</small>
+                      <a class="service-action" href="#auditoria-importacao">Conferir minha importação<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                     </div>
                   </details>
                 </article>
@@ -558,7 +581,7 @@
               <span class="live">Dispon&iacute;vel no DF</span>
             </div>
             <p class="seller-analysis-intro">
-              Est&aacute; comprando um im&oacute;vel? Use a IA AUDITA para reunir as certid&otilde;es do vendedor antes de avan&ccedil;ar. Nesta primeira etapa, consultamos automaticamente as certid&otilde;es dispon&iacute;veis para pessoa f&iacute;sica no TJDFT e organizamos os PDFs oficiais em um s&oacute; lugar. O cruzamento com outras fontes e a an&aacute;lise de risco ser&atilde;o adicionados nas pr&oacute;ximas etapas.
+              Está comprando um imóvel no Distrito Federal? Este serviço reúne as certidões judiciais disponíveis no TJDFT para vendedor pessoa física e organiza os PDFs oficiais em um só lugar. Os dados do vendedor são necessários para identificar a pessoa consultada. Confira-os antes de enviar: o resultado se limita às certidões obtidas e não é uma investigação completa do vendedor nem uma análise de risco por IA.
             </p>
 
             <div class="seller-analysis-scope">
@@ -884,6 +907,11 @@
               </div>
 
               <section class="audit-step-panel" data-audit-step-panel="1">
+                <div class="audit-step-copy" data-page="consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj">
+                  <strong>Encontre as certidões judiciais para a sua consulta</strong>
+                  <small>Precisa de uma certidão de pessoa física ou empresa? Escolha o tipo de documento e a localidade para consultar as opções disponíveis no tribunal correspondente.</small>
+                  <small>Na próxima etapa, o CPF ou CNPJ e os demais dados solicitados ajudam a identificar corretamente a pessoa consultada. A cobertura depende do tribunal e da certidão: no DF, usamos a consulta integrada ao TJDFT; em outros estados, orientamos o acesso ao portal oficial. O resultado não substitui uma pesquisa em todos os tribunais.</small>
+                </div>
                 <div class="audit-step-copy">
                   <strong>Escolha os documentos</strong>
                   <small>Selecione quais certid&otilde;es e consultas deseja gerar no resultado.</small>
@@ -1114,6 +1142,12 @@
               </div>
             </div>
 
+            <div class="audit-step-copy">
+              <strong>Pesquise informações de imóveis nos serviços disponíveis</strong>
+              <small>Precisa localizar referências de imóveis ou solicitar uma certidão? Selecione o serviço para consultar as bases participantes. O CPF ou CNPJ, o estado e, conforme a operação, a matrícula e o cartório ajudam a direcionar a pesquisa.</small>
+              <small>A integração ONR / RI Digital está em homologação e depende de credenciamento, cobertura e disponibilidade. Uma busca não garante localizar todos os imóveis e não substitui a conferência da matrícula atualizada.</small>
+            </div>
+
             <div class="property-workspace">
               <form class="property-search-form" id="propertySearchForm">
                 <label>
@@ -1255,9 +1289,12 @@
             <div class="cnib-layout">
               <form class="source-form cnib-form" id="cnibForm">
                 <div class="cnib-intro">
-                  <strong>Consulta por CPF ou CNPJ do vendedor</strong>
+                  <strong>Confira possíveis restrições associadas ao vendedor</strong>
                   <small>
-                    Resultado via provedor de dados. Validar se substitui ou complementa a certid&atilde;o oficial CNIB conforme contrato/fonte habilitada.
+                    Antes de avançar em uma negociação, esta consulta ajuda a identificar possíveis registros de indisponibilidade de bens associados ao CPF ou CNPJ informado. Precisamos do documento correto para pesquisar a pessoa ou empresa nas fontes disponíveis.
+                  </small>
+                  <small>
+                    O resultado vem de um provedor de dados e não equivale a uma avaliação completa do patrimônio. A cobertura depende da fonte habilitada; confirme se o documento obtido atende à finalidade da consulta e se é necessária uma certidão oficial da CNIB.
                   </small>
                 </div>
                 <label>
@@ -2102,11 +2139,12 @@
 
     <script type="module" src="/advogados.js?v=3"></script>
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
-    <script type="module" src="/ir-exemption.js?v=20260910-reintegrated"></script>
-    <script type="module" src="/bank-debt.js?v=20260914-triagem"></script>
-    <script type="module" src="charge-analysis.js?v=20260828-legal-documents-1"></script>
-    <script type="module" src="app.js?v=20260922-editar-conta"></script>
-      <script type="module" src="/pis-pasep.js?v=20260911"></script>
-  <script type="module" src="energy-audit.js"></script>
+    <script type="module" src="/ir-exemption.js?v=20260922-service-intros"></script>
+    <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
+    <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
+    <script type="module" src="app.js?v=20260922-import-audit"></script>
+    <script type="module" src="import-audit.js?v=20260922-fit"></script>
+      <script type="module" src="/pis-pasep.js?v=20260922-service-intros"></script>
+  <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>
 </body>
 </html>

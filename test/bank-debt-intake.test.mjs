@@ -15,7 +15,10 @@ test('extratos preservam atendimento ao complementar e permitem voltar da oferta
  assert.match(html(), /Internet banking/);
  assert.match(html(), /conta encerrada/);
  assert.doesNotMatch(html(), /0800|Itaú/);
- assert.match(html(),/Anexe abaixo os extratos bancários desde o início do saldo devedor até a presente data/);
+ assert.match(html(),/Entenda como sua dívida bancária chegou ao valor atual/);
+ assert.match(html(),/preciso dos extratos desde o início da dívida até hoje/);
+ assert.match(html(),/não garante desconto ou acordo com o banco/);
+ assert.ok(html().indexOf('Entenda como sua dívida') < html().indexOf('type="file"'));
  assert.equal((html().match(/type="file"/g)||[]).length,1);assert.match(html(),/Enviar extratos e analisar/);assert.doesNotMatch(html(),/Que documento você vai enviar/);
  vm.runInContext(`current={id:'qa',status:'calculation_pending',owner:true,documents:[{id:'a',kind:'evidence',name:'extrato.pdf',sha256:'same'},{id:'b',kind:'evidence',name:'copia.pdf',sha256:'same'}],documentConsent:{at:'2024-01-01'},analysisPending:new Date().toISOString()};render();`,context);
  assert.match(html(),/Seus extratos estão em análise/);assert.match(html(),/charge-analysis-loader debt-analysis-loader/);assert.doesNotMatch(html(),/type="file"|name="consent"|Anexar documento/);assert.equal((html().match(/<li>/g)||[]).length,1);
@@ -28,7 +31,8 @@ test('extratos preservam atendimento ao complementar e permitem voltar da oferta
   vm.runInContext(`current=JSON.parse(${JSON.stringify(pending)});current.analysisPending=null;current.${state};render();`,context);
   assert.equal(vm.runInContext('current.id',context),'qa');
   assert.match(html(),/role="alert"/);assert.match(html(),/arquivos estão salvos/);
-  assert.match(html(),/Envie seus extratos bancários/);assert.match(html(),/type="file"/);
+  assert.match(html(),/Envie seus extratos para análise/);assert.match(html(),/type="file"/);
+  assert.doesNotMatch(html(),/Entenda como sua dívida|Sua dívida cresceu/);
  }
  vm.runInContext(`current=JSON.parse(${JSON.stringify(pending)});current.analysisPending=new Date(Date.now()-16*60*1000).toISOString();delete current.documentConsent;render();`,context);
  assert.match(html(),/Tentar novamente/);assert.doesNotMatch(html(),/name="consent"/);assert.match(html(),/Ao solicitar a análise/);assert.doesNotMatch(html(),/type="file"/);

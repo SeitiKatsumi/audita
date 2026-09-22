@@ -1,4 +1,7 @@
 import {createDebtExtractor} from './services/bank-debt-ai.mjs';
+import {createImportAI} from './services/import-audit-ai.mjs';
+import {createImportService} from './services/import-audit.service.mjs';
+import {createImportHandler} from './services/import-audit-api.mjs';
 import {refreshReferences} from './services/energy-audit-references.mjs';
 import {createEnergyService} from "./services/energy-audit.service.mjs";
 import {createEnergyHandler} from "./services/energy-audit-api.mjs";
@@ -550,6 +553,7 @@ async function initializeDatabase() {
       await pool.query(await readFile(join(root, "db", "pis-pasep.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "bank-debt.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "energy-audit.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "import-audit.sql"), "utf8"));
     }
 
     await pool.query({ text: "SELECT 1", query_timeout: 5000 });
@@ -1749,6 +1753,8 @@ const irExemptionHandler = createIrExemptionHandler({
 });
 const energyService=createEnergyService({getDb:()=>({pool,dbReady}),extractor:createEnergyExtractor({recordUsage:async(usage,auth)=>{if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'energy_extraction',...usage});}})});
 const energyHandler=createEnergyHandler({service:energyService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
+const importService=createImportService({getDb:()=>({pool,dbReady}),ai:createImportAI({recordUsage:async(usage,auth)=>{if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'import_audit',...usage});}})});
+const importHandler=createImportHandler({service:importService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
 const pisPasepService=createPisPasepService({getDb:()=>({pool,dbReady})});
 const pisPasepHandler=createPisPasepHandler({service:pisPasepService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
 const directusLawyerKitService = createDirectusLawyerKitService();
@@ -6100,6 +6106,7 @@ const server = http.createServer(async (request, response) => {
   if (await irExemptionHandler(request, response, url)) return;
   if (await pisPasepHandler(request, response, url)) return;
   if (await energyHandler(request, response, url)) return;
+  if (await importHandler(request, response, url)) return;
   if (await bankDebtHandler(request, response, url)) return;
   if (await handleApi(request, response, url.pathname)) {
     return;
@@ -6117,7 +6124,7 @@ const server = http.createServer(async (request, response) => {
 
   const requestedPath = uiRoute.path;
   // Keep private storage, configuration and server implementation outside the static surface.
-  const publicRootFiles = new Set(["energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
+  const publicRootFiles = new Set(["import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
     "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
     "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");

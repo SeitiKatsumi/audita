@@ -32,7 +32,7 @@ test("database recovers after startup DNS failure and later disconnect without r
   assert.equal(context.dbReady, true);
   assert.equal(context.dbError, null);
   assert.equal(pools, 1);
-  assert.equal(migrations, 5);
+  assert.equal(migrations, 6);
   assert.equal(bootstrap, 1);
   unavailable = true;
   idleError({ code: "ECONNRESET" });
@@ -42,7 +42,7 @@ test("database recovers after startup DNS failure and later disconnect without r
   await context.initializeDatabase();
   assert.equal(context.dbReady, true);
   assert.equal(context.dbError, null);
-  assert.equal(migrations, 5);
+  assert.equal(migrations, 6);
   assert.equal(bootstrap, 1);
 
   const health = source.slice(source.indexOf('  if (pathname === "/api/health")'), source.indexOf('  if (pathname === "/api/config")'));

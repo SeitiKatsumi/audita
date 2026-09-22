@@ -9,7 +9,8 @@ test('login and registration refresh navigation identity; logout clears it',asyn
   const node=()=>({value:'test',classList:{add(){},remove(){}},focus(){}});
   const c=vm.createContext({loginMode:mode,loginError:{},loginEmail:node(),loginPassword:node(),loginName:node(),loginButton:node(),logoutButton:{...node(),addEventListener:(e,f)=>logout=f},loginForm:{addEventListener:(e,f)=>submit=f},
    fetch:async()=>({ok:true}),loadAuthState:async()=>({authRequired:true,user:{id:'test'}}),renderProfile(){},configureApiUsageAdmin:s=>c.currentAuthState=s,loadCurrentUserProfile:async()=>{},hideLogin(){},showLogin(){shown++;},
-   currentAuthState:{authRequired:true,user:null},currentUserProfile:{},activeChatBrowserSession:null,
+   currentAuthState:{authRequired:true,user:null},currentUserProfile:{},activeChatBrowserSession:null,pendingGuestAction:null,
+   isGuest:()=>!c.currentAuthState.user,publicPages:new Set(['home','central-servicos']),window:{location:{assign(){}}},
    pageMeta:{home:{},'central-servicos':{}},document:{body:{dataset:{}},dispatchEvent(){},querySelector(){return null;}},pageTitle:{},pageEyebrow:{},pageBlocks:[],operationsPages:null,navGroups:[],navLinks:[],applyAuditRouteDefaults(){},setMobileMenu(){},requestAnimationFrame(){},CustomEvent:class{},
   });
   for(const name of ['loadDashboard','loadAudits','loadAuditHistory','loadPropertyModule','loadConsultations','loadSources','loadAgentSettings','loadAssistantSources'])c[name]=async()=>{};
@@ -24,6 +25,6 @@ test('login and registration refresh navigation identity; logout clears it',asyn
   assert.equal(c.currentAuthState.user,null);
   assert.equal(c.currentUserProfile,null);
   vm.runInContext('setActivePage("central-servicos")',c);
-  assert.equal(shown,2,'logout and protected navigation require login');
+  assert.equal(shown,0,'logout leaves public navigation available');
  }
 });

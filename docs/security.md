@@ -92,6 +92,14 @@ Checklist inicial:
 - Sessoes usam cookie HttpOnly e devem trafegar com HTTPS.
 - Toda consulta de dados deve respeitar `tenant_id`.
 
+## Documentos de importação
+
+Payloads e arquivos usam AES-256-GCM e chave privada existente (ou chave específica
+do módulo). Autorização por tenant/usuário em cada leitura, escrita e download;
+somente super_admin pode revisar. Nenhuma alíquota da IA entra automaticamente
+no cálculo. Consentimento explícito para OpenAI; busca web recebe apenas códigos
+NCM públicos. Detalhes e limites em [import-audit.md](import-audit.md).
+
 ## Consultas governamentais
 
 - Validar base legal antes de consultar dados pessoais ou empresariais.

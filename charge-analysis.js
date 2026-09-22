@@ -927,7 +927,9 @@ if (stage) {
 
   function chargeAnalysisIntroMarkup() {
     return `
-      <p>Ol&aacute;! Sou a IA AUDITA. Vou conduzir uma verifica&ccedil;&atilde;o inicial de poss&iacute;veis cobran&ccedil;as de seguros ou servi&ccedil;os (Prestamista, Cartão/Bolsa Protegida, Perda e Roubo, Proteção Financeira / Perda de Renda, Acidentes Pessoais / Vida, Tarifas e Pacotes de Terceiros). Válido para cartões Itaú, Itaucard e <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras de cart&otilde;es de parceiras">133 parceiras</button> (Casas Bahia, Magalu, Ponto, Marisa etc.).</p>
+      <p><strong>Entenda as cobranças de seguros e serviços no seu cartão</strong></p>
+      <p>Você encontrou uma cobrança que não reconhece? Vou ajudar a verificar possíveis cobranças de seguros e serviços em cartões Itaú, Itaucard e <button type="button" class="charge-analysis-inline-link" data-charge-action="open-brand-references" aria-label="Abrir 113 refer&ecirc;ncias nominais das 133 bandeiras de cart&otilde;es de parceiras">133 parceiras</button> (Casas Bahia, Magalu, Ponto, Marisa etc.).</p>
+      <p>Primeiro, vamos identificar o cartão. Depois, as faturas e os extratos ajudam a conferir quais valores foram cobrados e em que período. A análise organiza os lançamentos encontrados e orienta os próximos passos, sem garantir restituição. Se você atua como advogado(a), use a opção abaixo para atender seu cliente.</p>
     `;
   }
 
@@ -1080,7 +1082,6 @@ if (stage) {
 
     return `
       <div class="charge-analysis-conversation compact" data-charge-conversation>
-        ${assistantMessage(chargeAnalysisIntroMarkup(), "IA AUDITA", "charge-analysis-intro-message")}
         ${userMessage(routeIdentityMessage())}
         ${assistantMessage(`
           <p><strong>Voc&ecirc; possui as faturas ou os extratos de todo o per&iacute;odo em que acredita ter recebido essa cobran&ccedil;a?</strong></p>
