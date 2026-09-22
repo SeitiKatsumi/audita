@@ -88,8 +88,6 @@ const pageBlocks = document.querySelectorAll("[data-page]");
 const chatThreadList = document.querySelector("#chatThreadList");
 const chatNewButton = document.querySelector("#chatNewButton");
 const chatMobileNewButton = document.querySelector("#chatMobileNewButton");
-const chatToolsButton = document.querySelector("#chatToolsButton");
-const chatToolsPanel = document.querySelector("#chatToolsPanel");
 const chatMessages = document.querySelector("#chatMessages");
 const chatEmptyState = document.querySelector("#chatEmptyState");
 const chatForm = document.querySelector("#chatForm");
@@ -4634,12 +4632,6 @@ chatSuggestionButtons.forEach((button) => {
 chatNewButton?.addEventListener("click", startNewChat);
 chatMobileNewButton?.addEventListener("click", startNewChat);
 
-chatToolsButton?.addEventListener("click", () => {
-  const expanded = chatToolsButton.getAttribute("aria-expanded") === "true";
-  chatToolsButton.setAttribute("aria-expanded", String(!expanded));
-  chatToolsPanel?.classList.toggle("hidden", expanded);
-});
-
 chatBrowserFrame?.addEventListener("load", () => {
   if (chatBrowserPane?.dataset.connection !== "offline") {
     setChatBrowserConnectionState("connecting", "Estabelecendo a sessão ao vivo...");
@@ -4727,13 +4719,6 @@ chatBrowserSplitter?.addEventListener("keydown", (event) => {
   const current = chatBrowserPane?.getBoundingClientRect().width || window.innerWidth * 0.58;
   const delta = event.key === "ArrowLeft" ? 24 : -24;
   chatPage.style.setProperty("--chat-browser-width", `${Math.max(500, current + delta)}px`);
-});
-
-document.addEventListener("click", (event) => {
-  if (!chatToolsPanel || chatToolsPanel.classList.contains("hidden")) return;
-  if (chatToolsPanel.contains(event.target) || chatToolsButton?.contains(event.target)) return;
-  chatToolsPanel.classList.add("hidden");
-  chatToolsButton?.setAttribute("aria-expanded", "false");
 });
 
 chatThreadList?.addEventListener("click", (event) => {

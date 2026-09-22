@@ -1,3 +1,7 @@
+# 2026-09-22 - Atalho de servicos no chat
+- Removido Meus Dados somente do topo do chat; Servicos centralizado e sem sublinhado. Playwright 1440px/390px confirmou estilo computado e destino na porta 3000. Acessos de conta fora do chat preservados.
+- Botao Ferramentas substituido por link Servicos para /#central-servicos. Removidos painel antigo, contador e eventos exclusivos. Oito testes passaram; Playwright confirmou navegacao em 1440px e 390px na porta 3000. Apenas local, sem push/deploy.
+
 # 2026-09-22 - Publicacao GitHub autorizada
 - Codex; consolidacao na main local de Meus Dados, perfil editavel, troca de senha, assinatura simplificada e navegacao da Central. npm test: 396 aprovados, um teste opcional ignorado, zero falhas; diff verificado. Remoto sincronizado antes do commit. Commit e push solicitados pelo usuario; sem deploy ou mudanca de banco/secrets. Os registros abaixo descrevem as validacoes locais anteriores.
 

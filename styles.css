@@ -5678,6 +5678,10 @@ body[data-active-page="chat"] .workspace {
 }
 
 .chat-tools-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
   min-height: 38px;
   padding: 0 11px;
   color: #cae3f5;
