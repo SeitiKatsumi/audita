@@ -8730,6 +8730,20 @@ body[data-active-page="chat"] .workspace {
   backdrop-filter: blur(5px);
 }
 
+.ir-diseases-dialog {
+  overflow-y: auto;
+}
+
+.ir-diseases-content {
+  padding: 0 24px 24px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.ir-diseases-content li + li {
+  margin-top: 10px;
+}
+
 .charge-faq-shell {
   display: grid;
   max-height: min(820px, calc(100vh - 32px));

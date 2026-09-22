@@ -77,7 +77,7 @@ test('all catalog cards have details and preserve destinations and searchable au
  ]) {
   const card=cards.find(c=>c.includes(`href="#${route}"`));
   for(const text of [title,action,'Para quem é','Como podemos ajudar','service-note']) assert.ok(card.includes(text));
-  assert.ok(!card.includes('<button'));
+  assert.equal(card.includes('<button'), route === 'isencao-ir');
   assert.ok(card.includes('<summary class="service-toggle">'));
   assert.ok(card.includes(`class="service-card-entry" href="#${route}"`));
   assert.ok(card.includes('Mais informações'));

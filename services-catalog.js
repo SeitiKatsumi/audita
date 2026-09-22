@@ -6,6 +6,9 @@ export function matchesService(service, query, category) {
 
 export function initServicesCatalog(root = document.querySelector('#central-servicos')) {
   if (!root) return;
+  root.querySelector('[data-ir-diseases-open]')?.addEventListener('click', () => {
+    document.querySelector('#irDiseasesDialog').showModal();
+  });
   const buttons = [...root.querySelectorAll('[data-service-category]')];
   const cards = [...root.querySelectorAll('[data-service-card]')];
   let category = 'all';

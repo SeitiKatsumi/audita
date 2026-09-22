@@ -11,6 +11,7 @@
 - Validacao: 98 testes pertinentes aprovados; scripts/check-account-ui.mjs verifica perfil, precos, checkout/portal simulados, assinatura ativa/pendente, erro/repeticao, permissoes, desktop/celular, teclado e logout. Capturas conferidas; nenhum pagamento real. Integrado e verificado na main local (portas 3000/3002), com Meus Dados aberto no navegador. Checkout real permanece indisponivel na configuracao local existente; sem commit, push ou deploy.
 
 # 2026-09-22 - Navegacao centralizada
+- Card de IR: botao Doencas abaixo do publico abre dialog nativo com os 17 itens fornecidos e ressalva de enquadramento individual. Seis testes passaram; Playwright desktop/mobile validou lista, fechamento por botao/Escape, retorno de foco e ausencia de overflow horizontal. Sem backend ou publicacao.
 - Removido o campo Buscar servico da Central; botoes de categoria e limpeza preservados sem dependencia do input. Seis testes passaram; Playwright na porta 3000 confirmou ausencia da busca e filtros Bancario/Todos. Apenas local.
 - Removido o grupo Ferramentas de Consulta (Dev) da lateral. Certidoes estaduais e indisponibilidade de bens adicionadas a Central; consulta de imoveis existente preservada. Rotas, provedores e permissoes inalterados. 49 testes passaram; Playwright validou links e retorno na porta 3000 em desktop e celular. Alteracao local, sem publicacao.
 

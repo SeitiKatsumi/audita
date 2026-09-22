@@ -376,6 +376,7 @@
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
                   <div class="service-expanded">
                     <span class="service-detail"><b>Para quem é</b><span>Aposentados, pensionistas e militares na reserva ou reforma com histórico de doença grave. Representantes e herdeiros também podem apresentar um caso.</span></span>
+                    <button class="secondary-action" type="button" data-ir-diseases-open aria-haspopup="dialog" aria-controls="irDiseasesDialog">Doenças</button>
                     <span class="service-detail"><b>Como podemos ajudar</b><span>Responda algumas perguntas e reúna seus documentos para a equipe avaliar uma possível isenção sobre os rendimentos abrangidos e a devolução de imposto pago.</span></span>
                     <small class="service-note">O direito e os valores dependem da análise dos documentos e das regras aplicáveis.</small>
                     <a class="service-action" href="#isencao-ir">Avaliar meu caso<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
@@ -512,6 +513,35 @@
           </div>
           <div class="services-empty" data-service-empty hidden><h3>Nenhum serviço encontrado</h3><p>Tente outro termo ou escolha uma categoria diferente.</p><button class="secondary-action" type="button" data-service-clear>Limpar busca e filtros</button></div>
         </section>
+
+        <dialog class="charge-faq-dialog ir-diseases-dialog" id="irDiseasesDialog" aria-labelledby="irDiseasesTitle" aria-describedby="irDiseasesNotice">
+          <header class="charge-faq-header">
+            <div><h2 id="irDiseasesTitle">Doenças para avaliação da isenção de IR</h2></div>
+            <form method="dialog"><button class="charge-faq-close" aria-label="Fechar lista de doenças" title="Fechar"><span aria-hidden="true">&times;</span></button></form>
+          </header>
+          <div class="ir-diseases-content">
+            <p id="irDiseasesNotice">A lista é informativa. Os exemplos não garantem o enquadramento: o direito à isenção depende da análise médica e documental, do tipo de rendimento e das regras aplicáveis.</p>
+            <ul>
+              <li>Moléstia profissional (doenças do trabalho, como LER/DORT ou depressão ocupacional)</li>
+              <li>Tuberculose ativa</li>
+              <li>Alienação mental (Alzheimer, demências avançadas, esquizofrenia)</li>
+              <li>Esclerose múltipla</li>
+              <li>Neoplasia maligna (câncer — inclusive em período de remissão ou controle)</li>
+              <li>Cegueira (inclui expressamente a cegueira monocular)</li>
+              <li>Hanseníase</li>
+              <li>Paralisia irreversível e incapacitante (tetraplegia, paraplegia, sequelas graves de AVC)</li>
+              <li>Cardiopatia grave (insuficiência cardíaca ou coronária crônica)</li>
+              <li>Doença de Parkinson</li>
+              <li>Espondiloartrose anquilosante</li>
+              <li>Nefropatia grave (insuficiência/patologia renal avançada)</li>
+              <li>Hepatopatia grave (cirrose avançada, insuficiência hepática crônica)</li>
+              <li>Doença de Paget (em estágios avançados)</li>
+              <li>Contaminação por radiação</li>
+              <li>AIDS / SIDA (Síndrome da Imunodeficiência Adquirida)</li>
+              <li>Fibrose cística (mucoviscidose)</li>
+            </ul>
+          </div>
+        </dialog>
 
         <section class="home-hero" id="home" data-page="home">
           <article class="home-hero-panel">
