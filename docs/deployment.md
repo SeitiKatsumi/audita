@@ -13,6 +13,12 @@ catalogo de cobertura e o fluxo autenticado SP ate resultados, PDFs e historico.
 Os 13 itens de SP sao sete certidoes, um comprovante PDF e cinco consultas de
 dados. A analise consolidada por IA permanece pendente.
 
+Publicado em 28/09: commit8d26f395, CapRover release129, imagem anterior128.
+Health/banco/autenticacao verificados. O volume captain--audita-pdfs preserva
+/app/storage/pdfs. Uma CNDT real passou pelo app, download e restauracao apos
+recarregar; arquivo conferido no volume. O lote completo SP continua pendente
+de saldo Direct Data. Consultar docs/STATUS.md antes de anunciar homologacao.
+
 ## Plataforma
 
 O deploy sera realizado via CapRover/Docker em VPS propria.
