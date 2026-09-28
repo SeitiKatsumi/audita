@@ -671,17 +671,17 @@ export function createDirectDataCertificatesService({
     const tenantId = cleanText(authContext?.tenantId, 100) || "public";
     if (!requestId) return executeQuery(input, authContext);
 
-    const cacheKey = `${tenantId}:${requestId}`;
+    const cacheKey = `${tenantId}:${cleanText(authContext.user?.id || authContext.userId, 100)}:${requestId}`;
     if (requestCache.has(cacheKey)) return requestCache.get(cacheKey);
 
     const task = executeQuery(input, authContext).then((result) => {
-      if (
+      if (!result?.providerRequestSubmitted && !result?.providerReference && (
         result?.failed ||
         result?.unavailable ||
         result?.invalid ||
         result?.unsupported ||
         result?.insufficientCredits
-      ) {
+      )) {
         requestCache.delete(cacheKey);
       }
       return result;

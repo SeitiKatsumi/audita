@@ -340,6 +340,19 @@ test("Direct Data certificate never auto-retries a billed unavailable response",
   );
 });
 
+test("same request does not repeat a paid submission after provider timeout", async () => {
+  let calls = 0;
+  const service = createDirectDataCertificatesService({ env: configuredEnv(), fetchImpl: async () => {
+    calls++;
+    throw new DOMException("Timed out", "AbortError");
+  } });
+  const first = await service.query(validRequest(), AUTH);
+  const second = await service.query(validRequest(), AUTH);
+  assert.equal(first.reason, "provider_timeout");
+  assert.deepEqual(second, first);
+  assert.equal(calls, 1);
+});
+
 test("Direct Data certificate can recover an asynchronous provider response", async () => {
   const calls = [];
   const service = createDirectDataCertificatesService({

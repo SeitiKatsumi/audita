@@ -53,7 +53,7 @@ test("sidebar groups service modules and preserves adaptive navigation", () => {
   assert.doesNotMatch(indexHtml, /Ferramentas de Consulta \(Dev\)/);
   for (const route of ["consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]) {
     assert.ok(chargeMainLink.includes(route));
-    assert.ok(indexHtml.includes(`class="service-card-entry" href="#${route === "consulta-tjdft" || route === "consulta-tjdft-pj" ? "consulta-tjdft-pf" : route}"`));
+    assert.ok(indexHtml.includes(`class="service-card-entry" href="#${route.startsWith("consulta-tjdft") ? "analise-vendedor" : route}"`));
   }
   assert.ok(indexHtml.indexOf(accountLink) > indexHtml.indexOf("#central-servicos"));
   assert.match(indexHtml, /id="sidebarToggleIcon"[\s\S]*?assets\/nav-icons\/chevron-left\.svg/);

@@ -6558,12 +6558,69 @@ async function loadAuditResult(consultaId, attempts = 180) {
   }
 }
 
-const sellerAnalysisCertificateTypes = [
-  "Criminal",
-  "Cível",
-  "Falência e Recuperação Judicial",
-  "Especial — Cível e Criminal",
-];
+let sellerCoverage = null;
+function selectedSellerCertificates() {
+  const ufs = [...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map((input) => input.value);
+  return (sellerCoverage?.certificates || []).filter((item) => ufs.includes(item.uf));
+}
+function selectedSellerQueries() {
+  const ids = [...document.querySelectorAll("#sellerAnalysisQueries input:checked")].map((input) => input.value);
+  return (sellerCoverage?.sellerSources?.queries || []).filter((item) => ids.includes(item.id));
+}
+function sellerCompanyCnpjs() {
+  return [...new Set(String(document.querySelector("#sellerAnalysisCompanyCnpjs")?.value || "")
+    .split(/[;,\s]+/).filter(Boolean).map((value) => value.replace(/\D/g, "")))];
+}
+function updateSellerEstimate() {
+  const selected = selectedSellerCertificates();
+  const queries = selectedSellerQueries();
+  const paidCount = selected.filter((item) => item.provider === "direct_data").length;
+  const companyCount = sellerCompanyCnpjs().length;
+  const cost = paidCount * (sellerCoverage?.pdfQueryCostBrl || 0.54) + queries.reduce((sum, item) => sum + Number(item.costBrl || 0) * (item.documentTypes?.includes("cpf") ? 1 : companyCount), 0);
+  const target = document.querySelector("#sellerAnalysisCost");
+  if (target) target.textContent = `Autorizo até R$ ${cost.toFixed(2).replace(".", ",")} pelas fontes selecionadas (${selected.length} certidões estaduais, ${queries.length} outras opções e ${companyCount} CNPJs). Cadastro e QSA dos CNPJs não têm tarifa. Certidões empresariais são cobradas por CNPJ.${selected.length ? " Se faltar o nome da mãe, a consulta cadastral pode ter custo adicional de R$ 0,36." : ""}`;
+  for (const selector of ["#sellerAnalysisRg", "#sellerAnalysisGender"]) {
+    const field = document.querySelector(selector);
+    if (field) field.required = selected.length > 0;
+  }
+  const birthDate = document.querySelector("#sellerAnalysisBirthDate");
+  if (birthDate) birthDate.required = selected.length > 0 || queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica");
+  if (!selected.length && sellerAnalysisMotherName) sellerAnalysisMotherName.required = false;
+}
+async function loadSellerCoverage() {
+  const target = document.querySelector("#sellerAnalysisCoverage");
+  if (!target) return;
+  try {
+    const response = await fetch("/api/seller-analysis/coverage");
+    if (!response.ok) throw new Error();
+    sellerCoverage = await response.json();
+    target.innerHTML = sellerCoverage.ufs.map((uf) => `<p><b>${escapeHtml(uf)}</b>: ${escapeHtml(sellerCoverage.certificates.filter((item) => item.uf === uf).map((item) => item.type).join(", "))}</p>`).join("");
+    document.querySelector("#sellerAnalysisUfs").innerHTML = '<legend>Certidões estaduais</legend>' + sellerCoverage.ufs.map((uf) => `<label><input type="checkbox" value="${escapeHtml(uf)}" />${escapeHtml(uf)}</label>`).join("");
+    const queries = sellerCoverage.sellerSources?.configured ? (sellerCoverage.sellerSources.queries || []).filter((item) => item.documentTypes?.some((type) => ["cpf", "cnpj"].includes(type))) : [];
+    const groups = [...new Set(queries.map((item) => item.category || "Outras consultas"))];
+    document.querySelector("#sellerAnalysisQueries").innerHTML = groups.length ? groups.map((category) => {
+      const items = queries.filter((item) => (item.category || "Outras consultas") === category);
+      return `<details><summary>${escapeHtml(category)} (${items.length})</summary>
+      <fieldset><legend>${escapeHtml(category)}</legend>${items.map((item) => `
+        <label class="seller-analysis-consent"><input type="checkbox" value="${escapeHtml(item.id)}" /><span>
+          <strong>${escapeHtml(item.label)}</strong><br />
+          ${escapeHtml(item.scope || "")}${item.scope ? " · " : ""}${item.kind === "data" ? "Consulta de dados" : "Certidão"} · R$ ${Number(item.costBrl || 0).toFixed(2).replace(".", ",")}${item.documentTypes?.includes("cpf") ? "" : " por CNPJ informado"}
+          ${item.limitation ? `<br /><small>${escapeHtml(item.limitation)}</small>` : ""}
+        </span></label>`).join("")}</fieldset></details>`;
+    }).join("") : "Nenhuma consulta adicional habilitada neste ambiente.";
+    updateSellerEstimate();
+  } catch { target.textContent = "Não foi possível carregar a cobertura. Recarregue antes de consultar."; }
+}
+document.querySelector("#sellerAnalysisUfs")?.addEventListener("change", updateSellerEstimate);
+document.querySelector("#sellerAnalysisQueries")?.addEventListener("change", updateSellerEstimate);
+document.querySelector("#sellerAnalysisCompanyCnpjs")?.addEventListener("input", updateSellerEstimate);
+for (const [id, checked] of [["sellerAnalysisSelectAll", true], ["sellerAnalysisClearAll", false]]) {
+  document.getElementById(id)?.addEventListener("click", () => {
+    document.querySelectorAll("#sellerAnalysisUfs input, #sellerAnalysisQueries input").forEach((input) => { input.checked = checked; });
+    updateSellerEstimate();
+  });
+}
+loadSellerCoverage();
 
 function isValidSellerAnalysisCpf(value) {
   const cpf = String(value || "").replace(/\D/g, "");
@@ -6584,16 +6641,17 @@ function getSellerCertificateStatus(certificate = {}, auditStatus = "pending", i
     return { label: "PDF disponível", className: "success" };
   }
   if (certificate.status === "success") {
-    return { label: "Resultado disponível", className: "success" };
+    return { label: certificate.kind === "data" ? "Consulta disponível" : "Resultado disponível", className: "success" };
   }
   if (certificate.status === "failed" || certificate.resultado === "erro") {
-    return { label: "Falha na emissão", className: "failed" };
+    return { label: certificate.kind === "data" ? "Consulta indisponível" : "Falha na emissão", className: "failed" };
   }
-  if (certificate.status === "waiting_user_action") {
+  if (["waiting_user_action", "manual_required"].includes(certificate.status)) {
     return { label: "Ação necessária", className: "waiting" };
   }
+  if (certificate.status === "unavailable") return { label: "Indisponível", className: "failed" };
   if (isCurrent && ["preparing", "pending", "running", "partial"].includes(auditStatus)) {
-    return { label: "Emitindo agora", className: "processing" };
+    return { label: "Consultando agora", className: "processing" };
   }
   if (["failed", "partial"].includes(auditStatus)) {
     return { label: "Não extraída", className: "failed" };
@@ -6610,22 +6668,27 @@ function formatSellerAnalysisElapsed(milliseconds) {
 
 function getSellerAnalysisStage(audit, execution, progress, completed) {
   if (audit?.status === "preparing") {
-    return "1 de 3 · Consultando dados cadastrais na Direct Data";
+    return "Validando dados e preparando as consultas";
   }
-  if (["failed", "success"].includes(audit?.status)) {
-    return audit.status === "success"
-      ? "3 de 3 · Extração concluída"
-      : "Processamento interrompido";
+  if (sellerAnalysisFinished(audit)) {
+    return audit?.errorMessage ? "Processamento interrompido" : "Consultas encerradas";
   }
   if (progress?.currentCertificate) {
-    return `2 de 3 · Emitindo ${progress.currentCertificate}`;
+    return `Consultando ${progress.currentCertificate}`;
   }
   if (completed) {
-    return "2 de 3 · Consolidando documentos do TJDFT";
+    return "Reunindo documentos e resultados";
   }
   return execution?.status === "running"
-    ? "2 de 3 · Conectando ao portal do TJDFT"
-    : "2 de 3 · Preparando as quatro certidões";
+    ? "Consultando as fontes selecionadas"
+    : "Preparando as consultas";
+}
+
+function sellerAnalysisFinished(audit) {
+  const executions = audit?.resultados || [];
+  return executions.length
+    ? executions.every((item) => !["pending", "running"].includes(item.status) || item.dados?.progress?.stage === "completed")
+    : Boolean(audit && !["preparing", "pending", "running", "partial"].includes(audit.status));
 }
 
 function renderSellerAnalysisFailure({ documento = "em preparação", message, detail = "" } = {}) {
@@ -6660,28 +6723,40 @@ function getSellerAnalysisStartError(data = {}, responseStatus = 0) {
     return "Não foi possível localizar automaticamente o nome da mãe. Informe-o para continuar.";
   }
   if (responseStatus === 400) {
-    return "Confira o CPF e o nome completo do vendedor.";
+    return "Confira os dados do vendedor, os CNPJs e as fontes selecionadas.";
   }
   return "Não foi possível iniciar a extração agora.";
 }
 
 function renderSellerAnalysisResult(audit) {
   if (!sellerAnalysisResult) return;
-  const execution = (audit?.resultados || []).find((item) => item.fonte === "tjdft");
-  const certificates = Array.isArray(execution?.dados?.certidoes) ? execution.dados.certidoes : [];
+  const executions = audit?.resultados || [];
+  const execution = executions.find((item) => ["pending", "running"].includes(item.status) && item.dados?.progress?.stage !== "completed") || executions[0];
+  const certificates = executions.flatMap((item) => {
+    const rows = item.dados?.certidoes;
+    return Array.isArray(rows) && rows.length
+      ? rows.map((row, index) => ({ ...row, fonte: item.fonte, documentIndex: index }))
+      : [{ tipo: item.dados?.label || item.fonte, status: item.status, resultado: item.resultado, kind: item.dados?.kind || "data", summary: item.dados?.resumo || item.erro, pdfPath: item.pdfUrl, fonte: item.fonte, documentIndex: 0 }];
+  });
   const progress = execution?.dados?.progress || {};
   const downloaded = certificates.filter((item) => item.pdfPath || item.pdfDownloaded).length;
-  const completed = Math.max(certificates.length, Number(progress.completed || 0));
-  const total = Number(progress.total || sellerAnalysisCertificateTypes.length);
-  const processing = !audit || ["preparing", "pending", "running", "partial"].includes(audit.status);
+  const available = certificates.filter((item) => item.status === "success" || item.pdfPath || item.pdfDownloaded).length;
+  const expectedTypes = certificates.length ? certificates.map((item) => item.tipo) : [
+    ...selectedSellerCertificates().map((item) => `${item.uf} · ${item.type}`),
+    ...selectedSellerQueries().map((item) => item.label),
+    ...sellerCompanyCnpjs().map((cnpj) => `Cadastro e QSA · ${cnpj}`),
+  ];
+  const completed = certificates.filter((item) => ["success", "failed", "unavailable", "manual_required", "waiting_user_action"].includes(item.status)).length;
+  const total = Math.max(expectedTypes.length, executions.reduce((sum, item) => sum + Number(item.dados?.progress?.total || item.dados?.certidoes?.length || 1), 0));
+  const processing = !sellerAnalysisFinished(audit);
   const overallLabel = processing
-    ? audit?.status === "preparing" ? "Validando vendedor" : "Extraindo"
-    : downloaded === sellerAnalysisCertificateTypes.length
+    ? audit?.status === "preparing" ? "Validando vendedor" : "Consultando"
+    : available === total && total > 0
       ? "Concluído"
-      : downloaded
+      : available
         ? "Concluído parcialmente"
-        : audit?.errorMessage ? "Falha antes de iniciar" : "Falha na extração";
-  const progressPercent = audit?.status === "success"
+        : audit?.errorMessage ? "Falha antes de iniciar" : "Consultas encerradas sem resultado disponível";
+  const progressPercent = !processing && !audit?.errorMessage
     ? 100
     : audit?.status === "preparing"
       ? 8
@@ -6689,7 +6764,7 @@ function renderSellerAnalysisResult(audit) {
         ? 0
         : Math.min(95, Math.round(15 + (completed / Math.max(1, total)) * 80));
   const startedAt = Date.parse(audit?.createdAt || execution?.startedAt || "");
-  const lastActivityAt = Date.parse(progress.updatedAt || audit?.updatedAt || execution?.startedAt || "");
+  const lastActivityAt = Date.parse(audit?.updatedAt || progress.updatedAt || execution?.startedAt || "");
   const elapsedMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
   const inactivityMs = Number.isFinite(lastActivityAt) ? Date.now() - lastActivityAt : 0;
   const activityState = processing && inactivityMs >= 90000
@@ -6698,23 +6773,30 @@ function renderSellerAnalysisResult(audit) {
       ? { className: "slow", label: `Aguardando o portal há ${formatSellerAnalysisElapsed(inactivityMs)}.` }
       : processing
         ? { className: "active", label: "Processamento ativo; a tela é atualizada automaticamente." }
-        : { className: audit?.status === "success" ? "active" : "stalled", label: audit?.errorDetail || audit?.errorMessage || "Processamento encerrado." };
+        : { className: available === total ? "active" : "stalled", label: audit?.errorDetail || audit?.errorMessage || "Processamento encerrado." };
   const stageLabel = getSellerAnalysisStage(audit, execution, progress, completed);
-  const certificateRows = sellerAnalysisCertificateTypes.map((expectedType, index) => {
+  const certificateRows = expectedTypes.map((expectedType, index) => {
     const certificate = certificates[index] || {};
-    const isCurrent = processing && Number(progress.completed || 0) === index && Boolean(progress.currentCertificate);
+    const isCurrent = processing && certificate.status === "running";
     const status = getSellerCertificateStatus(certificate, audit?.status, isCurrent);
-    const pdfUrl = toPdfPublicUrl(certificate.pdfPath);
-    const resultLabel = certificate.resultado === "consta"
+    const pdfUrl = (certificate.pdfPath || certificate.pdfDownloaded) && audit?.consultaId && certificate.fonte
+      ? `/audit/${encodeURIComponent(audit.consultaId)}/documents/${encodeURIComponent(certificate.fonte)}/${certificate.documentIndex}` : "";
+    const resultLabel = certificate.kind !== "data" && certificate.resultado === "consta"
       ? "Documento requer revisão"
-      : certificate.resultado === "nada_consta"
+      : certificate.kind !== "data" && certificate.resultado === "nada_consta"
         ? "Nada consta"
         : "";
+    const details = certificate.details && typeof certificate.details === "object"
+      ? Object.entries(certificate.details).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value)).slice(0, 30)
+        .map(([label, value]) => `<small><b>${escapeHtml(label)}</b>: ${escapeHtml(String(value))}</small>`).join("") : "";
     return `
       <article class="seller-certificate-item">
         <div>
           <strong>${escapeHtml(certificate.tipo || expectedType)}</strong>
-          <small>${escapeHtml(resultLabel || certificate.errorMessage || "Certidão oficial do TJDFT")}</small>
+          <small>${escapeHtml(certificate.summary || resultLabel || (certificate.errorMessage ? "Consulta indisponível nesta tentativa" : certificate.kind === "data" ? "Consulta de dados complementares" : "Certidão da fonte consultada"))}</small>
+          ${certificate.scope ? `<small>Abrangência: ${escapeHtml(certificate.scope)}</small>` : ""}
+          ${certificate.checkedAt ? `<small>Consulta: ${escapeHtml(certificate.checkedAt)}</small>` : ""}
+          ${details ? `<details><summary>Ver dados da consulta</summary>${details}</details>` : ""}
         </div>
         <span class="property-status ${escapeHtml(status.className)}">${escapeHtml(status.label)}</span>
         ${pdfUrl ? `<a class="secondary-action" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noreferrer">Abrir PDF</a>` : ""}
@@ -6728,7 +6810,7 @@ function renderSellerAnalysisResult(audit) {
         <small>Consulta ${escapeHtml(audit?.documento || "em preparação")}</small>
         <strong>${escapeHtml(overallLabel)}</strong>
       </div>
-      <span>${downloaded}/${sellerAnalysisCertificateTypes.length} PDFs</span>
+      <span>${available}/${total} resultados · ${downloaded} PDFs</span>
     </div>
     <section class="seller-analysis-progress" aria-label="Progresso da extração">
       <div class="seller-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progressPercent}">
@@ -6739,14 +6821,14 @@ function renderSellerAnalysisResult(audit) {
         <span>${escapeHtml(processing ? `Tempo decorrido: ${formatSellerAnalysisElapsed(elapsedMs)}` : `${progressPercent}%`)}</span>
       </div>
       <small class="seller-progress-activity ${escapeHtml(activityState.className)}">${escapeHtml(activityState.label)}</small>
-      <small class="seller-progress-expectation">Tempo normal: cerca de 30 segundos a 2 minutos. O limite técnico desta etapa é aproximadamente 3 minutos.</small>
+      <small class="seller-progress-expectation">Cada fonte pode levar até alguns minutos. Documentos e dados aparecem conforme são obtidos; uma falha não interrompe as demais consultas.</small>
     </section>
     <div class="seller-certificate-list">${certificateRows}</div>
-    <p class="seller-analysis-result-note">Esta etapa apresenta somente os documentos oficiais extraídos. A análise de risco por IA ainda não está ativa.</p>
+    <p class="seller-analysis-result-note">Certidões e consultas de dados têm abrangências diferentes. Confira a fonte e o alcance de cada resultado. A análise de risco por IA ainda não está ativa.</p>
   `;
 }
 
-async function loadSellerAnalysisResult(consultaId, attempts = 180) {
+async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const response = await fetch(`/audit/${encodeURIComponent(consultaId)}`, { headers: { accept: "application/json" } });
@@ -6762,7 +6844,7 @@ async function loadSellerAnalysisResult(consultaId, attempts = 180) {
       }
       const audit = await response.json();
       renderSellerAnalysisResult(audit);
-      if (!["pending", "running", "partial"].includes(audit.status)) return;
+      if (sellerAnalysisFinished(audit)) return;
     } catch {
       if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
       renderSellerAnalysisFailure({ message: "Falha de comunicação durante o acompanhamento." });
@@ -6770,10 +6852,8 @@ async function loadSellerAnalysisResult(consultaId, attempts = 180) {
     }
     if (attempt < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 1500));
   }
-  renderSellerAnalysisFailure({
-    message: "A extração excedeu o tempo esperado.",
-    detail: "O portal não concluiu dentro da janela de acompanhamento. Tente novamente mais tarde.",
-  });
+  if (attempts === 1) return;
+  if (sellerAnalysisError) sellerAnalysisError.textContent = "O lote continua no servidor. Acompanhe os documentos pelo histórico; não inicie outro lote para repetir as mesmas consultas.";
 }
 
 function validateCnibDocument(tipoDocumento, value) {
@@ -8764,6 +8844,27 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   const cpf = String(sellerAnalysisCpf?.value || "").replace(/\D/g, "");
   const fullName = sellerAnalysisFullName?.value.trim() || "";
   const motherName = sellerAnalysisMotherName?.value.trim() || "";
+  const ufs = [...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map((input) => input.value);
+  const sellerQueries = selectedSellerQueries().map((item) => item.id);
+  const companyCnpjs = sellerCompanyCnpjs();
+  if (!ufs.length && !sellerQueries.length && !companyCnpjs.length) {
+    sellerAnalysisError.textContent = "Selecione ao menos uma fonte ou informe um CNPJ para consultar.";
+    return;
+  }
+  if (companyCnpjs.some((cnpj) => !/^\d{14}$/.test(cnpj))) {
+    sellerAnalysisError.textContent = "Informe CNPJs com 14 dígitos, separados por vírgula.";
+    document.querySelector("#sellerAnalysisCompanyCnpjs")?.focus();
+    return;
+  }
+  if (!companyCnpjs.length && selectedSellerQueries().some((item) => !item.documentTypes?.includes("cpf"))) {
+    sellerAnalysisError.textContent = "Informe os CNPJs para consultar as certidões empresariais selecionadas.";
+    document.querySelector("#sellerAnalysisCompanyCnpjs")?.focus();
+    return;
+  }
+  if (!document.querySelector("#sellerAnalysisPaid")?.checked) {
+    sellerAnalysisError.textContent = "Confirme o custo das consultas selecionadas.";
+    return;
+  }
   if (!isValidSellerAnalysisCpf(cpf)) {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe um CPF válido.";
     sellerAnalysisCpf?.focus();
@@ -8782,7 +8883,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
 
   if (sellerAnalysisSubmit) {
     sellerAnalysisSubmit.disabled = true;
-    sellerAnalysisSubmit.textContent = motherName ? "Iniciando extração..." : "Consultando cadastro...";
+    sellerAnalysisSubmit.textContent = "Iniciando consultas...";
   }
   const startedAt = new Date().toISOString();
   renderSellerAnalysisResult({
@@ -8794,13 +8895,21 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   });
 
   try {
-    const response = await fetch("/api/seller-analysis/df", {
+    const response = await fetch("/api/seller-analysis", {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
         cpf,
         fullName,
         motherName,
+        ufs,
+        sellerQueries,
+        companyCnpjs,
+        paidQueryConfirmed: true,
+        birthDate: document.querySelector("#sellerAnalysisBirthDate").value,
+        rg: document.querySelector("#sellerAnalysisRg").value,
+        gender: document.querySelector("#sellerAnalysisGender").value,
+        email: document.querySelector("#sellerAnalysisEmail").value,
         authorizationConfirmed: true,
       }),
     });
@@ -8845,7 +8954,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   } finally {
     if (sellerAnalysisSubmit) {
       sellerAnalysisSubmit.disabled = false;
-      sellerAnalysisSubmit.textContent = "Extrair todas as certidões";
+      sellerAnalysisSubmit.textContent = "Consultar documentos selecionados";
     }
   }
 });

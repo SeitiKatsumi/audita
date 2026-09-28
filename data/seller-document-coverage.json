@@ -1,0 +1,2165 @@
+{
+  "validatedAt": "2026-09-28",
+  "queries": [
+    {
+      "id": "cndt",
+      "label": "CNDT — Débitos trabalhistas",
+      "category": "Trabalhista",
+      "scope": "Brasil",
+      "endpoint": "TSTCertidaoNegativaDebitosTrabalhistas",
+      "params": {},
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "DEBITOS TRABALHISTAS",
+        "BANCO NACIONAL DE DEVEDORES TRABALHISTAS"
+      ],
+      "limitation": "Consulta ao BNDT. Não substitui certidões de distribuição dos TRTs.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "protestos",
+      "label": "Protestos nacionais — IEPTB",
+      "category": "Protestos",
+      "scope": "Brasil",
+      "endpoint": "ProtestosOnline",
+      "params": {},
+      "costBrl": 3.5,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "limitation": "Consulta estruturada do provedor. Não é uma certidão cartorária em PDF."
+    },
+    {
+      "id": "cnd-ac",
+      "label": "AC — Débitos estaduais — SEFAZ",
+      "category": "Fiscal estadual",
+      "scope": "AC",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "AC"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DO ACRE",
+        "CREDITOS TRIBUTARIOS E NAO TRIBUTARIOS"
+      ],
+      "limitation": "Exclui créditos inscritos em dívida ativa.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-am",
+      "label": "AM — Débitos estaduais — SEFAZ e PGE",
+      "category": "Fiscal estadual",
+      "scope": "AM",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "AM"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DO AMAZONAS",
+        "CERTIDAO",
+        "DEBITOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ap",
+      "label": "AP — Tributos estaduais e dívida ativa",
+      "category": "Fiscal estadual",
+      "scope": "AP",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "AP"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DO AMAPA",
+        "TRIBUTOS ESTADUAIS",
+        "DIVIDA ATIVA"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ba",
+      "label": "BA — Débitos tributários estaduais",
+      "category": "Fiscal estadual",
+      "scope": "BA",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "BA"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DA BAHIA",
+        "DEBITOS TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ce",
+      "label": "CE — Débitos estaduais — CADINE",
+      "category": "Fiscal estadual",
+      "scope": "CE",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "CE"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DO CEARA",
+        "DEBITOS ESTADUAIS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-es",
+      "label": "ES — Débitos com a Fazenda estadual",
+      "category": "Fiscal estadual",
+      "scope": "ES",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "ES"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DO ESPIRITO SANTO",
+        "FAZENDA PUBLICA ESTADUAL"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-go",
+      "label": "GO — Débitos inscritos em dívida ativa",
+      "category": "Fiscal estadual",
+      "scope": "GO",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "GO"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DE GOIAS",
+        "CERTIDAO DE DEBITO INSCRITO EM DIVIDA ATIVA"
+      ],
+      "limitation": "Abrange somente dívida ativa estadual.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ma",
+      "label": "MA — Débitos tributários estaduais",
+      "category": "Fiscal estadual",
+      "scope": "MA",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "MA"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DO MARANHAO",
+        "CERTIDAO",
+        "DEBITO"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ms",
+      "label": "MS — Créditos tributários e não tributários",
+      "category": "Fiscal estadual",
+      "scope": "MS",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "MS"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "MATO GROSSO DO SUL",
+        "CREDITOS TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-mt",
+      "label": "MT — Débitos estaduais — SEFAZ e PGE",
+      "category": "Fiscal estadual",
+      "scope": "MT",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "MT"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DE MATO GROSSO",
+        "CREDITOS TRIBUTARIOS E NAO TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-pb",
+      "label": "PB — Débitos tributários e dívida ativa",
+      "category": "Fiscal estadual",
+      "scope": "PB",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "PB"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DA PARAIBA",
+        "CERTIDAO",
+        "DIVIDA ATIVA"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-rj",
+      "label": "RJ — Regularidade fiscal — SEFAZ",
+      "category": "Fiscal estadual",
+      "scope": "RJ",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "RJ"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "RIO DE JANEIRO",
+        "CERTIDAO DE REGULARIDADE FISCAL"
+      ],
+      "limitation": "Deve ser complementada pela certidão de dívida ativa da PGE/RJ.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-rr",
+      "label": "RR — Obrigações e débitos tributários",
+      "category": "Fiscal estadual",
+      "scope": "RR",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "RR"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DE RORAIMA",
+        "OBRIGACOES E DEBITOS TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-rs",
+      "label": "RS — Situação fiscal estadual",
+      "category": "Fiscal estadual",
+      "scope": "RS",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "RS"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "RIO GRANDE DO SUL",
+        "CERTIDAO"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-sc",
+      "label": "SC — Débitos estaduais",
+      "category": "Fiscal estadual",
+      "scope": "SC",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "SC"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DE SANTA CATARINA",
+        "DEBITOS ESTADUAIS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-sp",
+      "label": "SP — Débitos tributários não inscritos em dívida ativa",
+      "category": "Fiscal estadual",
+      "scope": "SP",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "SP"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "DEBITOS TRIBUTARIOS NAO INSCRITOS",
+        "ESTADO DE SAO PAULO"
+      ],
+      "limitation": "Não abrange dívida ativa nem débitos das empresas do titular.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-to",
+      "label": "TO — Débitos inscritos em dívida ativa",
+      "category": "Fiscal estadual",
+      "scope": "TO",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "TO"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "ESTADO DO TOCANTINS",
+        "CERTIDAO",
+        "DEBITO INSCRITO EM DIVIDA ATIVA"
+      ],
+      "limitation": "Abrange somente dívida ativa estadual.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf1-civel",
+      "label": "TRF1 — Cível",
+      "category": "Justiça Federal",
+      "scope": "TRF1",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF1",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 1ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf1-criminal",
+      "label": "TRF1 — Criminal",
+      "category": "Justiça Federal",
+      "scope": "TRF1",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF1",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 1ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf2-civel",
+      "label": "TRF2 — Cível",
+      "category": "Justiça Federal",
+      "scope": "TRF2",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF2",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 2ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf2-criminal",
+      "label": "TRF2 — Criminal",
+      "category": "Justiça Federal",
+      "scope": "TRF2",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF2",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 2ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf3-civel",
+      "label": "TRF3 — Cível",
+      "category": "Justiça Federal",
+      "scope": "TRF3",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF3",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 3a REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf3-criminal",
+      "label": "TRF3 — Criminal",
+      "category": "Justiça Federal",
+      "scope": "TRF3",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF3",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 3a REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf4-civel",
+      "label": "TRF4 — Cível",
+      "category": "Justiça Federal",
+      "scope": "TRF4",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF4",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "JUSTICA FEDERAL DA 4ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf4-criminal",
+      "label": "TRF4 — Criminal",
+      "category": "Justiça Federal",
+      "scope": "TRF4",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF4",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "JUSTICA FEDERAL DA 4ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf5-civel",
+      "label": "TRF5 — Cível",
+      "category": "Justiça Federal",
+      "scope": "TRF5",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF5",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf5-criminal",
+      "label": "TRF5 — Criminal",
+      "category": "Justiça Federal",
+      "scope": "TRF5",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF5",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf6-civel",
+      "label": "TRF6 — Cível",
+      "category": "Justiça Federal",
+      "scope": "TRF6",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF6",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 6ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "MG exige conferência complementar do eproc e acervo residual do TRF1; esta emissão não comprova cobertura de todos os sistemas.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf6-criminal",
+      "label": "TRF6 — Criminal",
+      "category": "Justiça Federal",
+      "scope": "TRF6",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF6",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 6ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "MG exige conferência complementar do eproc e acervo residual do TRF1; esta emissão não comprova cobertura de todos os sistemas.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt2-eletronico",
+      "label": "TRT2 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT2",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "2",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 2ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS"
+      ],
+      "limitation": "Abrange classes e polos indicados no documento; exclui processos físicos, arquivados definitivamente e débitos do BNDT.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "vinculos",
+      "label": "Vínculos empresariais por CPF",
+      "category": "Empresas",
+      "scope": "Brasil",
+      "endpoint": "VinculosSocietarios",
+      "params": {},
+      "costBrl": 1.84,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "limitation": "Base de vínculos do provedor; não substitui cadastro atualizado nem certidão de Junta Comercial."
+    },
+    {
+      "id": "credito-quod",
+      "label": "Pendências de crédito — QUOD",
+      "category": "Crédito",
+      "scope": "Brasil",
+      "endpoint": "DetalhamentoNegativo",
+      "params": {},
+      "costBrl": 2.38,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "limitation": "Consulta QUOD; não é Serasa nem certidão oficial."
+    },
+    {
+      "id": "processos-agrupados",
+      "label": "Processos judiciais — visão agrupada",
+      "category": "Processos",
+      "scope": "Brasil",
+      "endpoint": "ProcessosJudiciaisAgrupada",
+      "params": {},
+      "costBrl": 1.1,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "limitation": "Levantamento do provedor; não é certidão nem garante cobertura integral dos tribunais. Exige análise do papel do vendedor em cada processo."
+    },
+    {
+      "id": "cadin-go",
+      "endpoint": "CADINSecretariaFazendaEstaduais",
+      "params": {
+        "UF": "GO"
+      },
+      "costBrl": 0.54,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "includePdf": true,
+      "label": "GO — Consulta ao CADIN",
+      "category": "Fiscal estadual",
+      "scope": "GO",
+      "expectedText": [
+        "CADIN",
+        "GOIAS"
+      ],
+      "limitation": "Comprovante de consulta ao cadastro de inadimplentes; não substitui certidão de regularidade fiscal nem comprova ausência de todas as dívidas.",
+      "evidenceKind": "consultation_receipt"
+    },
+    {
+      "id": "cadin-rs",
+      "endpoint": "CADINSecretariaFazendaEstaduais",
+      "params": {
+        "UF": "RS"
+      },
+      "costBrl": 0.54,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "includePdf": true,
+      "label": "RS — Consulta ao CADIN",
+      "category": "Fiscal estadual",
+      "scope": "RS",
+      "expectedText": [
+        "CADIN",
+        "RIO GRANDE DO SUL"
+      ],
+      "limitation": "Comprovante de consulta ao cadastro de inadimplentes; não substitui certidão de regularidade fiscal nem comprova ausência de todas as dívidas.",
+      "evidenceKind": "consultation_receipt"
+    },
+    {
+      "id": "cadin-sp",
+      "endpoint": "CADINSecretariaFazendaSP",
+      "params": {},
+      "costBrl": 0.54,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "includePdf": true,
+      "label": "SP — Consulta ao CADIN",
+      "category": "Fiscal estadual",
+      "scope": "SP",
+      "expectedText": [
+        "CADIN",
+        "SAO PAULO"
+      ],
+      "limitation": "Comprovante de consulta ao cadastro de inadimplentes; não substitui certidão de regularidade fiscal nem comprova ausência de todas as dívidas.",
+      "evidenceKind": "consultation_receipt"
+    },
+    {
+      "id": "trt1-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "1",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT1 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT1",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 1ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt10-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "10",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT10 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT10",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 10ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt11-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "11",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT11 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT11",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 11ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt12-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "12",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT12 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT12",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 12ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt13-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "13",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT13 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT13",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 13ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt14-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "14",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT14 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT14",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 14ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt15-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "15",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT15 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT15",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 15ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt16-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "16",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT16 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT16",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 16ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt17-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "17",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT17 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT17",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 17ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt19-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "19",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT19 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT19",
+      "expectedText": [
+        "TRT19.JUS.BR",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt2-fisico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "2",
+        "TIPO": "Físico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT2 — Ações trabalhistas em processos físicos",
+      "category": "Trabalhista",
+      "scope": "TRT2",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 2ª REGIAO",
+        "CERTIDAO",
+        "PROCESSOS FISICOS"
+      ],
+      "limitation": "Abrange somente o acervo físico e os sistemas indicados no documento; não substitui consulta ao PJe nem CNDT/BNDT.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt20-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "20",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT20 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT20",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 20ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt22-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "22",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT22 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT22",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO 22ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt23-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "23",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT23 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT23",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 23ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt24-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "24",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT24 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT24",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 24ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt3-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "3",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT3 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT3",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 3ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt4-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "4",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT4 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT4",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 4ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt5-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "5",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT5 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT5",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 5ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt6-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "6",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT6 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT6",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 6ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt7-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "7",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT7 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT7",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 7ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt7-fisico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "7",
+        "TIPO": "Físico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT7 — Ações trabalhistas em processos físicos",
+      "category": "Trabalhista",
+      "scope": "TRT7",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 7ª REGIAO",
+        "CERTIDAO DE ACOES TRABALHISTAS",
+        "PROCESSOS FISICOS"
+      ],
+      "limitation": "Abrange somente o acervo físico e os sistemas indicados no documento; não substitui consulta ao PJe nem CNDT/BNDT.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt8-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "8",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT8 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT8",
+      "expectedText": [
+        "TRT8.JUS.BR",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trt9-eletronico",
+      "endpoint": "TribunalRegionalTrabalho",
+      "params": {
+        "REGIAO": "9",
+        "TIPO": "Eletrônico"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "TRT9 — Ações trabalhistas no PJe",
+      "category": "Trabalhista",
+      "scope": "TRT9",
+      "expectedText": [
+        "TRIBUNAL REGIONAL DO TRABALHO DA 9ª REGIAO",
+        "CERTIDAO ELETRONICA DE ACOES TRABALHISTAS",
+        "PJE"
+      ],
+      "limitation": "Cobertura limitada aos sistemas, classes, polos e períodos indicados no PDF. Não substitui CNDT/BNDT nem certidão de feitos físicos.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "processos-completos",
+      "label": "Processos judiciais — consulta detalhada",
+      "category": "Processos",
+      "scope": "Brasil",
+      "endpoint": "ProcessosJudiciaisCompleta",
+      "params": {},
+      "costBrl": 3.3,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "limitation": "Base do provedor; não é certidão nem garante cobertura integral. A tela apresenta até 20 detalhes, omite informações em segredo de justiça e exige análise do papel do vendedor."
+    },
+    {
+      "id": "cadin-mg",
+      "endpoint": "CADINSecretariaFazendaEstaduais",
+      "params": {
+        "UF": "MG"
+      },
+      "costBrl": 0.36,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "MG — Consulta estruturada ao CADIN",
+      "category": "Fiscal estadual",
+      "scope": "MG",
+      "limitation": "Retorno estruturado do provedor identificado por CPF. Sem comprovante PDF com identidade conferida; não substitui certidão fiscal."
+    },
+    {
+      "id": "cadin-pa",
+      "endpoint": "CADINSecretariaFazendaEstaduais",
+      "params": {
+        "UF": "PA"
+      },
+      "costBrl": 0.36,
+      "kind": "data",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "PA — Consulta estruturada ao CADIN",
+      "category": "Fiscal estadual",
+      "scope": "PA",
+      "limitation": "Retorno estruturado do provedor identificado por CPF. Sem comprovante PDF com identidade conferida; não substitui certidão fiscal."
+    },
+    {
+      "id": "municipal-aracaju-se",
+      "endpoint": "CertidaoNegativaDebitosMunicipal",
+      "params": {
+        "MUNICIPIO": "Aracaju-SE"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "Aracaju-SE — Débitos municipais",
+      "category": "Fiscal municipal",
+      "scope": "Aracaju-SE",
+      "expectedText": [
+        "CERTIDAO NEGATIVA DE DEBITOS",
+        "PREFEITURA MUNICIPAL DE ARACAJU",
+        "SERGIPE"
+      ],
+      "limitation": "Consulta do contribuinte no município indicado. IPTU, débitos do imóvel e condomínio só estão abrangidos se o documento declarar expressamente.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "municipal-goiania-go",
+      "endpoint": "CertidaoNegativaDebitosMunicipal",
+      "params": {
+        "MUNICIPIO": "Goiânia-GO"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "Goiânia-GO — Débitos municipais",
+      "category": "Fiscal municipal",
+      "scope": "Goiânia-GO",
+      "expectedText": [
+        "CERTIDAO CONJUNTA",
+        "PREFEITURA MUNICIPAL DE GOIANIA",
+        "GOIANIA(GO"
+      ],
+      "limitation": "Consulta do contribuinte no município indicado. IPTU, débitos do imóvel e condomínio só estão abrangidos se o documento declarar expressamente.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "municipal-lajes-rn",
+      "endpoint": "CertidaoNegativaDebitosMunicipal",
+      "params": {
+        "MUNICIPIO": "Lajes-RN"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "Lajes-RN — Débitos municipais",
+      "category": "Fiscal municipal",
+      "scope": "Lajes-RN",
+      "expectedText": [
+        "CERTIDAO NEGATIVA DE DEBITOS",
+        "PREFEITURA MUNICIPAL DE LAJES"
+      ],
+      "limitation": "Consulta do contribuinte no município indicado. IPTU, débitos do imóvel e condomínio só estão abrangidos se o documento declarar expressamente.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "municipal-sao-bento-do-norte-rn",
+      "endpoint": "CertidaoNegativaDebitosMunicipal",
+      "params": {
+        "MUNICIPIO": "São Bento do Norte-RN"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "label": "São Bento do Norte-RN — Débitos municipais",
+      "category": "Fiscal municipal",
+      "scope": "São Bento do Norte-RN",
+      "expectedText": [
+        "CERTIDAO NEGATIVA DE DEBITOS",
+        "PREFEITURA MUNICIPAL DE SAO BENTO DO NORTE"
+      ],
+      "limitation": "Consulta do contribuinte no município indicado. IPTU, débitos do imóvel e condomínio só estão abrangidos se o documento declarar expressamente.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "fgts-company",
+      "label": "FGTS — Regularidade do empregador",
+      "category": "Trabalhista — empresas",
+      "scope": "Brasil",
+      "endpoint": "CaixaRegularidadeEmpregadorFGTS",
+      "params": {},
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "CERTIFICADO DE REGULARIDADE DO FGTS",
+        "CAIXA ECONOMICA FEDERAL"
+      ],
+      "limitation": "Regularidade do empregador perante o FGTS na data e prazo do documento. Não substitui CNDT nem certidão de distribuição trabalhista.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-pe-portal",
+      "label": "PE — Regularidade fiscal — portal SEFAZ",
+      "category": "Fiscal estadual",
+      "scope": "PE",
+      "provider": "portal",
+      "endpoint": "PERegularidadeFiscal",
+      "params": {},
+      "costBrl": 0,
+      "kind": "certificate",
+      "documentTypes": [
+        "cpf"
+      ],
+      "expectedText": [
+        "CERTIDAO DE REGULARIDADE FISCAL",
+        "PERNAMBUCO"
+      ],
+      "limitation": "Certidão do portal SEFAZ-PE. Não compreende débitos cuja exigibilidade esteja suspensa e ressalva a cobrança de valores apurados posteriormente.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cndt-company",
+      "label": "CNDT — Débitos trabalhistas — empresa",
+      "category": "Trabalhista — empresas",
+      "scope": "Brasil",
+      "endpoint": "TSTCertidaoNegativaDebitosTrabalhistas",
+      "params": {},
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "DEBITOS TRABALHISTAS",
+        "BANCO NACIONAL DE DEVEDORES TRABALHISTAS"
+      ],
+      "limitation": "Consulta ao BNDT. Não substitui certidões de distribuição dos TRTs.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ac-company",
+      "label": "AC — Débitos estaduais — SEFAZ — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "AC",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "AC"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DO ACRE",
+        "CREDITOS TRIBUTARIOS E NAO TRIBUTARIOS"
+      ],
+      "limitation": "Exclui créditos inscritos em dívida ativa.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-am-company",
+      "label": "AM — Débitos estaduais — SEFAZ e PGE — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "AM",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "AM"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DO AMAZONAS",
+        "CERTIDAO",
+        "DEBITOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ap-company",
+      "label": "AP — Tributos estaduais e dívida ativa — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "AP",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "AP"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DO AMAPA",
+        "TRIBUTOS ESTADUAIS",
+        "DIVIDA ATIVA"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ba-company",
+      "label": "BA — Débitos tributários estaduais — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "BA",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "BA"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DA BAHIA",
+        "DEBITOS TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ce-company",
+      "label": "CE — Débitos estaduais — CADINE — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "CE",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "CE"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DO CEARA",
+        "DEBITOS ESTADUAIS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-es-company",
+      "label": "ES — Débitos com a Fazenda estadual — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "ES",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "ES"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DO ESPIRITO SANTO",
+        "FAZENDA PUBLICA ESTADUAL"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-go-company",
+      "label": "GO — Débitos inscritos em dívida ativa — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "GO",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "GO"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DE GOIAS",
+        "CERTIDAO DE DEBITO INSCRITO EM DIVIDA ATIVA"
+      ],
+      "limitation": "Abrange somente dívida ativa estadual.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ms-company",
+      "label": "MS — Créditos tributários e não tributários — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "MS",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "MS"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "MATO GROSSO DO SUL",
+        "CREDITOS TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-mt-company",
+      "label": "MT — Débitos estaduais — SEFAZ e PGE — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "MT",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "MT"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DE MATO GROSSO",
+        "CREDITOS TRIBUTARIOS E NAO TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-pb-company",
+      "label": "PB — Débitos tributários e dívida ativa — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "PB",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "PB"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DA PARAIBA",
+        "CERTIDAO",
+        "DIVIDA ATIVA"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-rr-company",
+      "label": "RR — Obrigações e débitos tributários — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "RR",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "RR"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DE RORAIMA",
+        "OBRIGACOES E DEBITOS TRIBUTARIOS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-sc-company",
+      "label": "SC — Débitos estaduais — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "SC",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "SC"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DE SANTA CATARINA",
+        "DEBITOS ESTADUAIS"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-to-company",
+      "label": "TO — Débitos inscritos em dívida ativa — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "TO",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "TO"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DO TOCANTINS",
+        "CERTIDAO",
+        "DEBITO INSCRITO EM DIVIDA ATIVA"
+      ],
+      "limitation": "Abrange somente dívida ativa estadual.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf1-civel-company",
+      "label": "TRF1 — Cível — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF1",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF1",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 1ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf1-criminal-company",
+      "label": "TRF1 — Criminal — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF1",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF1",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 1ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf2-civel-company",
+      "label": "TRF2 — Cível — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF2",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF2",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 2ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf2-criminal-company",
+      "label": "TRF2 — Criminal — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF2",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF2",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 2ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf3-civel-company",
+      "label": "TRF3 — Cível — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF3",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF3",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 3a REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf3-criminal-company",
+      "label": "TRF3 — Criminal — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF3",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF3",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 3a REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf4-civel-company",
+      "label": "TRF4 — Cível — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF4",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF4",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "JUSTICA FEDERAL DA 4ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf4-criminal-company",
+      "label": "TRF4 — Criminal — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF4",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF4",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "JUSTICA FEDERAL DA 4ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf6-civel-company",
+      "label": "TRF6 — Cível — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF6",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF6",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 6ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "MG exige conferência complementar do eproc e acervo residual do TRF1; esta emissão não comprova cobertura de todos os sistemas.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf6-criminal-company",
+      "label": "TRF6 — Criminal — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF6",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF6",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 6ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "MG exige conferência complementar do eproc e acervo residual do TRF1; esta emissão não comprova cobertura de todos os sistemas.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf5-civel-company",
+      "label": "TRF5 — Cível — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF5",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF5",
+        "TIPO": "Cível"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIAO",
+        "CERTIDAO",
+        "CIVEL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "trf5-criminal-company",
+      "label": "TRF5 — Criminal — empresa",
+      "category": "Justiça Federal — empresas",
+      "scope": "TRF5",
+      "endpoint": "TribunalRegionalFederal",
+      "params": {
+        "REGIAO": "TRF5",
+        "TIPO": "Criminal"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "TRIBUNAL REGIONAL FEDERAL DA 5ª REGIAO",
+        "CERTIDAO",
+        "CRIMINAL"
+      ],
+      "limitation": "Abrange a região e os sistemas expressamente indicados no PDF. Não substitui certidões estaduais.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-ma-company",
+      "label": "MA — Débitos tributários estaduais — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "MA",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "MA"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "ESTADO DO MARANHAO",
+        "CERTIDAO",
+        "DEBITO"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido.",
+      "evidenceKind": "official_certificate"
+    },
+    {
+      "id": "cnd-rj-company",
+      "label": "RJ — Regularidade fiscal — SEFAZ — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "RJ",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "RJ"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "RIO DE JANEIRO",
+        "CERTIDAO DE REGULARIDADE FISCAL"
+      ],
+      "limitation": "Deve ser complementada pela certidão de dívida ativa da PGE/RJ. Identificação no PDF por CNPJ raiz; a abrangência dos estabelecimentos segue o escopo declarado na certidão.",
+      "evidenceKind": "official_certificate",
+      "identityScope": "cnpj_root"
+    },
+    {
+      "id": "cnd-rs-company",
+      "label": "RS — Situação fiscal estadual — empresa",
+      "category": "Fiscal estadual — empresas",
+      "scope": "RS",
+      "endpoint": "CertidaoNegativaDebitos",
+      "params": {
+        "UF": "RS"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "expectedText": [
+        "RIO GRANDE DO SUL",
+        "CERTIDAO"
+      ],
+      "limitation": "Cobertura limitada ao escopo e às ressalvas do documento emitido. Identificação no PDF por CNPJ raiz; a abrangência dos estabelecimentos segue o escopo declarado na certidão.",
+      "evidenceKind": "official_certificate",
+      "identityScope": "cnpj_root"
+    },
+    {
+      "id": "municipal-company-sao-paulo",
+      "label": "São Paulo-SP — Tributos mobiliários — empresa",
+      "category": "Fiscal municipal — empresas",
+      "scope": "São Paulo-SP",
+      "endpoint": "CertidaoNegativaDebitosMunicipal",
+      "params": {
+        "MUNICIPIO": "São Paulo-SP"
+      },
+      "costBrl": 0.54,
+      "kind": "certificate",
+      "documentTypes": [
+        "cnpj"
+      ],
+      "identityScope": "cnpj_root",
+      "expectedText": [
+        "CERTIDAO CONJUNTA DE DEBITOS DE TRIBUTOS MOBILIARIOS",
+        "SECRETARIA MUNICIPAL DA FAZENDA",
+        "MUNICIPIO DE SAO PAULO"
+      ],
+      "limitation": "Certidão emitida pelo CNPJ raiz para os estabelecimentos no município de São Paulo. Abrange os tributos mobiliários inscritos e não inscritos descritos; não comprova regularidade do IPTU nem inscrição no CPOM.",
+      "evidenceKind": "official_certificate"
+    }
+  ]
+}

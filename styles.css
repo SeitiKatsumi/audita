@@ -12261,3 +12261,7 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 }
 
 body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
+
+.seller-analysis-ufs { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid #d4e4e4; border-radius: 8px; padding: 12px; }
+.seller-analysis-ufs label { display: flex; align-items: center; gap: 6px; }
+.seller-analysis-ufs input { width: auto; }

@@ -1,5 +1,18 @@
 # Deploy
 
+## Publicacao da analise do vendedor - 28/09/2026
+
+Publicacao autorizada pelo usuario. O app de producao existente e `audita`, em
+`https://app.auditainteligente.com.br`. Preservar banco, chaves, autenticacao e
+volumes. Nao ha migracao nova nesta entrega. Configurar
+`DIRECT_DATA_SELLER_ENABLED` e conferir `DIRECT_DATA_TOKEN` no ambiente privado,
+sem registrar seus valores. Confirmar armazenamento persistente de `storage/pdfs`.
+
+Registrar backup e imagem anterior antes do deploy. Validar saude, versao servida,
+catalogo de cobertura e o fluxo autenticado SP ate resultados, PDFs e historico.
+Os 13 itens de SP sao sete certidoes, um comprovante PDF e cinco consultas de
+dados. A analise consolidada por IA permanece pendente.
+
 ## Plataforma
 
 O deploy sera realizado via CapRover/Docker em VPS propria.

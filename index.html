@@ -392,17 +392,17 @@
               <h3 id="services-certidoes">Certidões</h3>
               <div class="services-grid">
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="certidao tribunal estado uf cpf cnpj pessoa física jurídica">
-                  <a class="service-card-entry" href="#consulta-tjdft-pf">
+                  <a class="service-card-entry" href="#analise-vendedor">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Certidões</small><strong>Certidões estaduais</strong><small>Escolha o estado e consulte as opções de certidões judiciais disponíveis.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Certidões</small><strong>Certidão de tribunais estaduais</strong><small>Escolha o estado e consulte as opções de certidões judiciais disponíveis.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
                     <div class="service-expanded">
                       <span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam reunir certidões dos tribunais estaduais.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>Acesse os formulários por estado e acompanhe a emissão pelos canais disponíveis.</span></span>
-                      <small class="service-note">A disponibilidade varia por tribunal; algumas etapas exigem validação humana.</small>
-                      <a class="service-action" href="#consulta-tjdft-pf">Consultar certidões<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Emita automaticamente os tipos validados para pessoa física. Selecione os estados e reúna os PDFs oficiais.</span></span>
+                      <small class="service-note">Outros tipos, estados e consultas de pessoa jurídica continuam disponíveis no fluxo assistido.</small>
+                      <a class="service-action" href="#consulta-tjdft-pf">Abrir fluxo assistido<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                     </div>
                   </details>
                 </article>
@@ -429,8 +429,8 @@
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
                     <div class="service-expanded">
-                      <span class="service-detail"><b>Para quem é</b><span>Quem está comprando um imóvel e precisa reunir documentos judiciais do vendedor pessoa física no Distrito Federal.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>Com os dados do vendedor, consultamos as certidões disponíveis no TJDFT e reunimos os PDFs oficiais para conferência.</span></span>
+                      <span class="service-detail"><b>Para quem é</b><span>Quem está comprando um imóvel e precisa reunir documentos judiciais do vendedor pessoa física nos estados habilitados.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Emissão automática das certidões validadas por estado, com PDFs oficiais e indicação das pendências.</span></span>
                       <small class="service-note">A etapa atual não inclui análise de risco por IA nem todas as fontes necessárias para avaliar uma compra.</small>
                       <a class="service-action" href="#analise-vendedor">Consultar certidões<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                     </div>
@@ -591,24 +591,19 @@
                 <p class="eyebrow">Compra e venda de im&oacute;veis</p>
                 <h2>An&aacute;lise de Vendedor</h2>
               </div>
-              <span class="live">Dispon&iacute;vel no DF</span>
+              <span class="live">Emissão autônoma</span>
             </div>
             <p class="seller-analysis-intro">
-              Está comprando um imóvel no Distrito Federal? Este serviço reúne as certidões judiciais disponíveis no TJDFT para vendedor pessoa física e organiza os PDFs oficiais em um só lugar. Os dados do vendedor são necessários para identificar a pessoa consultada. Confira-os antes de enviar: o resultado se limita às certidões obtidas e não é uma investigação completa do vendedor nem uma análise de risco por IA.
+              Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas, sem resolver CAPTCHA. Selecione os documentos e confira os dados antes de enviar. O resultado se limita às fontes consultadas e não é uma investigação completa do vendedor nem uma análise de risco por IA.
             </p>
 
             <div class="seller-analysis-scope">
               <div>
-                <small>Escopo desta primeira etapa</small>
-                <strong>Vendedor pessoa f&iacute;sica &middot; Distrito Federal</strong>
+                <small>Cobertura por fonte, estado e tipo</small>
+                <strong>Certidões em PDF e dados complementares</strong>
                 <span>A an&aacute;lise de risco por IA ser&aacute; adicionada em uma etapa futura.</span>
               </div>
-              <ul aria-label="Certid&otilde;es inclu&iacute;das">
-                <li>Criminal</li>
-                <li>C&iacute;vel</li>
-                <li>Fal&ecirc;ncia e Recupera&ccedil;&atilde;o Judicial</li>
-                <li>Especial &mdash; C&iacute;vel e Criminal</li>
-              </ul>
+              <div id="sellerAnalysisCoverage" aria-live="polite">Carregando cobertura...</div>
             </div>
 
             <div class="seller-analysis-workspace">
@@ -617,7 +612,7 @@
                   <span>1</span>
                   <div>
                     <strong>Dados do vendedor</strong>
-                    <small>Informe apenas o CPF e o nome completo. A filia&ccedil;&atilde;o ser&aacute; localizada automaticamente.</small>
+                    <small>RG e gênero são exigidos ao selecionar certidões estaduais. A filiação pode ser consultada na Direct Data quando necessária.</small>
                   </div>
                 </div>
                 <label>
@@ -628,25 +623,40 @@
                   Nome completo
                   <input id="sellerAnalysisFullName" type="text" maxlength="180" autocomplete="name" placeholder="Nome completo do vendedor" required />
                 </label>
-                <label class="hidden" id="sellerAnalysisMotherField">
+                <label>Data de nascimento<input id="sellerAnalysisBirthDate" type="date" /><small>Exigida para certidões estaduais e CND conjunta federal.</small></label>
+                <label>RG — para certidões estaduais<input id="sellerAnalysisRg" type="text" maxlength="30" /></label>
+                <label>Gênero exigido pelo portal estadual<select id="sellerAnalysisGender"><option value="">Selecione</option><option>Masculino</option><option>Feminino</option></select></label>
+                <label>E-mail<input id="sellerAnalysisEmail" type="email" maxlength="180" /></label>
+                <label id="sellerAnalysisMotherField">
                   Nome completo da m&atilde;e
                   <input id="sellerAnalysisMotherName" type="text" maxlength="180" autocomplete="off" placeholder="Informe somente se a busca autom&aacute;tica n&atilde;o localizar" />
                 </label>
+                <label class="seller-analysis-privacy">CNPJs relacionados ao vendedor — opcional
+                  <input id="sellerAnalysisCompanyCnpjs" type="text" maxlength="500" autocomplete="off" placeholder="Separe os CNPJs por vírgula" />
+                  <small>Até cinco CNPJs. Cadastro e quadro societário gratuitos; selecione abaixo as certidões empresariais pagas desejadas. A consulta de vínculos por CPF é uma opção separada.</small>
+                </label>
+                <fieldset id="sellerAnalysisUfs" class="seller-analysis-ufs seller-analysis-privacy"><legend>Certidões estaduais</legend></fieldset>
+                <div id="sellerAnalysisQueries" class="seller-analysis-privacy" aria-live="polite">Carregando outras consultas...</div>
+                <div class="seller-analysis-privacy">
+                  <button id="sellerAnalysisSelectAll" type="button" class="secondary-action">Selecionar todas</button>
+                  <button id="sellerAnalysisClearAll" type="button" class="secondary-action">Desmarcar todas</button>
+                </div>
+                <label class="seller-analysis-consent"><input id="sellerAnalysisPaid" type="checkbox" required /><span id="sellerAnalysisCost">Carregando estimativa de custo...</span></label>
                 <label class="seller-analysis-consent">
                   <input id="sellerAnalysisAuthorization" type="checkbox" required />
                   <span>Confirmo que possuo autoriza&ccedil;&atilde;o ou base legal para consultar os dados deste vendedor.</span>
                 </label>
                 <p class="seller-analysis-privacy">
-                  O CPF &eacute; consultado no cadastro da Direct Data para obter o nome da m&atilde;e e depois enviado ao portal oficial do TJDFT para a emiss&atilde;o. A IA AUDITA usa apenas os dados necess&aacute;rios e registra o identificador mascarado e seu hash para rastreabilidade.
+                  Os dados são enviados às fontes selecionadas e aos provedores de consulta. Nome da mãe é opcional quando a consulta cadastral estiver disponível. PDFs, resultados e histórico exigem autenticação.
                 </p>
-                <button class="primary-action" id="sellerAnalysisSubmit" type="submit">Extrair todas as certid&otilde;es</button>
+                <button class="primary-action" id="sellerAnalysisSubmit" type="submit">Consultar documentos selecionados</button>
                 <small class="login-error" id="sellerAnalysisError" role="alert"></small>
               </form>
 
               <section class="seller-analysis-result" id="sellerAnalysisResult" aria-live="polite">
                 <div class="seller-analysis-empty">
                   <strong>Nenhuma extra&ccedil;&atilde;o iniciada</strong>
-                  <p>Preencha os dados do vendedor para solicitar as quatro certid&otilde;es oficiais do TJDFT.</p>
+                  <p>Selecione as certidões e consultas para reunir os documentos disponíveis.</p>
                 </div>
               </section>
             </div>
@@ -2157,7 +2167,7 @@
     <script type="module" src="/ir-exemption.js?v=20260922-service-intros"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20260922-plans-label"></script>
+    <script type="module" src="app.js?v=20260928-autonomous-certificates"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260922-service-intros"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

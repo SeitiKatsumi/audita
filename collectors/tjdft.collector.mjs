@@ -7,6 +7,7 @@ import {
   SOURCE_RESULT,
 } from "./base.collector.mjs";
 import { readFile } from "node:fs/promises";
+import { collectAutonomousCertificates } from "../services/state-court-autonomous.service.mjs";
 import { extractPdfText, saveAndExtractPdfBuffer } from "../services/pdf.service.mjs";
 import {
   findStateCourtProfile,
@@ -211,6 +212,14 @@ export function discoverIntegrationStrategy() {
 
 export async function collect(input) {
   const extra = input.extraFields || {};
+  if (extra.autonomousUfs?.length) {
+    return collectAutonomousCertificates(input, {
+      collectPortal: collect,
+      closeAssisted: closeAssistedSession,
+      queryCertificate: input.queryCourtCertificate,
+      configuration: input.certificateConfiguration,
+    });
+  }
   const stateCourtUf = String(extra.stateCourtUf || "DF").trim().toUpperCase();
   const stateCourtProfile = findStateCourtProfile(stateCourtUf);
   const stateCourtName = String(extra.stateCourtName || stateCourtProfile?.court || "TJDFT").trim();
@@ -3802,7 +3811,7 @@ async function collectSeTjseStateCourt({ input, profile, stateCourtName, request
   }
 }
 
-async function fillSeTjseCertificate({ context, input, profile, certificateType, keepPageOpen = false }) {
+export async function fillSeTjseCertificate({ context, input, profile, certificateType, keepPageOpen = false }) {
   const page = await context.newPage();
   try {
     page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
@@ -3912,7 +3921,6 @@ async function fillSeTjseCertificate({ context, input, profile, certificateType,
       errorMessage: error.message,
     };
   } finally {
-    page.off?.("requestfailed", handleEmitRequestFailed);
     if (!keepPageOpen) {
       await page.close().catch(() => {});
     }
