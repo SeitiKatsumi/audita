@@ -17,12 +17,16 @@ import { createIrExtractor } from "./services/ir-exemption-ai.mjs";
 import http from "node:http";
 import crypto from "node:crypto";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { PDFDocument } from "pdf-lib";
 import WebSocket, { WebSocketServer } from "ws";
 import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
+import { getPdfRoot } from "./services/storage.service.mjs";
+import { getAutonomousCertificateCoverage, planAutonomousCertificates } from "./services/state-court-autonomous.service.mjs";
+import { getSellerDocumentCoverage, planSellerDocuments } from "./services/seller-documents.service.mjs";
+import { createDirectDataSellerService } from "./services/direct-data-seller.service.mjs";
 import {
   buildDfSellerAuditRequest,
   normalizeDfSellerInput,
@@ -1724,6 +1728,10 @@ const auditService = createAuditService({
   getDb: () => ({ pool, dbReady }),
   getAuthContext: getTenantIdForRequest,
   recordApiUsage: (usageContext, event) => apiUsageService.record(usageContext, event),
+  queryCourtCertificate: (input, auth) => directDataCertificatesService.query(input, auth),
+  getCertificateConfiguration: () => directDataCertificatesService.getStatus(),
+  querySellerDocument: (input, auth) => directDataSellerService.query(input, auth),
+  getSellerDocumentConfiguration: () => directDataSellerService.getStatus(),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
 const billingAccessService = createBillingAccessService({
@@ -1809,6 +1817,10 @@ const directDataCertificatesService = createDirectDataCertificatesService({
   creditsService,
   recordApiUsage: (usageContext, event) =>
     apiUsageService.record(usageContext, event),
+});
+const directDataSellerService = createDirectDataSellerService({
+  creditsService,
+  recordApiUsage: (usageContext, event) => apiUsageService.record(usageContext, event),
 });
 const directDataPersonService = createDirectDataPersonService({
   creditsService,
@@ -4050,7 +4062,15 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
-  if (pathname === "/api/seller-analysis/df" && request.method === "POST") {
+  if (pathname === "/api/seller-analysis/coverage" && request.method === "GET") {
+    sendJson(response, 200, {
+      ...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),
+      sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
+    });
+    return true;
+  }
+
+  if (["/api/seller-analysis/df", "/api/seller-analysis"].includes(pathname) && request.method === "POST") {
     try {
       const body = await readJsonBody(request);
       const sellerInput = normalizeDfSellerInput(body);
@@ -4068,11 +4088,38 @@ async function handleApi(request, response, pathname) {
         return true;
       }
 
+      let autonomousPlan = null;
+      let sellerDocumentPlan = null;
+      const companyCnpjs = body.companyCnpjs === undefined ? [] : body.companyCnpjs;
+      if (pathname === "/api/seller-analysis") {
+        try {
+          if (!Array.isArray(body.ufs)) throw new Error("invalid_ufs");
+          if (body.ufs.length) autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus());
+          if (!Array.isArray(companyCnpjs) || companyCnpjs.length > 5 || companyCnpjs.some((value) => !validateCnpj(value))) throw new Error("invalid_company_cnpjs");
+          sellerDocumentPlan = planSellerDocuments(body.sellerQueries || [], directDataSellerService.getStatus(), companyCnpjs);
+          if (!autonomousPlan && !sellerDocumentPlan.queries.length && !companyCnpjs.length) throw new Error("empty_selection");
+        } catch {
+          sendJson(response, 400, { error: "invalid_seller_selection" });
+          return true;
+        }
+        const maxProviderCostBrl = (autonomousPlan?.maxProviderCostBrl || 0) + sellerDocumentPlan.maxProviderCostBrl;
+        if ((maxProviderCostBrl > 0 || (autonomousPlan && !sellerInput.motherName)) && body.paidQueryConfirmed !== true) {
+          sendJson(response, 400, { error: "paid_query_confirmation_required", maxProviderCostBrl });
+          return true;
+        }
+        const date = new Date(`${body.birthDate}T00:00:00Z`);
+        const needsBirthDate = autonomousPlan || sellerDocumentPlan.queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica");
+        if ((needsBirthDate && (!/^\d{4}-\d{2}-\d{2}$/.test(body.birthDate || "") || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== body.birthDate || date > new Date())) || (autonomousPlan && (!String(body.rg || "").trim() || !["Masculino", "Feminino"].includes(body.gender)))) {
+          sendJson(response, 400, { error: "seller_birth_date_and_rg_required" });
+          return true;
+        }
+      }
+
       let resolvedFullName = sellerInput.fullName;
       let resolvedMotherName = sellerInput.motherName;
       let identityEnriched = false;
 
-      if (!resolvedMotherName) {
+      if (!resolvedMotherName && (autonomousPlan || pathname === "/api/seller-analysis/df")) {
         const enrichment = await directDataPersonService.lookup(
           {
             cpf: sellerInput.cpf,
@@ -4120,12 +4167,12 @@ async function handleApi(request, response, pathname) {
         identityEnriched = true;
       }
 
-      const prepared = buildDfSellerAuditRequest({
+      const prepared = (autonomousPlan || pathname === "/api/seller-analysis/df") ? buildDfSellerAuditRequest({
         cpf: sellerInput.cpf,
         fullName: resolvedFullName,
         motherName: resolvedMotherName,
         authorizationConfirmed: true,
-      });
+      }) : { invalid: false, requestBody: { tipoDocumento: "cpf", documento: sellerInput.cpf, fontes: [], authorizationConfirmed: true, extraFields: { stateCourtFields: { fullName: resolvedFullName } } } };
       if (prepared.invalid) {
         sendJson(response, 400, {
           error: "invalid_seller_analysis_request",
@@ -4135,6 +4182,25 @@ async function handleApi(request, response, pathname) {
       }
 
       request.body = prepared.requestBody;
+      request.body.extraFields.authorizationConfirmed = true;
+      if (sellerDocumentPlan && (sellerDocumentPlan.queries.length || companyCnpjs.length)) {
+        request.body.fontes.push("seller_documents");
+        Object.assign(request.body.extraFields, {
+          sellerQueries: sellerDocumentPlan.queries.map((item) => item.id),
+          companyCnpjs, authorizationConfirmed: true, paidQueryConfirmed: body.paidQueryConfirmed === true,
+        });
+        request.body.extraFields.stateCourtFields.birthDate = String(body.birthDate || "").split("-").reverse().join("/");
+      }
+      if (autonomousPlan) {
+        request.body.extraFields.autonomousUfs = body.ufs;
+        request.body.extraFields.paidQueryConfirmed = body.paidQueryConfirmed === true;
+        Object.assign(request.body.extraFields.stateCourtFields, {
+          birthDate: body.birthDate.split("-").reverse().join("/"),
+          rg: String(body.rg).trim().slice(0, 30),
+          email: String(body.email || "").trim().slice(0, 180),
+          gender: body.gender === "Feminino" ? "Feminino" : "Masculino",
+        });
+      }
       const result = await auditService.startAudit(request);
       if (result.unauthorized) {
         sendJson(response, 401, { error: "authentication_required" });
@@ -4177,6 +4243,54 @@ async function handleApi(request, response, pathname) {
         error: "audit_evidence_create_failed",
         message: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+    return true;
+  }
+
+  const auditDocumentMatch = pathname.match(/^\/audit\/([0-9a-fA-F-]{36})\/documents\/([a-z][a-z0-9_]{0,63})\/(\d{1,4})$/);
+  if (auditDocumentMatch && request.method === "GET") {
+    try {
+      const auth = await getTenantIdForRequest(request);
+      if (auth.unauthorized || !auth.user?.id || !auth.tenantId) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const audit = await auditService.findAudit(auditDocumentMatch[1], request);
+      if (audit?.unauthorized) {
+        sendJson(response, 401, { error: "authentication_required" });
+        return true;
+      }
+      const execution = audit?.resultados?.find((item) => item.fonte === auditDocumentMatch[2]);
+      const index = Number(auditDocumentMatch[3]);
+      const certificates = execution?.dados?.certidoes;
+      const pdfPath = Array.isArray(certificates)
+        ? certificates[index]?.pdfPath
+        : index === 0 ? execution?.pdfUrl || execution?.pdfPath : "";
+      if (!pdfPath || dirname(resolve(pdfPath)) !== resolve(getPdfRoot())) {
+        sendJson(response, 404, { error: "audit_document_not_found" });
+        return true;
+      }
+      const stat = await lstat(pdfPath);
+      const realFile = await realpath(pdfPath);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 20 * 1024 * 1024 || dirname(realFile) !== await realpath(getPdfRoot())) {
+        sendJson(response, 404, { error: "audit_document_not_found" });
+        return true;
+      }
+      const buffer = await readFile(realFile);
+      if (buffer.length > 20 * 1024 * 1024 || buffer.subarray(0, 5).toString() !== "%PDF-") {
+        sendJson(response, 404, { error: "audit_document_not_found" });
+        return true;
+      }
+      response.writeHead(200, {
+        "content-type": "application/pdf",
+        "content-disposition": `inline; filename="${auditDocumentMatch[2]}-${index + 1}.pdf"`,
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+        "content-length": buffer.length,
+      });
+      response.end(buffer);
+    } catch {
+      sendJson(response, 404, { error: "audit_document_not_found" });
     }
     return true;
   }

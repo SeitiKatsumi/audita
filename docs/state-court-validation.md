@@ -1,5 +1,7 @@
 # Validacao de tribunais estaduais
 
+> Histórico de junho de 2026. Para a cobertura autônoma revalidada em 28/09/2026, consulte [Certidões estaduais autônomas](state-court-autonomous.md). A matriz abaixo não representa a disponibilidade atual.
+
 Data da ultima rodada: 2026-06-24
 
 ## Criterios

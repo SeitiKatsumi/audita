@@ -16,4 +16,9 @@ backups
 private-documents/ir/
 
 private-documents/pis/
+private-documents/energy/
 storage/
+output/
+outputs/
+tmp/
+.playwright-cli/

@@ -32,7 +32,7 @@ export async function extractPdfText(buffer) {
 
   try {
     const parser = require("pdf-parse/lib/pdf-parse.js");
-    const parsed = await withPdfParseWarningFilter(() => parser(buffer));
+    const parsed = await withPdfParseWarningFilter(() => parser(new Uint8Array(buffer)));
     return String(parsed.text || "").replace(/\s+/g, " ").trim();
   } catch {
     return "";

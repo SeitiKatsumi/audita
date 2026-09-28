@@ -1,0 +1,202 @@
+{
+  "validatedAt": "2026-09-28",
+  "documentType": "cpf",
+  "certificates": [
+    {
+      "uf": "AP",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL"
+    },
+    {
+      "uf": "AP",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL"
+    },
+    {
+      "uf": "DF",
+      "type": "Criminal",
+      "provider": "portal",
+      "portalType": "criminal",
+      "expectedText": "(AÇÕES CRIMINAIS)"
+    },
+    {
+      "uf": "DF",
+      "type": "Cível",
+      "provider": "portal",
+      "portalType": "civil",
+      "expectedText": "(AÇÕES CÍVEIS)"
+    },
+    {
+      "uf": "DF",
+      "type": "Falência e Recuperação Judicial",
+      "provider": "portal",
+      "portalType": "falencia",
+      "expectedText": "(AÇÕES DE FALÊNCIAS E RECUPERAÇÕES JUDICIAIS)"
+    },
+    {
+      "uf": "DF",
+      "type": "Especial (Cível e Criminal)",
+      "provider": "portal",
+      "portalType": "especial",
+      "expectedText": "(ESPECIAL - AÇÕES CÍVEIS E CRIMINAIS)"
+    },
+    {
+      "uf": "ES",
+      "type": "Cível",
+      "provider": "portal",
+      "portalType": "civil",
+      "expectedText": "NATUREZA CÍVEL"
+    },
+    {
+      "uf": "ES",
+      "type": "Criminal",
+      "provider": "portal",
+      "portalType": "criminal",
+      "expectedText": "NATUREZA CRIMINAL"
+    },
+    {
+      "uf": "ES",
+      "type": "Família",
+      "provider": "direct_data",
+      "expectedText": "NATUREZA FAMÍLIA"
+    },
+    {
+      "uf": "ES",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "NATUREZA DE EXECUÇÕES FISCAIS"
+    },
+    {
+      "uf": "ES",
+      "type": "Militar",
+      "provider": "direct_data",
+      "expectedText": "NATUREZA AUDITORIA MILITAR"
+    },
+    {
+      "uf": "ES",
+      "type": "Falência e recuperação judicial",
+      "provider": "portal",
+      "portalType": "falencia",
+      "expectedText": "NATUREZA DE RECUPERAÇÃO JUDICIAL E EXTRAJUDICIAL"
+    },
+    {
+      "uf": "GO",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "AÇÕES CIVEIS TODAS AS COMARCAS"
+    },
+    {
+      "uf": "GO",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "AÇÕES CRIMINAIS TODAS AS COMARCAS"
+    },
+    {
+      "uf": "PA",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "DISTRIBUIÇÃO DE FEITOS CÍVEIS"
+    },
+    {
+      "uf": "PA",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO JUDICIAL CRIMINAL"
+    },
+    {
+      "uf": "PE",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL"
+    },
+    {
+      "uf": "PE",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL"
+    },
+    {
+      "uf": "PE",
+      "type": "Judicial para fins eleitorais",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO JUDICIAL PARA FINS ELEITORAIS",
+      "providerType": "FinsEleitorais"
+    },
+    {
+      "uf": "PI",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CÍVEL E EXECUÇÃO CÍVEL - UNIFICADA"
+    },
+    {
+      "uf": "PI",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CRIMINAL E AUDITORIA MILITAR - UNIFICADA"
+    },
+    {
+      "uf": "PI",
+      "type": "Judicial para fins eleitorais",
+      "provider": "direct_data",
+      "expectedText": "CÍVEL, EXECUÇÃO CÍVEL, CRIMINAL E AUDITORIA MILITAR - UNIFICADA",
+      "providerType": "FinsEleitorais"
+    },
+    {
+      "uf": "RR",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "providerType": "Cível",
+      "expectedText": "Certidão de Distribuição de Ação Criminal"
+    },
+    {
+      "uf": "RR",
+      "type": "Militar",
+      "provider": "direct_data",
+      "providerType": "Criminal",
+      "expectedText": "Certidão de Distribuição de Ação Militar"
+    },
+    {
+      "uf": "RR",
+      "type": "Concordata e Falências",
+      "provider": "direct_data",
+      "providerType": "Militar",
+      "expectedText": "Certidão de Distribuição de Ação Concordata e Falências"
+    },
+    {
+      "uf": "RS",
+      "type": "Alvará de folha corrida",
+      "provider": "direct_data",
+      "providerType": "Criminal",
+      "expectedText": "ALVARÁ DE FOLHA CORRIDA"
+    },
+    {
+      "uf": "TO",
+      "type": "Cível",
+      "provider": "portal",
+      "portalType": "civil",
+      "expectedText": "AÇÕES E EXECUÇÕES CÍVEIS"
+    },
+    {
+      "uf": "TO",
+      "type": "Criminal",
+      "provider": "portal",
+      "portalType": "criminal",
+      "expectedText": "AÇÕES E EXECUÇÕES CRIMINAIS"
+    },
+    {
+      "uf": "TO",
+      "type": "Falência e recuperação judicial",
+      "provider": "direct_data",
+      "expectedText": "DISTRIBUIÇÃO FALÊNCIA, RECUPERAÇÃO JUDICIAL",
+      "providerType": "FalênciaRecuperação"
+    },
+    {
+      "uf": "TO",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "AÇÕES DE EXECUÇÕES FISCAIS"
+    }
+  ]
+}

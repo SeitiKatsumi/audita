@@ -9,6 +9,7 @@ import * as portalTransparencia from "../collectors/portal-transparencia.collect
 import * as cnib from "../collectors/cnib.collector.mjs";
 import * as imoveisOnr from "../collectors/imoveis-onr.collector.mjs";
 import { calculateRiskScore } from "./risk-score.service.mjs";
+import { collectSellerDocuments } from "./seller-documents.service.mjs";
 
 const collectors = {
   receita_federal: receitaFederal,
@@ -20,6 +21,7 @@ const collectors = {
   portal_transparencia: portalTransparencia,
   cnib,
   imoveis_onr: imoveisOnr,
+  seller_documents: { collect: collectSellerDocuments },
 };
 
 const memoryQueries = new Map();
@@ -89,6 +91,11 @@ function envNumber(name, fallback) {
 
 function normalizeExtraFields(value) {
   return {
+    sellerQueries: Array.isArray(value.sellerQueries) ? [...new Set(value.sellerQueries.map(String))].slice(0, 160) : [],
+    companyCnpjs: Array.isArray(value.companyCnpjs) ? [...new Set(value.companyCnpjs.map(normalizeDocument))].slice(0, 5) : [],
+    authorizationConfirmed: value.authorizationConfirmed === true,
+    autonomousUfs: Array.isArray(value.autonomousUfs) ? [...new Set(value.autonomousUfs.map((uf) => String(uf).toUpperCase()))] : [],
+    paidQueryConfirmed: value.paidQueryConfirmed === true,
     firstName: String(value.firstName || value.primeiroNome || "").trim(),
     motherName: String(value.motherName || value.nomeMae || "").trim(),
     fatherName: String(value.fatherName || value.nomePai || "").trim(),
@@ -140,34 +147,27 @@ function toApiResult(row) {
   };
 }
 
-function toPublicPdfUrl(pdfPath) {
-  if (!pdfPath) {
-    return "";
-  }
-  const fileName = String(pdfPath).split(/[\\/]/).pop();
-  return fileName ? `/storage/pdfs/${encodeURIComponent(fileName)}` : "";
-}
-
-function extractPdfEvidence(result) {
+function extractPdfEvidence(result, consultaId) {
   const items = [];
-  if (result.pdfUrl || result.pdfPath) {
+  const dados = result.dados || result.dadosJson || {};
+  const certidoes = Array.isArray(dados.certidoes) ? dados.certidoes : null;
+  const documentUrl = (index) => `/audit/${encodeURIComponent(consultaId)}/documents/${encodeURIComponent(result.fonte)}/${index}`;
+  if (!certidoes && (result.pdfUrl || result.pdfPath)) {
     items.push({
       fonte: result.fonte,
       titulo: "PDF da certidao",
-      url: toPublicPdfUrl(result.pdfUrl || result.pdfPath),
+      url: documentUrl(0),
     });
   }
 
-  const dados = result.dados || result.dadosJson || {};
-  const certidoes = Array.isArray(dados.certidoes) ? dados.certidoes : [];
-  for (const certidao of certidoes) {
+  for (const [index, certidao] of (certidoes || []).entries()) {
     if (!certidao?.pdfPath) {
       continue;
     }
     items.push({
       fonte: result.fonte,
       titulo: certidao.tipo || "Certidao",
-      url: toPublicPdfUrl(certidao.pdfPath),
+      url: documentUrl(index),
     });
   }
 
@@ -218,14 +218,14 @@ function stableStringify(value) {
   return JSON.stringify(value);
 }
 
-function cacheKey({ tenantId, documentoHash, fonte, extraFields }) {
+function cacheKey({ tenantId, userId, documentoHash, fonte, extraFields }) {
   const scopeHash = crypto.createHash("sha256").update(stableStringify(extraFields || {})).digest("hex");
-  return `${tenantId || "public"}:${documentoHash}:${fonte}:${scopeHash}`;
+  return `${tenantId || "public"}:${userId || "anonymous"}:${documentoHash}:${fonte}:${scopeHash}`;
 }
 
 async function runCollectorWithCache({ collector, fonte, input, documentoHash, tenantId }) {
   const ttlMs = envNumber("AUDIT_CACHE_TTL_SECONDS", 900) * 1000;
-  const key = cacheKey({ tenantId, documentoHash, fonte, extraFields: input.extraFields });
+  const key = cacheKey({ tenantId, userId: input.usageContext?.userId, documentoHash, fonte, extraFields: input.extraFields });
   const cached = resultCache.get(key);
   if (cached && Date.now() - cached.createdAt < ttlMs) {
     return { ...cached.result, dados: { ...cached.result.dados, cacheHit: true } };
@@ -243,6 +243,10 @@ export function createAuditService({
   getDb,
   getAuthContext,
   recordApiUsage,
+  queryCourtCertificate,
+  getCertificateConfiguration,
+  querySellerDocument,
+  getSellerDocumentConfiguration,
   logError = console.error,
   customCollectors = collectors,
 } = {}) {
@@ -370,7 +374,9 @@ export function createAuditService({
   }
 
   async function executeCollector(query, fonte) {
-    const collector = customCollectors[fonte];
+    const collector = fonte === "seller_documents" && customCollectors[fonte]
+      ? { collect: (input) => collectSellerDocuments(input, { query: querySellerDocument, configuration: getSellerDocumentConfiguration?.() }) }
+      : customCollectors[fonte];
     if (!collector) {
       await updateResult(query.consultaId, {
         fonte,
@@ -417,6 +423,8 @@ export function createAuditService({
         collector,
         fonte,
         input: {
+          queryCourtCertificate,
+          certificateConfiguration: getCertificateConfiguration?.(),
           documento: query.documentoNormalizado,
           tipoDocumento: query.tipoDocumento,
           consultaId: query.consultaId,
@@ -541,7 +549,7 @@ export function createAuditService({
         status: result.status,
         resultado: result.resultado,
       })),
-      pdfs: resultados.flatMap(extractPdfEvidence),
+      pdfs: resultados.flatMap((result) => extractPdfEvidence(result, query.consultaId)),
     };
   }
 
@@ -626,7 +634,7 @@ export function createAuditService({
           status: result.status,
           resultado: result.resultado,
         })),
-        pdfs: resultados.flatMap(extractPdfEvidence),
+        pdfs: resultados.flatMap((result) => extractPdfEvidence(result, row.public_id)),
       });
     }
 
