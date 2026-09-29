@@ -15,7 +15,7 @@ test("seller analysis route opens its introductory screen", () => {
   assert.match(indexHtml, /id="analise-vendedor" data-page="analise-vendedor"/);
   assert.match(indexHtml, /certidões e consultas do vendedor pessoa física nas fontes habilitadas/);
   assert.match(indexHtml, /Certidões em PDF e dados complementares/);
-  assert.match(indexHtml, /não é uma investigação completa do vendedor nem uma análise de risco por IA/);
+  assert.match(indexHtml, /relatório em PDF com evidências e próximos passos/);
   assert.match(indexHtml, /Emissão autônoma/);
   assert.match(appJs, /"analise-vendedor":\s*\{/);
 });
@@ -32,7 +32,7 @@ test("seller analysis selects validated states with cost and legal consent", () 
   assert.match(indexHtml, /id="sellerAnalysisQueries"/);
   assert.match(indexHtml, /id="sellerAnalysisCompanyCnpjs"/);
   assert.match(indexHtml, /id="sellerAnalysisPaid"/);
-  assert.match(indexHtml, /A an&aacute;lise de risco por IA ser&aacute; adicionada em uma etapa futura/);
+  assert.match(indexHtml, /id="sellerAnalysisAiConsent"/);
   assert.match(appJs, /\/api\/seller-analysis\/coverage/);
   assert.match(appJs, /motherNameRequired/);
   assert.match(appJs, /role="progressbar"/);
@@ -116,6 +116,8 @@ test("seller results preserve every source, private PDF indices and pending quer
   assert.equal(context.sellerAnalysisFinished(audit), false, "one completed source must not stop polling");
   assert.match(result.innerHTML, /Consultando/);
   assert.match(result.innerHTML, /Consulta disponível/);
+  assert.match(result.innerHTML, /Na fila/);
+  assert.doesNotMatch(result.innerHTML, /Não extraída/);
   assert.match(result.innerHTML, /2\/4 resultados · 1 PDFs/);
   assert.match(result.innerHTML, /documents\/tjdft\/0/);
   assert.doesNotMatch(result.innerHTML, /storage\/pdfs|private-state.pdf|<script>|Nada consta/);

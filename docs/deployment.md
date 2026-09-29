@@ -1,5 +1,15 @@
 # Deploy
 
+## Publicacao da analise documental - 29/09/2026
+
+Usuario autorizou publicar o fluxo consolidado de IA e PDF do vendedor. Reutiliza
+chave/modelo OpenAI existentes e volume privado de PDFs; nenhuma migracao nova.
+Conferir `aiReady`, acesso autenticado ao historico e botao de analise das consultas
+anteriores, sem repetir consultas pagas. Preservar banco, chaves e volumes; registrar
+backup verificado, imagem anterior, SHA servido e validacao apos deploy no STATUS.
+Testes de IA usam dados ficticios; publicar nao autoriza iniciar analise externa dos
+documentos reais de uma consulta que ainda nao tem consentimento registrado.
+
 ## Publicacao da analise do vendedor - 28/09/2026
 
 Publicacao autorizada pelo usuario. O app de producao existente e `audita`, em

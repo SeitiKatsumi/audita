@@ -1,3 +1,13 @@
+# 2026-09-29 - Publicacao da analise e relatorio do vendedor
+- Codex, codex/seller-ai-report. Publicacao autorizada pelo usuario: fluxo IA/PDF, retomada de consultas anteriores e status correto durante fila. Main sem divergencia remota; validacao previa de 510 testes e 8 testes pertinentes apos ajuste da fila. Producao atual release131, chave OpenAI configurada e volumes privados presentes. Sem migracoes. Backup, integracao GitHub e deploy em andamento; confirmacao final pendente.
+
+# 2026-09-29 - Analise documental do vendedor
+- Codex, codex/seller-ai-report, integrado ao main local. Fluxo de dados/coleta existente/IA por fonte/PDF privado; consentimento OpenAI, progresso, checkpoints, retomada e historico. Compartilhados: app.js, index.html, styles.css, server.mjs e services/audit.service.mjs. Sem novas tabelas, migracoes compartilhadas, consultas pagas ou publicacao.
+- Validacao: 510 testes completos passaram em PGlite; 21 pertinentes apos ajustes. Navegador desktop/celular: coleta e IA automaticas, lacunas, PDF, recarga sem novas consultas e retorno aos dados, com provedores ficticios. PDF renderizado e conferido. OpenAI real validada com dados ficticios; citacao sem evidencia foi rejeitada em uma tentativa. Consolidacao final validada: 510 testes do diretorio test/ passaram na main, sem ignorados; execucao ampla inicial incluiu copias antigas em output/ e foi refeita somente nos testes do repositorio. Navegador reexecutado com assets da porta3000 e historico recuperado apos limpar sessionStorage. Health200, banco ready, IA ready; endpoints privados anonimos401 e codigo interno404. Servidor main reiniciado sem migracoes; tunel privado existente restabelecido. Ainda local, sem commit/push/deploy. Lote pago real e precisao em todas as certidoes nao homologados nesta entrega.
+
+# 2026-09-29 - Sincronizacao solicitada
+- Main atualizada para 61e180e por fast-forward, um commit. Registros locais conciliados e stash de seguranca preservado. 14 testes de IR/PIS/catalogo passaram; diff --check sem erros. Sem push/deploy.
+
 # 2026-09-29 - Publicacao consolidada solicitada
 - Usuario autorizou commit, push e atualizacao no CapRover. Inclui ajustes locais IR/PIS, categoria Analise do vendedor, URL NCM e inicializador local. Configuracoes privadas e dados fora do Git; sem novas migracoes de producao.
 - Origin atualizado sem divergencia; suite completa em PGlite isolado: 507 testes passaram, zero falhas/ignorados. Diff check aprovado. Confirmacao do deploy pelo hash publico pendente nesta etapa.
@@ -14,6 +24,10 @@
 # 2026-09-29 - Atualizacao local da main
 - Solicitado pelo usuario: origin/main atualizado em fast-forward de 1b8b032 para bc3862d (4 commits). Ajustes locais reaplicados; conflito apenas no registro de status, resolvido preservando ambos os historicos. Backup mantido no stash backup-before-pull-2026-09-29. Sem commit/push/deploy.
 - Validacao: 12 testes de chat IR/PIS e vendedor UI/API passaram; diff check e ausencia de conflitos confirmados, HEAD igual a origin/main. localhost:3000 nao respondeu nesta verificacao; atualizacao concluida no checkout, sem iniciar/reiniciar servico nesta operacao Git.
+# 2026-09-28 - Republicacao de toda a versao consolidada
+- Codex; codex/autonomous-certificates/main. Usuario solicitou publicar tudo. Main bc3862d274957ea8c1ff7523a1e00294112c0923 publicada no CapRover audita, release 130, apos backup verificado; rollback para imagem 129. Nenhuma mudanca funcional adicional ou migracao.
+- Verificado: health publico 200 com SHA correto, banco pronto, autenticacao exigida, interface atualizada e catalogo com 30 certidoes estaduais e 100 consultas adicionais. PDF real da CNDT preservado no volume apos o deploy, hash identico e acesso anonimo 401. CI da main aprovado.
+- O teste completo das 13 fontes de SP continua pendente; esta republicacao nao executou consultas pagas nem implementou a analise por IA. Main local e arquivos privados preservados; processo local nao reiniciado por bloqueio de revisao automatica ja registrado abaixo.
 
 # 2026-09-28 - Analise de vendedor publicada; teste SP completo pendente de saldo
 - Codex; codex/autonomous-certificates. Usuario autorizou publicar e validar ponta a ponta. Escopo: integrar os catalogos e coletores ja homologados, revisar pacote Docker/configuracao de producao, publicar e validar SP pelo app autenticado (13 resultados, oito PDFs, historico). Arquivos compartilhados: app.js, index.html, styles.css, server.mjs; preservadas as alteracoes conciliadas no main local. Sem analise por IA nesta publicacao.
@@ -515,3 +529,9 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Codex, codex/debt-free-flow, base main. Saldo explicitamente devedor normalizado sem alterar sinais de transações; cache de extração renovado. Contratação de dívidas liberada sem Stripe, evento específico e valor pago zero; demais módulos preservados. Concluído localmente: 388 testes aprovados, incluindo saldo textual, sinal contraditório, contratação sem chamada Stripe e download liberado. Integrado na main e porta 3000; sem push/deploy.
 - Publicação autorizada. Sem migração; rollback para audita:116 / d3a3bc6. GitHub e deploy em andamento.
 - Publicado: GitHub/main 9743a96, CI 35142522371 aprovado e CapRover audita:117. Smoke, banco e JS servido conferidos. Reanálise real do PDF fictício de juros elevados concluiu e abriu contratação: saldo cobrado 30.925,80; estimado 12.205,23–12.370,32; redução 60–60,53%. Tela informa sem cobrança nesta etapa. Liberação sem Stripe validada por teste integrado; não houve aceite contratual nem pagamento real pela interface de produção.
+
+# 2026-09-28 - Atualizacao do GitHub
+- Codex; main local atualizada por fast-forward de 7a97609 para 1b8b032 (origin/main). Escopo: sincronizacao solicitada; index.html e registros locais preservados, conflito documental conciliado mantendo ambos os registros. Validacao: 63 testes pertinentes passaram e git diff --check sem erros. Servidor do checkout principal iniciado na porta 3000, com auto-migracao desativada e configuracao privada existente preservada; pagina HTTP 200 e rotulo local conferido. Health confirma versao 1b8b032, mas banco configurado indisponivel (ECONNREFUSED); funcionalidades dependentes do banco permanecem pendentes. Sem push/deploy.
+
+# 2026-09-25 - Titulo do card de tribunais estaduais
+- Codex, codex/state-court-label; titulo em index.html integrado ao main local. Sete testes do catalogo passaram; sem push/deploy.

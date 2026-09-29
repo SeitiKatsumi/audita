@@ -91,6 +91,7 @@ function envNumber(name, fallback) {
 
 function normalizeExtraFields(value) {
   return {
+    sellerAiConsent: value.sellerAiConsent === true,
     sellerQueries: Array.isArray(value.sellerQueries) ? [...new Set(value.sellerQueries.map(String))].slice(0, 160) : [],
     companyCnpjs: Array.isArray(value.companyCnpjs) ? [...new Set(value.companyCnpjs.map(normalizeDocument))].slice(0, 5) : [],
     authorizationConfirmed: value.authorizationConfirmed === true,
@@ -247,6 +248,7 @@ export function createAuditService({
   getCertificateConfiguration,
   querySellerDocument,
   getSellerDocumentConfiguration,
+  onSellerCollected,
   logError = console.error,
   customCollectors = collectors,
 } = {}) {
@@ -261,9 +263,9 @@ export function createAuditService({
       `INSERT INTO audita_audits (
          public_id, tenant_id, requested_by_user_id, document_type, tipo_documento,
          document_hash, documento_hash, document_masked, status, score_nivel,
-         score_motivos, authorization_confirmed, request_payload
+         score_motivos, authorization_confirmed, request_payload, subject_name
        )
-       VALUES ($1, $2, $3, $4, $4, $5, $5, $6, $7, $8, $9, true, $10)`,
+       VALUES ($1, $2, $3, $4, $4, $5, $5, $6, $7, $8, $9, true, $10, $11)`,
       [
         query.consultaId,
         authContext.tenantId,
@@ -276,8 +278,10 @@ export function createAuditService({
         JSON.stringify(query.scoreRisco.motivos),
         JSON.stringify({
           fontes: query.fontes,
+          sellerAiConsent: query.extraFields.sellerAiConsent === true,
           extraFieldsProvided: Object.fromEntries(Object.keys(query.extraFields || {}).map((key) => [key, Boolean(query.extraFields[key])])),
         }),
+        String(query.extraFields.stateCourtFields?.fullName || '').slice(0, 180) || null,
       ],
     );
 
@@ -526,7 +530,9 @@ export function createAuditService({
     memoryQueries.set(consultaId, query);
     await persistQuery(query, authContext);
     setTimeout(() => {
-      Promise.all(fontes.map((fonte) => executeCollector(query, fonte))).catch((error) => {
+      Promise.all(fontes.map((fonte) => executeCollector(query, fonte))).then(async () => {
+        if (query.extraFields.sellerAiConsent && onSellerCollected) await onSellerCollected(consultaId, authContext, request);
+      }).catch((error) => {
         logError("[audita] audit execution failed", error);
       });
     }, 0);
@@ -658,6 +664,7 @@ export function createAuditService({
       return {
         consultaId: memory.consultaId,
         documento: memory.documento,
+        subjectName: memory.extraFields.stateCourtFields?.fullName || '',
         tipoDocumento: memory.tipoDocumento,
         status: aggregateStatus(memory.resultados),
         resultados: memory.resultados.map(toApiResult),
@@ -683,7 +690,7 @@ export function createAuditService({
     }
 
     const auditResult = await pool.query(
-      `SELECT public_id, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos, created_at, updated_at
+      `SELECT public_id, subject_name, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos, created_at, updated_at
        FROM audita_audits
        WHERE public_id = $1
          ${tenantFilter}
@@ -719,6 +726,7 @@ export function createAuditService({
     return {
       consultaId: audit.public_id,
       documento: audit.document_masked,
+      subjectName: audit.subject_name || '',
       tipoDocumento: audit.tipo_documento || audit.document_type,
       status: aggregateStatus(resultados),
       resultados,

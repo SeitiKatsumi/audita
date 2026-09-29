@@ -6704,6 +6704,7 @@ function renderSellerAnalysisFailure({ documento = "em preparação", message, d
 }
 
 function getSellerAnalysisStartError(data = {}, responseStatus = 0) {
+  if (data.error === 'seller_ai_unavailable') return 'A análise por IA não está disponível neste ambiente. Nenhuma consulta foi iniciada. Tente novamente quando a integração estiver disponível.';
   if (data.error === "seller_name_mismatch") {
     return "O nome informado não corresponde ao cadastro do CPF. Confira os dados.";
   }
@@ -6777,8 +6778,8 @@ function renderSellerAnalysisResult(audit) {
   const stageLabel = getSellerAnalysisStage(audit, execution, progress, completed);
   const certificateRows = expectedTypes.map((expectedType, index) => {
     const certificate = certificates[index] || {};
-    const isCurrent = processing && certificate.status === "running";
-    const status = getSellerCertificateStatus(certificate, audit?.status, isCurrent);
+    const isCurrent = processing && (certificate.status === "running" || certificate.tipo === progress.currentCertificate);
+    const status = getSellerCertificateStatus(certificate, processing ? "running" : audit?.status, isCurrent);
     const pdfUrl = (certificate.pdfPath || certificate.pdfDownloaded) && audit?.consultaId && certificate.fonte
       ? `/audit/${encodeURIComponent(audit.consultaId)}/documents/${encodeURIComponent(certificate.fonte)}/${certificate.documentIndex}` : "";
     const resultLabel = certificate.kind !== "data" && certificate.resultado === "consta"
@@ -6823,15 +6824,25 @@ function renderSellerAnalysisResult(audit) {
       <small class="seller-progress-activity ${escapeHtml(activityState.className)}">${escapeHtml(activityState.label)}</small>
       <small class="seller-progress-expectation">Cada fonte pode levar até alguns minutos. Documentos e dados aparecem conforme são obtidos; uma falha não interrompe as demais consultas.</small>
     </section>
-    <div class="seller-certificate-list">${certificateRows}</div>
-    <p class="seller-analysis-result-note">Certidões e consultas de dados têm abrangências diferentes. Confira a fonte e o alcance de cada resultado. A análise de risco por IA ainda não está ativa.</p>
+    ${processing ? `<div class="seller-certificate-list">${certificateRows}</div>` : `<div id="sellerReviewPanel" aria-live="polite"></div><details class="seller-source-details"><summary>Documentos e resultados das fontes (${available}/${total})</summary><div class="seller-certificate-list">${certificateRows}</div></details>`}
+    <p class="seller-analysis-result-note">A análise considera apenas as fontes selecionadas. Fontes indisponíveis não comprovam regularidade. Confira os documentos originais e a abrangência de cada consulta.</p>
   `;
 }
 
+let sellerCollectionRun = 0;
 async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
+  const run = ++sellerCollectionRun;
+  sellerReviewRun++;
+  if (sellerAnalysisForm) sellerAnalysisForm.hidden = true;
+  const changeData = document.querySelector('#sellerChangeData');
+  if (changeData) {
+    changeData.hidden = false;
+    changeData.onclick = () => { sellerAnalysisForm.hidden = false; changeData.hidden = true; sellerAnalysisCpf?.focus(); };
+  }
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const response = await fetch(`/audit/${encodeURIComponent(consultaId)}`, { headers: { accept: "application/json" } });
+      if (run !== sellerCollectionRun) return;
       if (response.status === 401) {
         showLogin("Entre para acompanhar a análise do vendedor.");
         renderSellerAnalysisFailure({ message: "É necessário entrar para acompanhar esta extração." });
@@ -6844,7 +6855,7 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
       }
       const audit = await response.json();
       renderSellerAnalysisResult(audit);
-      if (sellerAnalysisFinished(audit)) return;
+      if (sellerAnalysisFinished(audit)) { await loadSellerReview(consultaId); return; }
     } catch {
       if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
       renderSellerAnalysisFailure({ message: "Falha de comunicação durante o acompanhamento." });
@@ -6854,6 +6865,74 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
   }
   if (attempts === 1) return;
   if (sellerAnalysisError) sellerAnalysisError.textContent = "O lote continua no servidor. Acompanhe os documentos pelo histórico; não inicie outro lote para repetir as mesmas consultas.";
+}
+
+let sellerReviewRun = 0;
+async function loadSellerReviewHistory() {
+  const target = document.querySelector('#sellerReviewHistoryList');
+  if (!target) return;
+  target.textContent = 'Carregando consultas salvas...';
+  try {
+    const response = await fetch('/audit');
+    if (!response.ok) throw new Error();
+    const { audits = [] } = await response.json();
+    const sellers = audits.filter(a => a.fontes?.length && a.fontes.every(f => ['tjdft', 'seller_documents'].includes(f.fonte)));
+    target.innerHTML = sellers.length ? sellers.map(a => `<p><button type="button" class="secondary-action" data-seller-history="${escapeHtml(a.consultaId)}">${escapeHtml(a.documento)} · ${escapeHtml(new Date(a.createdAt).toLocaleString('pt-BR'))}</button></p>`).join('') : '<p>Nenhuma análise de vendedor nas consultas recentes.</p>';
+    target.querySelectorAll('[data-seller-history]').forEach(button => { button.onclick = () => {
+      sessionStorage.setItem('audita:lastSellerAnalysisDfAuditId', button.dataset.sellerHistory);
+      loadSellerAnalysisResult(button.dataset.sellerHistory);
+      sellerAnalysisResult?.scrollIntoView({ block: 'start' });
+    }; });
+  } catch { target.textContent = 'Entre na sua conta ou atualize a lista para recuperar as análises salvas.'; }
+}
+document.querySelector('#sellerReviewHistory')?.addEventListener('toggle', event => { if (event.target.open) loadSellerReviewHistory(); });
+document.querySelector('#sellerReviewHistoryRefresh')?.addEventListener('click', loadSellerReviewHistory);
+
+async function loadSellerReview(id) {
+  const run = ++sellerReviewRun;
+  const target = document.querySelector('#sellerReviewPanel');
+  if (!target) return;
+  while (run === sellerReviewRun && target.isConnected) {
+    try {
+      const response = await fetch(`/api/seller-analysis/${encodeURIComponent(id)}/review`);
+      const state = await response.json();
+      if (!response.ok) throw new Error('unavailable');
+      if (run !== sellerReviewRun || !target.isConnected) return;
+      renderSellerReview(target, id, state);
+      if (state.status !== 'running') return;
+    } catch {
+      target.innerHTML = '<p role="alert">Não foi possível acompanhar a análise. Os documentos continuam salvos.</p><button type="button" class="secondary-action" data-seller-review-reload>Atualizar análise</button>';
+      target.querySelector('[data-seller-review-reload]').onclick = () => loadSellerReview(id);
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+}
+
+function renderSellerReview(target, id, state) {
+  const report = state.report;
+  const running = state.status === 'running';
+  const canRetry = state.status === 'interrupted' || (!report && state.status === 'failed') || report?.sources.some(s => s.status === 'unread');
+  target.innerHTML = `<section class="seller-review" aria-busy="${running}">
+    <h3>${running ? '3. Analisando documentos e dados' : report ? '3. Seu relatório de análise' : '3. Análise por IA'}</h3>
+    ${running ? `<progress max="100" value="${Number(state.progress) || 0}" aria-label="Progresso da análise"></progress><p><strong>${Number(state.progress) || 0}%</strong> · ${Number(state.completed) || 0} de ${Number(state.total) || 0} fontes</p><p>${escapeHtml(state.current || '')}</p><small>Pode sair desta tela. A análise continua no servidor e o resultado fica salvo na consulta.</small>` : ''}
+    ${report ? `<p><strong>${escapeHtml(report.conclusion)}</strong></p><p>${report.analyzed}/${report.total} fontes analisadas · ${report.findings.length} apontamentos · ${report.gaps} fontes com lacunas</p>
+      ${state.status === 'completed' ? `<a class="primary-action" href="/api/seller-analysis/${encodeURIComponent(id)}/report.pdf" download>Baixar relatório completo em PDF</a>` : ''}
+      ${report.findings.length ? `<details><summary>Ver apontamentos e providências</summary>${report.findings.map(f => `<article><h4>${escapeHtml(f.title)}</h4><p>${escapeHtml(f.description)}</p><small>Fonte: ${escapeHtml(f.sourceTitle)}</small><blockquote>${escapeHtml(f.quote)}</blockquote>${f.identity !== 'compatible' ? '<p>Identidade não confirmada: confira o original antes de atribuir este registro ao vendedor.</p>' : ''}<p><strong>Próximo passo:</strong> ${escapeHtml(f.recommendation)}</p></article>`).join('')}</details>` : ''}
+      ${report.gaps ? `<details><summary>Ver lacunas da análise (${report.gaps})</summary>${report.sources.filter(s => s.status !== 'analyzed' || s.outcome === 'inconclusive').map(s => `<p><strong>${escapeHtml(s.title)}</strong>: ${escapeHtml(s.message || s.limitations.join(' '))}</p>`).join('')}</details>` : ''}
+      <p class="seller-analysis-result-note">${escapeHtml(report.scopeNotice)}</p>` : ''}
+    ${!running && (!report || canRetry) ? `<p>${state.message || state.current ? escapeHtml(state.message || state.current) : 'Confira as fontes obtidas e gere a análise consolidada.'}</p>${!state.aiReady ? '<p role="alert">A análise por IA ainda não está disponível neste ambiente. Os documentos obtidos permanecem acessíveis.</p>' : `<label class="seller-analysis-consent"><input type="checkbox" data-seller-review-consent /><span>Autorizo a análise destes documentos e dados pela OpenAI e Audita.</span></label><button type="button" class="primary-action" data-seller-review-start>${canRetry ? 'Retomar análise sem refazer consultas' : 'Analisar documentos e gerar relatório'}</button>`}` : ''}
+    </section>`;
+  const button = target.querySelector('[data-seller-review-start]');
+  if (button) button.onclick = async () => {
+    if (!target.querySelector('[data-seller-review-consent]')?.checked) { target.querySelector('[data-seller-review-consent]')?.focus(); return; }
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/seller-analysis/${encodeURIComponent(id)}/review`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ consent: true }) });
+      if (!response.ok) throw new Error('unavailable');
+      await loadSellerReview(id);
+    } catch { button.disabled = false; button.textContent = 'Não foi possível iniciar. Tentar novamente'; }
+  };
 }
 
 function validateCnibDocument(tipoDocumento, value) {
@@ -8902,6 +8981,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
         cpf,
         fullName,
         motherName,
+        aiConsent: document.querySelector('#sellerAnalysisAiConsent')?.checked === true,
         ufs,
         sellerQueries,
         companyCnpjs,
@@ -8954,7 +9034,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   } finally {
     if (sellerAnalysisSubmit) {
       sellerAnalysisSubmit.disabled = false;
-      sellerAnalysisSubmit.textContent = "Consultar documentos selecionados";
+      sellerAnalysisSubmit.textContent = "Iniciar análise do vendedor";
     }
   }
 });
