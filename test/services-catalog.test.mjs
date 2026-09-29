@@ -3,19 +3,17 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {matchesService, initServicesCatalog} from '../services-catalog.js';
 
-test('property lookup belongs to certificates without a duplicate property group', async () => {
+test('property analysis and certificate issuance have separate categories and destinations', async () => {
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
- const group=html.match(/<section[^>]*aria-labelledby="services-certidoes"[^]*?<\/section>/)[0];
- const card=[...group.matchAll(/<article[^]*?<\/article>/g)].map(m=>m[0]).find(c=>c.includes('href="#consulta-imoveis"'));
- assert.ok(card);
- assert.match(card,/data-categories="certidoes imoveis"/);
- assert.match(card,/Certidões · Imóveis<\/small><strong>Consulta de imóveis/);
- assert.equal(matchesService({text:'Consulta de imóveis ONR',categories:['certidoes','imoveis']},'imoveis','certidoes'),true);
+ const group=id=>html.match(new RegExp(`<section[^>]*aria-labelledby="services-${id}"[\\s\\S]*?</section>`))[0];
+ const properties=group('imoveis'),certificates=group('certidoes');
+ for(const route of ['analise-vendedor','consulta-imoveis','consulta-cnib']) assert.ok(properties.includes(`href="#${route}"`));
+ assert.match(properties,/<strong>Análise de Vendedor<\/strong>/);
+ assert.ok(certificates.includes('href="#emissao-certidoes"'));
+ assert.ok(!certificates.includes('href="#analise-vendedor"'));
+ assert.match(certificates,/<h3 id="services-certidoes">Emissão de certidões<\/h3>/);
+ assert.match(html,/data-service-category="imoveis"[^>]*>Imóveis<\/button>/);
  assert.equal((html.match(/class="service-card-entry" href="#consulta-imoveis"/g)||[]).length,1);
- assert.ok(!html.includes('id="services-imoveis"'));
- assert.ok(!html.includes('data-service-category="imoveis"'));
- assert.match(html,/data-service-category="certidoes"[^>]*>Análise do vendedor<\/button>/);
- assert.match(group,/<h3 id="services-certidoes">Análise do vendedor<\/h3>/);
 });
 
 test('catalog keeps PIS, energy and IR visible without configured backends', () => {

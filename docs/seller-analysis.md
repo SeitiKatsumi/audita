@@ -29,3 +29,9 @@ Uma atualização atômica no PostgreSQL concede a execução por consulta, com 
 - `AUDITA_BASE_URL=http://localhost:3000 node scripts/check-seller-review-ui.mjs`: interface e assets locais, rotas reais extraídas do servidor, serviços reais e PostgreSQL PGlite isolado; provedores fictícios. Não usa banco nem consultas de produção. Testa entrada, coleta, progresso, análise, lacunas, PDF, recarga, histórico e retorno em desktop/celular.
 - PDF fictício em `output/pdf/analise-vendedor-ficticio.pdf`; capturas e download da interface em `output/playwright/`. Artefatos de teste privados/ignorados.
 - A validação com fontes reais pagas é separada da validação do fluxo. O teste real de OpenAI usa somente dados fictícios e não valida precisão sobre todos os modelos de certidão.
+
+## Emissão de certidões diversas
+
+A Central organiza Análise de Vendedor, Consulta de imóveis e Indisponibilidade de bens em **Imóveis**. **Emissão de certidões** abre `#emissao-certidoes`, reutilizando os coletores e controles de custo e autorização. Esse fluxo oferece somente as fontes de tipo certidão, entrega os PDFs e não inclui a etapa 3, consentimento OpenAI ou relatório de IA.
+
+A seleção é enviada com `flow: certificates`; o servidor força `sellerAiConsent=false`, restringe as fontes e persiste `sellerFlow` no JSON da consulta, sem migração. O início da análise de IA é recusado para uma emissão mesmo que solicitado diretamente à API. Históricos e retomadas do navegador são separados; consultas antigas sem marcador continuam no histórico de análise do vendedor. Não houve novas consultas pagas na validação.

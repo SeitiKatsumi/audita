@@ -96,6 +96,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
   }
   async function start(id, auth, request, consent) {
     const row = await access(id, auth);
+    if (row.request_payload.sellerFlow === 'certificates') fail('certificate_collection_only', 409);
     if (consent !== true && row.request_payload.sellerAiConsent !== true) fail('seller_ai_consent_required');
     const audit = await auditService.findAudit(id, request);
     if (!audit || audit.unauthorized) fail('seller_analysis_not_found', 404);
