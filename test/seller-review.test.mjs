@@ -51,8 +51,15 @@ test('seller collection -> AI -> persisted report -> private PDF; source failure
     assert.ok(!JSON.stringify(state).includes('test.pdf'));assert.ok(!('checkpoints' in state));
     assert.equal(f.calls.length,2);assert.ok(!f.calls.some(s=>s.buffer),'digital PDFs use text only');
     await f.review.start(id,owner,f.request,true);assert.equal(f.calls.length,2,'completed report is cached');
-    const reloaded=createSellerReviewService(f.options);
+    const restartedModule=await import(`../services/audit.service.mjs?restart=${randomUUID()}`);
+    const restoredAudit=restartedModule.createAuditService({getDb:f.options.getDb,getAuthContext:async req=>req?.auth||owner});
+    const savedAudit=await restoredAudit.findAudit(id,f.request);
+    assert.equal(savedAudit.subjectName,'Vendedor Fictício');
+    assert.equal(savedAudit.resultados[0].dados.certidoes.length,3);
+    assert.equal(await restoredAudit.findAudit(id,{auth:{tenantId:1,user:{id:812}}}),null);
+    const reloaded=createSellerReviewService({...f.options,auditService:restoredAudit});
     assert.deepEqual(await reloaded.get(id,owner),state);
+    await reloaded.start(id,owner,f.request,true);assert.equal(f.calls.length,2);
     for(const auth of [{tenantId:2,user:{id:811}},{tenantId:1,user:{id:812}},{unauthorized:true}]){
       await assert.rejects(()=>reloaded.get(id,auth));await assert.rejects(()=>reloaded.pdf(id,auth));await assert.rejects(()=>reloaded.start(id,auth,f.request,true));
     }

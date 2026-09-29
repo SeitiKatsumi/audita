@@ -1,4 +1,5 @@
 # 2026-09-29 - Publicacao da analise e relatorio do vendedor
+- Primeira publicacao confirmada: PR3/main6e4c5ad, CapRover132, CI aprovado, health/banco/autenticacao/IA prontos, assets identicos ao main e quatro PDFs preservados por hash. OpenAI real e PDF de duas paginas validados no container com dados ficticios. Validacao autenticada revelou consulta SQL ambigua ao restaurar historico apos reinicio (status sem alias); corrigida e reproduzida em teste com modulo sem cache. 59 testes pertinentes passaram. Republicacao da correcao em andamento.
 - Codex, codex/seller-ai-report. Publicacao autorizada pelo usuario: fluxo IA/PDF, retomada de consultas anteriores e status correto durante fila. Main sem divergencia remota; validacao previa de 510 testes e 8 testes pertinentes apos ajuste da fila. Producao atual release131, chave OpenAI configurada e volumes privados presentes. Sem migracoes. Backup, integracao GitHub e deploy em andamento; confirmacao final pendente.
 
 # 2026-09-29 - Analise documental do vendedor
