@@ -703,7 +703,7 @@ export function createAuditService({
       return null;
     }
     const results = await pool.query(
-      `SELECT fonte, status, resultado, dados_json, pdf_path, raw_text, error_message, started_at, finished_at
+      `SELECT ae.fonte, ae.status, ae.resultado, ae.dados_json, ae.pdf_path, ae.raw_text, ae.error_message, ae.started_at, ae.finished_at
        FROM audita_audit_executions ae
        JOIN audita_audits aq ON aq.id = ae.audit_id
        WHERE aq.public_id = $1
