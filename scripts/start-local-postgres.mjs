@@ -4,6 +4,8 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import crypto from 'node:crypto';
+import {parseEnv} from 'node:util';
+import pg from 'pg';
 import EmbeddedPostgres from '../storage/dev-tools/node_modules/embedded-postgres/dist/index.js';
 
 const root=resolve('.');
@@ -12,13 +14,16 @@ await mkdir('storage',{recursive:true});
 const secretFile='storage/local-postgres-secret';
 let password;
 try{password=(await readFile(secretFile,'utf8')).trim();}catch(e){if(e.code!=='ENOENT')throw e;password=crypto.randomBytes(32).toString('hex');await writeFile(secretFile,password,{mode:0o600,flag:'wx'});}
-const postgres=new EmbeddedPostgres({databaseDir:resolve('storage/postgresql'),user:'audita_local',password,port:54329,persistent:true,authMethod:'scram-sha-256',postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:()=>{}});
+// A relative path avoids initdb's Windows re-execution issues with spaces in the workspace path.
+const postgres=new EmbeddedPostgres({databaseDir:'storage/postgresql',user:'audita_local',password,port:54329,persistent:true,authMethod:'scram-sha-256',initdbFlags:['--locale=C','--encoding=UTF8'],postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:()=>{}});
 if(!existsSync('storage/postgresql/PG_VERSION'))await postgres.initialise();
-await postgres.start();
+const probe=new pg.Client({host:'127.0.0.1',port:54329,user:'audita_local',password,database:'postgres',connectionTimeoutMillis:3000});
+try{await probe.connect();}
+catch(e){if(e.code!=='ECONNREFUSED')throw e;await postgres.start();}
+finally{await probe.end();}
 const client=postgres.getPgClient();await client.connect();
 if(!(await client.query("SELECT 1 FROM pg_database WHERE datname='audita_local'")).rows.length)await postgres.createDatabase('audita_local');
 await client.end();
-const {default:pg}=await import('pg');
 const appClient=new pg.Client({host:'127.0.0.1',port:54329,user:'audita_local',password,database:'audita_local'});await appClient.connect();
 await appClient.query(await readFile('db/schema.sql','utf8'));
 await appClient.query(await readFile('db/ir-exemption.sql','utf8'));
@@ -39,4 +44,11 @@ if(!(await appClient.query('SELECT 1 FROM audita_users LIMIT 1')).rows.length&&e
 await appClient.end();
 if(!existsSync('.env.local'))await writeFile('.env.local',`APP_ENV=local\nAPP_URL=http://localhost:3000\nPORT=3000\nHOST=127.0.0.1\nDATABASE_URL=postgres://audita_local:${password}@127.0.0.1:54329/audita_local\nAUDITA_IR_ENABLED=true\nAUDITA_IR_ENCRYPTION_KEY=${crypto.randomBytes(32).toString('hex')}\nAUDITA_IR_AI_ENABLED=false\n`,{mode:0o600,flag:'wx'});
 console.log('Local PostgreSQL ready on 127.0.0.1:54329. Persistent workspace storage; credentials not displayed.');
+if(process.argv.includes('--serve')){
+  const local=parseEnv(await readFile('.env.local','utf8'));
+  const target=new URL(process.env.DATABASE_URL||local.DATABASE_URL);
+  if(target.hostname!=='127.0.0.1'||target.port!=='54329'||target.pathname!=='/audita_local')throw Error('Refusing to serve against a non-local database.');
+  await import('../server.mjs');
+}
+else setInterval(()=>{},60000);
 // EmbeddedPostgres registers an exit hook that stops the process without deleting data.

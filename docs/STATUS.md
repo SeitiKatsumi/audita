@@ -1,3 +1,20 @@
+# 2026-09-29 - Publicacao consolidada solicitada
+- Usuario autorizou commit, push e atualizacao no CapRover. Inclui ajustes locais IR/PIS, categoria Analise do vendedor, URL NCM e inicializador local. Configuracoes privadas e dados fora do Git; sem novas migracoes de producao.
+- Origin atualizado sem divergencia; suite completa em PGlite isolado: 507 testes passaram, zero falhas/ignorados. Diff check aprovado. Confirmacao do deploy pelo hash publico pendente nesta etapa.
+
+# 2026-09-29 - Nome da categoria de vendedor
+- Ajuste final solicitado: filtro e titulo corrigidos para Analise do vendedor.
+- Continuacao codex/imoveis-certidoes: filtro Imoveis removido; filtro Certidoes e titulo do grupo renomeados para Analise de vendedor de imoveis. Identificadores internos, cards e URLs preservados. Sem commit/push/deploy.
+- Validado: 13 testes catalogo/vendedor UI passaram, diff check sem erros e HTML atualizado confirmado em localhost:3000.
+
+# 2026-09-29 - Consulta de imoveis em Certidoes
+- Codex, codex/imoveis-certidoes, consolidado no main local: card Consulta de imoveis movido para Certidoes, rotulo Certidoes / Imoveis e filtro Certidoes habilitado. Grupo Imoveis vazio removido; links, detalhes e filtro transversal Imoveis preservados.
+- 13 testes catalogo/vendedor UI passaram, diff check sem erros e HTML servido na porta 3000 confirmado. Servidor iniciado sem migracoes; banco local indisponivel (ECONNREFUSED), sem alterar configuracao privada. Sem commit/push/deploy.
+
+# 2026-09-29 - Atualizacao local da main
+- Solicitado pelo usuario: origin/main atualizado em fast-forward de 1b8b032 para bc3862d (4 commits). Ajustes locais reaplicados; conflito apenas no registro de status, resolvido preservando ambos os historicos. Backup mantido no stash backup-before-pull-2026-09-29. Sem commit/push/deploy.
+- Validacao: 12 testes de chat IR/PIS e vendedor UI/API passaram; diff check e ausencia de conflitos confirmados, HEAD igual a origin/main. localhost:3000 nao respondeu nesta verificacao; atualizacao concluida no checkout, sem iniciar/reiniciar servico nesta operacao Git.
+
 # 2026-09-28 - Analise de vendedor publicada; teste SP completo pendente de saldo
 - Codex; codex/autonomous-certificates. Usuario autorizou publicar e validar ponta a ponta. Escopo: integrar os catalogos e coletores ja homologados, revisar pacote Docker/configuracao de producao, publicar e validar SP pelo app autenticado (13 resultados, oito PDFs, historico). Arquivos compartilhados: app.js, index.html, styles.css, server.mjs; preservadas as alteracoes conciliadas no main local. Sem analise por IA nesta publicacao.
 - Publicado: PR1 integrado na main, commit 8d26f395506b11cf8bab1f7a65858936490010c3, CapRover audita release129. Health publico 200, banco pronto e autenticacao exigida; catalogos e interface novos servidos. Preservados banco/configuracao/volume anterior; backup verificado e imagem128 disponivel para rollback. DIRECT_DATA_SELLER_ENABLED e DIRECT_DATA_PERSON_ENABLED ativos. Volume captain--audita-pdfs montado em /app/storage/pdfs; sem migracoes novas.
@@ -27,6 +44,34 @@
 - 104 combinacoes UF/tipo consultadas na API e seis portais retestados. Lote real integrado: 8 PDFs, mais falencia ES validada separadamente; reproducao dos 30 PDFs originais pelo coletor passou. Arquivos reais e pacote de PDFs privados fora do Git.
 - Validacao: suite completa com PGlite isolado, 455 aprovados; depois dos ajustes finais, 63 testes pertinentes e interface desktop/celular na porta 3000 passaram. Health 200, banco ready, 30 itens de cobertura, POST anonimo 401 e pacote privado por HTTP 404. git diff --check sem erros. Tunel local existente restabelecido sem alterar configuracao, sem migracao no banco compartilhado.
 - Entregue no main local/localhost:3000; sem commit/push/deploy. Pendencias: 17 UFs sem emissao autonoma validada, homologacao PJ/variacoes de dados e resultados positivos, analise de risco por IA e publicacao. RS limitado a alvara; RR confere os tipos pelo documento.
+
+# 2026-09-25 - Chat de IR consolidado localmente
+- Codex, codex/ir-chat-layout, integrado ao main local: viewport delimitado e rolagem apenas no chat; retorno a Central, identidade e ajuda fora da area rolavel. Resumo automatico apos agradecimento, anexos/propostas/acompanhamento em mensagens, sem painel extra do cliente. Painel e permissoes da equipe preservados.
+- Reutilizada acao analyze, sem backend, banco ou novas dependencias. Retomada preserva analise/revisao existente; falha ao gerar resumo preserva respostas e permite repetir. Alteracoes: ir-exemption.js/css, cache/acessibilidade index.html, teste de chat e docs/ir-exemption.md.
+- 19 testes IR/chat/PIS passaram (banco isolado, provedores simulados); node --check e git diff --check passaram. Navegador localhost:3000 validado em desktop e 390x844: cabecalho imovel, scroll de pagina zero, sem overflow horizontal, resumo e upload dentro do chat. Sem envio real de documento, pagamento ou alteracao de respostas.
+- Preservadas mudancas paralelas PIS, importacao e armazenamento local. Sem commit/push/deploy.
+
+# 2026-09-25 - Orientacao PIS/PASEP consolidada localmente
+- Codex, codex/pis-guidance, integrado ao main local: contexto antes de pedir numero, ajuda especifica para numero desconhecido, orientacao de consulta manual no REPIS e resultado somente apos acao explicita. Titular, representante e herdeiro com instrucoes distintas; sem consulta automatica ou compartilhamento de senha.
+- Reutilizadas pergunta consultation e resposta difficulty; sem nova API, tabela, permissao ou dependencia. Historico/retomada preservados. Arquivos: pis-pasep.js, index.html (cache), test/pis-pasep-panel.test.mjs e docs/pis-pasep.md.
+- 12 testes PIS/painel/chat passaram em banco isolado; node --check e git diff --check passaram. HTTP localhost:3000/pis-pasep.js confirmou conteudo identico ao main. Navegador abriu a entrada, mas fluxo visual completo nao validado: configuracao local atual informa PIS/PASEP desabilitado; nao foi alterada.
+- Preservadas mudancas paralelas de importacao e armazenamento local IR. Sem commit/push/deploy.
+
+# 2026-09-25 - IR habilitado em producao
+- Usuario confirmou configuracao em producao. CapRover audita: adicionados AUDITA_IR_ENABLED=true, AUDITA_IR_STORAGE_PATH=/audita-private/ir e chave aleatoria de 32 bytes em AUDITA_IR_ENCRYPTION_KEY, somente no painel, sem valor em logs/codigo. Banco e volume audita-private-documents existentes preservados; nenhuma chave substituida.
+- Save & Restart concluido: health 200, database.ready=true, versao 1b8b032; IR enabled=true, ready=true, aiEnabled=false. Tela publica confirmada com Para mim habilitado e aviso de armazenamento ausente. Nao criado atendimento real nem enviado documento; extracao IA opcional nao habilitada. Sem novo commit/push.
+
+# 2026-09-25 - Armazenamento local de IR habilitado
+- Codex, main local: PostgreSQL persistente instalado em storage/dev-tools, banco exclusivo 127.0.0.1:54329 e .env.local gerado pelo inicializador existente com segredo aleatorio, sem imprimir credenciais. Contas/sessoes locais preservadas pelo migrador existente. Producao intocada.
+- Inicializador corrigido para caminho relativo/locale no Windows, reutilizacao de instancia e modo --serve. npm run dev:local inicia banco e app; nao apagar storage/.env.local. Schema aplicado somente ao banco local.
+- localhost:3000: health database.ready=true; IR enabled/ready=true. Check real com usuario temporario passou: criar, responder, recuperar, payload criptografado, anonimo 401 e botao Para mim habilitado. Registros ficticios removidos. Extracao OpenAI opcional permanece desativada, sem chamadas pagas. Sem commit/push.
+- 15 testes IR/chat passaram; inicializador --serve recusa DATABASE_URL fora do banco local dedicado.
+
+# 2026-09-23 - Validacao das APIs de importacao
+- Codex: 12 testes passaram em PostgreSQL isolado, incluindo despacho de todas as rotas, sessoes, origem, downloads, erros, criptografia, isolamento, revisao, conflitos e extracao/pesquisa simuladas. check-import-ui passou em 1440/390.
+- Consulta REAL NCM encontrou redirecionamento 307 rejeitado pelo carregador. URL corrigida com perfil=PUBLICO, preservando bloqueio de redirects; carregador real validado com 10.515 NCMs. Adicionado teste de regressao e de respostas invalidas/incompletas.
+- Producao: config HTTP 200, storageReady=false, aiReady=true, ready=false; cases/queue anonimos retornam 401. Armazenamento requer conferir tabelas, banco e chave de criptografia; endpoint nao identifica qual requisito falta. Local: storageReady=false e aiReady=false. Sem extracao OpenAI real, documentos privados, chamada paga ou migracao de producao.
+- Nao implementados: Siscomex autenticado/DI/Duimp, BACEN/PTAX, DirectD e monitoramento diario DOU. Pesquisa de beneficios existente usa OpenAI web search, validada apenas com mock nesta rodada. Correcao local, sem commit/push/deploy.
 
 # 2026-09-23 - Envio autorizado dos ajustes de assinatura e conta
 - Usuario solicitou commit/push: cotas percentuais, Assinatura IA, remocao do atalho antigo, separacao Planos/Meus Dados e categorias IA/Central. Origin atualizado sem divergencia. Check-account-ui e 43 testes de charge-analysis-ui passaram; check-chat-subscription-ui reexecutado com sucesso antes do commit. Deploy nao verificado.

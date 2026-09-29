@@ -57,4 +57,8 @@ revisão, não substitui diagnóstico médico ou decisão jurídica.
 
 ## Interface integrada
 
+No IR, somente a conversa tem rolagem: retorno à Central, identidade da assistente e ajuda permanecem visíveis, inclusive com navegação inferior no celular. Resumo, documentos, propostas e acompanhamento aparecem em mensagens, sem painel separado para o cliente.
+
+Ao concluir ou retomar uma triagem completa sem análise, o cliente prepara automaticamente o resumo pela ação existente `analyze`. Análises/revisões já salvas não são regeneradas na retomada. Falhas preservam respostas e oferecem nova tentativa; correções e documentos continuam usando a invalidação existente. Não há envio a órgão externo nem concessão automática. Operadores mantêm seu painel e permissões.
+
 O módulo abre em `/#isencao-ir` ou `/chat?tool=ir-exemption`, dentro de `index.html`. Reutiliza a navegação, autenticação, avatar, balões e botões do fluxo Itaú (`charge-analysis-*`). Os eventos e estilos complementares de IR ficam restritos a `#isencao-ir`; não há página ou login separados.

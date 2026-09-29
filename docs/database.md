@@ -28,7 +28,17 @@ postgres://audita_app_staging:SENHA@srv-captain--audita-db-staging:5432/audita_s
 
 Nao expor a porta do PostgreSQL publicamente.
 
-## Recuperação de conexão
+## Desenvolvimento Local no Windows
+
+Instale uma vez `npm install --prefix storage/dev-tools embedded-postgres` e execute
+`npm run dev:local`. O inicializador reutiliza o banco local na porta 54329,
+preserva contas/sessoes locais e cria `.env.local` somente se ausente. Banco e
+segredos ficam ignorados pelo Git; nao apagar `.env.local` nem `storage/`.
+O servidor atende em localhost:3000. Nao usar este comando para producao.
+Verificacao local com dados ficticios e limpeza dos registros do teste:
+`node --env-file=.env.local scripts/check-ir-local-storage.mjs`.
+
+## Recuperação de Conexão do Servidor
 
 O servidor verifica o PostgreSQL a cada 10 segundos e repete a inicialização
 quando o banco volta após falha de DNS/conexão. Reutiliza um único pool e não

@@ -7,7 +7,7 @@
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
     <link rel="stylesheet" href="styles.css?v=20260922-remember-login" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
-    <link rel="stylesheet" href="/ir-exemption.css?v=20260911-chat-spacing" />
+    <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
   <link rel="stylesheet" href="/advogados.css?v=3" />
   <link rel="stylesheet" href="/energy-audit.css">
@@ -308,9 +308,8 @@
             <button class="secondary-action" type="button" data-service-category="all" aria-pressed="true">Todos</button>
             <button class="secondary-action" type="button" data-service-category="bancario" aria-pressed="false">Bancário</button>
             <button class="secondary-action" type="button" data-service-category="beneficios" aria-pressed="false">Benefícios e tributos</button>
-            <button class="secondary-action" type="button" data-service-category="certidoes" aria-pressed="false">Certidões</button>
+            <button class="secondary-action" type="button" data-service-category="certidoes" aria-pressed="false">Análise do vendedor</button>
             <button class="secondary-action" type="button" data-service-category="energia" aria-pressed="false">Energia</button>
-            <button class="secondary-action" type="button" data-service-category="imoveis" aria-pressed="false">Imóveis</button>
             <button class="secondary-action" type="button" data-service-category="importacao" aria-pressed="false">Imposto de Importação</button>
             <button class="secondary-action" type="button" data-service-category="laudos" aria-pressed="false">Laudos</button>
           </div>
@@ -389,7 +388,7 @@
               </div>
             </section>
             <section class="services-group" data-service-group aria-labelledby="services-certidoes">
-              <h3 id="services-certidoes">Certidões</h3>
+              <h3 id="services-certidoes">Análise do vendedor</h3>
               <div class="services-grid">
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="certidao tribunal estado uf cpf cnpj pessoa física jurídica">
                   <a class="service-card-entry" href="#analise-vendedor">
@@ -436,6 +435,21 @@
                     </div>
                   </details>
                 </article>
+                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes imoveis" data-keywords="imovel onr patrimonio matrícula cartório registro ri digital">
+                  <a class="service-card-entry" href="#consulta-imoveis">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Certidões · Imóveis</small><strong>Consulta de imóveis</strong><small>Pesquise registros imobiliários pelos serviços disponíveis do ONR / RI Digital.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam pesquisar informações de imóveis com autorização e finalidade legítima.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>O módulo reúne opções de pesquisa e documentos imobiliários pelos canais disponíveis do ONR / RI Digital, conforme o serviço e os dados informados.</span></span>
+                      <small class="service-note">A integração está em homologação e depende de credenciamento e disponibilidade. Uma busca não substitui a conferência da matrícula atualizada.</small>
+                      <a class="service-action" href="#consulta-imoveis">Abrir consulta de imóveis<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
               </div>
             </section>
             <section class="services-group" data-service-group aria-labelledby="services-importacao">
@@ -474,26 +488,6 @@
                     <small class="service-note">A análise não garante devolução de valores nem envia o pedido automaticamente.</small>
                     <a class="service-action" href="#contas-de-luz">Analisar minhas contas<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                   </div>
-                  </details>
-                </article>
-              </div>
-            </section>
-            <section class="services-group" data-service-group aria-labelledby="services-imoveis">
-              <h3 id="services-imoveis">Imóveis</h3>
-              <div class="services-grid">
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="imoveis" data-keywords="imovel onr patrimonio matrícula cartório registro ri digital">
-                  <a class="service-card-entry" href="#consulta-imoveis">
-                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Imóveis</small><strong>Consulta de imóveis</strong><small>Pesquise registros imobiliários pelos serviços disponíveis do ONR / RI Digital.</small></span>
-                  </a>
-                  <details class="service-disclosure">
-                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
-                    <div class="service-expanded">
-                      <span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam pesquisar informações de imóveis com autorização e finalidade legítima.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>O módulo reúne opções de pesquisa e documentos imobiliários pelos canais disponíveis do ONR / RI Digital, conforme o serviço e os dados informados.</span></span>
-                      <small class="service-note">A integração está em homologação e depende de credenciamento e disponibilidade. Uma busca não substitui a conferência da matrícula atualizada.</small>
-                      <a class="service-action" href="#consulta-imoveis">Abrir consulta de imóveis<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
-                    </div>
                   </details>
                 </article>
               </div>
@@ -703,7 +697,7 @@
             </header>
             <div class="charge-analysis-workspace"><div class="charge-analysis-content">
               <p id="notice" class="ir-notice" role="alert" hidden></p>
-              <div id="app" class="charge-analysis-stage" aria-live="polite" aria-busy="true">Preparando seu atendimento…</div>
+              <div id="app" class="charge-analysis-stage" role="region" aria-label="Conversa de isenção de IR" tabindex="0" aria-live="polite" aria-busy="true">Preparando seu atendimento…</div>
             </div></div>
           </div>
         </section>
@@ -2164,12 +2158,12 @@
 
     <script type="module" src="/advogados.js?v=3"></script>
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
-    <script type="module" src="/ir-exemption.js?v=20260922-service-intros"></script>
+    <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
     <script type="module" src="app.js?v=20260928-autonomous-certificates"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
-      <script type="module" src="/pis-pasep.js?v=20260922-service-intros"></script>
+      <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>
 </body>
 </html>

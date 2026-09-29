@@ -6,13 +6,38 @@ import {PGlite} from '@electric-sql/pglite';
 import {createImportService} from '../services/import-audit.service.mjs';
 import {createImportAI} from '../services/import-audit-ai.mjs';
 import {createImportHandler} from '../services/import-audit-api.mjs';
-import {simulate,reviewSchema,normalizeNcm,officialUrl} from '../services/import-audit-domain.mjs';
+import {simulate,reviewSchema,normalizeNcm,officialUrl,loadNcm} from '../services/import-audit-domain.mjs';
 import {sealIr,irKey} from '../services/ir-exemption-domain.mjs';
 import parsePdf from 'pdf-parse/lib/pdf-parse.js';
 
 const source='https://www.gov.br/receitafederal/pt-br/teste';
 const product={description:'Equipamento fictício',original:'Fictional equipment',quantity:'1',value:'100',currency:'USD',specifications:'Apenas fixture, sem enquadramento real.',page:1};
 const row={index:0,ncm:'85437099',customsValueCents:100000,otherIpiBaseCents:0,iiBps:1000,ipiBps:500,scenarioIiBps:0,scenarioIpiBps:500,iiSource:source,ipiSource:source,basis:'Ato fictício, datas e condições conferidas apenas para teste.'};
+test('NCM requests public profile directly and rejects failed, malformed or incomplete sources',async()=>{
+ const result=await loadNcm(async(url,options)=>{
+  assert.equal(new URL(url).searchParams.get('perfil'),'PUBLICO');
+  assert.equal(options.redirect,'error');
+  return Response.json({Nomenclaturas:Array.from({length:1000},(_,i)=>({Codigo:String(10000000+i),Descricao:'Fixture'}))});
+ });
+ assert.equal(result.rows.size,1000);
+ for(const response of [new Response('',{status:503}),new Response('invalid'),Response.json({Nomenclaturas:[]})])await assert.rejects(loadNcm(async()=>response));
+});
+
+test('all import API routes dispatch, downloads and error responses',async()=>{
+ const id=randomUUID(),did=randomUUID();let auth={user:{id:1},tenantId:1},last,status,payload,body={consent:true},failure=null;
+ const service=Object.fromEntries(['configuration','list','create','get','command','upload','report','download'].map(name=>[name,async(...args)=>{last={name,args};if(failure)throw failure;return ['report','download'].includes(name)?{mime:'application/pdf',name:'fixture.pdf',buffer:Buffer.from('%PDF-')}:{};}]));
+ const handler=createImportHandler({service,getAuth:async()=>auth,readJson:async()=>body,readBuffer:async()=>Buffer.from('%PDF-'),sendJson:(_,s,p)=>{status=s;payload=p;}});
+ const res={setHeader(){},writeHead(s){status=s;},end(b){payload=b;}};
+ const routes=[['GET','/config','configuration'],['GET','/cases','list'],['GET','/queue','list'],['POST','/cases','create'],['GET',`/cases/${id}`,'get'],['POST',`/cases/${id}/actions`,'command'],['POST',`/cases/${id}/documents?name=fixture.pdf&type=invoice&revision=2`,'upload'],['GET',`/cases/${id}/report`,'report'],['GET',`/cases/${id}/documents/${did}`,'download']];
+ const call=(method,path,headers={})=>handler({method,headers:{host:'localhost',origin:'http://localhost',...headers}},res,new URL('http://localhost/api/import-audit'+path));
+ for(const [method,path,name] of routes){await call(method,path);assert.equal(status,200);assert.equal(last.name,name);if(name==='upload')assert.equal(last.args[2].revision,2);}
+ await call('DELETE',`/cases/${id}`);assert.equal(status,404);
+ await call('POST','/cases',{'sec-fetch-site':'cross-site'});assert.equal(status,403);
+ failure=new SyntaxError('private');await call('POST','/cases');assert.equal(status,400);assert.ok(!JSON.stringify(payload).includes('private'));
+ failure=Object.assign(new Error('private'),{code:'BODY_TOO_LARGE'});await call('POST',`/cases/${id}/documents`);assert.equal(status,413);
+ failure=new Error('private');await call('GET','/cases');assert.equal(status,503);assert.ok(!JSON.stringify(payload).includes('private'));
+ auth=null;for(const [method,path] of routes.filter(r=>r[1]!=='/config')){await call(method,path);assert.equal(status,401);}
+});
 test('II and IPI have separate rates/bases, integer rounding, input boundaries and official URLs',()=>{
  assert.deepEqual(simulate(row),{reference:{iiCents:10000,ipiBaseCents:110000,ipiCents:5500,totalCents:15500},proposed:{iiCents:0,ipiBaseCents:100000,ipiCents:5000,totalCents:5000},differenceCents:10500});
  assert.equal(simulate({...row,customsValueCents:1,iiBps:5000}).reference.iiCents,1);

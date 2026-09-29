@@ -18,10 +18,10 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
   vm.runInContext((await readFile(new URL('../audita-chat-motion.js', import.meta.url), 'utf8')).replace('export function','function'), context);
   vm.runInContext((await readFile(new URL('../ir-exemption.js', import.meta.url), 'utf8')).replace(/^import .*;\r?\n/,''), context);
   vm.runInContext(`
-    state.config = { statuses: { triage: 'Triagem' } };
+    state.config = { statuses: { triage: 'Triagem' },documentTypes:{medical:'Laudo médico'} };
     const role = { key:'role', type:'choice', title:'Para quem?', options:[{ value:'self', label:'Para mim' }] };
     const identity = { key:'identity', type:'identity', title:'Como você se chama?' };
-    state.case = { answers:{role:'self'}, permissions:{owner:true}, steps:[role,identity], question:identity };
+    state.case = { answers:{role:'self'}, permissions:{owner:true}, steps:[role,identity], question:identity,checklist:[],documents:[] };
     render();
   `, context);
   const first = element('#app').innerHTML;
@@ -43,14 +43,19 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
   for(const action of ['documents','proposals','timeline']) assert.ok(!next.includes(`data-tab="${action}"`));
   vm.runInContext('state.case.question=null; render();',context);
   const completed=element('#app').innerHTML;
-  assert.ok(completed.includes('data-action="start"'));
-  assert.ok(completed.includes('Iniciar nova análise'));
-  assert.ok(completed.includes('data-tab="documents"'));
+  assert.ok(completed.includes('Obrigado por compartilhar'));
+  assert.ok(completed.includes('id="uploadForm"'));
+  assert.ok(!completed.includes('Ver meu resumo'));
+  assert.ok(!completed.includes('ir-chat-tools'));
+  assert.ok(!completed.includes('id="irConversationPanel"'));
   assert.ok(!completed.includes('data-tab="proposals"'));
-  vm.runInContext('state.case.analysis={}; state.case.proposals=[{state:"published"}]; render();',context);
+  vm.runInContext('state.case.analysis={state:"preliminary_indications",warnings:[],pending:[],estimate:{rows:[],notice:"Estimativa preliminar"},sources:[]}; state.case.proposals=[{kind:"adm",state:"paid"}]; render();',context);
   const reviewed=element('#app').innerHTML;
-  assert.ok(reviewed.includes('data-tab="proposals"'));
-  assert.ok(reviewed.includes('data-tab="timeline"'));
+  assert.ok(reviewed.includes('Há indícios para aprofundar'));
+  assert.ok(reviewed.includes('Proposta ADM'));
+  assert.ok(reviewed.indexOf('Obrigado por compartilhar')<reviewed.indexOf('Há indícios para aprofundar'));
+  assert.ok(reviewed.indexOf('Há indícios para aprofundar')<reviewed.indexOf('id="uploadForm"'));
+  assert.ok(!reviewed.includes('data-tab="analysis"'));
 
 
   vm.runInContext("state.editing='role'; render();",context);
@@ -120,4 +125,32 @@ test('Itaú follows new messages on desktop and mobile only while active', async
   context.document.body.dataset.activePage='home';
   vm.runInContext('scrollLatestMessage(container)',context);
   assert.equal(options,null);
+});
+
+test('IR automatically prepares a missing summary, preserves saved reviews and allows retry without losing answers', async () => {
+  const nodes=new Map(),node=s=>{if(!nodes.has(s))nodes.set(s,{innerHTML:'',setAttribute(){},scrollIntoView(){}});return nodes.get(s);};
+  const root={querySelector:node,querySelectorAll:()=>[],addEventListener(){}};
+  const calls=[];
+  const context=vm.createContext({document:{querySelector:()=>root,body:{dataset:{activePage:'home'}},addEventListener(){}},window:{addEventListener(){}},Intl,URL,URLSearchParams,
+    createAuditaChatMotion:()=>({cancelTyping(){},moveAssistantAvatar(){},scrollLatestAssistant(){},animateAssistant(){}}),
+    fetch:async(url,options)=>{calls.push(JSON.parse(options.body));return {ok:true,json:async()=>({case:{...context.fixture,analysis:context.analysis}})}}
+  });
+  vm.runInContext((await readFile(new URL('../ir-exemption.js',import.meta.url),'utf8')).replace(/^import .*;\r?\n/,''),context);
+  context.analysis={state:'preliminary_indications',warnings:[],pending:[],estimate:{rows:[]},sources:[]};
+  context.fixture={id:'fixture',revision:5,answers:{},steps:[],question:null,permissions:{owner:true},documents:[],checklist:[]};
+  await vm.runInContext('state.config={documentTypes:{}};state.case=fixture;completeSummary()',context);
+  assert.deepEqual(calls,[{action:'analyze',revision:5}]);
+  assert.match(node('#app').innerHTML,/Há indícios para aprofundar/);
+  await vm.runInContext('completeSummary()',context);
+  assert.equal(calls.length,1,'a saved summary/review must not be regenerated on resume');
+  context.fetch=async()=>{throw Error('offline');};
+  await vm.runInContext('state.case=fixture;completeSummary()',context);
+  assert.equal(vm.runInContext('state.case===fixture',context),true);
+  assert.match(node('#app').innerHTML,/Tentar preparar o resumo novamente/);
+  assert.match(node('#notice').textContent,/respostas estão salvas/);
+  await vm.runInContext('state.case={...fixture,permissions:{owner:false}};completeSummary()',context);
+  assert.equal(calls.length,1,'operator view does not automatically replace the client summary');
+  const css=await readFile(new URL('../ir-exemption.css',import.meta.url),'utf8');
+  assert.match(css,/#isencao-ir #app \{[^}]*overflow-y: auto/);
+  assert.match(css,/height: calc\(100dvh - var\(--mobile-nav-height\)\)/);
 });

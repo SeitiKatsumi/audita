@@ -29,7 +29,7 @@ export function simulate(row){
  const reference=scenario(row.iiBps,row.ipiBps),proposed=scenario(row.scenarioIiBps,row.scenarioIpiBps);
  return {reference,proposed,differenceCents:reference.totalCents-proposed.totalCents};
 }
-export const NCM_URL='https://portalunico.siscomex.gov.br/classif/api/publico/nomenclatura/download/json';
+export const NCM_URL='https://portalunico.siscomex.gov.br/classif/api/publico/nomenclatura/download/json?perfil=PUBLICO';
 export function normalizeNcm(data){
  if(!Array.isArray(data?.Nomenclaturas))throw Error('invalid_ncm_source');
  const all=new Map(data.Nomenclaturas.map(r=>[String(r.Codigo||'').replace(/\./g,''),r]));
