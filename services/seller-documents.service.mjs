@@ -219,7 +219,9 @@ export async function collectSellerDocuments(input, {
           pdfPath = saved.pdfPath;
         } else if (!matchedDocument) throw new Error("evidence_identity_unverified");
         const summary = summarizeSellerData(item.endpoint, data);
-        rows[index] = { ...rows[index], status: "success", ...summary, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
+        const evidenceJson = JSON.stringify(data, (key, value) => /token|senha|password|base64|urlcomprovante|documentoConsultado/i.test(key) ? undefined : value);
+        const evidenceDataLimited = evidenceJson.length > 180000;
+        rows[index] = { ...rows[index], status: "success", ...summary, evidenceData: evidenceDataLimited ? {} : JSON.parse(evidenceJson), evidenceDataLimited, evidenceIdentityVerified: true, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
       } else {
         const companyIndex = index - work.length;
         if (companyIndex > 0) await delay(12000);

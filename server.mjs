@@ -23,6 +23,8 @@ import { PDFDocument } from "pdf-lib";
 import WebSocket, { WebSocketServer } from "ws";
 import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
+import { createSellerReviewService } from './services/seller-review.service.mjs';
+import { createSellerReviewAI } from './services/seller-review-ai.mjs';
 import { getPdfRoot } from "./services/storage.service.mjs";
 import { getAutonomousCertificateCoverage, planAutonomousCertificates } from "./services/state-court-autonomous.service.mjs";
 import { getSellerDocumentCoverage, planSellerDocuments } from "./services/seller-documents.service.mjs";
@@ -1732,6 +1734,11 @@ const auditService = createAuditService({
   getCertificateConfiguration: () => directDataCertificatesService.getStatus(),
   querySellerDocument: (input, auth) => directDataSellerService.query(input, auth),
   getSellerDocumentConfiguration: () => directDataSellerService.getStatus(),
+  onSellerCollected: (id, auth, request) => sellerReviewService.start(id, auth, request, true),
+});
+const sellerReviewService = createSellerReviewService({
+  getDb: () => ({ pool, dbReady }), auditService,
+  ai: createSellerReviewAI({ recordUsage: (usage, auth) => apiUsageService.record(auth, { provider: 'openai', service: 'responses', model: process.env.AUDITA_SELLER_AI_MODEL || process.env.AUDITA_CHAT_MODEL || 'gpt-5-mini', operation: 'seller_document_analysis', ...usage }) }),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
 const billingAccessService = createBillingAccessService({
@@ -4064,6 +4071,7 @@ async function handleApi(request, response, pathname) {
 
   if (pathname === "/api/seller-analysis/coverage" && request.method === "GET") {
     sendJson(response, 200, {
+      aiReady: sellerReviewService.ready(),
       ...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
     });
@@ -4089,6 +4097,10 @@ async function handleApi(request, response, pathname) {
       }
 
       let autonomousPlan = null;
+      if (body.aiConsent === true && !sellerReviewService.ready()) {
+        sendJson(response, 503, { error: 'seller_ai_unavailable', message: 'A análise por IA não está configurada neste ambiente. Nenhuma consulta foi iniciada.' });
+        return true;
+      }
       let sellerDocumentPlan = null;
       const companyCnpjs = body.companyCnpjs === undefined ? [] : body.companyCnpjs;
       if (pathname === "/api/seller-analysis") {
@@ -4182,6 +4194,7 @@ async function handleApi(request, response, pathname) {
       }
 
       request.body = prepared.requestBody;
+      request.body.extraFields.sellerAiConsent = body.aiConsent === true;
       request.body.extraFields.authorizationConfirmed = true;
       if (sellerDocumentPlan && (sellerDocumentPlan.queries.length || companyCnpjs.length)) {
         request.body.fontes.push("seller_documents");
@@ -4217,6 +4230,31 @@ async function handleApi(request, response, pathname) {
         message: error instanceof Error ? error.message : "Unknown error",
       });
     }
+    return true;
+  }
+
+  const sellerReviewMatch = pathname.match(/^\/api\/seller-analysis\/([0-9a-fA-F-]{36})\/(review|report\.pdf)$/);
+  if (sellerReviewMatch && ['GET', 'POST'].includes(request.method)) {
+    try {
+      const auth = await getTenantIdForRequest(request);
+      if (auth.unauthorized || !auth.user?.id) { sendJson(response, 401, { error: 'authentication_required' }); return true; }
+      const id = sellerReviewMatch[1];
+      if (request.method === 'POST') {
+        if (sellerReviewMatch[2] !== 'review') { sendJson(response, 405, { error: 'method_not_allowed' }); return true; }
+        if (!String(request.headers['content-type']).startsWith('application/json') || request.headers['sec-fetch-site'] === 'cross-site' || (request.headers.origin && new URL(request.headers.origin).host !== request.headers.host)) {
+          sendJson(response, 403, { error: 'same_origin_required' }); return true;
+        }
+        const body = await readJsonBody(request);
+        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent));
+      } else if (sellerReviewMatch[2] === 'report.pdf') {
+        const buffer = await sellerReviewService.pdf(id, auth);
+        response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="analise-vendedor.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });
+        response.end(buffer);
+      } else {
+        response.setHeader('cache-control', 'private, no-store');
+        sendJson(response, 200, await sellerReviewService.get(id, auth));
+      }
+    } catch (error) { sendJson(response, error.status || 503, { error: error.code || 'seller_review_unavailable' }); }
     return true;
   }
 

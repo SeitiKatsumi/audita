@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260922-remember-login" />
+    <link rel="stylesheet" href="styles.css?v=20260929-seller-report" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -588,14 +588,14 @@
               <span class="live">Emissão autônoma</span>
             </div>
             <p class="seller-analysis-intro">
-              Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas, sem resolver CAPTCHA. Selecione os documentos e confira os dados antes de enviar. O resultado se limita às fontes consultadas e não é uma investigação completa do vendedor nem uma análise de risco por IA.
+              Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas. A IA confere os documentos e dados obtidos, identifica apontamentos e gera um relatório em PDF com evidências e próximos passos.
             </p>
 
             <div class="seller-analysis-scope">
               <div>
                 <small>Cobertura por fonte, estado e tipo</small>
                 <strong>Certidões em PDF e dados complementares</strong>
-                <span>A an&aacute;lise de risco por IA ser&aacute; adicionada em uma etapa futura.</span>
+                <span>Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF</span>
               </div>
               <div id="sellerAnalysisCoverage" aria-live="polite">Carregando cobertura...</div>
             </div>
@@ -629,6 +629,7 @@
                   <input id="sellerAnalysisCompanyCnpjs" type="text" maxlength="500" autocomplete="off" placeholder="Separe os CNPJs por vírgula" />
                   <small>Até cinco CNPJs. Cadastro e quadro societário gratuitos; selecione abaixo as certidões empresariais pagas desejadas. A consulta de vínculos por CPF é uma opção separada.</small>
                 </label>
+                <div class="seller-analysis-form-heading"><span>2</span><div><strong>Fontes do levantamento</strong><small>Selecione o alcance e confira o custo antes de iniciar.</small></div></div>
                 <fieldset id="sellerAnalysisUfs" class="seller-analysis-ufs seller-analysis-privacy"><legend>Certidões estaduais</legend></fieldset>
                 <div id="sellerAnalysisQueries" class="seller-analysis-privacy" aria-live="polite">Carregando outras consultas...</div>
                 <div class="seller-analysis-privacy">
@@ -640,10 +641,11 @@
                   <input id="sellerAnalysisAuthorization" type="checkbox" required />
                   <span>Confirmo que possuo autoriza&ccedil;&atilde;o ou base legal para consultar os dados deste vendedor.</span>
                 </label>
+                <label class="seller-analysis-consent"><input id="sellerAnalysisAiConsent" type="checkbox" required /><span>Autorizo o envio dos documentos e dados obtidos à OpenAI para a análise por IA da Audita.</span></label>
                 <p class="seller-analysis-privacy">
                   Os dados são enviados às fontes selecionadas e aos provedores de consulta. Nome da mãe é opcional quando a consulta cadastral estiver disponível. PDFs, resultados e histórico exigem autenticação.
                 </p>
-                <button class="primary-action" id="sellerAnalysisSubmit" type="submit">Consultar documentos selecionados</button>
+                <button class="primary-action" id="sellerAnalysisSubmit" type="submit">Iniciar análise do vendedor</button>
                 <small class="login-error" id="sellerAnalysisError" role="alert"></small>
               </form>
 
@@ -654,6 +656,8 @@
                 </div>
               </section>
             </div>
+            <button type="button" class="secondary-action" id="sellerChangeData" hidden>Voltar aos dados / Nova consulta</button>
+            <details id="sellerReviewHistory" class="seller-source-details"><summary>Análises anteriores</summary><div id="sellerReviewHistoryList"></div><button type="button" class="secondary-action" id="sellerReviewHistoryRefresh">Atualizar lista</button></details>
           </article>
         </section>
 
@@ -2161,7 +2165,7 @@
     <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20260928-autonomous-certificates"></script>
+    <script type="module" src="app.js?v=20260929-seller-report"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>
