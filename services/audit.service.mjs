@@ -91,7 +91,8 @@ function envNumber(name, fallback) {
 
 function normalizeExtraFields(value) {
   return {
-    sellerAiConsent: value.sellerAiConsent === true,
+    sellerFlow: value.sellerFlow === 'certificates' ? 'certificates' : 'seller',
+    sellerAiConsent: value.sellerFlow !== 'certificates' && value.sellerAiConsent === true,
     sellerQueries: Array.isArray(value.sellerQueries) ? [...new Set(value.sellerQueries.map(String))].slice(0, 160) : [],
     companyCnpjs: Array.isArray(value.companyCnpjs) ? [...new Set(value.companyCnpjs.map(normalizeDocument))].slice(0, 5) : [],
     authorizationConfirmed: value.authorizationConfirmed === true,
@@ -279,6 +280,7 @@ export function createAuditService({
         JSON.stringify({
           fontes: query.fontes,
           sellerAiConsent: query.extraFields.sellerAiConsent === true,
+          sellerFlow: query.extraFields.sellerFlow,
           extraFieldsProvided: Object.fromEntries(Object.keys(query.extraFields || {}).map((key) => [key, Boolean(query.extraFields[key])])),
         }),
         String(query.extraFields.stateCourtFields?.fullName || '').slice(0, 180) || null,
@@ -544,6 +546,7 @@ export function createAuditService({
     const resultados = query.resultados || [];
     return {
       consultaId: query.consultaId,
+      sellerFlow: query.extraFields?.sellerFlow || 'seller',
       documento: query.documento,
       tipoDocumento: query.tipoDocumento,
       status: aggregateStatus(resultados),
@@ -587,6 +590,7 @@ export function createAuditService({
          aq.id,
          aq.public_id,
          aq.document_masked,
+         aq.request_payload->>'sellerFlow' AS seller_flow,
          aq.tipo_documento,
          aq.document_type,
          aq.status,
@@ -626,6 +630,7 @@ export function createAuditService({
       );
       audits.push({
         consultaId: row.public_id,
+        sellerFlow: row.seller_flow || 'seller',
         documento: row.document_masked,
         tipoDocumento: row.tipo_documento || row.document_type,
         status: aggregateStatus(resultados),
@@ -663,6 +668,7 @@ export function createAuditService({
       }
       return {
         consultaId: memory.consultaId,
+        sellerFlow: memory.extraFields.sellerFlow || 'seller',
         documento: memory.documento,
         subjectName: memory.extraFields.stateCourtFields?.fullName || '',
         tipoDocumento: memory.tipoDocumento,
@@ -690,7 +696,7 @@ export function createAuditService({
     }
 
     const auditResult = await pool.query(
-      `SELECT public_id, subject_name, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos, created_at, updated_at
+      `SELECT public_id, request_payload->>'sellerFlow' AS seller_flow, subject_name, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos, created_at, updated_at
        FROM audita_audits
        WHERE public_id = $1
          ${tenantFilter}
@@ -725,6 +731,7 @@ export function createAuditService({
     );
     return {
       consultaId: audit.public_id,
+      sellerFlow: audit.seller_flow || 'seller',
       documento: audit.document_masked,
       subjectName: audit.subject_name || '',
       tipoDocumento: audit.tipo_documento || audit.document_type,

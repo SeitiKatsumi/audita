@@ -9,6 +9,7 @@ import { normalizeDfSellerInput, buildDfSellerAuditRequest } from "../services/s
 import { planSellerDocuments } from "../services/seller-documents.service.mjs";
 import { collectAutonomousCertificates, planAutonomousCertificates } from "../services/state-court-autonomous.service.mjs";
 import { createDirectDataSellerService } from "../services/direct-data-seller.service.mjs";
+import { createSellerReviewService } from '../services/seller-review.service.mjs';
 import { personNamesMatch } from "../services/direct-data-person.service.mjs";
 
 test("seller POST validates selection and consent, persists the selected source and needs no unrelated identity fields", async () => {
@@ -103,6 +104,16 @@ test("seller POST validates selection and consent, persists the selected source 
     assert.equal(providerCalls.length, 1, "generic/default audits without consent must not trigger paid queries");
     assert.equal(courtCalls, 0);
     assert.equal(enrichmentCalls, 0);
+    assert.equal((await post({...body,flow:'certificates',aiConsent:true})).status,400,'data queries are not certificate issuance');
+    const issuance=await post({...body,flow:'certificates',aiConsent:true,sellerQueries:['cndt']});
+    assert.equal(issuance.status,202,'issuance works without an AI integration');
+    await waitForAudit(issuance.body.consultaId);
+    const saved=(await pg.query('SELECT request_payload FROM audita_audits WHERE public_id=$1',[issuance.body.consultaId])).rows[0].request_payload;
+    assert.equal(saved.sellerFlow,'certificates');assert.equal(saved.sellerAiConsent,false);
+    const history=await auditService.listAuditHistory({auth:owner});
+    assert.equal(history.audits.find(a=>a.consultaId===issuance.body.consultaId).sellerFlow,'certificates');
+    const review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService,ai:{ready:()=>{throw Error('AI must not run');}}});
+    await assert.rejects(()=>review.start(issuance.body.consultaId,owner,{auth:owner},true),/certificate_collection_only/);
   } finally {
     await pg.close();
   }

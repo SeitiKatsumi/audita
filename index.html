@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260929-seller-report" />
+    <link rel="stylesheet" href="styles.css?v=20260929-certificates-flow" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -89,7 +89,7 @@
             <span class="nav-label">IA AUDITA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
           </a>
-          <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
+          <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
             <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
             <span class="nav-label">Central de Serviços</span>
           </a>
@@ -122,7 +122,7 @@
       <nav class="mobile-bottom-nav" aria-label="Navegação principal mobile">
         <a href="#home"><img src="assets/audita-logo-original.png" alt="" /><span>Home</span></a>
         <a href="/chat" data-app-route="chat"><img class="nav-icon" src="assets/nav-icons/sparkles.svg" alt="" /><span>IA</span></a>
-        <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
+        <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
         <a href="#planos"><img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" /><span>Planos</span></a>
         <a href="#meus-dados"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Meus Dados</span></a>
       </nav>
@@ -145,7 +145,7 @@
 <div class="module list-panel"><table><thead><tr><th>Atendimento</th><th>Serviço</th><th>Situação</th><th>Próximo passo</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="lawyer-caseRows"></tbody></table><p id="lawyer-empty" hidden>Nenhum atendimento nesta lista.</p></div>
 <section id="lawyer-details" class="panel" hidden tabindex="-1"><button class="secondary-action" id="lawyer-closeDetails">Voltar à lista</button><div id="lawyer-detailBody"></div></section></div>
 <aside class="activity"><section class="panel"><h2>Pendências de atenção</h2><div id="lawyer-attention"></div></section><section class="panel"><h2>Atualizações recentes</h2><div id="lawyer-recent"></div></section><p class="muted">Os prazos oficiais devem ser conferidos pela equipe nos canais responsáveis.</p></aside></div></div></section>
-        <nav class="service-return page-hidden" data-page="auditoria-importacao analise-vendedor consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
+        <nav class="service-return page-hidden" data-page="auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
           <a href="#central-servicos"><img src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />Voltar à Central de Serviços</a>
         </nav>
 
@@ -308,8 +308,9 @@
             <button class="secondary-action" type="button" data-service-category="all" aria-pressed="true">Todos</button>
             <button class="secondary-action" type="button" data-service-category="bancario" aria-pressed="false">Bancário</button>
             <button class="secondary-action" type="button" data-service-category="beneficios" aria-pressed="false">Benefícios e tributos</button>
-            <button class="secondary-action" type="button" data-service-category="certidoes" aria-pressed="false">Análise do vendedor</button>
+            <button class="secondary-action" type="button" data-service-category="certidoes" aria-pressed="false">Emissão de certidões</button>
             <button class="secondary-action" type="button" data-service-category="energia" aria-pressed="false">Energia</button>
+            <button class="secondary-action" type="button" data-service-category="imoveis" aria-pressed="false">Imóveis</button>
             <button class="secondary-action" type="button" data-service-category="importacao" aria-pressed="false">Imposto de Importação</button>
             <button class="secondary-action" type="button" data-service-category="laudos" aria-pressed="false">Laudos</button>
           </div>
@@ -351,7 +352,7 @@
                 </article>
               </div>
             </section>
-            <section class="services-group" data-service-group aria-labelledby="services-beneficios">
+<section class="services-group" data-service-group aria-labelledby="services-beneficios">
               <h3 id="services-beneficios">Benefícios e tributos</h3>
               <div class="services-grid">
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios" data-keywords="pis pasep cotas beneficio herdeiros carteira assinada servidor público" data-service-pis hidden>
@@ -387,92 +388,27 @@
                 </article>
               </div>
             </section>
-            <section class="services-group" data-service-group aria-labelledby="services-certidoes">
-              <h3 id="services-certidoes">Análise do vendedor</h3>
-              <div class="services-grid">
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="certidao tribunal estado uf cpf cnpj pessoa física jurídica">
-                  <a class="service-card-entry" href="#analise-vendedor">
+<section class="services-group" data-service-group aria-labelledby="services-certidoes">
+<h3 id="services-certidoes">Emissão de certidões</h3>
+<div class="services-grid">
+<article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="certidao tribunal estado uf cpf cnpj pessoa física jurídica">
+                  <a class="service-card-entry" href="#emissao-certidoes">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Certidões</small><strong>Certidão de tribunais estaduais</strong><small>Escolha o estado e consulte as opções de certidões judiciais disponíveis.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Emissão de certidões</small><strong>Emissão de certidões diversas</strong><small>Selecione as certidões disponíveis e obtenha os documentos emitidos, sem análise por IA.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
                     <div class="service-expanded">
-                      <span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam reunir certidões dos tribunais estaduais.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>Emita automaticamente os tipos validados para pessoa física. Selecione os estados e reúna os PDFs oficiais.</span></span>
+                      <span class="service-detail"><b>Para quem é</b><span>Pessoas que precisam emitir certidões judiciais, fiscais e trabalhistas nas fontes disponíveis.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Informe os dados do titular, selecione as certidões e acompanhe a emissão dos PDFs. Este serviço termina na entrega dos documentos.</span></span>
                       <small class="service-note">Outros tipos, estados e consultas de pessoa jurídica continuam disponíveis no fluxo assistido.</small>
                       <a class="service-action" href="#consulta-tjdft-pf">Abrir fluxo assistido<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                     </div>
                   </details>
                 </article>
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="cnib cpf cnpj vendedor restricao indisponibilidade">
-                  <a class="service-card-entry" href="#consulta-cnib">
-                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Certidões</small><strong>Indisponibilidade de bens</strong><small>Consulte registros de indisponibilidade de bens pelo CPF ou CNPJ do vendedor.</small></span>
-                  </a>
-                  <details class="service-disclosure">
-                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
-                    <div class="service-expanded">
-                      <span class="service-detail"><b>Para quem é</b><span>Quem precisa verificar possíveis restrições relacionadas ao vendedor de um imóvel.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>Consulte os dados pelo provedor integrado e confira o resultado na plataforma.</span></span>
-                      <small class="service-note">Depende de provedor habilitado. O resultado não substitui automaticamente uma certidão oficial CNIB.</small>
-                      <a class="service-action" href="#consulta-cnib">Consultar indisponibilidade<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
-                    </div>
-                  </details>
-                </article>
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes imoveis" data-keywords="vendedor compra venda certidao pessoa física distrito federal df tjdft">
-                  <a class="service-card-entry" href="#analise-vendedor">
-                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Certidões · Imóveis</small><strong>Certidões do vendedor</strong><small>Assinar a escritura em cartório não evita fraudes ou processos ocultos, tornando indispensável uma investigação jurídica completa ( Due diligencia) para proteger a compra do seu imóvel diante dos milhões de ações que surgem todos os anos.</small></span>
-                  </a>
-                  <details class="service-disclosure">
-                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
-                    <div class="service-expanded">
-                      <span class="service-detail"><b>Para quem é</b><span>Quem está comprando um imóvel e precisa reunir documentos judiciais do vendedor pessoa física nos estados habilitados.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>Emissão automática das certidões validadas por estado, com PDFs oficiais e indicação das pendências.</span></span>
-                      <small class="service-note">A etapa atual não inclui análise de risco por IA nem todas as fontes necessárias para avaliar uma compra.</small>
-                      <a class="service-action" href="#analise-vendedor">Consultar certidões<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
-                    </div>
-                  </details>
-                </article>
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes imoveis" data-keywords="imovel onr patrimonio matrícula cartório registro ri digital">
-                  <a class="service-card-entry" href="#consulta-imoveis">
-                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Certidões · Imóveis</small><strong>Consulta de imóveis</strong><small>Pesquise registros imobiliários pelos serviços disponíveis do ONR / RI Digital.</small></span>
-                  </a>
-                  <details class="service-disclosure">
-                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
-                    <div class="service-expanded">
-                      <span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam pesquisar informações de imóveis com autorização e finalidade legítima.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>O módulo reúne opções de pesquisa e documentos imobiliários pelos canais disponíveis do ONR / RI Digital, conforme o serviço e os dados informados.</span></span>
-                      <small class="service-note">A integração está em homologação e depende de credenciamento e disponibilidade. Uma busca não substitui a conferência da matrícula atualizada.</small>
-                      <a class="service-action" href="#consulta-imoveis">Abrir consulta de imóveis<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
-                    </div>
-                  </details>
-                </article>
-              </div>
-            </section>
-            <section class="services-group" data-service-group aria-labelledby="services-importacao">
-              <h3 id="services-importacao">Imposto de Importação</h3>
-              <div class="services-grid">
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios importacao" data-keywords="imposto de importação invoice packing list NCM TIPI IPI II imposto importacao ex tarifário">
-                  <a class="service-card-entry" href="#auditoria-importacao">
-                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Imposto de Importação · Tributos</small><strong>Auditoria do Imposto de Importação</strong><small>Confira documentos, pesquise NCMs e possíveis benefícios e prepare uma simulação de II/IPI com revisão humana.</small></span>
-                  </a>
-                  <details class="service-disclosure">
-                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
-                    <div class="service-expanded">
-                      <span class="service-detail"><b>Para quem é</b><span>Importadores e responsáveis fiscais que precisam organizar documentos e conferir o enquadramento dos produtos.</span></span>
-                      <span class="service-detail"><b>Como podemos ajudar</b><span>Leitura de Invoice, Packing List e fichas técnicas, sugestões fundamentadas, fontes oficiais e relatório para revisão.</span></span>
-                      <small class="service-note">Não registra DI/Duimp nem garante benefício, economia ou desembaraço. Ex-tarifário de II não significa IPI zero.</small>
-                      <a class="service-action" href="#auditoria-importacao">Conferir minha importação<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
-                    </div>
-                  </details>
-                </article>
-              </div>
-            </section>
-            <section class="services-group" data-service-group aria-labelledby="services-energia">
+</div>
+</section>
+<section class="services-group" data-service-group aria-labelledby="services-energia">
               <h3 id="services-energia">Energia</h3>
               <div class="services-grid">
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="energia" data-keywords="fatura tarifa ICMS solar restituição energia conta de energia cobrança" data-service-energy hidden>
@@ -492,7 +428,77 @@
                 </article>
               </div>
             </section>
-            <section class="services-group" data-service-group aria-labelledby="services-laudos">
+<section class="services-group" data-service-group aria-labelledby="services-imoveis">
+<h3 id="services-imoveis">Imóveis</h3>
+<div class="services-grid">
+<article class="home-module-action service-card service-card-explained" data-service-card data-categories="imoveis" data-keywords="vendedor compra venda certidao pessoa física distrito federal df tjdft">
+                  <a class="service-card-entry" href="#analise-vendedor">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Imóveis</small><strong>Análise de Vendedor</strong><small>Assinar a escritura em cartório não evita fraudes ou processos ocultos, tornando indispensável uma investigação jurídica completa ( Due diligencia) para proteger a compra do seu imóvel diante dos milhões de ações que surgem todos os anos.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Quem está comprando um imóvel e precisa reunir documentos judiciais do vendedor pessoa física nos estados habilitados.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Emissão automática das certidões validadas por estado, com PDFs oficiais e indicação das pendências.</span></span>
+                      <small class="service-note">A etapa atual não inclui análise de risco por IA nem todas as fontes necessárias para avaliar uma compra.</small>
+                      <a class="service-action" href="#analise-vendedor">Analisar vendedor<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
+<article class="home-module-action service-card service-card-explained" data-service-card data-categories="imoveis" data-keywords="imovel onr patrimonio matrícula cartório registro ri digital">
+                  <a class="service-card-entry" href="#consulta-imoveis">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Imóveis</small><strong>Consulta de imóveis</strong><small>Pesquise registros imobiliários pelos serviços disponíveis do ONR / RI Digital.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam pesquisar informações de imóveis com autorização e finalidade legítima.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>O módulo reúne opções de pesquisa e documentos imobiliários pelos canais disponíveis do ONR / RI Digital, conforme o serviço e os dados informados.</span></span>
+                      <small class="service-note">A integração está em homologação e depende de credenciamento e disponibilidade. Uma busca não substitui a conferência da matrícula atualizada.</small>
+                      <a class="service-action" href="#consulta-imoveis">Abrir consulta de imóveis<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
+<article class="home-module-action service-card service-card-explained" data-service-card data-categories="imoveis" data-keywords="cnib cpf cnpj vendedor restricao indisponibilidade">
+                  <a class="service-card-entry" href="#consulta-cnib">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Imóveis</small><strong>Indisponibilidade de bens</strong><small>Consulte registros de indisponibilidade de bens pelo CPF ou CNPJ do vendedor.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Quem precisa verificar possíveis restrições relacionadas ao vendedor de um imóvel.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Consulte os dados pelo provedor integrado e confira o resultado na plataforma.</span></span>
+                      <small class="service-note">Depende de provedor habilitado. O resultado não substitui automaticamente uma certidão oficial CNIB.</small>
+                      <a class="service-action" href="#consulta-cnib">Consultar indisponibilidade<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
+</div>
+</section>
+<section class="services-group" data-service-group aria-labelledby="services-importacao">
+              <h3 id="services-importacao">Imposto de Importação</h3>
+              <div class="services-grid">
+                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="beneficios importacao" data-keywords="imposto de importação invoice packing list NCM TIPI IPI II imposto importacao ex tarifário">
+                  <a class="service-card-entry" href="#auditoria-importacao">
+                    <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
+                    <span class="home-module-copy"><small class="service-category-label">Imposto de Importação · Tributos</small><strong>Auditoria do Imposto de Importação</strong><small>Confira documentos, pesquise NCMs e possíveis benefícios e prepare uma simulação de II/IPI com revisão humana.</small></span>
+                  </a>
+                  <details class="service-disclosure">
+                    <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+                    <div class="service-expanded">
+                      <span class="service-detail"><b>Para quem é</b><span>Importadores e responsáveis fiscais que precisam organizar documentos e conferir o enquadramento dos produtos.</span></span>
+                      <span class="service-detail"><b>Como podemos ajudar</b><span>Leitura de Invoice, Packing List e fichas técnicas, sugestões fundamentadas, fontes oficiais e relatório para revisão.</span></span>
+                      <small class="service-note">Não registra DI/Duimp nem garante benefício, economia ou desembaraço. Ex-tarifário de II não significa IPI zero.</small>
+                      <a class="service-action" href="#auditoria-importacao">Conferir minha importação<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+                    </div>
+                  </details>
+                </article>
+              </div>
+            </section>
+<section class="services-group" data-service-group aria-labelledby="services-laudos">
               <h3 id="services-laudos">Laudos</h3>
               <div class="services-grid">
                 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="laudos" data-keywords="laudo exames relatório desenvolvimento">
@@ -578,16 +584,16 @@
           </article>
         </section>
 
-        <section class="seller-analysis-page" id="analise-vendedor" data-page="analise-vendedor">
+        <section class="seller-analysis-page" id="analise-vendedor" data-page="analise-vendedor emissao-certidoes">
           <article class="module seller-analysis-module">
             <div class="module-header seller-analysis-header">
               <div>
-                <p class="eyebrow">Compra e venda de im&oacute;veis</p>
-                <h2>An&aacute;lise de Vendedor</h2>
+                <p class="eyebrow" id="sellerFlowEyebrow">Compra e venda de im&oacute;veis</p>
+                <h2 id="sellerFlowTitle">An&aacute;lise de Vendedor</h2>
               </div>
               <span class="live">Emissão autônoma</span>
             </div>
-            <p class="seller-analysis-intro">
+            <p class="seller-analysis-intro" id="sellerFlowIntro">
               Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas. A IA confere os documentos e dados obtidos, identifica apontamentos e gera um relatório em PDF com evidências e próximos passos.
             </p>
 
@@ -595,7 +601,7 @@
               <div>
                 <small>Cobertura por fonte, estado e tipo</small>
                 <strong>Certidões em PDF e dados complementares</strong>
-                <span>Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF</span>
+                <span id="sellerFlowSteps">Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF</span>
               </div>
               <div id="sellerAnalysisCoverage" aria-live="polite">Carregando cobertura...</div>
             </div>
@@ -605,17 +611,17 @@
                 <div class="seller-analysis-form-heading">
                   <span>1</span>
                   <div>
-                    <strong>Dados do vendedor</strong>
+                    <strong>Dados do titular</strong>
                     <small>RG e gênero são exigidos ao selecionar certidões estaduais. A filiação pode ser consultada na Direct Data quando necessária.</small>
                   </div>
                 </div>
                 <label>
-                  CPF do vendedor
+                  CPF do titular
                   <input id="sellerAnalysisCpf" type="text" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000.000.000-00" required />
                 </label>
                 <label>
                   Nome completo
-                  <input id="sellerAnalysisFullName" type="text" maxlength="180" autocomplete="name" placeholder="Nome completo do vendedor" required />
+                  <input id="sellerAnalysisFullName" type="text" maxlength="180" autocomplete="name" placeholder="Nome completo do titular" required />
                 </label>
                 <label>Data de nascimento<input id="sellerAnalysisBirthDate" type="date" /><small>Exigida para certidões estaduais e CND conjunta federal.</small></label>
                 <label>RG — para certidões estaduais<input id="sellerAnalysisRg" type="text" maxlength="30" /></label>
@@ -625,7 +631,7 @@
                   Nome completo da m&atilde;e
                   <input id="sellerAnalysisMotherName" type="text" maxlength="180" autocomplete="off" placeholder="Informe somente se a busca autom&aacute;tica n&atilde;o localizar" />
                 </label>
-                <label class="seller-analysis-privacy">CNPJs relacionados ao vendedor — opcional
+                <label class="seller-analysis-privacy">CNPJs relacionados — opcional
                   <input id="sellerAnalysisCompanyCnpjs" type="text" maxlength="500" autocomplete="off" placeholder="Separe os CNPJs por vírgula" />
                   <small>Até cinco CNPJs. Cadastro e quadro societário gratuitos; selecione abaixo as certidões empresariais pagas desejadas. A consulta de vínculos por CPF é uma opção separada.</small>
                 </label>
@@ -639,9 +645,9 @@
                 <label class="seller-analysis-consent"><input id="sellerAnalysisPaid" type="checkbox" required /><span id="sellerAnalysisCost">Carregando estimativa de custo...</span></label>
                 <label class="seller-analysis-consent">
                   <input id="sellerAnalysisAuthorization" type="checkbox" required />
-                  <span>Confirmo que possuo autoriza&ccedil;&atilde;o ou base legal para consultar os dados deste vendedor.</span>
+                  <span>Confirmo que possuo autoriza&ccedil;&atilde;o ou base legal para consultar os dados deste titular.</span>
                 </label>
-                <label class="seller-analysis-consent"><input id="sellerAnalysisAiConsent" type="checkbox" required /><span>Autorizo o envio dos documentos e dados obtidos à OpenAI para a análise por IA da Audita.</span></label>
+                <label class="seller-analysis-consent" id="sellerAiConsentLabel"><input id="sellerAnalysisAiConsent" type="checkbox" required /><span>Autorizo o envio dos documentos e dados obtidos à OpenAI para a análise por IA da Audita.</span></label>
                 <p class="seller-analysis-privacy">
                   Os dados são enviados às fontes selecionadas e aos provedores de consulta. Nome da mãe é opcional quando a consulta cadastral estiver disponível. PDFs, resultados e histórico exigem autenticação.
                 </p>
@@ -2165,7 +2171,7 @@
     <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20260929-seller-report"></script>
+    <script type="module" src="app.js?v=20260929-certificates-flow"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

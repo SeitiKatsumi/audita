@@ -7,12 +7,12 @@ const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8"
 const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
 test("seller analysis is available in the property category of the service catalog", () => {
-  assert.match(indexHtml, /data-service-card data-categories="certidoes imoveis"[^>]*>\s*<a class="service-card-entry" href="#analise-vendedor"/);
-  assert.match(indexHtml, /<strong>Certidões do vendedor<\/strong>/);
+  assert.match(indexHtml, /data-service-card data-categories="imoveis"[^>]*>\s*<a class="service-card-entry" href="#analise-vendedor"/);
+  assert.match(indexHtml, /<strong>Análise de Vendedor<\/strong>/);
 });
 
 test("seller analysis route opens its introductory screen", () => {
-  assert.match(indexHtml, /id="analise-vendedor" data-page="analise-vendedor"/);
+  assert.match(indexHtml, /id="analise-vendedor" data-page="analise-vendedor emissao-certidoes"/);
   assert.match(indexHtml, /certidões e consultas do vendedor pessoa física nas fontes habilitadas/);
   assert.match(indexHtml, /Certidões em PDF e dados complementares/);
   assert.match(indexHtml, /relatório em PDF com evidências e próximos passos/);
@@ -45,6 +45,7 @@ test("seller query groups start collapsed and birth date follows the selected so
   const elements = new Map(["#sellerAnalysisCoverage", "#sellerAnalysisUfs", "#sellerAnalysisQueries", "#sellerAnalysisCost", "#sellerAnalysisBirthDate", "#sellerAnalysisRg", "#sellerAnalysisGender", "#sellerAnalysisCompanyCnpjs"].map((selector) => [selector, { innerHTML: "", textContent: "", value: "", required: false }]));
   const selected = { ufs: [], queries: [] };
   const context = vm.createContext({
+    isCertificateOnly:()=>false,
     document: {
       querySelector: (selector) => elements.get(selector),
       querySelectorAll: (selector) => (selector.includes("sellerAnalysisUfs") ? selected.ufs : selected.queries).map((value) => ({ value })),
@@ -94,7 +95,7 @@ test("seller query groups start collapsed and birth date follows the selected so
 test("seller results preserve every source, private PDF indices and pending queries", () => {
   const result = { innerHTML: "" };
   const context = vm.createContext({
-    sellerAnalysisResult: result, Date, Number, encodeURIComponent,
+    sellerAnalysisResult: result, Date, Number, encodeURIComponent, isCertificateOnly:()=>false,
     escapeHtml: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"),
     selectedSellerCertificates: () => [], selectedSellerQueries: () => [], sellerCompanyCnpjs: () => [],
   });
@@ -129,4 +130,9 @@ test("seller results preserve every source, private PDF indices and pending quer
   assert.match(result.innerHTML, /Concluído parcialmente/);
   assert.match(result.innerHTML, /documents\/seller_sources\/2/);
   assert.match(result.innerHTML, /3\/4 resultados · 2 PDFs/);
+  context.isCertificateOnly=()=>true;
+  context.renderSellerAnalysisResult(audit);
+  assert.doesNotMatch(result.innerHTML,/sellerReviewPanel/);
+  assert.match(result.innerHTML,/documents\/tjdft\/0/);
+  assert.match(result.innerHTML,/documents\/seller_sources\/2/);
 });

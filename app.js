@@ -261,7 +261,7 @@ let selectedAuditViews = [];
 let apiUsageDashboardData = null;
 let currentAuthState = { authRequired: true, user: null };
 let pendingGuestAction = null;
-const publicPages = new Set(["home", "chat", "central-servicos", "analise-vendedor",
+const publicPages = new Set(["home", "chat", "central-servicos", "analise-vendedor", "emissao-certidoes",
   "consulta-imoveis", "isencao-ir", "pis-pasep", "analise-cobrancas", "dividas-bancarias",
   "auditoria-importacao", "contas-de-luz", "consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]);
 const isGuest = () => currentAuthState.authRequired && !currentAuthState.user;
@@ -935,6 +935,7 @@ const pageMeta = {
     title: "An\u00e1lise de cobran\u00e7as indevidas",
     eyebrow: "Triagem guiada sem IA",
   },
+  "emissao-certidoes": { title: "Emissão de certidões diversas", eyebrow: "Emissão de certidões" },
   "analise-vendedor": {
     title: "An\u00e1lise de Vendedor",
     eyebrow: "Compra e venda de im\u00f3veis",
@@ -6558,6 +6559,42 @@ async function loadAuditResult(consultaId, attempts = 180) {
   }
 }
 
+let sellerFlowPage = null;
+function isCertificateOnly() { return getActivePage() === 'emissao-certidoes'; }
+function sellerHistoryKey(flow = isCertificateOnly() ? 'certificates' : 'seller') {
+  return flow === 'certificates' ? 'audita:lastCertificateAuditId' : 'audita:lastSellerAnalysisDfAuditId';
+}
+function configureSellerFlow(page) {
+  if (sellerFlowPage === page) return;
+  sellerFlowPage = page;
+  sellerCollectionRun++;
+  sellerReviewRun++;
+  if (!['analise-vendedor', 'emissao-certidoes'].includes(page) || !sellerAnalysisForm) return;
+  const certificates = page === 'emissao-certidoes';
+  document.querySelector('#sellerFlowEyebrow').textContent = certificates ? 'Emissão de certidões' : 'Compra e venda de imóveis';
+  document.querySelector('#sellerFlowTitle').textContent = certificates ? 'Emissão de certidões diversas' : 'Análise de Vendedor';
+  document.querySelector('#sellerFlowIntro').textContent = certificates
+    ? 'Informe os dados do titular, selecione as certidões disponíveis e acompanhe a emissão. Ao concluir, você poderá abrir os documentos obtidos. Este serviço não inclui análise por IA.'
+    : 'Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas. A IA confere os documentos e dados obtidos, identifica apontamentos e gera um relatório em PDF com evidências e próximos passos.';
+  document.querySelector('#sellerFlowSteps').textContent = certificates ? 'Dados do titular → Seleção e emissão → Documentos disponíveis' : 'Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF';
+  document.querySelector('#sellerAiConsentLabel').hidden = certificates;
+  const consent = document.querySelector('#sellerAnalysisAiConsent');
+  consent.disabled = certificates;
+  consent.required = !certificates;
+  consent.checked = false;
+  sellerAnalysisForm.hidden = false;
+  sellerAnalysisSubmit.disabled = false;
+  sellerAnalysisSubmit.textContent = certificates ? 'Emitir certidões selecionadas' : 'Iniciar análise do vendedor';
+  sellerAnalysisError.textContent = '';
+  sellerAnalysisResult.innerHTML = '<p>Selecione os documentos para iniciar.</p>';
+  document.querySelector('#sellerChangeData').hidden = true;
+  const history = document.querySelector('#sellerReviewHistory');
+  history.open = false;
+  history.querySelector('summary').textContent = certificates ? 'Emissões anteriores' : 'Análises anteriores';
+  document.querySelector('#sellerReviewHistoryList').innerHTML = '';
+  loadSellerCoverage();
+}
+document.addEventListener('audita:pagechange', event => configureSellerFlow(event.detail.page));
 let sellerCoverage = null;
 function selectedSellerCertificates() {
   const ufs = [...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map((input) => input.value);
@@ -6596,7 +6633,7 @@ async function loadSellerCoverage() {
     sellerCoverage = await response.json();
     target.innerHTML = sellerCoverage.ufs.map((uf) => `<p><b>${escapeHtml(uf)}</b>: ${escapeHtml(sellerCoverage.certificates.filter((item) => item.uf === uf).map((item) => item.type).join(", "))}</p>`).join("");
     document.querySelector("#sellerAnalysisUfs").innerHTML = '<legend>Certidões estaduais</legend>' + sellerCoverage.ufs.map((uf) => `<label><input type="checkbox" value="${escapeHtml(uf)}" />${escapeHtml(uf)}</label>`).join("");
-    const queries = sellerCoverage.sellerSources?.configured ? (sellerCoverage.sellerSources.queries || []).filter((item) => item.documentTypes?.some((type) => ["cpf", "cnpj"].includes(type))) : [];
+    const queries = sellerCoverage.sellerSources?.configured ? (sellerCoverage.sellerSources.queries || []).filter((item) => item.documentTypes?.some((type) => ["cpf", "cnpj"].includes(type)) && (!isCertificateOnly() || item.kind === "certificate")) : [];
     const groups = [...new Set(queries.map((item) => item.category || "Outras consultas"))];
     document.querySelector("#sellerAnalysisQueries").innerHTML = groups.length ? groups.map((category) => {
       const items = queries.filter((item) => (item.category || "Outras consultas") === category);
@@ -6824,8 +6861,8 @@ function renderSellerAnalysisResult(audit) {
       <small class="seller-progress-activity ${escapeHtml(activityState.className)}">${escapeHtml(activityState.label)}</small>
       <small class="seller-progress-expectation">Cada fonte pode levar até alguns minutos. Documentos e dados aparecem conforme são obtidos; uma falha não interrompe as demais consultas.</small>
     </section>
-    ${processing ? `<div class="seller-certificate-list">${certificateRows}</div>` : `<div id="sellerReviewPanel" aria-live="polite"></div><details class="seller-source-details"><summary>Documentos e resultados das fontes (${available}/${total})</summary><div class="seller-certificate-list">${certificateRows}</div></details>`}
-    <p class="seller-analysis-result-note">A análise considera apenas as fontes selecionadas. Fontes indisponíveis não comprovam regularidade. Confira os documentos originais e a abrangência de cada consulta.</p>
+    ${processing || isCertificateOnly() ? `<div class="seller-certificate-list">${certificateRows}</div>` : `<div id="sellerReviewPanel" aria-live="polite"></div><details class="seller-source-details"><summary>Documentos e resultados das fontes (${available}/${total})</summary><div class="seller-certificate-list">${certificateRows}</div></details>`}
+    <p class="seller-analysis-result-note">O resultado se limita às fontes selecionadas. Fontes indisponíveis não comprovam regularidade. Confira os documentos originais e a abrangência de cada consulta.</p>
   `;
 }
 
@@ -6855,7 +6892,7 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
       }
       const audit = await response.json();
       renderSellerAnalysisResult(audit);
-      if (sellerAnalysisFinished(audit)) { await loadSellerReview(consultaId); return; }
+      if (sellerAnalysisFinished(audit)) { if (!isCertificateOnly()) await loadSellerReview(consultaId); return; }
     } catch {
       if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
       renderSellerAnalysisFailure({ message: "Falha de comunicação durante o acompanhamento." });
@@ -6871,15 +6908,17 @@ let sellerReviewRun = 0;
 async function loadSellerReviewHistory() {
   const target = document.querySelector('#sellerReviewHistoryList');
   if (!target) return;
+  const flow = isCertificateOnly() ? 'certificates' : 'seller';
   target.textContent = 'Carregando consultas salvas...';
   try {
     const response = await fetch('/audit');
     if (!response.ok) throw new Error();
     const { audits = [] } = await response.json();
-    const sellers = audits.filter(a => a.fontes?.length && a.fontes.every(f => ['tjdft', 'seller_documents'].includes(f.fonte)));
-    target.innerHTML = sellers.length ? sellers.map(a => `<p><button type="button" class="secondary-action" data-seller-history="${escapeHtml(a.consultaId)}">${escapeHtml(a.documento)} · ${escapeHtml(new Date(a.createdAt).toLocaleString('pt-BR'))}</button></p>`).join('') : '<p>Nenhuma análise de vendedor nas consultas recentes.</p>';
+    if (flow !== (isCertificateOnly() ? 'certificates' : 'seller')) return;
+    const sellers = audits.filter(a => (a.sellerFlow || 'seller') === flow && a.fontes?.length && a.fontes.every(f => ['tjdft', 'seller_documents'].includes(f.fonte)));
+    target.innerHTML = sellers.length ? sellers.map(a => `<p><button type="button" class="secondary-action" data-seller-history="${escapeHtml(a.consultaId)}">${escapeHtml(a.documento)} · ${escapeHtml(new Date(a.createdAt).toLocaleString('pt-BR'))}</button></p>`).join('') : '<p>Nenhuma consulta deste serviço nas consultas recentes.</p>';
     target.querySelectorAll('[data-seller-history]').forEach(button => { button.onclick = () => {
-      sessionStorage.setItem('audita:lastSellerAnalysisDfAuditId', button.dataset.sellerHistory);
+      sessionStorage.setItem(sellerHistoryKey(), button.dataset.sellerHistory);
       loadSellerAnalysisResult(button.dataset.sellerHistory);
       sellerAnalysisResult?.scrollIntoView({ block: 'start' });
     }; });
@@ -6889,6 +6928,7 @@ document.querySelector('#sellerReviewHistory')?.addEventListener('toggle', event
 document.querySelector('#sellerReviewHistoryRefresh')?.addEventListener('click', loadSellerReviewHistory);
 
 async function loadSellerReview(id) {
+  if (isCertificateOnly()) return;
   const run = ++sellerReviewRun;
   const target = document.querySelector('#sellerReviewPanel');
   if (!target) return;
@@ -8918,6 +8958,7 @@ sellerAnalysisCpf?.addEventListener("input", () => {
 
 sellerAnalysisForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
+  const flow = isCertificateOnly() ? "certificates" : "seller";
   if (sellerAnalysisError) sellerAnalysisError.textContent = "";
 
   const cpf = String(sellerAnalysisCpf?.value || "").replace(/\D/g, "");
@@ -8926,7 +8967,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   const ufs = [...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map((input) => input.value);
   const sellerQueries = selectedSellerQueries().map((item) => item.id);
   const companyCnpjs = sellerCompanyCnpjs();
-  if (!ufs.length && !sellerQueries.length && !companyCnpjs.length) {
+  if (!ufs.length && !sellerQueries.length && (flow === "certificates" || !companyCnpjs.length)) {
     sellerAnalysisError.textContent = "Selecione ao menos uma fonte ou informe um CNPJ para consultar.";
     return;
   }
@@ -8981,7 +9022,8 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
         cpf,
         fullName,
         motherName,
-        aiConsent: document.querySelector('#sellerAnalysisAiConsent')?.checked === true,
+        flow,
+        aiConsent: flow !== 'certificates' && document.querySelector('#sellerAnalysisAiConsent')?.checked === true,
         ufs,
         sellerQueries,
         companyCnpjs,
@@ -9022,7 +9064,8 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
       return;
     }
 
-    sessionStorage.setItem("audita:lastSellerAnalysisDfAuditId", data.consultaId);
+    sessionStorage.setItem(sellerHistoryKey(flow), data.consultaId);
+    if (flow !== (isCertificateOnly() ? "certificates" : "seller")) return;
     await loadSellerAnalysisResult(data.consultaId);
   } catch {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
@@ -9034,7 +9077,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   } finally {
     if (sellerAnalysisSubmit) {
       sellerAnalysisSubmit.disabled = false;
-      sellerAnalysisSubmit.textContent = "Iniciar análise do vendedor";
+      sellerAnalysisSubmit.textContent = isCertificateOnly() ? "Emitir certidões selecionadas" : "Iniciar análise do vendedor";
     }
   }
 });
@@ -9533,8 +9576,8 @@ apiPricingList?.addEventListener("click", (event) => {
 
 window.addEventListener("hashchange", () => {
   setActivePage(getActivePage());
-  if (getActivePage() === "analise-vendedor") {
-    const sellerAuditId = sessionStorage.getItem("audita:lastSellerAnalysisDfAuditId");
+  if (["analise-vendedor", "emissao-certidoes"].includes(getActivePage())) {
+    const sellerAuditId = sessionStorage.getItem(sellerHistoryKey());
     if (sellerAuditId) loadSellerAnalysisResult(sellerAuditId, 1);
   }
   if (getActivePage() === "consulta-imoveis") {
@@ -9592,8 +9635,8 @@ if (authState.authRequired && !authState.user) {
     setAuditWizardStep(3);
     await loadAuditResult(resumeAuditId, 1);
   }
-  if (getActivePage() === "analise-vendedor") {
-    const sellerAuditId = sessionStorage.getItem("audita:lastSellerAnalysisDfAuditId");
+  if (["analise-vendedor", "emissao-certidoes"].includes(getActivePage())) {
+    const sellerAuditId = sessionStorage.getItem(sellerHistoryKey());
     if (sellerAuditId) await loadSellerAnalysisResult(sellerAuditId, 1);
   }
   await loadAuditHistory();

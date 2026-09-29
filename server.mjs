@@ -4097,7 +4097,7 @@ async function handleApi(request, response, pathname) {
       }
 
       let autonomousPlan = null;
-      if (body.aiConsent === true && !sellerReviewService.ready()) {
+      if (body.flow !== 'certificates' && body.aiConsent === true && !sellerReviewService.ready()) {
         sendJson(response, 503, { error: 'seller_ai_unavailable', message: 'A análise por IA não está configurada neste ambiente. Nenhuma consulta foi iniciada.' });
         return true;
       }
@@ -4109,6 +4109,7 @@ async function handleApi(request, response, pathname) {
           if (body.ufs.length) autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus());
           if (!Array.isArray(companyCnpjs) || companyCnpjs.length > 5 || companyCnpjs.some((value) => !validateCnpj(value))) throw new Error("invalid_company_cnpjs");
           sellerDocumentPlan = planSellerDocuments(body.sellerQueries || [], directDataSellerService.getStatus(), companyCnpjs);
+          if (body.flow === 'certificates' && (sellerDocumentPlan.queries.some(item => item.kind !== 'certificate') || (!autonomousPlan && !sellerDocumentPlan.queries.length))) throw new Error('invalid_certificate_selection');
           if (!autonomousPlan && !sellerDocumentPlan.queries.length && !companyCnpjs.length) throw new Error("empty_selection");
         } catch {
           sendJson(response, 400, { error: "invalid_seller_selection" });
@@ -4194,7 +4195,8 @@ async function handleApi(request, response, pathname) {
       }
 
       request.body = prepared.requestBody;
-      request.body.extraFields.sellerAiConsent = body.aiConsent === true;
+      request.body.extraFields.sellerFlow = body.flow === 'certificates' ? 'certificates' : 'seller';
+      request.body.extraFields.sellerAiConsent = body.flow !== 'certificates' && body.aiConsent === true;
       request.body.extraFields.authorizationConfirmed = true;
       if (sellerDocumentPlan && (sellerDocumentPlan.queries.length || companyCnpjs.length)) {
         request.body.fontes.push("seller_documents");
