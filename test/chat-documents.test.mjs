@@ -15,6 +15,17 @@ async function pdf(pages = 1) {
   return {buffer:Buffer.from(await doc.save()),fileName:'fictional.pdf',mimeType:'application/pdf'};
 }
 const output = pages => ({status:'completed',output_text:JSON.stringify({summary:'Fictional summary [p. 1]',pages:Array.from({length:pages},(_,i) => ({page:i+1,text:`Fictional text ${i+1}`,uncertain:i === 1}))})});
+test('text attachments preserve originals privately without a redundant AI read; profile key fallback and malformed Office rejected',async t=>{
+  const {options,state}=await fixture(t);
+  options.env={AUDITA_PROFILE_ENCRYPTION_KEY:options.env.AUDITA_IR_ENCRYPTION_KEY};
+  const service=createChatDocumentsService(options),bytes=Buffer.from('Item,Valor\nFictício,35\n');
+  const prepared=await service.prepare(auth,{fileName:'dados.csv',mimeType:'text/csv',buffer:bytes});
+  assert.equal(prepared.pages,1);await service.analyze(auth,prepared.id,{confirmed:true});
+  assert.equal(state.calls.length,0);assert.deepEqual((await service.getInput(auth,prepared.id)).buffer,bytes);
+  await assert.rejects(service.getInput({tenantId:1,user:{id:2}},prepared.id),{code:'not_found'});
+  await assert.rejects(service.prepare(auth,{fileName:'invalid.txt',mimeType:'text/plain',buffer:Buffer.from([0xff,0xfe])}),{code:'invalid_file'});
+  await assert.rejects(service.prepare(auth,{fileName:'invalid.docx',mimeType:'application/octet-stream',buffer:Buffer.from([0x50,0x4b,3,4])}),{code:'invalid_file'});
+});
 async function fixture(t) {
   const pg = new PGlite();
   await pg.exec('CREATE TABLE audita_tenants(id BIGINT PRIMARY KEY); CREATE TABLE audita_users(id BIGINT PRIMARY KEY); INSERT INTO audita_tenants VALUES(1),(2); INSERT INTO audita_users VALUES(1),(2),(3);');

@@ -12276,4 +12276,68 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 
 .seller-analysis-ufs { display: flex; flex-wrap: wrap; gap: 12px; border: 1px solid #d4e4e4; border-radius: 8px; padding: 12px; }
 .seller-analysis-ufs label { display: flex; align-items: center; gap: 6px; }
+
+.seller-step-shell { width: 100%; max-width: 980px; min-width: 0; margin: 0 auto; padding: 32px; gap: 24px; }
+.seller-step-shell [hidden] { display: none !important; }
+.seller-step-shell .seller-analysis-header { margin-bottom: 8px; }
+.seller-step-shell .seller-analysis-intro { max-width: 680px; margin: 0 0 4px; }
+.seller-step-nav { display: flex; list-style: none; padding: 0; margin: 0 0 4px; gap: 30px; }
+.seller-step-nav li { display: flex; align-items: center; gap: 10px; color: #8397a8; font-size: 14px; }
+.seller-step-nav li > span { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #294456; border-radius: 50%; font-weight: 700; }
+.seller-step-nav li[aria-current] { color: #e5f7ff; }
+.seller-step-nav li[aria-current] > span { color: #032032; background: linear-gradient(120deg,#2ecaf3,#72edb6); border-color: transparent; box-shadow: 0 0 22px #2dc4c926; }
+.seller-step-nav li.complete > span { color: #75ebbc; border-color: #387d73; }
+.seller-step-shell .seller-analysis-workspace { display: block; }
+.seller-step-shell .seller-analysis-form { gap: 22px; padding: 28px; border-radius: 16px; }
+.seller-step-shell .seller-analysis-form-heading { margin-bottom: 8px; }
+.seller-step-shell .seller-analysis-form-heading small { max-width: 580px; }
+.seller-step-shell .seller-analysis-form select { width: 100%; min-height: 46px; }
+.seller-step-shell .seller-analysis-consent { margin: 0; padding: 14px; border-radius: 10px; font-size: 13px; line-height: 1.6; }
+.seller-step-actions { display: flex; align-items: center; justify-content: space-between; gap: 24px; grid-column: 1 / -1; padding-top: 22px; border-top: 1px solid #234051; }
+.seller-cost-preview { display: grid; gap: 5px; max-width: 430px; }
+.seller-cost-preview > strong { font-size: 23px; color: #76e9c1; }
+.seller-cost-preview > small { color: #9bafbd; font-size: 12px; line-height: 1.5; }
+.seller-step-actions > button { white-space: nowrap; min-height: 48px; padding: 14px 22px; }
+.seller-step-shell .seller-analysis-result { padding: 30px; border-radius: 16px; }
+.seller-step-shell .seller-analysis-progress { margin-top: 26px; padding: 22px; }
+.seller-step-shell .seller-progress-summary > span { white-space: nowrap; }
+.seller-step-shell .seller-progress-summary b { color: #72ecc3; font-size: 24px; }
+.seller-step-shell .seller-source-details { margin-top: 24px; }
+.seller-step-shell .seller-source-details > summary { cursor: pointer; padding: 12px 0; color: #b6d0dc; }
+.seller-step-shell .seller-review h3 { font-size: 25px; margin: 0 0 24px; }
+.seller-step-shell .seller-review > progress { width: 100%; height: 14px; accent-color: #58dabe; }
+.seller-step-shell .seller-review > .primary-action { display: inline-flex; align-items: center; margin: 22px 0 8px; padding: 18px 26px; font-size: 17px; }
+.seller-report-summary { max-width: 740px; font-size: 18px; line-height: 1.7; color: #e1f2f7; }
+.seller-step-shell .seller-certificate-item { grid-template-columns: minmax(0,1fr) auto auto; }
+@media (max-width: 680px) {
+  .seller-step-shell { padding: 16px; }
+  .seller-step-nav { gap: 12px; justify-content: space-between; }
+  .seller-step-nav li { font-size: 11px; flex-direction: column; text-align: center; gap: 8px; flex: 1; }
+  .seller-step-nav li { min-width: 0; }
+  .seller-step-shell .seller-analysis-form, .seller-step-shell .seller-analysis-result { padding: 18px; }
+  .seller-step-actions { flex-direction: column; align-items: stretch; gap: 18px; }
+  .seller-step-actions > button { white-space: normal; }
+  .seller-step-shell .seller-certificate-item { grid-template-columns: 1fr; }
+  .seller-step-shell .seller-review > .primary-action { width: 100%; text-align: center; justify-content: center; }
+}
 .seller-analysis-ufs input { width: auto; }
+.general-chat-controls {display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 24px;color:var(--muted);font-size:.85rem}
+.general-chat-controls [hidden] {display:none!important}
+.general-chat-message-actions {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;color:var(--muted)}
+.general-chat-message-actions button,.general-chat-artifact button,.chat-message-content>button {background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--muted);padding:6px 10px;font-size:.8rem;box-shadow:none}
+.general-chat-artifact {display:grid;gap:10px;min-width:0;overflow-wrap:anywhere;padding:14px;border:1px solid var(--line);border-radius:12px;margin-top:14px}
+.general-chat-artifact img {max-width:100%;max-height:480px;object-fit:contain;border-radius:8px}
+.general-chat-artifact>div {display:flex;gap:18px;align-items:center}
+.general-chat-artifact a,.general-chat-sources a {color:var(--aqua)}
+.general-chat-sources {margin-top:12px}
+.general-chat-sources a {display:block;margin:8px 0;overflow-wrap:anywhere}
+.chat-message-body pre {white-space:pre;overflow:auto;max-width:100%;background:var(--bg-elevated);padding:14px;border-radius:8px}
+.chat-message-body h3 {font-size:1.1rem;margin:16px 0 8px}
+.general-chat-preview {width:min(1100px,95vw);height:min(850px,90vh);padding:18px;background:var(--bg-elevated);color:var(--text);border:1px solid var(--line);border-radius:14px}
+.general-chat-preview::backdrop {background:#000a}
+.general-chat-preview header {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.general-chat-preview section {height:calc(100% - 64px)}
+.general-chat-preview iframe {width:100%;height:100%;border:0;background:white}
+.general-chat-preview img {width:100%;height:100%;object-fit:contain}
+@media(max-width:600px){.general-chat-controls {padding:10px 12px;gap:8px}.general-chat-controls>span {display:none}.general-chat-preview {padding:12px}}
+@media(max-width:960px){.chat-threads.general-history-open {display:flex;flex-direction:column;position:fixed;inset:0;z-index:200;width:min(340px,100vw);background:var(--bg);box-shadow:0 0 0 100vw #0008}.chat-threads.general-history-open .chat-thread-list {overflow:auto}}

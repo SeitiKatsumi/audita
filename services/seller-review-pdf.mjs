@@ -1,7 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 
 const category = { fiscal: 'Fiscal e tributário', judicial: 'Judicial', labor: 'Trabalhista', credit: 'Crédito e protestos', company: 'Empresas relacionadas', identity: 'Identificação', other: 'Outros' };
-const outcome = { occurrences: 'Apontamentos na fonte', no_occurrence_in_scope: 'Sem ocorrência no alcance consultado', informational: 'Informações cadastrais', inconclusive: 'Inconclusivo' };
 export async function sellerReportPdf(report) {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -32,34 +31,23 @@ export async function sellerReportPdf(report) {
   }
   text('Relatório de análise documental', true);
   text(`${report.subject.name}\nDocumento: ${report.subject.document}\nConsulta: ${report.id}\nGerado em: ${new Date(report.generatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})} (Brasília)`);
-  text('1. Resumo e alcance',true);
-  text(report.conclusion);
-  text(`${report.analyzed} de ${report.total} fontes analisadas. ${report.gaps} fonte(s) com lacunas ou conclusão inconclusiva. ${report.findings.length} apontamento(s), incluindo informações cadastrais. Prioridade indica necessidade de conferência, não uma classificação de crédito.`);
-  text(report.scopeNotice);
-  text('2. Apontamentos e providências',true);
-  if (!report.findings.length) text('Nenhum apontamento extraído. Isso não elimina as lacunas e os limites descritos neste relatório.');
-  for (const [index,f] of report.findings.entries()) {
+  text('Resumo da análise',true);
+  text(report.executiveSummary || report.conclusion);
+  text(`${report.analyzed} documentos e consultas analisados. ${report.findings.filter(f=>f.priority!=='information').length} pontos de atenção no material obtido.`);
+  const issues=report.findings.filter(f=>f.priority!=='information');
+  if(issues.length) text('Pendências identificadas e próximos passos',true);
+  for (const [index,f] of issues.entries()) {
     text(`${index+1}. ${f.title}`,true);
-    text(`${category[f.category] || 'Outros'} | Prioridade: ${{high:'Alta',medium:'Atenção',information:'Informativa'}[f.priority]}\nFonte: ${f.sourceTitle} [${f.sourceId}]`);
+    text(`${category[f.category] || 'Outros'} | Prioridade: ${{high:'Alta',medium:'Atenção',information:'Informativa'}[f.priority]}\nFonte: ${f.sourceTitle}`);
     if (f.identity !== 'compatible') text('IDENTIDADE NÃO CONFIRMADA: não atribuir este registro ao vendedor sem conferência.');
     text(f.description);
     if (f.amount) text(`Valor informado pela fonte: ${f.amount}. Não somado a outros registros para evitar duplicidade.`);
     if (f.date) text(`Data informada: ${f.date}`);
     text(`Trecho de evidência: "${f.quote}"\nPróximo passo: ${f.recommendation}`);
   }
-  text('3. Fontes, documentos e lacunas',true);
-  for (const s of report.sources) {
-    text(`${s.title} [${s.id}]`,true);
-    text(`Origem: ${s.provider} | Alcance: ${s.scope}\nColeta: ${s.checkedAt || 'Data não informada'}\nResultado da leitura: ${s.status === 'analyzed' ? outcome[s.outcome] : 'Não analisado'}`);
-    text(s.status === 'analyzed' ? s.summary : s.message);
-    if(s.issuedAt || s.validUntil) text(`Emissão: ${s.issuedAt || 'Não identificada'} | Validade: ${s.validUntil || 'Não identificada'}`);
-    if(s.method) text(`Método: ${s.method}`);
-    for(const limitation of [s.limitation,...(s.limitations || [])].filter(Boolean)) text(`Limitação: ${limitation}`);
-    if(s.url) text('Documento original disponível na consulta autenticada da Audita, em Documentos e resultados das fontes.');
-  }
-  text('4. Como usar este relatório',true);
-  text('Confira a identidade, datas, validade e abrangência de cada documento original. Solicite documentos ausentes ou atualizados. Leve os apontamentos e as evidências a um profissional habilitado para avaliar o efeito na negociação. Processos, vínculos societários e registros de terceiros não constituem, isoladamente, dívida pessoal nem impedimento à venda.');
-  text('Leitura assistida por IA, sujeita a erros de interpretação. Não é certidão oficial, decisão jurídica, garantia de regularidade ou recomendação automática de contratar. Não foram feitas pesquisas além das fontes selecionadas.');
+  text('Sobre este levantamento',true);
+  text(`Análise de ${report.analyzed} das ${report.total} fontes do levantamento, limitada ao material obtido e à data da consulta. Originais, status e detalhes das fontes permanecem disponíveis na consulta autenticada da Audita.`);
+  text('Leitura assistida por IA para conferência. Registros de processos ou empresas não representam automaticamente dívida pessoal do vendedor. Não é certidão oficial nem decisão jurídica ou garantia de regularidade.');
   const pages=pdf.getPages();
   pages.forEach((p,i)=>p.drawText(`Audita | Relatório documental | ${i+1} / ${pages.length}`,{x:44,y:30,font,size:8,color:ink}));
   return Buffer.from(await pdf.save());

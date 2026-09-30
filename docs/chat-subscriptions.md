@@ -1,11 +1,22 @@
 # Paid chat: local implementation, not released
 
+The general chat was replaced locally on 2026-09-30; see [general-chat.md](general-chat.md) for the current models, tools, attachment formats, history and execution limits. Billing/reservation rules below remain; older context/output limits and cost simulations below describe the previous assistant and must not be used to price Sol/Luna or hosted tools.
+
 Four separate chat plans are defined in `services/billing-catalog.service.mjs`.
 Standard prices and contracts are unchanged. Only an active, unexpired Stripe
 Standard subscription is recognized as legacy chat access; login and demo grants
 are not payment. New plans are individual, tenant/user scoped.
 
 ## Setup for authorized staging
+
+For free chat testing, explicitly set `AUDITA_CHAT_TEST_BYPASS_ENABLED=true` on
+the test server. The plans dialog then offers “Liberar acesso de teste (sem cobrança)”.
+Login is required; the server grants only the authenticated tenant/user, including
+messages and document processing. No Stripe call, paid entitlement or trial purchase
+is created. Existing reservations, encryption and provider usage accounting remain.
+Grants are process-local and must be enabled again after a server restart; disable
+the flag to remove both the button and the bypass. The flag defaults to false and
+must remain disabled for paid operation. AI provider costs still apply.
 
 Apply `db/schema.sql`, then the three `db/migrations/20260922-chat-*.sql`
 files. The existing automatic migration bootstrap includes them when enabled.
@@ -14,7 +25,7 @@ Configure existing Stripe TEST secret/webhook and `APP_URL`, plus the four
 `STRIPE_PRICE_CHAT_*` IDs matching the BRL catalog exactly. Experimente is one
 payment, the other three recurring monthly. No annual prices or automatic tax.
 Set `AUDITA_CHAT_DOCUMENTS_ENCRYPTION_KEY` to a secure 32-byte base64 key,
-or reuse the configured IR/import key. Preserve that key across restarts.
+or reuse the configured IR/import/profile key. Preserve that key across restarts.
 Never put documents or credentials in public static paths.
 Chat uses a separate Stripe customer per tenant/user, not the legacy tenant
 customer. Configure the test customer portal for payment-method management and

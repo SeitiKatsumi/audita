@@ -94,6 +94,8 @@ function normalizeExtraFields(value) {
     sellerFlow: value.sellerFlow === 'certificates' ? 'certificates' : 'seller',
     sellerAiConsent: value.sellerFlow !== 'certificates' && value.sellerAiConsent === true,
     sellerQueries: Array.isArray(value.sellerQueries) ? [...new Set(value.sellerQueries.map(String))].slice(0, 160) : [],
+    sellerState: /^[A-Z]{2}$/.test(value.sellerState || '') ? value.sellerState : '',
+    discoverCompanies: value.sellerFlow !== 'certificates' && value.discoverCompanies === true,
     companyCnpjs: Array.isArray(value.companyCnpjs) ? [...new Set(value.companyCnpjs.map(normalizeDocument))].slice(0, 5) : [],
     authorizationConfirmed: value.authorizationConfirmed === true,
     autonomousUfs: Array.isArray(value.autonomousUfs) ? [...new Set(value.autonomousUfs.map((uf) => String(uf).toUpperCase()))] : [],

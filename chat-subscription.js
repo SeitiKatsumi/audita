@@ -24,11 +24,11 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     <p data-access role="status"></p><section class="chat-quota" data-quota hidden aria-label="Cotas restantes"></section><p data-notice role="status" aria-live="polite"></p>
     <p data-payment-status role="status"></p><section data-legacy hidden></section><div class="chat-subscription-plans"></div>
     <section class="chat-subscription-rules" aria-label="O que o plano inclui e regras de uso">
-      <p><strong>Inclui:</strong> conversa com a IA e leitura de PDF, PNG e JPEG. A an\u00e1lise inicial gera um resumo e consome p\u00e1ginas; perguntas posteriores consomem mensagens.</p>
+      <p><strong>Inclui:</strong> conversa, pesquisa na web, análise de documentos e fotos, geração de imagens e arquivos. A leitura inicial consome páginas; perguntas posteriores consomem mensagens.</p>
       <p><strong>N\u00e3o inclui:</strong> consultas externas, certid\u00f5es, servi\u00e7os especializados ou honor\u00e1rios profissionais.</p>
       <p><strong>Uso individual, sem compartilhamento.</strong> Planos mensais renovam no anivers\u00e1rio da contrata\u00e7\u00e3o. Saldos n\u00e3o acumulam entre per\u00edodos e n\u00e3o h\u00e1 cobran\u00e7a autom\u00e1tica por excedentes. Experimente: compra \u00fanica, sem renova\u00e7\u00e3o.</p>
     </section>
-    <footer><button type="button" data-refresh>Atualizar acesso</button><button type="button" data-manage hidden>Gerenciar assinatura</button></footer>`;
+    <footer><button type="button" data-test-access hidden>Liberar acesso de teste (sem cobrança)</button><button type="button" data-refresh>Atualizar acesso</button><button type="button" data-manage hidden>Gerenciar assinatura</button></footer>`;
   const documentDialog = document.createElement("dialog");
   documentDialog.id = "chatDocumentDialog";
   documentDialog.className = "chat-subscription-dialog chat-document-dialog";
@@ -60,7 +60,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   }
   function allowed(kind = "messages") {
     return Boolean(owner && owner === userId() && loaded && access?.active === true &&
-      (Number(access.remaining?.[kind]) > 0 || (access.legacy === true && access.remaining?.[kind] == null)));
+      (Number(access.remaining?.[kind]) > 0 || ((access.legacy === true || access.test === true) && access.remaining?.[kind] == null)));
   }
   async function request(url, body) {
     const response = await fetch(url, { method: body === undefined ? "GET" : "POST", credentials: "same-origin",
@@ -86,6 +86,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     if (!owner) return "Escolha um plano para conversar e analisar documentos.";
     if (!loaded) return "Consultando acesso...";
     if (!access?.active) return "Nenhum plano de chat ativo.";
+    if (access.test) return "Acesso de teste liberado · sem cobrança do plano.";
     const plan = PLANS.find(item => item.id === access.planId);
     const remaining = access.remaining;
     let text = `${plan?.name || (access.legacy ? "Acesso legado" : "Chat ativo")} \u00b7 ${remaining?.messages ?? "-"} mensagens e ${remaining?.pages ?? "-"} p\u00e1ginas restantes`;
@@ -118,7 +119,11 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     dialog.querySelector("[data-payment-status]").textContent = !catalog
       ? loaded ? "Pagamentos indispon\u00edveis: n\u00e3o foi poss\u00edvel verificar a configura\u00e7\u00e3o deste ambiente." : "Consultando disponibilidade dos pagamentos."
       : `${catalog.billing?.demoMode || catalog.billing?.mode === "test" ? "Ambiente de testes: sem cobran\u00e7a real. " : ""}${!PLANS.some(plan => available(plan.id)) ? "Pagamentos indispon\u00edveis neste ambiente: a configura\u00e7\u00e3o de cobran\u00e7a n\u00e3o est\u00e1 habilitada. Nenhuma compra pode ser conclu\u00edda." : ""}`;
-    manage.hidden = !(owner && (access?.active && !access.legacy || billing?.canManage && billing?.subscription?.provider === "stripe"));
+    const testButton = dialog.querySelector('[data-test-access]');
+    testButton.hidden = !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable);
+    testButton.disabled = busy || Boolean(loading) || access?.test === true;
+    testButton.textContent = access?.test ? 'Acesso de teste liberado' : 'Liberar acesso de teste (sem cobrança)';
+    manage.hidden = !(owner && (access?.active && !access.legacy && !access.test || billing?.canManage && billing?.subscription?.provider === "stripe"));
     manage.disabled = busy;
     const legacy = billing?.subscription?.planId === "standard" ? billing.subscription : null;
     const legacyPlan = catalog?.plans?.find(plan => plan.id === "standard");
@@ -150,10 +155,11 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
         target.innerHTML = source.innerHTML;
         target.hidden = source.hidden;
       }
-      for (const selector of ["[data-manage]", "[data-refresh]"]) {
+      for (const selector of ["[data-manage]", "[data-refresh]", "[data-test-access]"]) {
         const source = dialog.querySelector(selector), target = accountView.querySelector(selector);
         target.hidden = source.hidden;
         target.disabled = source.disabled;
+        target.textContent = source.textContent;
       }
       if (focused) {
         const button = [...accountView.querySelectorAll("[data-plan]")].find(item => item.dataset.plan === focused);
@@ -302,6 +308,35 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       }
     } finally { busy = false; render(); }
   }
+  async function enableTestAccess() {
+    if (busy || !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable)) return;
+    if (!userId()) {
+      dialog.close();
+      requestLogin('Entre para liberar o chat sem cobrança durante os testes.', async () => {
+        await onAuthChanged();
+        open();
+        await enableTestAccess();
+      });
+      return;
+    }
+    const version = revision, account = userId();
+    busy = true;
+    notice.textContent = '';
+    render();
+    try {
+      if (loading) await loading;
+      if (version !== revision || account !== userId()) return;
+      await request('/api/chat/test-access', {});
+      if (version !== revision || account !== userId()) return;
+      await refresh();
+      if (version !== revision || account !== userId()) return;
+      if (!allowed()) throw new Error('Não foi possível confirmar a liberação. Atualize o acesso.');
+      if (dialog.open) dialog.close();
+      input.focus();
+    } catch (error) {
+      if (version === revision && account === userId()) notice.textContent = error.message;
+    } finally { busy = false; render(); }
+  }
   function finishDocument(value) {
     const resolve = documentResolve;
     documentResolve = null;
@@ -311,7 +346,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   }
   async function prepareDocument(file) {
     if (documentBusy || documentResolve) throw new Error("Aguarde o documento atual.");
-    if (!file || !["application/pdf", "image/png", "image/jpeg"].includes(file.type)) throw new Error("Use PDF, PNG ou JPEG.");
+    if (!file || !(/\.(pdf|png|jpe?g|txt|md|csv|json|html|docx|xlsx)$/i.test(file.name))) throw new Error("Use PDF, fotos, texto, Word ou Excel.");
     if (!file.size || file.size > 12 * 1024 * 1024) throw new Error(file.size ? "O arquivo excede o limite de 12 MB." : "O arquivo est\u00e1 vazio.");
     documentBusy = true;
     const version = revision, account = userId();
@@ -330,8 +365,12 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       if (!prepared?.id || !Number.isInteger(prepared.pages) || prepared.pages <= 0) throw new Error("Contagem de p\u00e1ginas indispon\u00edvel. Nenhuma an\u00e1lise foi solicitada.");
       analysisRequestId = crypto.randomUUID();
       documentDialog.querySelector("[data-document-name]").textContent = file.name;
-      documentDialog.querySelector("[data-document-pages]").textContent = `${prepared.pages} p\u00e1gina(s) ser\u00e3o descontadas do saldo ao analisar. Saldo atual: ${access.remaining?.pages ?? "-"}.`;
-      const insufficient = !(access.legacy && access.remaining?.pages == null) && prepared.pages > Number(access.remaining?.pages ?? 0);
+      documentDialog.querySelector("[data-document-pages]").textContent = access.test
+        ? `${prepared.pages} unidade(s) de processamento · acesso de teste, sem desconto de saldo.`
+        : /\.(pdf|png|jpe?g)$/i.test(file.name)
+        ? `${prepared.pages} página(s) serão descontadas do saldo ao analisar. Saldo atual: ${access.remaining?.pages ?? "-"}.`
+        : `Este arquivo usa 1 unidade do saldo de páginas para processamento, sem representar a quantidade de páginas ou abas. Saldo atual: ${access.remaining?.pages ?? "-"}.`;
+      const insufficient = !((access.legacy || access.test) && access.remaining?.pages == null) && prepared.pages > Number(access.remaining?.pages ?? 0);
       documentDialog.querySelector("[data-document-error]").textContent = insufficient ? "Saldo de p\u00e1ginas insuficiente para este documento." : "";
       documentDialog.querySelector("[data-analyze]").disabled = insufficient;
       documentDialog.querySelector("[data-analyze]").textContent = "Analisar documento";
@@ -410,10 +449,12 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     open();
     if (button.dataset.plan) void checkout(button.dataset.plan);
     else if (button.matches("[data-manage]")) void checkout(null, true);
+    else if (button.matches("[data-test-access]")) void enableTestAccess();
   });
   listen(dialog.querySelector("[data-close]"), "click", () => dialog.close());
   listen(dialog.querySelector("[data-refresh]"), "click", () => void refresh());
   listen(manage, "click", () => void checkout(null, true));
+  listen(dialog.querySelector('[data-test-access]'), 'click', () => void enableTestAccess());
   listen(cards, "click", event => { const button = event.target.closest("[data-plan]"); if (button && !button.disabled) void checkout(button.dataset.plan); });
   listen(documentDialog.querySelector("[data-analyze]"), "click", () => void analyze());
   for (const selector of ["[data-close]", "[data-cancel]"]) listen(documentDialog.querySelector(selector), "click", () => { if (!documentBusy) documentDialog.close(); });

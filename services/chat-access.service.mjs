@@ -36,7 +36,10 @@ function reservation(row, duplicate = false) {
 
 // Grant/revoke methods are trusted billing primitives, not public HTTP handlers.
 export function createChatAccessService({ getDb, now = () => new Date(), getLegacyAccess = async () => false,
+  testBypassEnabled = false,
   maxReservationQuantity = { messages: 1, pages: 200 } } = {}) {
+  // ponytail: test grants belong to this process; reenable after restart, shared storage only if testing multiple replicas.
+  const testOwners = new Set();
   const bounds = { ...maxReservationQuantity };
   for (const kind of ['messages', 'pages']) check(Number.isSafeInteger(bounds[kind]) && bounds[kind] > 0 && bounds[kind] <= 2147483647, 'chat_invalid_bounds');
 
@@ -71,6 +74,9 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
     return used;
   }
   async function access(db, ids, auth) {
+    if (testBypassEnabled === true && testOwners.has(ids.join(':'))) {
+      return { allowed: true, active: true, source: 'test', planId: null, limits: null, used: null, remaining: null };
+    }
     const row = await current(db, ids);
     if (row) {
       const used = await usage(db, ids, row.id), limits = LIMITS[row.plan_id];
@@ -121,7 +127,15 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
   async function getAccess(auth) {
     const ids = signed(auth);
     return transaction(ids, async (db, account) => ({ ...await access(db, ids, auth),
+      testBypassAvailable: testBypassEnabled === true,
       trialUsed: account.trial_used, trialAvailable: !account.trial_used }));
+  }
+  async function enableTestAccess(auth) {
+    const ids = signed(auth);
+    check(testBypassEnabled === true, 'chat_test_bypass_disabled', 403);
+    await getAccess(auth); // Validate the authenticated owner in the database before granting.
+    testOwners.add(ids.join(':'));
+    return getAccess(auth);
   }
   async function reserve(auth, { requestId, kind, quantity = 1 } = {}) {
     const ids = signed(auth);
@@ -175,7 +189,7 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
       return { revoked: result.rows.length };
     });
   }
-  return { grantPaidAccess, getAccess, reserve,
+  return { grantPaidAccess, getAccess, enableTestAccess, reserve,
     complete: (auth, input) => finish(auth, input, 'completed'),
     release: (auth, input) => finish(auth, input, 'released'),
     revokeSubscription: input => revoke(input, 'subscription'), revokePayment: input => revoke(input, 'payment') };

@@ -29,6 +29,7 @@ export function sellerSources(audit) {
     return (rows?.length ? rows : [{ tipo: execution.fonte, status: execution.status, rawText: execution.rawText, details: execution.dados, pdfPath: execution.pdfUrl }])
       .map((row, index) => ({
         id: `${execution.fonte}:${index}`, title: row.tipo || execution.fonte,
+        subject:row.subjectDocument?{name:row.details?.['Razão social']||row.tipo,document:row.subjectDocument}:null,
         status: row.status, kind: row.kind || 'certificate', scope: row.scope || row.uf || 'Conforme documento',
         checkedAt: row.checkedAt || execution.finishedAt || audit.updatedAt,
         identityVerified: row.evidenceIdentityVerified === true,
@@ -148,7 +149,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
               const scanned = Boolean(buffer && (needsVision || plain(text).length < 80));
               if (!buffer && !plain(text) && !Object.keys(details).length) fail('empty_evidence', 422);
               if (plain(text).length + JSON.stringify(details).length > 180000) fail('source_too_large', 422);
-              const reading = validateSellerReading(await ai.read({ id: source.id, title: source.title, scope: source.scope, subject: rowSubject(audit), identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), source, text, scanned);
+              const reading = validateSellerReading(await ai.read({ id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), source, text, scanned);
               results[index] = { ...meta, status: 'analyzed', method: scanned ? 'Leitura visual por IA; confira a transcrição no original' : 'Texto e dados da fonte', ...reading };
             } catch {
               results[index] = { ...meta, status: 'unread', message: 'Não foi possível concluir a leitura desta fonte. Confira o original ou tente novamente.', outcome: 'inconclusive' };
@@ -166,8 +167,14 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
       const analyzed = results.filter(r => r.status === 'analyzed').length;
       const gaps = results.filter(r => r.status !== 'analyzed' || r.outcome === 'inconclusive');
       const report = { id, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
-        conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : gaps.length ? 'Análise com lacunas: há fontes que precisam de complementação ou conferência.' : findings.some(f => f.priority !== 'information') ? 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado. Observe o alcance das fontes.',
+        conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
       };
+      report.executiveSummary=[report.conclusion,...findings.filter(f=>f.priority!=='information').map(f=>`${f.title}: ${f.description}`),...findings.filter(f=>f.category==='company'&&f.priority==='information').map(f=>f.description)].join('\n\n');
+      if(analyzed&&typeof ai.summarize==='function') {
+        state.current='Preparando o resumo e o relatório em PDF';state.progress=97;await persist();
+        try {report.summaryParagraphs=await ai.summarize(report,auth);report.executiveSummary=report.summaryParagraphs.map(p=>p.text).join('\n\n');report.summaryStatus='completed';}
+        catch {report.summaryStatus='source_readings';}
+      }
       state.report = report;
       state.status = analyzed ? 'completed' : 'failed';
       state.progress = analyzed ? 100 : 0;

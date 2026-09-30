@@ -1022,7 +1022,7 @@ test("server never substitutes the OpenAI answer with an Itau state-machine resp
     source,
     /buildItauTransitionAnswer|audita-itau-state-machine|inferItauChatCaseUpdate/,
   );
-  assert.match(source, /result = await runAuditaChat\(/);
+  assert.match(source, /generalChatService\.run\(authContext,body,options\)/);
 });
 
 test("chat reports configuration pending without importing or calling OpenAI", async () => {

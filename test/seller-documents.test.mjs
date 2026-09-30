@@ -2,6 +2,29 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { collectSellerDocuments, getSellerDocumentCoverage, planSellerDocuments, summarizeSellerData } from "../services/seller-documents.service.mjs";
+import { sellerStatePlans, sellerQueriesForState } from '../services/seller-state-plan.mjs';
+
+test('automatic state plans include federal jurisdictions and only matching municipal sources', () => {
+  const coverage={certificates:[],sellerSources:getSellerDocumentCoverage({configured:true})};
+  const states=sellerStatePlans(coverage);
+  assert.equal(states.length,27);
+  const sp=states.find(s=>s.uf==='SP');
+  assert.equal(sp.queryIds.length,13);
+  assert.equal(sp.baseCostBrl,16.44);
+  assert.ok(sp.queryIds.includes('vinculos'));
+  const queries=coverage.sellerSources.queries;
+  for(const state of states) {
+    assert.equal(sellerQueriesForState(queries,state.uf).filter(q=>q.endpoint==='TribunalRegionalFederal').length,2);
+    assert.ok(!sellerQueriesForState(queries,state.uf).some(q=>q.endpoint==='CertidaoNegativaDebitosMunicipal'));
+  }
+  assert.deepEqual(sellerQueriesForState(queries,'RJ').filter(q=>q.endpoint==='TribunalRegionalTrabalho').map(q=>q.params.REGIAO),['1']);
+  assert.ok(sellerQueriesForState(queries,'SP').filter(q=>q.endpoint==='TribunalRegionalTrabalho').every(q=>['2','15'].includes(q.params.REGIAO)));
+  const municipal=queries.find(q=>q.endpoint==='CertidaoNegativaDebitosMunicipal'&&q.documentTypes.includes('cpf'));
+  const city=municipal.params.MUNICIPIO.slice(0,-3),uf=municipal.params.MUNICIPIO.slice(-2);
+  assert.ok(sellerQueriesForState(queries,uf,'cpf',city).includes(municipal));
+  assert.ok(!sellerQueriesForState(queries,uf,'cpf','Outra cidade').includes(municipal));
+  assert.throws(()=>sellerQueriesForState(queries,'XX'),/invalid_seller_state/);
+});
 
 const CPF = "52998224725";
 const CNPJ = "04252011000110";
@@ -11,6 +34,40 @@ const result = (data, metadata = {}) => ({ result: { status: "success", payload:
 const PDF = Buffer.from("%PDF-test");
 const PDF_TEXT = "CERTIDÃO DE DÉBITOS TRABALHISTAS BANCO NACIONAL DE DEVEDORES TRABALHISTAS 529.982.247-25";
 const dependencies = (overrides = {}) => ({ configuration, query: async () => result({ documentoConsultado: CPF, possuiProcesso: false }), download: async () => PDF, readPdf: async () => PDF_TEXT, savePdf: async () => ({ pdfPath: "private-test.pdf", rawText: "never-copy-this" }), ...overrides });
+
+test('CPF discovery deduplicates and caps companies, then uses each company UF without attributing failures as clearance',async()=>{
+  const companies=Array.from({length:6},(_,index)=>{
+    let value=String(index+1).padStart(12,'0');
+    for(const weights of [[5,4,3,2,9,8,7,6,5,4,3,2],[6,5,4,3,2,9,8,7,6,5,4,3,2]]) {
+      const remainder=[...value].reduce((sum,digit,i)=>sum+Number(digit)*weights[i],0)%11;
+      value+=remainder<2?'0':String(11-remainder);
+    }
+    return value;
+  });
+  const requested=[],lookedUp=[],updates=[];
+  const batch=input({sellerQueries:['vinculos'],sellerState:'SP',discoverCompanies:true});
+  batch.onProgress=async p=>updates.push(p);
+  const output=await collectSellerDocuments(batch,dependencies({
+    query:async request=>{
+      requested.push(request);
+      if(request.endpoint==='VinculosSocietarios') return result({documentoConsultado:CPF,relacionamentos:[...companies,companies[0],'invalid'].map(documento=>({documento}))});
+      return {reason:'fixture_unavailable'};
+    },
+    collectCompany:async ({documento})=>{lookedUp.push(documento);return {status:'success',dados:{cnpj:documento,razaoSocial:'Empresa Fictícia',uf:'RJ'}};},
+    delay:async()=>{},
+  }));
+  assert.equal(lookedUp.length,5);
+  assert.deepEqual(lookedUp,companies.slice(0,5));
+  const rows=output.dados.certidoes;
+  assert.equal(rows[0].details['Empresas consultadas automaticamente'],'5');
+  assert.match(rows[0].details['Empresas adicionais'],/1 vínculos/);
+  assert.equal(rows.filter(r=>r.id.startsWith('cnd-rj-company')).length,5);
+  assert.ok(!rows.some(r=>r.id.startsWith('cnd-sp-company')||r.id.startsWith('trf3-')));
+  assert.ok(requested.slice(1).every(r=>companies.slice(0,5).includes(r.parameters.CNPJ)));
+  assert.ok(rows.filter(r=>r.status==='failed').every(r=>r.resultado==='indisponivel'&&r.subjectDocument));
+  assert.equal(updates.at(-1).completed,updates.at(-1).total);
+  assert.equal(updates.at(-1).stage,'completed');
+});
 
 test("seller plans contain only explicitly selected, available entries and deduplicate their cost", () => {
   assert.deepEqual(getSellerDocumentCoverage({}).queries.map(item => item.id), ["cnd-pe-portal"]);

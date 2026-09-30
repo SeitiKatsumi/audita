@@ -18,7 +18,7 @@ test('entering AI starts blank while history selection survives renders', () => 
   const extract = (name, next) => source.slice(source.indexOf(`function ${name}(`), source.indexOf(`function ${next}(`));
   const old = { id: 'old', messages: [{ role: 'user', content: 'Histórico' }] };
   const context = vm.createContext({
-    chatState: { currentThreadId: 'old', threads: [old] },
+    generalChat:null, chatState: { currentThreadId: 'old', threads: [old] },
     pageMeta: { chat: {}, home: {} }, document: { body: { dataset: {} }, dispatchEvent() {}, querySelector() { return null; } },
     pageTitle: {}, pageEyebrow: {}, pageBlocks: [], operationsPages: null, navGroups: [], navLinks: [],
     applyAuditRouteDefaults() {}, setMobileMenu() {}, renderChatWorkspace() {},
