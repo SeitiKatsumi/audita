@@ -14,9 +14,9 @@ test("seller analysis is available in the property category of the service catal
 test("seller analysis route opens its introductory screen", () => {
   assert.match(indexHtml, /id="analise-vendedor" data-page="analise-vendedor emissao-certidoes"/);
   assert.match(indexHtml, /certidões e consultas do vendedor pessoa física nas fontes habilitadas/);
-  assert.match(indexHtml, /Certidões em PDF e dados complementares/);
+  assert.match(indexHtml, /Coleta de dados/);
   assert.match(indexHtml, /relatório em PDF com evidências e próximos passos/);
-  assert.match(indexHtml, /Emissão autônoma/);
+  assert.match(indexHtml, /id="sellerAnalysisState"/);
   assert.match(appJs, /"analise-vendedor":\s*\{/);
 });
 
@@ -45,17 +45,19 @@ test("seller query groups start collapsed and birth date follows the selected so
   const elements = new Map(["#sellerAnalysisCoverage", "#sellerAnalysisUfs", "#sellerAnalysisQueries", "#sellerAnalysisCost", "#sellerAnalysisBirthDate", "#sellerAnalysisRg", "#sellerAnalysisGender", "#sellerAnalysisCompanyCnpjs"].map((selector) => [selector, { innerHTML: "", textContent: "", value: "", required: false }]));
   const selected = { ufs: [], queries: [] };
   const context = vm.createContext({
-    isCertificateOnly:()=>false,
+    isCertificateOnly:()=>true,
+    updateSellerMunicipalities:()=>{},
     document: {
       querySelector: (selector) => elements.get(selector),
       querySelectorAll: (selector) => (selector.includes("sellerAnalysisUfs") ? selected.ufs : selected.queries).map((value) => ({ value })),
     },
     sellerAnalysisMotherName: { required: false },
+    sellerAnalysisError:null,
     escapeHtml: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"),
     fetch: async () => ({ ok: true, json: async () => ({ ufs: ["AP"], certificates: [{ uf: "AP", type: "Cível", provider: "direct_data" }], sellerSources: { configured: true, queries: [
-      { id: "fiscal", category: "Fiscal", label: "Fiscal", costBrl: 0.54, documentTypes: ["cpf"], limitation: "Não inclui <dívida ativa>" },
-      { id: "ccd", category: "Fiscal", label: "CND conjunta", endpoint: "CertidaoConjuntaDebitosPessoaFisica", documentTypes: ["cpf"] },
-      { id: "fgts", category: "Empresa", label: "FGTS", costBrl: 0.54, documentTypes: ["cnpj"] },
+      { id: "fiscal",kind:'certificate',category: "Fiscal", label: "Fiscal", costBrl: 0.54, documentTypes: ["cpf"], limitation: "Não inclui <dívida ativa>" },
+      { id: "ccd",kind:'certificate',category: "Fiscal", label: "CND conjunta", endpoint: "CertidaoConjuntaDebitosPessoaFisica", documentTypes: ["cpf"] },
+      { id: "fgts",kind:'certificate',category: "Empresa", label: "FGTS", costBrl: 0.54, documentTypes: ["cnpj"] },
     ] } }) }),
   });
   const start = appJs.indexOf("let sellerCoverage = null;");
@@ -73,7 +75,7 @@ test("seller query groups start collapsed and birth date follows the selected so
   selected.queries = ["fgts"];
   elements.get("#sellerAnalysisCompanyCnpjs").value = "04252011000110, 11444777000161, 04252011000110";
   context.updateSellerEstimate();
-  assert.match(elements.get("#sellerAnalysisCost").textContent, /R\$ 1,08/);
+  assert.match(elements.get("#sellerAnalysisCost").innerHTML, /R\$ 1,08/);
   assert.match(elements.get("#sellerAnalysisQueries").innerHTML, /por CNPJ informado/);
   assert.equal(elements.get("#sellerAnalysisBirthDate").required, false);
   selected.queries = ["ccd"];
@@ -96,6 +98,7 @@ test("seller results preserve every source, private PDF indices and pending quer
   const result = { innerHTML: "" };
   const context = vm.createContext({
     sellerAnalysisResult: result, Date, Number, encodeURIComponent, isCertificateOnly:()=>false,
+    document:{querySelector:()=>null},
     escapeHtml: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"),
     selectedSellerCertificates: () => [], selectedSellerQueries: () => [], sellerCompanyCnpjs: () => [],
   });

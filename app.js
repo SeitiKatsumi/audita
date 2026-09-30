@@ -1,3 +1,4 @@
+import { initGeneralChat } from './general-chat.js';
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js";
 const canvas = document.querySelector("#signalCanvas");
@@ -92,6 +93,7 @@ const chatMobileNewButton = document.querySelector("#chatMobileNewButton");
 const chatMessages = document.querySelector("#chatMessages");
 const chatEmptyState = document.querySelector("#chatEmptyState");
 const chatForm = document.querySelector("#chatForm");
+let generalChat = null;
 const chatInput = document.querySelector("#chatInput");
 const chatSendButton = document.querySelector("#chatSendButton");
 const chatError = document.querySelector("#chatError");
@@ -3890,6 +3892,7 @@ function renderChatMessages() {
 }
 
 function renderChatWorkspace() {
+  if (generalChat) { generalChat.render(); return; }
   renderChatThreads();
   renderChatMessages();
   renderChatAttachmentControl();
@@ -3902,6 +3905,7 @@ function setChatError(message = "") {
 }
 
 function startNewChat() {
+  if (generalChat) { generalChat.newThread(); return; }
   const blankThread = chatState.threads.find((thread) => thread.messages.length === 0);
   const thread = blankThread || createChatThread();
   if (!blankThread) chatState.threads.unshift(thread);
@@ -4493,6 +4497,7 @@ async function submitCourtCertificateForm(form) {
 }
 
 async function sendChatMessage(rawMessage, attachedFile = chatPendingAttachment) {
+  if (generalChat) { return generalChat.send(rawMessage); }
   const content = String(rawMessage || "").trim();
   if ((!content && !attachedFile) || chatSending) return;
   const thread = getCurrentChatThread();
@@ -6575,16 +6580,25 @@ function configureSellerFlow(page) {
   document.querySelector('#sellerFlowTitle').textContent = certificates ? 'Emissão de certidões diversas' : 'Análise de Vendedor';
   document.querySelector('#sellerFlowIntro').textContent = certificates
     ? 'Informe os dados do titular, selecione as certidões disponíveis e acompanhe a emissão. Ao concluir, você poderá abrir os documentos obtidos. Este serviço não inclui análise por IA.'
-    : 'Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas. A IA confere os documentos e dados obtidos, identifica apontamentos e gera um relatório em PDF com evidências e próximos passos.';
+    : 'Do CPF ao relatório: informe o estado e acompanhe a análise do vendedor e das empresas vinculadas.';
   document.querySelector('#sellerFlowSteps').textContent = certificates ? 'Dados do titular → Seleção e emissão → Documentos disponíveis' : 'Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF';
-  document.querySelector('#sellerAiConsentLabel').hidden = certificates;
+  document.querySelector('.seller-analysis-form-heading strong').textContent=certificates?'Dados do titular':'Quem está vendendo o imóvel?';
+  document.querySelector('.seller-analysis-form-heading small').textContent=certificates?'Informe o titular e selecione as certidões para emitir.':'Informe o vendedor e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente.';
+  document.querySelector('#sellerAiConsentLabel').hidden = true;
   const consent = document.querySelector('#sellerAnalysisAiConsent');
   consent.disabled = certificates;
-  consent.required = !certificates;
+  consent.required = false;
   consent.checked = false;
   sellerAnalysisForm.hidden = false;
   sellerAnalysisSubmit.disabled = false;
-  sellerAnalysisSubmit.textContent = certificates ? 'Emitir certidões selecionadas' : 'Iniciar análise do vendedor';
+  sellerAnalysisSubmit.textContent = certificates ? 'Emitir certidões selecionadas' : 'Avançar e iniciar extração →';
+  for(const selector of ['#sellerManualSelection','#sellerManualCompanies','#sellerPaidConsentLabel']) document.querySelector(selector).hidden=!certificates;
+  document.querySelector('#sellerStateField').hidden=certificates;
+  document.querySelector('#sellerAnalysisState').required=!certificates;
+  document.querySelector('#sellerAnalysisPaid').required=certificates;
+  document.querySelector('#sellerAuthorizationText').textContent=certificates?'Tenho autorização ou base legal para consultar este titular.':'Tenho autorização ou base legal para consultar este vendedor e autorizo o levantamento e a análise dos documentos pela IA da Audita (OpenAI).';
+  document.querySelector('#sellerStepNav li:last-child').hidden=certificates;
+  setSellerStep(1);
   sellerAnalysisError.textContent = '';
   sellerAnalysisResult.innerHTML = '<p>Selecione os documentos para iniciar.</p>';
   document.querySelector('#sellerChangeData').hidden = true;
@@ -6596,15 +6610,36 @@ function configureSellerFlow(page) {
 }
 document.addEventListener('audita:pagechange', event => configureSellerFlow(event.detail.page));
 let sellerCoverage = null;
+function selectedSellerState() {
+  return sellerCoverage?.states?.find(item=>item.uf===document.querySelector('#sellerAnalysisState')?.value);
+}
+function setSellerStep(step) {
+  const shell=document.querySelector('#sellerStepShell');
+  if(!shell) return;
+  const changed=shell.dataset.step!==String(step);
+  shell.dataset.step=String(step);
+  sellerAnalysisForm.hidden=step!==1;
+  sellerAnalysisResult.hidden=step===1;
+  document.querySelectorAll('#sellerStepNav li').forEach((item,index)=>{
+    item.classList.toggle('complete',index+1<step);
+    if(index+1===step) item.setAttribute('aria-current','step'); else item.removeAttribute('aria-current');
+  });
+  if(changed) { const target=step===1?sellerAnalysisCpf:sellerAnalysisResult; if(step!==1) target?.setAttribute('tabindex','-1');target?.focus({preventScroll:true});shell.scrollIntoView({block:'start',behavior:'instant'}); }
+}
 function selectedSellerCertificates() {
-  const ufs = [...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map((input) => input.value);
+  const ufs = isCertificateOnly()?[...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map(input=>input.value):[selectedSellerState()?.uf];
   return (sellerCoverage?.certificates || []).filter((item) => ufs.includes(item.uf));
 }
 function selectedSellerQueries() {
+  if(!isCertificateOnly()) {
+    const state=selectedSellerState(),city=document.querySelector('#sellerAnalysisMunicipality')?.value;
+    return (sellerCoverage?.sellerSources?.queries||[]).filter(item=>state?.queryIds.includes(item.id)||(state&&city&&item.documentTypes.includes('cpf')&&item.endpoint==='CertidaoNegativaDebitosMunicipal'&&item.params.MUNICIPIO===`${city}-${state.uf}`));
+  }
   const ids = [...document.querySelectorAll("#sellerAnalysisQueries input:checked")].map((input) => input.value);
   return (sellerCoverage?.sellerSources?.queries || []).filter((item) => ids.includes(item.id));
 }
 function sellerCompanyCnpjs() {
+  if(!isCertificateOnly()) return [];
   return [...new Set(String(document.querySelector("#sellerAnalysisCompanyCnpjs")?.value || "")
     .split(/[;,\s]+/).filter(Boolean).map((value) => value.replace(/\D/g, "")))];
 }
@@ -6615,13 +6650,21 @@ function updateSellerEstimate() {
   const companyCount = sellerCompanyCnpjs().length;
   const cost = paidCount * (sellerCoverage?.pdfQueryCostBrl || 0.54) + queries.reduce((sum, item) => sum + Number(item.costBrl || 0) * (item.documentTypes?.includes("cpf") ? 1 : companyCount), 0);
   const target = document.querySelector("#sellerAnalysisCost");
-  if (target) target.textContent = `Autorizo até R$ ${cost.toFixed(2).replace(".", ",")} pelas fontes selecionadas (${selected.length} certidões estaduais, ${queries.length} outras opções e ${companyCount} CNPJs). Cadastro e QSA dos CNPJs não têm tarifa. Certidões empresariais são cobradas por CNPJ.${selected.length ? " Se faltar o nome da mãe, a consulta cadastral pode ter custo adicional de R$ 0,36." : ""}`;
+  const state=selectedSellerState();
+  const identityCost=selected.length&&!(sellerAnalysisMotherName?.value||'').trim() ? Number(sellerCoverage?.identityQueryCostBrl ?? .36) : 0;
+  const companyCeiling=!isCertificateOnly()&&state?.discoversCompanies?state.maxCompanyCostBrl*state.companyLimit:0;
+  const brl=value=>`R$ ${value.toFixed(2).replace('.',',')}`;
+  if(target) target.innerHTML=!isCertificateOnly()&&!state?'Selecione o estado para calcular a estimativa.':`<small>Estimativa da extração</small><strong>${brl(cost+identityCost)}</strong>${companyCeiling?`<small>Empresas vinculadas: até ${brl(companyCeiling)} adicionais (máximo de cinco). Limite dos provedores: ${brl(cost+identityCost+companyCeiling)}.</small>`:''}${!isCertificateOnly()?'<small>Custo da IA apurado por uso, separadamente.</small>':''}`;
   for (const selector of ["#sellerAnalysisRg", "#sellerAnalysisGender"]) {
     const field = document.querySelector(selector);
     if (field) field.required = selected.length > 0;
   }
   const birthDate = document.querySelector("#sellerAnalysisBirthDate");
   if (birthDate) birthDate.required = selected.length > 0 || queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica");
+  for(const [wrapper,field] of [['#sellerBirthDateField',birthDate],['#sellerRgField',document.querySelector('#sellerAnalysisRg')],['#sellerGenderField',document.querySelector('#sellerAnalysisGender')]]) {
+    const element=document.querySelector(wrapper); if(element) element.hidden=!field?.required;
+    if(field) field.disabled=!field.required;
+  }
   if (!selected.length && sellerAnalysisMotherName) sellerAnalysisMotherName.required = false;
 }
 async function loadSellerCoverage() {
@@ -6631,7 +6674,8 @@ async function loadSellerCoverage() {
     const response = await fetch("/api/seller-analysis/coverage");
     if (!response.ok) throw new Error();
     sellerCoverage = await response.json();
-    target.innerHTML = sellerCoverage.ufs.map((uf) => `<p><b>${escapeHtml(uf)}</b>: ${escapeHtml(sellerCoverage.certificates.filter((item) => item.uf === uf).map((item) => item.type).join(", "))}</p>`).join("");
+    const stateSelect=document.querySelector('#sellerAnalysisState');
+    if(stateSelect) { const value=stateSelect.value; stateSelect.innerHTML='<option value="">Selecione o estado</option>'+(sellerCoverage.states||[]).map(item=>`<option value="${item.uf}">${escapeHtml(item.name)} (${item.uf})</option>`).join('');stateSelect.value=value; }
     document.querySelector("#sellerAnalysisUfs").innerHTML = '<legend>Certidões estaduais</legend>' + sellerCoverage.ufs.map((uf) => `<label><input type="checkbox" value="${escapeHtml(uf)}" />${escapeHtml(uf)}</label>`).join("");
     const queries = sellerCoverage.sellerSources?.configured ? (sellerCoverage.sellerSources.queries || []).filter((item) => item.documentTypes?.some((type) => ["cpf", "cnpj"].includes(type)) && (!isCertificateOnly() || item.kind === "certificate")) : [];
     const groups = [...new Set(queries.map((item) => item.category || "Outras consultas"))];
@@ -6645,12 +6689,14 @@ async function loadSellerCoverage() {
           ${item.limitation ? `<br /><small>${escapeHtml(item.limitation)}</small>` : ""}
         </span></label>`).join("")}</fieldset></details>`;
     }).join("") : "Nenhuma consulta adicional habilitada neste ambiente.";
+    updateSellerMunicipalities();
     updateSellerEstimate();
-  } catch { target.textContent = "Não foi possível carregar a cobertura. Recarregue antes de consultar."; }
+  } catch { target.textContent = "Não foi possível carregar a cobertura. Recarregue antes de consultar.";if(sellerAnalysisError) sellerAnalysisError.textContent=target.textContent; }
 }
 document.querySelector("#sellerAnalysisUfs")?.addEventListener("change", updateSellerEstimate);
 document.querySelector("#sellerAnalysisQueries")?.addEventListener("change", updateSellerEstimate);
 document.querySelector("#sellerAnalysisCompanyCnpjs")?.addEventListener("input", updateSellerEstimate);
+sellerAnalysisMotherName?.addEventListener('input',updateSellerEstimate);
 for (const [id, checked] of [["sellerAnalysisSelectAll", true], ["sellerAnalysisClearAll", false]]) {
   document.getElementById(id)?.addEventListener("click", () => {
     document.querySelectorAll("#sellerAnalysisUfs input, #sellerAnalysisQueries input").forEach((input) => { input.checked = checked; });
@@ -6658,6 +6704,19 @@ for (const [id, checked] of [["sellerAnalysisSelectAll", true], ["sellerAnalysis
   });
 }
 loadSellerCoverage();
+function updateSellerMunicipalities() {
+  const state=selectedSellerState(),select=document.querySelector('#sellerAnalysisMunicipality');
+  if(!select) return;
+  const value=select.value;
+  select.innerHTML='<option value="">Não informado</option>'+(state?.municipalities||[]).map(city=>`<option>${escapeHtml(city)}</option>`).join('');
+  select.value=(state?.municipalities||[]).includes(value)?value:'';
+  document.querySelector('#sellerMunicipalityField').hidden=isCertificateOnly()||!state?.municipalities.length;
+}
+document.querySelector('#sellerAnalysisState')?.addEventListener('change',()=>{updateSellerMunicipalities();updateSellerEstimate();});
+document.querySelector('#sellerAnalysisMunicipality')?.addEventListener('change',updateSellerEstimate);
+sellerAnalysisAuthorization?.addEventListener('change',()=>{
+  if(!isCertificateOnly()) for(const selector of ['#sellerAnalysisPaid','#sellerAnalysisAiConsent']) document.querySelector(selector).checked=sellerAnalysisAuthorization.checked;
+});
 
 function isValidSellerAnalysisCpf(value) {
   const cpf = String(value || "").replace(/\D/g, "");
@@ -6797,10 +6856,10 @@ function renderSellerAnalysisResult(audit) {
   const progressPercent = !processing && !audit?.errorMessage
     ? 100
     : audit?.status === "preparing"
-      ? 8
+      ? 0
       : audit?.status === "failed"
         ? 0
-        : Math.min(95, Math.round(15 + (completed / Math.max(1, total)) * 80));
+        : Math.min(99, Math.round(completed / Math.max(1, total) * 100));
   const startedAt = Date.parse(audit?.createdAt || execution?.startedAt || "");
   const lastActivityAt = Date.parse(audit?.updatedAt || progress.updatedAt || execution?.startedAt || "");
   const elapsedMs = Number.isFinite(startedAt) ? Date.now() - startedAt : 0;
@@ -6842,7 +6901,9 @@ function renderSellerAnalysisResult(audit) {
     `;
   }).join("");
 
+  const documentsOpen=document.querySelector('#sellerCollectionDetails')?.open===true;
   sellerAnalysisResult.innerHTML = `
+    <div id="sellerExtractionPanel">
     <div class="seller-analysis-result-head">
       <div>
         <small>Consulta ${escapeHtml(audit?.documento || "em preparação")}</small>
@@ -6856,13 +6917,14 @@ function renderSellerAnalysisResult(audit) {
       </div>
       <div class="seller-progress-summary">
         <strong>${escapeHtml(stageLabel)}</strong>
-        <span>${escapeHtml(processing ? `Tempo decorrido: ${formatSellerAnalysisElapsed(elapsedMs)}` : `${progressPercent}%`)}</span>
+        <span><b>${progressPercent}%</b>${processing ? ` · ${formatSellerAnalysisElapsed(elapsedMs)}` : ''}</span>
       </div>
       <small class="seller-progress-activity ${escapeHtml(activityState.className)}">${escapeHtml(activityState.label)}</small>
       <small class="seller-progress-expectation">Cada fonte pode levar até alguns minutos. Documentos e dados aparecem conforme são obtidos; uma falha não interrompe as demais consultas.</small>
     </section>
-    ${processing || isCertificateOnly() ? `<div class="seller-certificate-list">${certificateRows}</div>` : `<div id="sellerReviewPanel" aria-live="polite"></div><details class="seller-source-details"><summary>Documentos e resultados das fontes (${available}/${total})</summary><div class="seller-certificate-list">${certificateRows}</div></details>`}
-    <p class="seller-analysis-result-note">O resultado se limita às fontes selecionadas. Fontes indisponíveis não comprovam regularidade. Confira os documentos originais e a abrangência de cada consulta.</p>
+    </div>
+    ${!isCertificateOnly()?'<div id="sellerReviewPanel" aria-live="polite"></div>':''}
+    <details id="sellerCollectionDetails" class="seller-source-details" ${documentsOpen?'open':''}><summary>Ver documentos extraídos e status (${available}/${total})</summary><div class="seller-certificate-list">${certificateRows}</div></details>
   `;
 }
 
@@ -6871,10 +6933,11 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
   const run = ++sellerCollectionRun;
   sellerReviewRun++;
   if (sellerAnalysisForm) sellerAnalysisForm.hidden = true;
+  setSellerStep(2);
   const changeData = document.querySelector('#sellerChangeData');
   if (changeData) {
-    changeData.hidden = false;
-    changeData.onclick = () => { sellerAnalysisForm.hidden = false; changeData.hidden = true; sellerAnalysisCpf?.focus(); };
+    changeData.hidden = true;
+    changeData.onclick = () => { sellerCollectionRun++;sellerReviewRun++;setSellerStep(1);changeData.hidden=true;sellerAnalysisError.textContent=''; };
   }
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
@@ -6892,7 +6955,7 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
       }
       const audit = await response.json();
       renderSellerAnalysisResult(audit);
-      if (sellerAnalysisFinished(audit)) { if (!isCertificateOnly()) await loadSellerReview(consultaId); return; }
+      if (sellerAnalysisFinished(audit)) { if(changeData) changeData.hidden=false;if (!isCertificateOnly()) await loadSellerReview(consultaId); return; }
     } catch {
       if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
       renderSellerAnalysisFailure({ message: "Falha de comunicação durante o acompanhamento." });
@@ -6933,6 +6996,8 @@ async function loadSellerReview(id) {
   const target = document.querySelector('#sellerReviewPanel');
   if (!target) return;
   while (run === sellerReviewRun && target.isConnected) {
+    setSellerStep(3);
+    document.querySelector('#sellerExtractionPanel').hidden=true;
     try {
       const response = await fetch(`/api/seller-analysis/${encodeURIComponent(id)}/review`);
       const state = await response.json();
@@ -6956,11 +7021,10 @@ function renderSellerReview(target, id, state) {
   target.innerHTML = `<section class="seller-review" aria-busy="${running}">
     <h3>${running ? '3. Analisando documentos e dados' : report ? '3. Seu relatório de análise' : '3. Análise por IA'}</h3>
     ${running ? `<progress max="100" value="${Number(state.progress) || 0}" aria-label="Progresso da análise"></progress><p><strong>${Number(state.progress) || 0}%</strong> · ${Number(state.completed) || 0} de ${Number(state.total) || 0} fontes</p><p>${escapeHtml(state.current || '')}</p><small>Pode sair desta tela. A análise continua no servidor e o resultado fica salvo na consulta.</small>` : ''}
-    ${report ? `<p><strong>${escapeHtml(report.conclusion)}</strong></p><p>${report.analyzed}/${report.total} fontes analisadas · ${report.findings.length} apontamentos · ${report.gaps} fontes com lacunas</p>
+    ${report ? `<p class="seller-report-summary"><strong>${escapeHtml(report.conclusion)}</strong></p><p>${report.analyzed} documentos e consultas analisados · ${report.findings.filter(f=>f.priority!=='information').length} pontos de atenção</p>
       ${state.status === 'completed' ? `<a class="primary-action" href="/api/seller-analysis/${encodeURIComponent(id)}/report.pdf" download>Baixar relatório completo em PDF</a>` : ''}
-      ${report.findings.length ? `<details><summary>Ver apontamentos e providências</summary>${report.findings.map(f => `<article><h4>${escapeHtml(f.title)}</h4><p>${escapeHtml(f.description)}</p><small>Fonte: ${escapeHtml(f.sourceTitle)}</small><blockquote>${escapeHtml(f.quote)}</blockquote>${f.identity !== 'compatible' ? '<p>Identidade não confirmada: confira o original antes de atribuir este registro ao vendedor.</p>' : ''}<p><strong>Próximo passo:</strong> ${escapeHtml(f.recommendation)}</p></article>`).join('')}</details>` : ''}
-      ${report.gaps ? `<details><summary>Ver lacunas da análise (${report.gaps})</summary>${report.sources.filter(s => s.status !== 'analyzed' || s.outcome === 'inconclusive').map(s => `<p><strong>${escapeHtml(s.title)}</strong>: ${escapeHtml(s.message || s.limitations.join(' '))}</p>`).join('')}</details>` : ''}
-      <p class="seller-analysis-result-note">${escapeHtml(report.scopeNotice)}</p>` : ''}
+      ${report.findings.some(f=>f.priority!=='information') ? `<details><summary>Ver pendências e próximos passos</summary>${report.findings.filter(f=>f.priority!=='information').map(f => `<article><h4>${escapeHtml(f.title)}</h4><p>${escapeHtml(f.description)}</p><small>Fonte: ${escapeHtml(f.sourceTitle)}</small>${f.identity !== 'compatible' ? '<p>Identidade não confirmada: confira o original antes de atribuir este registro ao vendedor.</p>' : ''}<p><strong>Próximo passo:</strong> ${escapeHtml(f.recommendation)}</p></article>`).join('')}</details>` : ''}
+      <small class="seller-analysis-result-note">Resumo do material obtido, com as pendências encontradas e providências sugeridas.</small>` : ''}
     ${!running && (!report || canRetry) ? `<p>${state.message || state.current ? escapeHtml(state.message || state.current) : 'Confira as fontes obtidas e gere a análise consolidada.'}</p>${!state.aiReady ? '<p role="alert">A análise por IA ainda não está disponível neste ambiente. Os documentos obtidos permanecem acessíveis.</p>' : `<label class="seller-analysis-consent"><input type="checkbox" data-seller-review-consent /><span>Autorizo a análise destes documentos e dados pela OpenAI e Audita.</span></label><button type="button" class="primary-action" data-seller-review-start>${canRetry ? 'Retomar análise sem refazer consultas' : 'Analisar documentos e gerar relatório'}</button>`}` : ''}
     </section>`;
   const button = target.querySelector('[data-seller-review-start]');
@@ -8964,9 +9028,11 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   const cpf = String(sellerAnalysisCpf?.value || "").replace(/\D/g, "");
   const fullName = sellerAnalysisFullName?.value.trim() || "";
   const motherName = sellerAnalysisMotherName?.value.trim() || "";
-  const ufs = [...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map((input) => input.value);
+  const automatic=flow==='seller',state=selectedSellerState();
+  const ufs = automatic?(state?.certificateCount?[state.uf]:[]):[...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map(input=>input.value);
   const sellerQueries = selectedSellerQueries().map((item) => item.id);
   const companyCnpjs = sellerCompanyCnpjs();
+  if(automatic&&!state) {sellerAnalysisError.textContent='Selecione o estado do vendedor.';document.querySelector('#sellerAnalysisState').focus();return;}
   if (!ufs.length && !sellerQueries.length && (flow === "certificates" || !companyCnpjs.length)) {
     sellerAnalysisError.textContent = "Selecione ao menos uma fonte ou informe um CNPJ para consultar.";
     return;
@@ -8981,7 +9047,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     document.querySelector("#sellerAnalysisCompanyCnpjs")?.focus();
     return;
   }
-  if (!document.querySelector("#sellerAnalysisPaid")?.checked) {
+  if (!automatic&&!document.querySelector("#sellerAnalysisPaid")?.checked) {
     sellerAnalysisError.textContent = "Confirme o custo das consultas selecionadas.";
     return;
   }
@@ -9006,6 +9072,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     sellerAnalysisSubmit.textContent = "Iniciando consultas...";
   }
   const startedAt = new Date().toISOString();
+  setSellerStep(2);
   renderSellerAnalysisResult({
     status: "preparing",
     documento: formatJecCpf(cpf),
@@ -9023,7 +9090,8 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
         fullName,
         motherName,
         flow,
-        aiConsent: flow !== 'certificates' && document.querySelector('#sellerAnalysisAiConsent')?.checked === true,
+        automatic,state:state?.uf,municipality:automatic?document.querySelector('#sellerAnalysisMunicipality').value:'',
+        aiConsent: flow !== 'certificates' && sellerAnalysisAuthorization.checked,
         ufs,
         sellerQueries,
         companyCnpjs,
@@ -9031,13 +9099,13 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
         birthDate: document.querySelector("#sellerAnalysisBirthDate").value,
         rg: document.querySelector("#sellerAnalysisRg").value,
         gender: document.querySelector("#sellerAnalysisGender").value,
-        email: document.querySelector("#sellerAnalysisEmail").value,
         authorizationConfirmed: true,
       }),
     });
     const data = await response.json().catch(() => ({}));
     if (response.status === 401) {
       showLogin("Entre para extrair as certidões do vendedor.");
+      setSellerStep(1);
       renderSellerAnalysisFailure({
         documento: formatJecCpf(cpf),
         message: "É necessário entrar para iniciar a extração.",
@@ -9045,11 +9113,13 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
       return;
     }
     if (!response.ok || !data.consultaId) {
+      setSellerStep(1);
       const startError = getSellerAnalysisStartError(data, response.status);
       if (sellerAnalysisError) {
         sellerAnalysisError.textContent = startError;
         if (data.motherNameRequired) {
           sellerAnalysisMotherField?.classList.remove("hidden");
+          sellerAnalysisMotherField.hidden=false;
           if (sellerAnalysisMotherName) sellerAnalysisMotherName.required = true;
           sellerAnalysisMotherName?.focus();
         }
@@ -9069,6 +9139,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     await loadSellerAnalysisResult(data.consultaId);
   } catch {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
+    setSellerStep(1);
     renderSellerAnalysisFailure({
       documento: formatJecCpf(cpf),
       message: "Falha de comunicação com a API da IA AUDITA.",
@@ -9077,7 +9148,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   } finally {
     if (sellerAnalysisSubmit) {
       sellerAnalysisSubmit.disabled = false;
-      sellerAnalysisSubmit.textContent = isCertificateOnly() ? "Emitir certidões selecionadas" : "Iniciar análise do vendedor";
+      sellerAnalysisSubmit.textContent = isCertificateOnly() ? "Emitir certidões selecionadas" : "Avançar e iniciar extração →";
     }
   }
 });
@@ -9658,4 +9729,5 @@ const chatSubscription = initChatSubscription({
   },
 });
 document.querySelector("#chatSubscriptionButton")?.addEventListener("click", () => chatSubscription.open());
+generalChat = initGeneralChat({getLegacyThreads:()=>chatState.threads,getAuthState:()=>currentAuthState,subscription:chatSubscription,requestLogin:(message,resume)=>{pendingGuestAction=resume;showLogin(message);}});
 initServicesCatalog();

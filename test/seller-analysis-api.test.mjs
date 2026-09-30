@@ -6,8 +6,9 @@ import vm from "node:vm";
 import { PGlite } from "@electric-sql/pglite";
 import { createAuditService, validateCnpj } from "../services/audit.service.mjs";
 import { normalizeDfSellerInput, buildDfSellerAuditRequest } from "../services/seller-analysis.service.mjs";
-import { planSellerDocuments } from "../services/seller-documents.service.mjs";
-import { collectAutonomousCertificates, planAutonomousCertificates } from "../services/state-court-autonomous.service.mjs";
+import { planSellerDocuments,getSellerDocumentCoverage } from "../services/seller-documents.service.mjs";
+import { collectAutonomousCertificates, planAutonomousCertificates,getAutonomousCertificateCoverage } from "../services/state-court-autonomous.service.mjs";
+import { sellerStatePlans,sellerQueriesForState } from '../services/seller-state-plan.mjs';
 import { createDirectDataSellerService } from "../services/direct-data-seller.service.mjs";
 import { createSellerReviewService } from '../services/seller-review.service.mjs';
 import { personNamesMatch } from "../services/direct-data-person.service.mjs";
@@ -45,6 +46,7 @@ test("seller POST validates selection and consent, persists the selected source 
     assert.ok(genericStart > 0 && genericEnd > genericStart && sellerStart > 0 && sellerEnd > sellerStart);
     const context = vm.createContext({
       crypto, auditService, normalizeDfSellerInput, buildDfSellerAuditRequest, planSellerDocuments, planAutonomousCertificates, validateCnpj, personNamesMatch,
+      getSellerDocumentCoverage,getAutonomousCertificateCoverage,sellerStatePlans,sellerQueriesForState,sellerReviewService:{ready:()=>true},
       getTenantIdForRequest: auth, readJsonBody: async (request) => request.body,
       directDataSellerService: provider,
       directDataCertificatesService: { getStatus: () => ({ configured: true, allowedUfs: ["AP"] }) },
@@ -114,6 +116,24 @@ test("seller POST validates selection and consent, persists the selected source 
     assert.equal(history.audits.find(a=>a.consultaId===issuance.body.consultaId).sellerFlow,'certificates');
     const review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService,ai:{ready:()=>{throw Error('AI must not run');}}});
     await assert.rejects(()=>review.start(issuance.body.consultaId,owner,{auth:owner},true),/certificate_collection_only/);
+    const beforeAutomatic=providerCalls.length;
+    for(const override of [{state:'XX'},{state:'SP',aiConsent:false},{state:'SP',municipality:'Cidade inválida'},{state:'SP',paidQueryConfirmed:false}]) {
+      assert.equal((await post({...body,automatic:true,aiConsent:true,...override})).status,400);
+    }
+    assert.equal(providerCalls.length,beforeAutomatic,'invalid automatic requests never call providers');
+    const automaticRequest={...body,automatic:true,state:'SP',aiConsent:true,sellerQueries:['unknown'],ufs:['XX'],companyCnpjs:['invalid']};
+    const automatic=await post(automaticRequest);
+    assert.equal(automatic.status,202);
+    await waitForAudit(automatic.body.consultaId);
+    const automaticSaved=(await pg.query('SELECT request_payload FROM audita_audits WHERE public_id=$1',[automatic.body.consultaId])).rows[0].request_payload;
+    assert.equal(automaticSaved.extraFieldsProvided.sellerState,true);
+    assert.equal(automaticSaved.extraFieldsProvided.discoverCompanies,true);
+    assert.equal(automaticRequest.companyCnpjs.length,0);
+    assert.equal(automaticRequest.sellerQueries.length,13);
+    assert.ok(automaticRequest.sellerQueries.includes('cnd-sp'));
+    assert.ok(!automaticRequest.sellerQueries.includes('cnd-mg'));
+    const automaticAudit=await auditService.findAudit(automatic.body.consultaId,{auth:owner});
+    assert.deepEqual(automaticAudit.resultados[0].dados.certidoes.map(r=>r.id),Array.from(automaticRequest.sellerQueries));
   } finally {
     await pg.close();
   }

@@ -36,6 +36,37 @@ async function fixture(t, options = {}) {
     setTime: value => { clock = value; } };
 }
 
+test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/trial unchanged', async t => {
+  const { service: s, pg, make } = await fixture(t, { testBypassEnabled: true });
+  const disabled = await fixture(t);
+  assert.equal((await disabled.service.getAccess(auth)).testBypassAvailable, false);
+  await assert.rejects(disabled.service.enableTestAccess(auth), { code: 'chat_test_bypass_disabled', statusCode: 403 });
+  await assert.rejects(s.enableTestAccess({}), { statusCode: 401 });
+  await assert.rejects(s.enableTestAccess({ tenantId: '2', user: { id: '1' } }), { statusCode: 401 });
+  assert.equal((await s.getAccess(auth)).allowed, false);
+  const access = await s.enableTestAccess(auth);
+  assert.equal(access.source, 'test');
+  assert.equal(access.allowed, true);
+  assert.equal(access.remaining, null);
+  assert.equal(access.trialUsed, false);
+  assert.equal((await s.enableTestAccess(auth)).source, 'test');
+  assert.equal((await s.getAccess(other)).allowed, false);
+  assert.equal((await s.getAccess({ tenantId: '1', user: { id: '3' } })).allowed, false);
+  assert.equal((await make().getAccess(auth)).allowed, false, 'restart requires a fresh test grant');
+  await s.grantPaidAccess(invoice());
+  for (const [kind, quantity] of [['messages', 1], ['pages', 30]]) {
+    const reservation = await s.reserve(auth, { requestId: `test-${kind}`, kind, quantity });
+    assert.equal(reservation.entitlementId, null);
+    await s.complete(auth, { requestId: `test-${kind}`, result: 'fictional result' });
+    assert.equal((await s.reserve(auth, { requestId: `test-${kind}`, kind, quantity })).duplicate, true);
+  }
+  await assert.rejects(s.reserve(auth, { requestId: 'too-many', kind: 'pages', quantity: 201 }), { code: 'chat_invalid_quantity' });
+  const paid = await make().getAccess(auth);
+  assert.deepEqual(paid.used, { messages: 0, pages: 0 });
+  assert.equal(paid.trialUsed, false);
+  assert.equal((await pg.query('SELECT count(*)::int AS n FROM audita_chat_entitlements')).rows[0].n, 1, 'only the explicitly paid grant exists');
+});
+
 test('paid plans, invoice idempotency, nonoverlap and current half-open period', async t => {
   const { service: s, setTime } = await fixture(t);
   assert.deepEqual(Object.fromEntries(CHAT_PLANS.map(({ id, messages, pages }) => [id, { messages, pages }])), {

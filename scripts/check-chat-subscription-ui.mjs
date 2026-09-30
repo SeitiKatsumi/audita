@@ -18,7 +18,7 @@ const first = { id: "first", title: "Nova conversa", messages: [] };
 const second = { id: "second", title: "Nova conversa", messages: [] };
 let currentThread = first, sends = 0, release;
 const harness = {
-  currentAuthState: { user: { id: "same-user", tenant: { id: "tenant-a" } } },
+  generalChat:null, currentAuthState: { user: { id: "same-user", tenant: { id: "tenant-a" } } },
   chatState: { threads: [first, second] }, chatSending: false, chatSendingThreadId: "", chatPendingAttachment: null,
   chatInput: { value: "rascunho", focus() {} }, chatSendButton: {}, chatAttachment: {},
   activeChatBrowserSession: null, document: { querySelector: () => null },
@@ -45,7 +45,7 @@ assert.equal(harness.payload.caseContext.case.id, "itau-existing");
 const upload = { name: "teste.pdf" };
 harness.chatPendingAttachment = upload;
 const analyzing = harness.send("", upload);
-await Promise.resolve();
+await new Promise(setImmediate);
 assert.equal(harness.chatSending, true);
 await harness.send("duplicate", upload);
 currentThread = second;
@@ -59,7 +59,7 @@ assert.equal(harness.chatPendingAttachment, newerUpload);
 assert.equal(sends, 1, "Document summary does not POST chat");
 currentThread = first;
 const obsolete = harness.send("", upload);
-await Promise.resolve();
+await new Promise(setImmediate);
 harness.currentAuthState.user.tenant.id = "tenant-b";
 harness.chatState = { threads: [second] };
 release({ id: "private-old-document", summary: "Do not inject" });
@@ -135,7 +135,7 @@ const browser = await chromium.launch({ headless: true });
 const errors = [];
 const posts = [];
 let access = { active: false, planId: null, remaining: { messages: 0, pages: 0 }, periodEnd: null, legacy: false };
-let accessFailure = false, catalogFailure = false, analyzeFailure = false, checkoutFailure = false, prepareQuotaFailure = false;
+let accessFailure = false, catalogFailure = false, analyzeFailure = false, checkoutFailure = false, prepareQuotaFailure = false, testBypassAvailable = false;
 const chatPlans = [
   ["experiment", "Experimente", 990, 20, 5], ["essential", "Essencial", 4990, 100, 20],
   ["professional", "Profissional", 9990, 300, 80], ["premium", "Premium", 19990, 700, 200],
@@ -163,7 +163,8 @@ await context.route("**/*", async route => {
   if (request.method() === "POST") posts.push({ path: url.pathname, body: request.postDataJSON() });
   let status = 200, body;
   switch (url.pathname) {
-    case "/api/billing/plans": status = catalogFailure ? 503 : 200; body = { plans: [{ id: "standard" }], chatPlans }; break;
+    case "/api/billing/plans": status = catalogFailure ? 503 : 200; body = { plans: [{ id: "standard" }], chatPlans, chatTestBypassAvailable: testBypassAvailable }; break;
+    case "/api/chat/test-access": access = { active: true, source: 'test', test: true, testBypassAvailable: true, remaining: null }; body = { access }; break;
     case "/api/chat/access": status = accessFailure ? 503 : 200; body = { access }; break;
     case "/api/billing/subscription": body = { canManage: true, subscription: { provider: "stripe" } }; break;
     case "/api/billing/checkout": status = checkoutFailure ? 503 : 200; body = { url: "https://checkout.stripe.com/mock" }; break;
@@ -301,7 +302,7 @@ try {
   assert.equal(posts.find(post => post.path.endsWith("/prepare")).body.contentBase64, Buffer.from("fake PDF").toString("base64"));
   const invalid = await page.evaluate(async () => {
     const results = [];
-    for (const file of [new File(["csv"], "a.csv", { type: "text/csv" }), new File([], "a.pdf", { type: "application/pdf" }), new File([new Uint8Array(12 * 1024 * 1024 + 1)], "a.pdf", { type: "application/pdf" })]) {
+    for (const file of [new File(["executable"], "a.exe", { type: "application/octet-stream" }), new File([], "a.pdf", { type: "application/pdf" }), new File([new Uint8Array(12 * 1024 * 1024 + 1)], "a.pdf", { type: "application/pdf" })]) {
       try { await window.chat.prepareDocument(file); results.push(false); } catch { results.push(true); }
     }
     return results;
@@ -366,6 +367,25 @@ try {
   await modal.locator('[data-manage]').click();
   await page.waitForURL("https://billing.stripe.com/mock");
   assert.deepEqual(posts.at(-1).body, {});
+  await boot();
+  await page.evaluate(() => window.chat.open());
+  assert.equal(await modal.locator('[data-test-access]').isVisible(), false, 'default-off test bypass');
+  testBypassAvailable = true;
+  access = { active: false, remaining: null };
+  await page.evaluate(() => window.chat.refresh());
+  const previousPosts = posts.length;
+  await modal.locator('[data-test-access]').click();
+  assert.equal(await page.evaluate(() => window.loginCalls), 1, 'test access requires login');
+  assert.equal(posts.length, previousPosts, 'anonymous click does not grant access');
+  await page.evaluate(async () => { window.auth = { user: { id: 'test-user' } }; await window.resume(); });
+  await modal.waitFor({ state: 'hidden' });
+  assert.equal(posts.length, previousPosts + 1);
+  assert.equal(posts.at(-1).path, '/api/chat/test-access');
+  assert.equal(await page.evaluate(() => window.chat.ensureAccess('pages')), true);
+  await page.evaluate(() => window.chat.open());
+  assert.equal(await modal.locator('[data-test-access]').isDisabled(), true);
+  assert.match(await modal.locator('[data-access]').textContent(), /Acesso de teste liberado/);
+  assert.equal(await page.evaluate(() => window.sent), 0, 'grant does not send a message');
   assert.deepEqual(errors, []);
   console.log(`Chat subscription checks passed: gates, login resume, catalog, server-only access, drafts, documents, retries, keyboard, desktop/mobile. Screenshots: ${output}`);
 } finally { await browser.close(); }

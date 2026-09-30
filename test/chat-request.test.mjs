@@ -35,11 +35,12 @@ test('one concurrent execution, cached retry and trusted document context', asyn
   const { service, calls } = fixture({ getDocumentContext: async (a, id) => {
     assert.equal(a, auth); assert.equal(id, 'doc-1'); lookups++; return 'Trusted lookup';
   } });
-  const input = { ...body, documentId: 'doc-1', documentContext: 'Forged', unexpected: 'drop' };
+  const input = { ...body, mode:'deep', documentId: 'doc-1', documentContext: 'Forged', unexpected: 'drop' };
   const run = async sanitized => {
     runs++;
     assert.equal(sanitized.documentContext, 'Trusted lookup');
     assert.equal(sanitized.unexpected, undefined);
+    assert.equal(sanitized.mode,'auto','API keeps model selection automatic');
     started(); await gate; return { answer: 'Success' };
   };
   const first = service.execute(auth, input, run);

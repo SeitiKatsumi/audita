@@ -4,6 +4,7 @@ import { downloadCertificateEvidence } from "./state-court-autonomous.service.mj
 import { extractPdfText, saveAndExtractPdfBuffer } from "./pdf.service.mjs";
 import { collect as collectPublicCompany } from "../collectors/receita-federal.collector.mjs";
 import { pdfHasCnpjRoot } from "./pdf-cnpj-root.service.mjs";
+import { SELLER_STATES, sellerQueriesForState } from './seller-state-plan.mjs';
 
 const catalog = JSON.parse(readFileSync(new URL("../data/seller-document-coverage.json", import.meta.url), "utf8"));
 const clean = (value, limit = 250) => typeof value === "string" || typeof value === "number" ? String(value).replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, limit) : "";
@@ -166,6 +167,8 @@ export async function collectSellerDocuments(input, {
   if (!/^[\d.\-/\s]+$/.test(String(input.documento || "")) || !["cpf", "cnpj"].includes(input.tipoDocumento) || !isValidDocument(input.tipoDocumento, document)) throw new Error("invalid_seller_document");
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(input.consultaId || "")) throw new Error("invalid_consulta_id");
   const companies = normalizeCompanies(extra.companyCnpjs ?? []);
+  const automaticCompanies = extra.discoverCompanies === true;
+  if (automaticCompanies && (companies.length || !Object.hasOwn(SELLER_STATES,extra.sellerState) || !extra.sellerQueries?.includes('vinculos') || extra.paidQueryConfirmed !== true)) throw new Error('invalid_company_discovery');
   const plan = planSellerDocuments(extra.sellerQueries ?? [], configuration, companies);
   if (plan.queries.some((item) => !isCompanyQuery(item) && !item.documentTypes.includes(input.tipoDocumento))) throw new Error("unsupported_seller_document_type");
   if (plan.maxProviderCostBrl > 0 && extra.paidQueryConfirmed !== true) throw new Error("paid_query_confirmation_required");
@@ -173,17 +176,20 @@ export async function collectSellerDocuments(input, {
   const work = plan.queries.flatMap((item) => isCompanyQuery(item)
     ? companies.map((cnpj, companyIndex) => ({ item, document: cnpj, documentType: "cnpj", id: `${item.id}-empresa${companyIndex + 1}`, label: `${item.label} — empresa ${companyIndex + 1}` }))
     : [{ item, document, documentType: input.tipoDocumento, id: item.id, label: item.label }]);
-  const rows = [
-    ...work.map(({ item, id, label, document: target, documentType }) => ({ id, tipo: label, kind: item.kind, scope: item.scope, status: "pending", resultado: "indisponivel", provider: item.provider === "portal" ? "SEFAZ-PE" : "Direct Data", providerReference: "", details: documentType === "cnpj" ? { "CNPJ consultado": target } : {}, limitation: item.limitation || "" })),
-    ...companies.map((_, index) => ({ id: `company-${index + 1}`, tipo: `Empresa ${index + 1} — cadastro e QSA`, kind: "data", scope: "Brasil", status: "pending", resultado: "indisponivel", provider: "Bases públicas de CNPJ", providerReference: "", details: {}, limitation: "Dados cadastrais de base espelhada; não substituem certidão fiscal nem certidão da Junta Comercial." })),
-  ];
+  work.push(...companies.map((cnpj,index)=>({company:cnpj,id:`company-${index+1}`,label:`Empresa ${index+1} — cadastro e QSA`})));
+  function makeRow({item,id,label,document:target,documentType,company}) {
+    return {id,tipo:label,kind:item?.kind||'data',scope:item?.scope||'Brasil',status:'pending',resultado:'indisponivel',provider:company?'Bases públicas de CNPJ':item.provider==='portal'?'SEFAZ-PE':'Direct Data',providerReference:'',subjectDocument:documentType==='cnpj'?target:company||'',details:documentType==='cnpj'?{'CNPJ consultado':target}:{},limitation:item?.limitation||''};
+  }
+  const rows=work.map(makeRow);
+  function appendJob(job) { work.push(job); rows.push(makeRow(job)); }
+  let companyRequests=0;
   async function progress(completed) {
     await input.onProgress?.({ stage: completed === rows.length ? "completed" : "seller_documents", completed, total: rows.length, currentCertificate: rows[completed]?.tipo || "", certidoes: structuredClone(rows) });
   }
   await progress(0);
   for (let index = 0; index < rows.length; index++) {
     try {
-      if (index < work.length) {
+      if (!work[index].company) {
         const { item, document: target, documentType, id } = work[index];
         const parameters = { ...item.params, [documentType.toUpperCase()]: target };
         if (item.kind === "certificate" || item.includePdf === true) parameters.GERARCOMPROVANTE = "Habilitar";
@@ -222,13 +228,27 @@ export async function collectSellerDocuments(input, {
         const evidenceJson = JSON.stringify(data, (key, value) => /token|senha|password|base64|urlcomprovante|documentoConsultado/i.test(key) ? undefined : value);
         const evidenceDataLimited = evidenceJson.length > 180000;
         rows[index] = { ...rows[index], status: "success", ...summary, evidenceData: evidenceDataLimited ? {} : JSON.parse(evidenceJson), evidenceDataLimited, evidenceIdentityVerified: true, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
+        if(automaticCompanies&&item.id==='vinculos') {
+          const linked=[...new Set(list(field(data,'relacionamentos')).map(entry=>normalizeDocument(field(entry,'documento'))).filter(cnpj=>isValidDocument('cnpj',cnpj)))];
+          for(const [companyIndex,cnpj] of linked.slice(0,5).entries()) appendJob({company:cnpj,id:`company-${companyIndex+1}`,label:`Empresa ${companyIndex+1} — cadastro e QSA`});
+          rows[index].details['Empresas consultadas automaticamente']=String(Math.min(5,linked.length));
+          if(linked.length>5) rows[index].details['Empresas adicionais']=`${linked.length-5} vínculos excedem o limite de cinco empresas desta análise.`;
+        }
       } else {
-        const companyIndex = index - work.length;
-        if (companyIndex > 0) await delay(12000);
-        const cnpj = companies[companyIndex];
+        if(companyRequests++) await delay(12000);
+        const cnpj=work[index].company;
         const company = await collectCompany({ documento: cnpj, tipoDocumento: "cnpj", consultaId: input.consultaId, extraFields: {}, usageContext: input.usageContext, retries: 0, timeoutMs: 15000 });
         if (company?.status !== "success" || normalizeDocument(company.dados?.cnpj) !== cnpj || !clean(company.dados?.razaoSocial)) throw new Error("company_identity_unverified");
         rows[index] = { ...rows[index], status: "success", details: companyDetails(company.dados), summary: "Cadastro empresarial e QSA obtidos. Situação cadastral não comprova regularidade fiscal.", checkedAt: new Date().toISOString(), providerReference: "" };
+        rows[index].evidenceIdentityVerified=true;
+        if(automaticCompanies) {
+          const companyUf=clean(company.dados.uf||company.dados.endereco?.uf,2).toUpperCase();
+          const municipality=clean(company.dados.municipio||company.dados.cidade||company.dados.endereco?.municipio,100);
+          const available=getSellerDocumentCoverage(configuration).queries;
+          const selected=Object.hasOwn(SELLER_STATES,companyUf)?sellerQueriesForState(available,companyUf,'cnpj',municipality):available.filter(item=>item.documentTypes.includes('cnpj')&&item.scope==='Brasil');
+          for(const item of selected) appendJob({item,document:cnpj,documentType:'cnpj',id:`${item.id}-${work[index].id}`,label:`${item.label} — ${clean(company.dados.razaoSocial,100)}`});
+          rows[index].details['Certidões da empresa']=companyUf?`Consultas nacionais e aplicáveis a ${companyUf}.`:'Somente consultas nacionais: UF cadastral não identificada.';
+        }
       }
     } catch (error) {
       const errorCode = [error?.code, error?.message].find(value => /^[a-z0-9_]{1,80}$/.test(value || ""));

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260929-certificates-flow" />
+    <link rel="stylesheet" href="styles.css?v=20260930-seller-steps" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -150,23 +150,24 @@
         </nav>
 
         <section class="chat-page" id="chat" data-page="chat">
-          <aside class="chat-threads" aria-label="Conversas recentes">
+          <aside class="chat-threads" id="chatThreads" aria-label="Conversas recentes">
             <a class="chat-home-link" href="/#home" aria-label="Voltar à IA AUDITA">
               <img src="assets/audita-logo-original.png" alt="" />
               <span>IA AUDITA</span>
             </a>
             <div class="chat-threads-header">
-              <strong>Conversas</strong>
+              <strong>Conversas</strong><button class="chat-icon-button chat-mobile-new" id="chatHistoryClose" type="button" aria-label="Fechar conversas">×</button>
               <button class="chat-icon-button" id="chatNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
             </div>
             <div class="chat-thread-list" id="chatThreadList"></div>
             <a class="chat-icon-button chat-back-home chat-back-sidebar" href="/#home" aria-label="Voltar para a Home" title="Voltar para a Home"><img src="assets/nav-icons/chevron-left.svg" alt="" /><span>Voltar</span></a>
-            <p class="chat-privacy-note">Dados pessoais devem ser informados somente nos formul&aacute;rios seguros de consulta.</p>
+            <p class="chat-privacy-note">Suas conversas e arquivos ficam vinculados à sua conta.</p>
           </aside>
 
           <div class="chat-main">
             <header class="chat-header">
               <div class="chat-header-start">
+                <button class="chat-icon-button chat-mobile-new" id="chatHistoryButton" type="button" aria-label="Abrir conversas" aria-controls="chatThreads" aria-expanded="false">☰</button>
                 <a class="chat-icon-button chat-back-home" href="/#home" aria-label="Voltar para a Home" title="Voltar para a Home"><img src="assets/nav-icons/chevron-left.svg" alt="" /><span>Voltar</span></a>
               <a class="chat-assistant-identity" href="/#home" aria-label="Voltar à IA AUDITA">
                 <span class="chat-logo-frame"><img src="assets/audita-logo-original.png" alt="" /></span>
@@ -190,7 +191,7 @@
                 <span class="chat-welcome-logo"><img src="assets/audita-logo-original.png" alt="IA AUDITA" /></span>
                 <p class="eyebrow">Intelig&ecirc;ncia artificial</p>
                 <h2>Como posso ajudar?</h2>
-                <p>Conte o que voc&ecirc; precisa verificar. Eu organizo o caminho e aciono as fontes adequadas.</p>
+                <p>Converse, pesquise, analise documentos e crie arquivos com a IA AUDITA.</p>
               </section>
             </main>
 
@@ -210,6 +211,7 @@
               </button>
             </section>
             <div class="chat-error hidden" id="chatError" role="alert"></div>
+            <div class="general-chat-controls"><span>Pesquisa, documentos, imagens e arquivos</span><button id="chatStopButton" type="button" hidden>Parar geração</button></div>
             <form class="chat-composer" id="chatForm">
               <div class="chat-attachment-preview hidden" id="chatAttachmentPreview"></div>
               <button
@@ -227,7 +229,7 @@
                 class="hidden"
                 id="chatAttachment"
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                accept=".pdf,.png,.jpg,.jpeg,.txt,.md,.csv,.json,.html,.docx,.xlsx" multiple
               />
               <textarea
                 id="chatInput"
@@ -237,7 +239,7 @@
                 aria-label="Mensagem para a IA AUDITA"
               ></textarea>
               <button class="chat-send-button" id="chatSendButton" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem">&#8593;</button>
-              <small>PDF, PNG ou JPEG. At&eacute; 12 MB e 20 p&aacute;ginas. Documentos protegidos e vinculados &agrave; sua conta.</small>
+              <small>Até 6 arquivos: PDF, fotos, texto, Word e Excel. Até 12 MB por arquivo e 20 páginas por PDF. Serviços Audita disponíveis pela Central.</small>
             </form>
           </div>
 
@@ -571,34 +573,31 @@
         </section>
 
         <section class="seller-analysis-page" id="analise-vendedor" data-page="analise-vendedor emissao-certidoes">
-          <article class="module seller-analysis-module">
-            <div class="module-header seller-analysis-header">
+          <article class="module seller-analysis-module seller-step-shell" id="sellerStepShell" data-step="1">
+            <div class="module-header seller-analysis-header" hidden>
               <div>
                 <p class="eyebrow" id="sellerFlowEyebrow">Compra e venda de im&oacute;veis</p>
                 <h2 id="sellerFlowTitle">An&aacute;lise de Vendedor</h2>
               </div>
-              <span class="live">Emissão autônoma</span>
             </div>
             <p class="seller-analysis-intro" id="sellerFlowIntro">
               Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas. A IA confere os documentos e dados obtidos, identifica apontamentos e gera um relatório em PDF com evidências e próximos passos.
             </p>
 
-            <div class="seller-analysis-scope">
-              <div>
-                <small>Cobertura por fonte, estado e tipo</small>
-                <strong>Certidões em PDF e dados complementares</strong>
-                <span id="sellerFlowSteps">Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF</span>
-              </div>
-              <div id="sellerAnalysisCoverage" aria-live="polite">Carregando cobertura...</div>
-            </div>
+            <ol class="seller-step-nav" id="sellerStepNav" aria-label="Etapas da análise">
+              <li aria-current="step"><span>1</span>Coleta de dados</li>
+              <li><span>2</span>Extração</li>
+              <li><span>3</span>Análise e relatório</li>
+            </ol>
+            <div id="sellerAnalysisCoverage" hidden></div><span id="sellerFlowSteps" hidden></span>
 
             <div class="seller-analysis-workspace">
               <form class="seller-analysis-form" id="sellerAnalysisForm">
                 <div class="seller-analysis-form-heading">
                   <span>1</span>
                   <div>
-                    <strong>Dados do titular</strong>
-                    <small>RG e gênero são exigidos ao selecionar certidões estaduais. A filiação pode ser consultada na Direct Data quando necessária.</small>
+                    <strong>Quem está vendendo o imóvel?</strong>
+                    <small>Informe o vendedor e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente.</small>
                   </div>
                 </div>
                 <label>
@@ -609,39 +608,41 @@
                   Nome completo
                   <input id="sellerAnalysisFullName" type="text" maxlength="180" autocomplete="name" placeholder="Nome completo do titular" required />
                 </label>
-                <label>Data de nascimento<input id="sellerAnalysisBirthDate" type="date" /><small>Exigida para certidões estaduais e CND conjunta federal.</small></label>
-                <label>RG — para certidões estaduais<input id="sellerAnalysisRg" type="text" maxlength="30" /></label>
-                <label>Gênero exigido pelo portal estadual<select id="sellerAnalysisGender"><option value="">Selecione</option><option>Masculino</option><option>Feminino</option></select></label>
-                <label>E-mail<input id="sellerAnalysisEmail" type="email" maxlength="180" /></label>
-                <label id="sellerAnalysisMotherField">
+                <label id="sellerStateField">Estado do vendedor<select id="sellerAnalysisState" required><option value="">Selecione o estado</option></select></label>
+                <label id="sellerMunicipalityField" hidden>Município — opcional<select id="sellerAnalysisMunicipality"><option value="">Não informado</option></select><small>Inclui as consultas municipais disponíveis para a cidade informada.</small></label>
+                <label id="sellerBirthDateField" hidden>Data de nascimento<input id="sellerAnalysisBirthDate" type="date" /><small>Necessária para emitir os documentos deste estado.</small></label>
+                <label id="sellerRgField" hidden>RG<input id="sellerAnalysisRg" type="text" maxlength="30" /></label>
+                <label id="sellerGenderField" hidden>Gênero exigido pelo tribunal<select id="sellerAnalysisGender"><option value="">Selecione</option><option>Masculino</option><option>Feminino</option></select></label>
+                <label id="sellerAnalysisMotherField" hidden>
                   Nome completo da m&atilde;e
                   <input id="sellerAnalysisMotherName" type="text" maxlength="180" autocomplete="off" placeholder="Informe somente se a busca autom&aacute;tica n&atilde;o localizar" />
                 </label>
-                <label class="seller-analysis-privacy">CNPJs relacionados — opcional
+                <label class="seller-analysis-privacy" id="sellerManualCompanies" hidden>CNPJs relacionados — opcional
                   <input id="sellerAnalysisCompanyCnpjs" type="text" maxlength="500" autocomplete="off" placeholder="Separe os CNPJs por vírgula" />
                   <small>Até cinco CNPJs. Cadastro e quadro societário gratuitos; selecione abaixo as certidões empresariais pagas desejadas. A consulta de vínculos por CPF é uma opção separada.</small>
                 </label>
-                <div class="seller-analysis-form-heading"><span>2</span><div><strong>Fontes do levantamento</strong><small>Selecione o alcance e confira o custo antes de iniciar.</small></div></div>
+                <div class="seller-analysis-privacy" id="sellerManualSelection" hidden>
                 <fieldset id="sellerAnalysisUfs" class="seller-analysis-ufs seller-analysis-privacy"><legend>Certidões estaduais</legend></fieldset>
                 <div id="sellerAnalysisQueries" class="seller-analysis-privacy" aria-live="polite">Carregando outras consultas...</div>
                 <div class="seller-analysis-privacy">
                   <button id="sellerAnalysisSelectAll" type="button" class="secondary-action">Selecionar todas</button>
                   <button id="sellerAnalysisClearAll" type="button" class="secondary-action">Desmarcar todas</button>
                 </div>
-                <label class="seller-analysis-consent"><input id="sellerAnalysisPaid" type="checkbox" required /><span id="sellerAnalysisCost">Carregando estimativa de custo...</span></label>
+                </div>
+                <label class="seller-analysis-consent" id="sellerPaidConsentLabel" hidden><input id="sellerAnalysisPaid" type="checkbox" /><span>Autorizo o custo informado para as consultas.</span></label>
                 <label class="seller-analysis-consent">
                   <input id="sellerAnalysisAuthorization" type="checkbox" required />
-                  <span>Confirmo que possuo autoriza&ccedil;&atilde;o ou base legal para consultar os dados deste titular.</span>
+                  <span id="sellerAuthorizationText">Tenho autorização ou base legal para consultar este vendedor e autorizo o levantamento e a análise dos documentos pela IA da Audita (OpenAI).</span>
                 </label>
-                <label class="seller-analysis-consent" id="sellerAiConsentLabel"><input id="sellerAnalysisAiConsent" type="checkbox" required /><span>Autorizo o envio dos documentos e dados obtidos à OpenAI para a análise por IA da Audita.</span></label>
+                <label class="seller-analysis-consent" id="sellerAiConsentLabel" hidden><input id="sellerAnalysisAiConsent" type="checkbox" /><span>Autorizo o envio dos documentos e dados obtidos à OpenAI para a análise por IA da Audita.</span></label>
                 <p class="seller-analysis-privacy">
-                  Os dados são enviados às fontes selecionadas e aos provedores de consulta. Nome da mãe é opcional quando a consulta cadastral estiver disponível. PDFs, resultados e histórico exigem autenticação.
+                  Documentos, resultados e relatório ficam salvos na sua conta.
                 </p>
-                <button class="primary-action" id="sellerAnalysisSubmit" type="submit">Iniciar análise do vendedor</button>
+                <div class="seller-step-actions"><div class="seller-cost-preview" id="sellerAnalysisCost" aria-live="polite">Selecione o estado para calcular a estimativa.</div><button class="primary-action" id="sellerAnalysisSubmit" type="submit">Avançar e iniciar extração <span aria-hidden="true">→</span></button></div>
                 <small class="login-error" id="sellerAnalysisError" role="alert"></small>
               </form>
 
-              <section class="seller-analysis-result" id="sellerAnalysisResult" aria-live="polite">
+              <section class="seller-analysis-result" id="sellerAnalysisResult" aria-live="polite" hidden>
                 <div class="seller-analysis-empty">
                   <strong>Nenhuma extra&ccedil;&atilde;o iniciada</strong>
                   <p>Selecione as certidões e consultas para reunir os documentos disponíveis.</p>
@@ -2157,7 +2158,7 @@
     <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20260929-certificates-flow"></script>
+    <script type="module" src="app.js?v=20260930-seller-steps"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

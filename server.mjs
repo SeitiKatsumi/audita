@@ -1,3 +1,5 @@
+import { createGeneralChatStorage } from './services/general-chat-storage.service.mjs';
+import { createGeneralChatService } from './services/general-chat.service.mjs';
 import {createDebtExtractor} from './services/bank-debt-ai.mjs';
 import {createImportAI} from './services/import-audit-ai.mjs';
 import {createImportService} from './services/import-audit.service.mjs';
@@ -33,6 +35,7 @@ import {
   buildDfSellerAuditRequest,
   normalizeDfSellerInput,
 } from "./services/seller-analysis.service.mjs";
+import { sellerStatePlans, sellerQueriesForState } from './services/seller-state-plan.mjs';
 import { createApiUsageService } from "./services/api-usage.service.mjs";
 import { createOpenAIOfficialUsageService } from "./services/openai-official-usage.service.mjs";
 import {
@@ -62,9 +65,6 @@ import {
   personNamesMatch,
 } from "./services/direct-data-person.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
-import {
-  runAuditaChat,
-} from "./services/chat-assistant.service.mjs";
 import {
   createItauRefundService,
   updateItauCaseSnapshot,
@@ -1747,8 +1747,10 @@ const billingAccessService = createBillingAccessService({
   isDemoModeEnabled: () =>
     String(process.env.AUDITA_BILLING_DEMO_MODE || "").trim().toLowerCase() === "true",
 });
+const chatTestBypassEnabled = process.env.AUDITA_CHAT_TEST_BYPASS_ENABLED === 'true';
 const chatAccessService = createChatAccessService({
   getDb: () => ({ pool, dbReady }),
+  testBypassEnabled: chatTestBypassEnabled,
   getLegacyAccess: async (auth, connection) => {
     const result = await connection.query(`SELECT 1 FROM audita_subscriptions
       WHERE tenant_id=$1 AND provider='stripe' AND plan_id='standard'
@@ -1766,10 +1768,16 @@ const stripeBillingService = createStripeBillingService({
 });
 const chatDocumentsService = createChatDocumentsService({
   getDb: () => ({ pool, dbReady }), accessService: chatAccessService,
-  recordUsage: (usage, auth) => apiUsageService.record(auth, { provider: "openai", service: "responses", model: process.env.AUDITA_CHAT_MODEL || "gpt-5-mini", operation: "chat_document", ...usage }),
+  recordUsage: (usage, auth) => apiUsageService.record(auth, { provider: "openai", service: "responses", model: process.env.AUDITA_CHAT_DOCUMENT_MODEL || process.env.AUDITA_CHAT_QUICK_MODEL || "gpt-6-luna", operation: "chat_document", ...usage }),
 });
+const generalChatStorage = createGeneralChatStorage();
+const generalChatService = createGeneralChatService({storage:generalChatStorage,documents:chatDocumentsService,
+  recordUsage:(usage,auth,model)=>apiUsageService.record(auth,{provider:'openai',service:'responses',model,operation:'general_chat',...usage})});
 const chatRequestService = createChatRequestService({
-  accessService: chatAccessService,
+  accessService: {...chatAccessService,
+    reserve:async(auth,input)=>{const held=await chatAccessService.reserve(auth,input);return {...held,result:generalChatStorage.openResult(auth,input.requestId,held.result)};},
+    complete:(auth,input)=>chatAccessService.complete(auth,{...input,result:generalChatStorage.sealResult(auth,input.requestId,input.result)}),
+  },
   getDocumentContext: async (auth, id) => (await chatDocumentsService.getContext(auth, id)).text,
 });
 const bankDebtService = createBankDebtService({
@@ -3149,251 +3157,66 @@ async function runAuditaAgent(request) {
   };
 }
 
-async function runChatConversation(request, body, authContext) {
-  if (authContext.unauthorized) {
-    return { unauthorized: true };
-  }
-
-  const settings = await getAgentSettings(request);
-  let effectiveCaseContext = body.caseContext;
-  let synchronizedCase = null;
-  const itauAuth = {
-    tenantId: authContext.tenantId,
-    userId: authContext.user?.id || null,
-  };
-  const certificateStatus = directDataCertificatesService.getStatus();
-  const certificateRequestId =
-    String(body.requestId || "").trim() || crypto.randomUUID();
-  const queryCourtCertificate = async (input = {}) => {
-    if (!certificateStatus.configured) {
-      return {
-        unavailable: true,
-        reason: certificateStatus.enabled
-          ? "direct_data_token_missing"
-          : "direct_data_certificates_disabled",
-        configuration: certificateStatus,
-      };
-    }
-    if (input.authorizationConfirmed !== true) {
-      return {
-        invalid: true,
-        reason: "authorization_required",
-        configuration: certificateStatus,
-      };
-    }
-    if (input.paidQueryConfirmed !== true) {
-      return {
-        invalid: true,
-        reason: "paid_query_confirmation_required",
-        configuration: certificateStatus,
-      };
-    }
-
-    const requestedSubjectType =
-      String(input.subjectType || "cpf").toLowerCase() === "cnpj"
-        ? "cnpj"
-        : "cpf";
-    const profileState = authContext.user
-      ? await loadUserProfile(authContext.user)
-      : { profile: {} };
-    const profile = profileState.profile || {};
-    if (requestedSubjectType === "cnpj" || !profile.document) {
-      return {
-        requiresSecureIntake: true,
-        reason:
-          requestedSubjectType === "cnpj"
-            ? "cnpj_secure_intake_required"
-            : "profile_document_required",
-        configuration: certificateStatus,
-      };
-    }
-
-    const idempotencyKey = crypto
-      .createHash("sha256")
-      .update(
-        `${certificateRequestId}:${JSON.stringify({
-          uf: input.uf,
-          certificateType: input.certificateType,
-          generatePdf: input.generatePdf === true,
-          subjectType: requestedSubjectType,
-        })}`,
-      )
-      .digest("hex")
-      .slice(0, 48);
-
-    return directDataCertificatesService.query(
-      {
-        ...input,
-        requestId: idempotencyKey,
-        document: profile.document,
-        documentType: "cpf",
-        fullName: profile.fullName || authContext.user?.name || "",
-        rg: profile.rg || "",
-      },
-      authContext,
-    );
-  };
-  let browserContext = null;
-  const browserSessionId = String(body.browserSessionId || "").trim();
-  const jecBrowserEnabled =
-    String(process.env.AUDITA_JEC_BROWSER_ENABLED || "false").toLowerCase() ===
-    "true";
-
-  if (
-    jecBrowserEnabled &&
-    /^[A-Za-z0-9_-]{1,100}$/.test(browserSessionId)
-  ) {
-    let browserView = await chatBrowserService.getView(browserSessionId, itauAuth);
-    let browserTransport = "live";
-    if (browserView.notFound) {
-      browserView = await getAssistedSessionView(browserSessionId, itauAuth);
-      browserTransport = "assisted";
-    }
-    if (!browserView.notFound && !browserView.forbidden) {
-      const portal = getJecPortal(browserView.courtUf || "");
-      const agentSession = browserView.agentSessionId
-        ? getOwnedStateCourtAgentSession(browserView.agentSessionId, itauAuth)
-        : null;
-      browserContext = {
-        sessionId: browserSessionId,
-        status: browserView.status || (browserView.closed ? "offline" : "live"),
-        closed: browserView.closed === true,
-        controlMode: browserView.controlMode || (browserTransport === "assisted" ? "human" : ""),
-        transport: browserTransport,
-        courtName: browserView.courtName,
-        courtUf: browserView.courtUf,
-        title: browserView.title,
-        url: browserView.url,
-        outcome: browserView.outcome,
-        formState: browserView.formState,
-        agent: agentSession && !agentSession.forbidden
-          ? {
-              status: agentSession.status,
-              nextAction: agentSession.nextAction,
-              resultStatus: agentSession.result?.status || "",
-            }
-          : null,
-        portalGuide: portal
-          ? {
-              name: portal.name,
-              checkpoint: portal.checkpoint,
-              requirements: portal.requirements,
-              steps: portal.guide?.steps || portal.instructions,
-              humanOnly: portal.guide?.humanOnly || [],
-              caseNotes: portal.guide?.caseNotes || [],
-              sources: portal.guide?.sources || [portal.officialUrl],
-            }
-          : null,
-      };
-    }
-  }
-
-  const applyItauCaseUpdate = async (payload) => {
-    const currentCase = synchronizedCase || effectiveCaseContext?.case;
-    if (!currentCase?.id || !payload || typeof payload !== "object") return null;
-
-    const updated = itauRefundService.updateCase(currentCase.id, payload, itauAuth);
-    if (updated.forbidden) {
-      throw new Error("itau_case_forbidden");
-    }
-    synchronizedCase = updated.case
-      ? updated.case
-      : updateItauCaseSnapshot(currentCase, payload);
-    effectiveCaseContext = { type: "itau_refund", case: synchronizedCase };
-    return synchronizedCase;
-  };
-
-  if (body.caseContext?.type === "itau_refund" && body.caseContext?.case?.id) {
-    synchronizedCase = body.caseContext.case;
-  }
-
-  let result;
-  try {
-    result = await runAuditaChat({
-      messages: body.messages,
-      settings,
-      userName: authContext.user?.name || "",
-      caseContext: effectiveCaseContext,
-      documentContext: body.documentContext,
-      browserContext,
-      getItauCase: () => synchronizedCase || effectiveCaseContext?.case || null,
-      onItauCaseUpdate: applyItauCaseUpdate,
-      onCourtCertificateQuery: queryCourtCertificate,
-      courtCertificateStatus: certificateStatus,
-    });
-  } catch (error) {
-    try {
-      await apiUsageService.record(authContext, {
-        provider: "openai",
-        service: "responses",
-        operation: "audita_chat",
-        model: String(process.env.AUDITA_CHAT_MODEL || settings.model || "gpt-5-mini").trim(),
-        status: error?.name === "AbortError" ? "cancelled" : "failed",
-        requestCount: 1,
-        referenceId: crypto.randomUUID(),
-        unitName: "token",
-        metadata: {
-          messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
-        },
-      });
-    } catch (usageError) {
-      console.error("[audita] failed to record failed chat usage", usageError);
-    }
-    throw error;
-  }
-
-  if (!result.invalid && !result.unavailable && result.usage) {
-    try {
-      await apiUsageService.record(authContext, {
-        provider: "openai",
-        service: "responses",
-        operation: "audita_chat",
-        model: result.model || "gpt-5-mini",
-        referenceId: crypto.randomUUID(),
-        unitName: "token",
-        metadata: {
-          messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
-          actionCount: Array.isArray(result.actions) ? result.actions.length : 0,
-        },
-        ...result.usage,
-      });
-    } catch (error) {
-      console.error("[audita] failed to record chat usage", error);
-    }
-  }
-
-  if (!result.invalid && !result.unavailable && pool && dbReady && authContext.tenantId) {
-    await pool.query(
-      `INSERT INTO audita_app_events (tenant_id, event_type, payload)
-       VALUES ($1, 'chat.message.completed', $2)`,
-      [
-        authContext.tenantId,
-        JSON.stringify({
-          model: result.model,
-          messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
-          actions: Array.isArray(result.actions) ? result.actions.map((action) => action.moduleId) : [],
-          sources: Array.isArray(result.sources) ? result.sources.map((source) => source.name) : [],
-        }),
-      ],
-    );
-  }
-
-  return synchronizedCase ? { ...result, itauCase: synchronizedCase } : result;
+async function runChatConversation(request, body, authContext, options) {
+  return generalChatService.run(authContext,body,options);
 }
 
 const lawyerQueue = createLawyerQueueService({ getDb: () => ({ pool, dbReady }) });
 
 async function handleApi(request, response, pathname) {
-  if (pathname === "/api/chat/access" || pathname.startsWith("/api/chat/documents/")) {
+  if (pathname === '/api/chat/cancel' || pathname === '/api/chat/threads' || pathname.startsWith('/api/chat/threads/') || pathname.startsWith('/api/chat/artifacts/')) {
+    try {
+      const auth=await getTenantIdForRequest(request);
+      if(auth.unauthorized||!auth.user?.id){sendJson(response,401,{error:'authentication_required'});return true;}
+      if(pathname==='/api/chat/cancel'&&request.method==='POST'){sendJson(response,200,generalChatService.cancel(auth,await readJsonBody(request)));return true;}
+      if(pathname==='/api/chat/threads'&&request.method==='POST'){
+        const body=await readJsonBody(request);
+        if(!Array.isArray(body.threads)||body.threads.length>16){sendJson(response,400,{error:'chat_invalid_thread'});return true;}
+        for(const thread of body.threads){
+          if(!Array.isArray(thread.messages)||thread.messages.length>50||typeof thread.title!=='string'){sendJson(response,400,{error:'chat_invalid_thread'});return true;}
+          const messages=thread.messages.map(m=>({id:crypto.randomUUID(),role:m.role,content:typeof m.content==='string'?m.content.slice(0,5000):''}));
+          if(messages.some(m=>!['user','assistant'].includes(m.role)||!m.content)){sendJson(response,400,{error:'chat_invalid_thread'});return true;}
+          await generalChatStorage.saveThread(auth,{id:crypto.randomUUID(),title:thread.title.slice(0,65),messages,updatedAt:new Date().toISOString()});
+        }
+        sendJson(response,200,{imported:true});return true;
+      }
+      if(pathname==='/api/chat/threads'&&request.method==='GET'){sendJson(response,200,{threads:await generalChatStorage.listThreads(auth)});return true;}
+      const thread=pathname.match(/^\/api\/chat\/threads\/([0-9a-f-]{36})$/i);
+      if(thread&&request.method==='GET'){sendJson(response,200,{thread:await generalChatService.getThread(auth,thread[1])});return true;}
+      if(thread&&request.method==='DELETE'){if(generalChatService.isBusy(auth,thread[1])){sendJson(response,409,{error:'chat_thread_busy'});return true;}await generalChatStorage.deleteThread(auth,thread[1]);sendJson(response,200,{deleted:true});return true;}
+      const artifact=pathname.match(/^\/api\/chat\/artifacts\/([0-9a-f-]{36})$/i);
+      if(artifact&&request.method==='GET'){
+        const file=await generalChatStorage.getArtifact(auth,artifact[1]);
+        const inline=file.mime.startsWith('image/')&&file.mime!=='image/svg+xml';
+        response.writeHead(200,{'content-type':file.mime,'content-length':file.buffer.length,'cache-control':'private, no-store',
+          'x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; sandbox",
+          'content-disposition':`${inline?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(file.name)}`});response.end(file.buffer);return true;
+      }
+      sendJson(response,404,{error:'not_found'});
+    }catch(error){sendJson(response,error.statusCode||500,{error:error.code||'chat_storage_failed'});}
+    return true;
+  }
+
+  if (["/api/chat/access", "/api/chat/test-access"].includes(pathname) || pathname.startsWith("/api/chat/documents/")) {
     try {
       const auth = await getTenantIdForRequest(request);
       if (auth.unauthorized || !auth.user?.id) {
         sendJson(response, 401, { error: "authentication_required" });
         return true;
       }
-      if (pathname === "/api/chat/access" && request.method === "GET") {
-        const access = await chatAccessService.getAccess(auth);
-        sendJson(response, 200, { access: { ...access, active: access.allowed, legacy: access.source === "legacy" } });
+      if (pathname === "/api/chat/access" && request.method === "GET" || pathname === "/api/chat/test-access" && request.method === "POST") {
+        if (pathname === "/api/chat/test-access" && (request.headers['sec-fetch-site'] === 'cross-site' ||
+          (request.headers.origin && new URL(request.headers.origin).host !== request.headers.host))) {
+          sendJson(response, 403, { error: 'invalid_origin' });
+          return true;
+        }
+        if (pathname === "/api/chat/test-access" && !/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] || '')) {
+          sendJson(response, 415, { error: 'json_required' });
+          return true;
+        }
+        const access = pathname === "/api/chat/test-access"
+          ? await chatAccessService.enableTestAccess(auth) : await chatAccessService.getAccess(auth);
+        sendJson(response, 200, { access: { ...access, active: access.allowed, legacy: access.source === "legacy", test: access.source === "test" } });
         return true;
       }
       if (pathname === "/api/chat/documents/prepare" && request.method === "POST") {
@@ -3455,7 +3278,7 @@ async function handleApi(request, response, pathname) {
     return true;
   }
   if (pathname === "/api/billing/plans" && request.method === "GET") {
-    sendJson(response, 200, stripeBillingService.catalog());
+    sendJson(response, 200, { ...stripeBillingService.catalog(), chatTestBypassAvailable: chatTestBypassEnabled });
     return true;
   }
 
@@ -4070,11 +3893,12 @@ async function handleApi(request, response, pathname) {
   }
 
   if (pathname === "/api/seller-analysis/coverage" && request.method === "GET") {
-    sendJson(response, 200, {
+    const coverage = {
       aiReady: sellerReviewService.ready(),
       ...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
-    });
+    };
+    sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage),identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl });
     return true;
   }
 
@@ -4097,6 +3921,18 @@ async function handleApi(request, response, pathname) {
       }
 
       let autonomousPlan = null;
+      let statePlan = null;
+      if(body.flow !== 'certificates' && body.automatic === true) {
+        if(body.aiConsent!==true||body.paidQueryConfirmed!==true) {sendJson(response,400,{error:'seller_consent_required'});return true;}
+        const coverage={...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),sellerSources:getSellerDocumentCoverage(directDataSellerService.getStatus())};
+        statePlan=sellerStatePlans(coverage).find(item=>item.uf===body.state);
+        if(!statePlan || (body.municipality && !statePlan.municipalities.includes(body.municipality))) {
+          sendJson(response,400,{error:'invalid_seller_state'}); return true;
+        }
+        body.ufs=statePlan.certificateCount?[statePlan.uf]:[];
+        body.sellerQueries=sellerQueriesForState(coverage.sellerSources.queries,statePlan.uf,'cpf',body.municipality||'').map(item=>item.id);
+        body.companyCnpjs=[];
+      }
       if (body.flow !== 'certificates' && body.aiConsent === true && !sellerReviewService.ready()) {
         sendJson(response, 503, { error: 'seller_ai_unavailable', message: 'A análise por IA não está configurada neste ambiente. Nenhuma consulta foi iniciada.' });
         return true;
@@ -4203,6 +4039,7 @@ async function handleApi(request, response, pathname) {
         Object.assign(request.body.extraFields, {
           sellerQueries: sellerDocumentPlan.queries.map((item) => item.id),
           companyCnpjs, authorizationConfirmed: true, paidQueryConfirmed: body.paidQueryConfirmed === true,
+          ...(statePlan ? {sellerState:statePlan.uf,discoverCompanies:statePlan.discoversCompanies} : {}),
         });
         request.body.extraFields.stateCourtFields.birthDate = String(body.birthDate || "").split("-").reverse().join("/");
       }
@@ -6044,38 +5881,27 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
-  if (pathname === "/api/chat" && request.method === "POST") {
+  if ((pathname === '/api/chat' || pathname === '/api/chat/stream') && request.method === 'POST') {
+    const streaming=pathname.endsWith('/stream'),controller=new AbortController();
+    let heartbeat;
+    const emit=event=>{if(!response.destroyed)response.write(`data: ${JSON.stringify(event)}\n\n`);};
     try {
-      const auth = await getTenantIdForRequest(request);
-      const result = await chatRequestService.execute(auth, await readJsonBody(request),
-        (body) => runChatConversation(request, body, auth));
-      if (result.unauthorized) {
-        sendJson(response, 401, { error: "authentication_required" });
-        return true;
-      }
-      if (result.invalid) {
-        sendJson(response, 400, { error: "invalid_chat_messages" });
-        return true;
-      }
-      if (result.unavailable) {
-        sendJson(response, 503, {
-          error: result.reason || "chat_unavailable",
-          quotaReleased: result.quotaReleased === true,
-          secretRef: result.secretRef || "AUDITA_OPENAI_API_KEY",
-        });
-        return true;
-      }
-      sendJson(response, 200, result);
-    } catch (error) {
-      const timedOut = error?.name === "AbortError" || /aborted|timeout/i.test(String(error?.message || ""));
-      sendJson(response, error.statusCode || error.status || (timedOut ? 504 : 500), {
-        error: error.code || (timedOut ? "chat_timeout" : "chat_failed"),
-        quotaReleased: error.quotaReleased === true,
-        message: timedOut
-          ? "A IA AUDITA demorou mais que o esperado para responder."
-          : "Nao foi possivel concluir esta conversa.",
+      const auth=await getTenantIdForRequest(request);
+      if(auth.unauthorized||!auth.user?.id){sendJson(response,401,{error:'authentication_required'});return true;}
+      const body=await readJsonBody(request);
+      const result=await chatRequestService.execute(auth,body,input=>{
+        if(streaming){response.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache, no-transform','x-accel-buffering':'no'});
+          heartbeat=setInterval(()=>{if(!response.destroyed)response.write(': keepalive\n\n');},15000);}
+        // Keep work running when the browser leaves; explicit cancellation is owner scoped.
+        return runChatConversation(request,input,auth,{signal:controller.signal,onEvent:streaming?emit:()=>{}});
       });
-    }
+      if(streaming){if(!response.headersSent)response.writeHead(200,{'content-type':'text/event-stream','cache-control':'no-cache'});emit({type:'completed',result});response.end();}
+      else sendJson(response,200,result);
+    }catch(error){
+      const failure={error:error.code||(error.name==='AbortError'?'chat_cancelled':'chat_failed'),quotaReleased:error.quotaReleased===true,
+        message:'Não foi possível concluir. Seus dados permanecem salvos; tente novamente.'};
+      if(response.headersSent){emit({type:'error',...failure});response.end();}else sendJson(response,error.statusCode||error.status||500,failure);
+    }finally{clearInterval(heartbeat);}
     return true;
   }
 
@@ -6345,7 +6171,7 @@ const server = http.createServer(async (request, response) => {
   // Keep private storage, configuration and server implementation outside the static surface.
   const publicRootFiles = new Set(["import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
     "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
-    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css"]);
+    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css", "general-chat.js"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");
   if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;

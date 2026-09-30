@@ -13,6 +13,11 @@ import { planSellerDocuments, getSellerDocumentCoverage } from '../services/sell
 import { planAutonomousCertificates } from '../services/state-court-autonomous.service.mjs';
 import { createSellerReviewService } from '../services/seller-review.service.mjs';
 import { extractPdfText } from '../services/pdf.service.mjs';
+import { sellerStatePlans,sellerQueriesForState } from '../services/seller-state-plan.mjs';
+
+const sourceCoverage=getSellerDocumentCoverage({configured:true});sourceCoverage.queries=sourceCoverage.queries.filter(q=>['protestos','cndt','vinculos'].includes(q.id));
+const courtCoverage={ufs:['ES'],certificates:[{uf:'ES',type:'Cível',provider:'portal'}]};
+const fixtureCoverage={aiReady:true,...courtCoverage,sellerSources:sourceCoverage};fixtureCoverage.states=sellerStatePlans(fixtureCoverage);
 
 let base=process.env.AUDITA_BASE_URL||'http://localhost:3012';
 const appBase=base; let httpServer;
@@ -29,12 +34,13 @@ try {
  let review;
  const audit=createAuditService({getDb:()=>({pool:pg,dbReady:true}),getAuthContext:async()=>auth,customCollectors:{seller_documents:{},tjdft:{collect:async()=>{providerCalls++;return {fonte:'tjdft',status:'success',resultado:'nada_consta',dados:{certidoes:[{tipo:'ES · Cível',status:'success',resultado:'nada_consta',pdfPath:'/private/ficticio.pdf'}]},rawText:''};}}},
    getSellerDocumentConfiguration:()=>({configured:true}),
-   querySellerDocument:async input=>{providerCalls++;await new Promise(r=>setTimeout(r,600));if(input.endpoint!=='ProtestosOnline')return {reason:'provider_timeout'};return {result:{status:'success',queriedAt:new Date().toISOString(),providerReference:'fixture',payload:{retorno:{documentoConsultado:'52998224725',constamProtestos:true,numeroTotalProtestos:1,valorTotalProtestos:'R$ 1.250,00'}}}};},
+   querySellerDocument:async input=>{providerCalls++;await new Promise(r=>setTimeout(r,600));if(input.endpoint==='VinculosSocietarios')return {result:{status:'success',payload:{retorno:{documentoConsultado:'52998224725',relacionamentos:[]}}}};if(input.endpoint!=='ProtestosOnline')return {reason:'provider_timeout'};return {result:{status:'success',queriedAt:new Date().toISOString(),providerReference:'fixture',payload:{retorno:{documentoConsultado:'52998224725',constamProtestos:true,numeroTotalProtestos:1,valorTotalProtestos:'R$ 1.250,00'}}}};},
    onSellerCollected:(id,a,request)=>review.start(id,a,request,true),logError:()=>{},
  });
- review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService:audit,ai:{ready:()=>true,read:async()=>{aiCalls++;await new Promise(r=>setTimeout(r,2500));return {summary:'Há um protesto informado pela fonte.',identity:'compatible',outcome:'occurrences',issuedAt:null,validUntil:null,limitations:[],findings:[{category:'credit',priority:'high',title:'Protesto informado',description:'Conferir valor e eventual baixa com o cartório.',quote:'R$ 1.250,00',amount:'R$ 1.250,00',date:null,recommendation:'Solicitar a certidão atualizada e o comprovante de baixa.'}]};}}});
+ review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService:audit,ai:{ready:()=>true,read:async source=>{aiCalls++;await new Promise(r=>setTimeout(r,2500));return {summary:source.title.includes('Vínculos')?'Não foram identificadas empresas vinculadas no retorno.':'Há um protesto informado pela fonte.',identity:'compatible',outcome:source.title.includes('Vínculos')?'informational':'occurrences',issuedAt:null,validUntil:null,limitations:[],findings:source.title.includes('Vínculos')?[]:[{category:'credit',priority:'high',title:'Protesto informado',description:'Conferir valor e eventual baixa com o cartório.',quote:'R$ 1.250,00',amount:'R$ 1.250,00',date:null,recommendation:'Solicitar a certidão atualizada e o comprovante de baixa.'}]};}}});
  const sandbox=vm.createContext({URL,crypto:{randomUUID},sellerReviewService:review,auditService:audit,normalizeDfSellerInput,buildDfSellerAuditRequest,planSellerDocuments,planAutonomousCertificates,validateCnpj,
-   directDataCertificatesService:{getStatus:()=>({configured:true,allowedUfs:[]})},directDataSellerService:{getStatus:()=>({configured:true})},getTenantIdForRequest:async()=>auth,
+   getSellerDocumentCoverage:()=>sourceCoverage,getAutonomousCertificateCoverage:()=>courtCoverage,sellerStatePlans,sellerQueriesForState,
+   directDataPersonService:{lookup:async()=>({reason:'fixture_unavailable'})},directDataCertificatesService:{getStatus:()=>({configured:true,allowedUfs:[]})},directDataSellerService:{getStatus:()=>({configured:true})},getTenantIdForRequest:async()=>auth,
    readJsonBody:async req=>req.body,sendJson:(res,status,body)=>Object.assign(res,{status,body}),
  });
  const start=source.slice(source.indexOf('  if (["/api/seller-analysis/df"'),source.indexOf('  const publicAuditEvidenceMatch ='));
@@ -46,7 +52,7 @@ try {
    const req=route.request(),url=new URL(req.url()),path=url.pathname;
    if(url.origin!==new URL(base).origin)return route.abort();
    if(path==='/api/auth/me')return route.fulfill({json:{authRequired:true,user:auth.user}});
-   if(path==='/api/seller-analysis/coverage')return route.fulfill({json:{aiReady:true,ufs:['ES'],certificates:[{uf:'ES',type:'Cível',provider:'portal'}],sellerSources:{...getSellerDocumentCoverage({configured:true}),queries:getSellerDocumentCoverage({configured:true}).queries.filter(q=>['protestos','cndt'].includes(q.id))}}});
+   if(path==='/api/seller-analysis/coverage')return route.fulfill({json:fixtureCoverage});
    if(path.startsWith('/api/seller-analysis')){
      const res={setHeader(){},writeHead(status,headers){Object.assign(this,{status,headers});},end(buffer){this.buffer=buffer;}};
      await sandbox.handle(path,{method:req.method(),body:req.method()==='POST'?req.postDataJSON():{},headers:{'content-type':'application/json',host:new URL(base).host,origin:base}},res);
@@ -70,26 +76,25 @@ try {
  await page.goto(base+'/#analise-vendedor');
  await page.locator('#sellerAnalysisCpf').fill('52998224725');
  await page.locator('#sellerAnalysisFullName').fill('Vendedor Fictício');
- for(const id of ['protestos','cndt']){const box=page.locator(`#sellerAnalysisQueries input[value="${id}"]`);await page.locator('#sellerAnalysisQueries details').filter({has:page.locator(`input[value="${id}"]`)}).locator('summary').click();await box.check();}
- for(const id of ['sellerAnalysisPaid','sellerAnalysisAuthorization','sellerAnalysisAiConsent'])await page.locator('#'+id).check();
+ await page.locator('#sellerAnalysisState').selectOption('SP');
+ await page.locator('#sellerAnalysisAuthorization').check();
  await page.screenshot({path:'output/playwright/seller-input-desktop.png',fullPage:true});
  await page.locator('#sellerAnalysisSubmit').click();
  await page.getByRole('heading',{name:'3. Analisando documentos e dados'}).waitFor();
  await page.screenshot({path:'output/playwright/seller-progress-desktop.png',fullPage:true});
  const download=page.getByRole('link',{name:'Baixar relatório completo em PDF'});
  await download.waitFor();
- assert.equal(providerCalls,2);assert.equal(aiCalls,1);
- await page.getByText('Ver apontamentos e providências',{exact:true}).click();
- await page.getByText('Ver lacunas da análise (1)',{exact:true}).click();
+ assert.equal(providerCalls,3);assert.equal(aiCalls,2);
+ await page.getByText('Ver pendências e próximos passos',{exact:true}).click();
  await page.screenshot({path:'output/playwright/seller-report-desktop.png',fullPage:true});
  const downloadEvent=page.waitForEvent('download');await download.click();const file=await downloadEvent;
  await file.saveAs('output/playwright/seller-ui-report.pdf');
  assert.match(await extractPdfText(await readFile('output/playwright/seller-ui-report.pdf')),/R\$ 1\.250,00/);
- await page.reload();await download.waitFor();assert.equal(aiCalls,1,'reload must not rerun AI');
+ await page.reload();await download.waitFor();assert.equal(aiCalls,2,'reload must not rerun AI');
  await page.setViewportSize({width:390,height:844}); await page.reload(); await download.waitFor(); await page.waitForFunction(()=>{const r=document.querySelector('#sellerAnalysisResult').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth;});
  await page.screenshot({path:'output/playwright/seller-report-mobile.png',fullPage:true});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'mobile overflow');
- await page.evaluate(()=>sessionStorage.removeItem('audita:lastSellerAnalysisDfAuditId')); await page.reload(); await page.locator('#sellerReviewHistory > summary').click(); await page.locator('[data-seller-history]').first().click(); await download.waitFor(); assert.equal(providerCalls,2); assert.equal(aiCalls,1);
+ await page.evaluate(()=>sessionStorage.removeItem('audita:lastSellerAnalysisDfAuditId')); await page.reload(); await page.locator('#sellerReviewHistory > summary').click(); await page.locator('[data-seller-history]').first().click(); await download.waitFor(); assert.equal(providerCalls,3); assert.equal(aiCalls,2);
  await page.locator('#sellerChangeData').click();await page.locator('#sellerAnalysisCpf').waitFor({state:'visible'});
  await page.screenshot({path:'output/playwright/seller-return-mobile.png',fullPage:true});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'form mobile overflow');
@@ -103,26 +108,28 @@ try {
  assert.equal(await page.locator('#sellerAnalysisQueries input[value="protestos"]').count(),0);
  await page.locator('#sellerAnalysisCpf').fill('52998224725');
  await page.locator('#sellerAnalysisFullName').fill('Titular Fictício');
+ await page.locator('#sellerAnalysisUfs input[value="ES"]').check();
  await page.locator('#sellerAnalysisBirthDate').fill('1980-01-01');
  await page.locator('#sellerAnalysisRg').fill('123456789');
  await page.locator('#sellerAnalysisGender').selectOption('Masculino');
- await page.locator('#sellerAnalysisMotherName').fill('Mãe Fictícia');
- await page.locator('#sellerAnalysisUfs input[value="ES"]').check();
  for(const id of ['sellerAnalysisPaid','sellerAnalysisAuthorization'])await page.locator('#'+id).check();
  await page.getByRole('button',{name:'Emitir certidões selecionadas',exact:true}).click();
+ await page.locator('#sellerAnalysisMotherName').fill('Mãe Fictícia');
+ await page.getByRole('button',{name:'Emitir certidões selecionadas',exact:true}).click();
+ await page.locator('#sellerCollectionDetails > summary').click();
  await page.getByRole('link',{name:'Abrir PDF',exact:true}).waitFor();
  assert.equal(await page.locator('#sellerReviewPanel').count(),0);
- assert.equal(aiCalls,1,'issuance does not call AI');assert.equal(providerCalls,3);
+ assert.equal(aiCalls,2,'issuance does not call AI');assert.equal(providerCalls,4);
  const pdfLink=await page.getByRole('link',{name:'Abrir PDF',exact:true}).getAttribute('href');
  assert.match(await extractPdfText(Buffer.from(await (await fetch(base+pdfLink)).arrayBuffer())),/CERTIDAO FICTICIA/);
  const state=await review.get(lastId,auth);assert.equal(state.status,'not_started');
  const refusal={};await sandbox.handle(`/api/seller-analysis/${lastId}/review`,{method:'POST',body:{consent:true},headers:{'content-type':'application/json',host:new URL(base).host,origin:base}},refusal);assert.equal(refusal.status,409);
  await page.screenshot({path:'output/playwright/certificates-mobile.png',fullPage:true});
- await page.reload();await page.getByRole('link',{name:'Abrir PDF',exact:true}).waitFor();assert.equal(providerCalls,3);assert.equal(aiCalls,1);
+ await page.reload();await page.locator('#sellerCollectionDetails > summary').click();await page.getByRole('link',{name:'Abrir PDF',exact:true}).waitFor();assert.equal(providerCalls,4);assert.equal(aiCalls,2);
  await page.locator('#sellerReviewHistory > summary').click();await page.locator('[data-seller-history]').first().waitFor();assert.equal(await page.locator('[data-seller-history]').count(),1);
  await page.goto(base+'/#analise-vendedor');await download.waitFor();
  await page.locator('#sellerReviewHistory > summary').click();await page.locator('[data-seller-history]').first().waitFor();assert.equal(await page.locator('[data-seller-history]').count(),1);
- assert.equal(aiCalls,1);assert.equal(providerCalls,3);
+ assert.equal(aiCalls,2);assert.equal(providerCalls,4);
  assert.deepEqual(errors,[]);
  console.log('PASS: desktop/mobile, inputs, collection, automatic AI, progress, partial results, PDF download, reload without queries, return to form; PGlite and fictitious providers.');
 }finally{await browser?.close();await new Promise(resolve=>httpServer?httpServer.close(resolve):resolve());await pg.close();}

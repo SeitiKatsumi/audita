@@ -20,7 +20,7 @@ async function fixture() {
   let review;
   const rows = [
     { tipo:'Protestos', kind:'data', status:'success', details:{valor:'R$ 1.250,00'}, checkedAt:'2026-09-29' },
-    { tipo:'CNDT', kind:'certificate', status:'success', pdfPath:'test.pdf', checkedAt:'2026-09-29' },
+    { tipo:'CNDT', kind:'certificate', status:'success', pdfPath:'test.pdf',subjectDocument:'04252011000110', checkedAt:'2026-09-29' },
     { tipo:'Fiscal estadual', kind:'certificate', status:'failed', checkedAt:'2026-09-29' },
   ];
   const calls=[];
@@ -50,6 +50,8 @@ test('seller collection -> AI -> persisted report -> private PDF; source failure
     assert.equal(state.report.analyzed,2);assert.equal(state.report.gaps,1);assert.equal(state.report.findings.length,1);
     assert.ok(!JSON.stringify(state).includes('test.pdf'));assert.ok(!('checkpoints' in state));
     assert.equal(f.calls.length,2);assert.ok(!f.calls.some(s=>s.buffer),'digital PDFs use text only');
+    assert.equal(f.calls.find(s=>s.title==='CNDT').subject.document,'04252011000110','company evidence is analyzed against its CNPJ');
+    assert.notEqual(f.calls.find(s=>s.title==='Protestos').subject.document,'04252011000110');
     await f.review.start(id,owner,f.request,true);assert.equal(f.calls.length,2,'completed report is cached');
     const restartedModule=await import(`../services/audit.service.mjs?restart=${randomUUID()}`);
     const restoredAudit=restartedModule.createAuditService({getDb:f.options.getDb,getAuthContext:async req=>req?.auth||owner});
@@ -63,8 +65,8 @@ test('seller collection -> AI -> persisted report -> private PDF; source failure
     for(const auth of [{tenantId:2,user:{id:811}},{tenantId:1,user:{id:812}},{unauthorized:true}]){
       await assert.rejects(()=>reloaded.get(id,auth));await assert.rejects(()=>reloaded.pdf(id,auth));await assert.rejects(()=>reloaded.start(id,auth,f.request,true));
     }
-    const buffer=await reloaded.pdf(id,owner);assert.ok((await PDFDocument.load(buffer)).getPageCount()>1);
-    const text=await extractPdfText(buffer);assert.match(text,/R\$ 1\.250,00/);assert.match(text,/Fiscal estadual/);assert.match(text,/não comprova ausência geral/);
+    const buffer=await reloaded.pdf(id,owner);assert.ok((await PDFDocument.load(buffer)).getPageCount()>=1);
+    const text=await extractPdfText(buffer);assert.match(text,/R\$ 1\.250,00/);assert.match(text,/Resumo da análise/);assert.doesNotMatch(text,/Fontes, documentos e lacunas/);
     await mkdir(new URL('../output/pdf/',import.meta.url),{recursive:true});
     await writeFile(new URL('../output/pdf/analise-vendedor-ficticio.pdf',import.meta.url),buffer);
     // Execute the actual HTTP route, including authorization and same-origin checks.
@@ -113,4 +115,12 @@ test('AI grounding, ambiguous identity, file boundaries, strict JSON and refusal
   response.status='incomplete';await assert.rejects(()=>ai.read({text:'teste'},owner));
   response.status='completed';response.output_text='{}';await assert.rejects(()=>ai.read({text:'teste'},owner));
   assert.equal(createSellerReviewAI({env:{}}).ready(),false);
+  response.output_text=JSON.stringify({paragraphs:[{text:'Há protesto informado; conferir sua situação atual.',sourceIds:['protestos'],quotes:['R$ 1.250,00']}]});
+  const report={subject:{name:'Vendedor Fictício'},sources:[{id:'protestos',title:'Protestos',status:'analyzed',...reading}]};
+  assert.equal((await ai.summarize(report,owner)).length,1);
+  assert.equal(sent.text.format.name,'seller_executive_summary');
+  response.output_text=JSON.stringify({paragraphs:[{text:'Afirmação sem evidência.',sourceIds:['protestos'],quotes:['R$ 9.999,00']}]});
+  await assert.rejects(()=>ai.summarize(report,owner),/ungrounded_summary/);
+  response.output_text=JSON.stringify({paragraphs:[{text:'Afirmação.',sourceIds:['fonte-inexistente'],quotes:['R$ 1.250,00']}]});
+  await assert.rejects(()=>ai.summarize(report,owner),/ungrounded_summary/);
 });

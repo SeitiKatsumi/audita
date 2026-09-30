@@ -59,7 +59,7 @@
 .chat-subscription-rules p { margin: 8px 0; }
 .chat-subscription-rules strong { color: var(--text, #edf8ff); }
 .chat-subscription-plan button { margin-top: auto; width: 100%; overflow-wrap: anywhere; }
-.chat-subscription-plan.is-recommended button:not(:disabled), .chat-document-dialog [data-analyze]:not(:disabled) { background: #116b61; color: white; border-color: #116b61; }
+.chat-subscription-plan.is-recommended button:not(:disabled), .chat-document-dialog [data-analyze]:not(:disabled), [data-test-access]:not(:disabled) { background: #116b61; color: white; border-color: #116b61; }
 .chat-subscription-dialog footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .chat-subscription-dialog [hidden] { display: none; }
 .chat-document-dialog { width: min(540px, calc(100% - 32px)); }
