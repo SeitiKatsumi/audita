@@ -2,6 +2,22 @@
 
 ## Acesso comercial individual
 
+Jurisprudencias do card de cobrancas: `/api/jurisprudence` exige sessao e plano
+pago vigente (incluindo Experimente/Standard legado) ou liberacao individual ja
+autorizada. Cotas esgotadas nao bloqueiam a leitura; bypass gratuito de chat nao
+concede acesso. Listagem e cada download revalidam o acesso. Acervo original
+DOCX por UF e XLSX geral em `storage/jurisprudence` (ou AUDITA_JURISPRUDENCE_DIR),
+fora das rotas estaticas e do Git; nomes fixos, tamanho limitado e sem symlinks.
+Importacao: `python scripts/import-jurisprudence.py arquivo.zip storage/jurisprudence`;
+preserva bytes e inventario SHA256; gera indices JSON privados para leitura no app.
+`view=read` exige o mesmo acesso pago, sem expor caminhos; texto e tabelas sao
+renderizados com textContent, sem executar HTML, scripts ou links dos documentos.
+Registros mantem linha de origem e valores ausentes; relatorio separado nao e
+associado a um processo por inferencia. Reiniciar o servidor apos importar. Persistir
+essa pasta em volume privado ao publicar; arquivos locais nao seguem no deploy.
+Sem pasta local, usa o Directus privado existente, sem IDs/token expostos.
+O kit avulso conserva suas regras. Relatorios fornecidos nao sao validacao juridica.
+
 `AUDITA_UNLIMITED_ACCESS_EMAILS` aceita e-mails exatos separados por virgula,
 somente na configuracao privada do servidor. A comparacao usa a identidade
 autenticada, nunca dados enviados no corpo da requisicao. A excecao remove cotas
