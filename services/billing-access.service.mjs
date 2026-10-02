@@ -1,3 +1,5 @@
+import { hasUnlimitedAccess } from './complimentary-access.mjs';
+
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
 
 function text(value, fallback = "") {
@@ -70,6 +72,7 @@ export function createBillingAccessService({
   }
 
   async function getEntitlement(authContext, subscription = null) {
+    if (hasUnlimitedAccess(authContext)) return { entitled: true, source: 'complimentary', unlimited: true, planId: 'standard', interval: '', annualItauLegalSupport: false, expiresAt: null };
     const subscriptionActive = subscriptionIsActive(subscription, {
       demoMode: Boolean(isDemoModeEnabled()),
       now: now(),

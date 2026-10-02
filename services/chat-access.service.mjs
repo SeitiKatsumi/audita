@@ -1,4 +1,5 @@
 import { CHAT_PLANS } from './billing-catalog.service.mjs';
+import { hasUnlimitedAccess } from './complimentary-access.mjs';
 
 const LIMITS = Object.freeze(Object.fromEntries(CHAT_PLANS.map(({ id, messages, pages }) =>
   [id, Object.freeze({ messages, pages })])));
@@ -74,6 +75,9 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
     return used;
   }
   async function access(db, ids, auth) {
+    if (hasUnlimitedAccess(auth)) {
+      return { allowed: true, active: true, source: 'complimentary', unlimited: true, planId: null, limits: null, used: null, remaining: null };
+    }
     if (testBypassEnabled === true && testOwners.has(ids.join(':'))) {
       return { allowed: true, active: true, source: 'test', planId: null, limits: null, used: null, remaining: null };
     }

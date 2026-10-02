@@ -1,5 +1,17 @@
 # Seguranca
 
+## Acesso comercial individual
+
+`AUDITA_UNLIMITED_ACCESS_EMAILS` aceita e-mails exatos separados por virgula,
+somente na configuracao privada do servidor. A comparacao usa a identidade
+autenticada, nunca dados enviados no corpo da requisicao. A excecao remove cotas
+de mensagens/paginas e debitos de creditos da Central; libera analise e kit Itau.
+Nao concede papel administrativo, acesso a outros clientes, dispensa de revisao
+profissional ou alteracao de contratos/honorarios. Limites tecnicos por envio e
+registros de uso permanecem. Remover o e-mail e reiniciar revoga a excecao.
+Sem migracao, assinatura Stripe ficticia ou concessao global. Excecao sem prazo,
+persistente entre reinicios; configurar apenas apos autorizacao do responsavel.
+
 ## Principios
 
 - Menor privilegio.

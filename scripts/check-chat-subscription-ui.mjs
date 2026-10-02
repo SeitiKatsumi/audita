@@ -386,6 +386,23 @@ try {
   assert.equal(await modal.locator('[data-test-access]').isDisabled(), true);
   assert.match(await modal.locator('[data-access]').textContent(), /Acesso de teste liberado/);
   assert.equal(await page.evaluate(() => window.sent), 0, 'grant does not send a message');
+  access = {active:true,source:'complimentary',unlimited:true,remaining:null,limits:null};
+  await page.evaluate(() => window.chat.refresh());
+  assert.equal(await page.evaluate(() => window.chat.ensureAccess('messages')), true);
+  assert.equal(await page.evaluate(() => window.chat.ensureAccess('pages')), true);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({width,height:900});
+    await page.evaluate(() => window.chat.open());
+    assert.match(await modal.locator('[data-access]').textContent(), /Acesso ilimitado liberado/);
+    assert.equal(await modal.locator('[data-test-access]').isVisible(), false);
+    assert.equal(await choose('professional').isDisabled(), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({path:join(output,`complimentary-${width}.png`)});
+    await close();
+  }
+  await prepare();
+  assert.equal(await docModal.locator('[data-analyze]').isDisabled(), false);
+  await page.keyboard.press('Escape');
   assert.deepEqual(errors, []);
   console.log(`Chat subscription checks passed: gates, login resume, catalog, server-only access, drafts, documents, retries, keyboard, desktop/mobile. Screenshots: ${output}`);
 } finally { await browser.close(); }

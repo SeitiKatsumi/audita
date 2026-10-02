@@ -81,6 +81,14 @@ async function fixture(t) {
   return {pg,pool,state,options,service:createChatDocumentsService(options)};
 }
 
+test('complimentary access can prepare documents without a page balance, retaining file limits', async t => {
+  const {options} = await fixture(t);
+  options.accessService.getAccess = async () => ({allowed:true,unlimited:true,source:'complimentary',remaining:null});
+  const service = createChatDocumentsService(options);
+  assert.equal((await service.prepare(auth, await pdf(2))).pages, 2);
+  await assert.rejects(service.prepare(auth, await pdf(21)));
+});
+
 test('prepare counts the entire PDF without AI or quota consumption; encrypts private metadata and bytes',async t => {
   const {service,pg,state} = await fixture(t);
   const input = await pdf(20);
