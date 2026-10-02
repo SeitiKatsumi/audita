@@ -1,3 +1,6 @@
+import { readFile, realpath, stat } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+
 const UFS = new Set([
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
@@ -15,6 +18,91 @@ export class DirectusLawyerKitError extends Error {
     this.code = code;
     this.statusCode = statusCode;
   }
+}
+
+// Subscriber access is independent of the separately purchased lawyer kit.
+export function createSubscriberJurisprudenceService({ accessService, documents }) {
+  return async function read(auth, { uf = '', order = '', view = '' } = {}) {
+    if (auth?.unauthorized || !auth?.user?.id || !auth?.tenantId) {
+      throw new DirectusLawyerKitError('authentication_required', 401);
+    }
+    const access = await accessService.getAccess(auth, { includeTestAccess: false });
+    if (!access.allowed) throw new DirectusLawyerKitError('subscription_required', 403);
+    if (!['', 'read'].includes(view) || (view && (!uf || order))) {
+      throw new DirectusLawyerKitError('invalid_jurisprudence_selection', 400);
+    }
+    if (!uf && !order) return { states: documents.listStates ? await documents.listStates() : [...UFS] };
+    const state = normalizeLawyerKitUf(uf);
+    if (!state || !['', '1', '2'].includes(order)) {
+      throw new DirectusLawyerKitError('invalid_jurisprudence_selection', 400);
+    }
+    if (view === 'read') {
+      if (!documents.readContent) throw new DirectusLawyerKitError('jurisprudence_reader_unavailable');
+      return documents.readContent(state);
+    }
+    const result = await documents.listJurisprudence(state);
+    if (order) {
+      const file = result.files.find(file => String(file.order) === order);
+      if (!file) throw new DirectusLawyerKitError('jurisprudence_not_found', 404);
+      return { fileName: file.fileName, contentType: file.contentType || 'application/pdf', bytes: await documents.download(file.id) };
+    }
+    return { uf: state, files: result.files.map(file => ({ title: file.title, fileName: file.fileName,
+      format: file.format || 'PDF',
+      downloadUrl: `/api/jurisprudence?uf=${state}&order=${file.order}` })) };
+  };
+}
+
+// Original reports stay outside the public static surface; access is checked by read().
+export function createLocalJurisprudenceService(directory) {
+  const root = resolve(directory);
+  async function pathFor(fileName) {
+    if (!/^jurisprudencia-(?:[a-z]{2}\.(?:docx|json)|base-geral\.xlsx)$/.test(fileName)) {
+      throw new DirectusLawyerKitError('invalid_jurisprudence_file', 400);
+    }
+    const path = join(root, fileName);
+    try {
+      if (await realpath(path) !== join(await realpath(root), fileName)) throw new Error('symlink');
+      const info = await stat(path);
+      if (!info.isFile() || info.size > 10_000_000) throw new Error('invalid file');
+      return path;
+    } catch { throw new DirectusLawyerKitError('jurisprudence_file_unavailable'); }
+  }
+  async function listStates() {
+    const states = [];
+    for (const uf of UFS) {
+      try { await pathFor(`jurisprudencia-${uf.toLowerCase()}.docx`); states.push(uf); }
+      catch { /* Missing states are not advertised. */ }
+    }
+    if (!states.length) throw new DirectusLawyerKitError('jurisprudence_unavailable');
+    return states;
+  }
+  async function listJurisprudence(value) {
+    const uf = normalizeLawyerKitUf(value);
+    if (!uf) throw new DirectusLawyerKitError('invalid_lawyer_kit_uf', 400);
+    const files = [
+      { order: 1, fileName: `jurisprudencia-${uf.toLowerCase()}.docx`, title: `Relatório ${uf}`, format: 'Word (DOCX)', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
+      { order: 2, fileName: 'jurisprudencia-base-geral.xlsx', title: 'Base geral — todos os estados', format: 'Excel (XLSX)', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+    ];
+    for (const file of files) await pathFor(file.fileName);
+    return { uf, files: files.map(file => ({ ...file, id: file.fileName })) };
+  }
+  async function download(fileName) {
+    const bytes = await readFile(await pathFor(fileName));
+    if (!bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 3, 4]))) {
+      throw new DirectusLawyerKitError('jurisprudence_invalid_document');
+    }
+    return bytes;
+  }
+  async function readContent(value) {
+    const uf = normalizeLawyerKitUf(value);
+    if (!uf) throw new DirectusLawyerKitError('invalid_lawyer_kit_uf', 400);
+    try {
+      const data = JSON.parse(await readFile(await pathFor(`jurisprudencia-${uf.toLowerCase()}.json`), 'utf8'));
+      if (data.version !== 1 || data.uf !== uf || !Array.isArray(data.records) || !Array.isArray(data.report)) throw new Error('invalid index');
+      return data;
+    } catch { throw new DirectusLawyerKitError('jurisprudence_reader_unavailable'); }
+  }
+  return { listStates, listJurisprudence, download, readContent };
 }
 
 export function createDirectusLawyerKitService({

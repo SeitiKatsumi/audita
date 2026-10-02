@@ -68,11 +68,13 @@ test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/tria
   assert.equal(access.allowed, true);
   assert.equal(access.remaining, null);
   assert.equal(access.trialUsed, false);
+  assert.equal((await s.getAccess(auth, { includeTestAccess: false })).allowed, false, 'free test access must not unlock subscriber documents');
   assert.equal((await s.enableTestAccess(auth)).source, 'test');
   assert.equal((await s.getAccess(other)).allowed, false);
   assert.equal((await s.getAccess({ tenantId: '1', user: { id: '3' } })).allowed, false);
   assert.equal((await make().getAccess(auth)).allowed, false, 'restart requires a fresh test grant');
   await s.grantPaidAccess(invoice());
+  assert.equal((await s.getAccess(auth, { includeTestAccess: false })).source, 'entitlement', 'a test grant must not hide a valid paid plan');
   for (const [kind, quantity] of [['messages', 1], ['pages', 30]]) {
     const reservation = await s.reserve(auth, { requestId: `test-${kind}`, kind, quantity });
     assert.equal(reservation.entitlementId, null);

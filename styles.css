@@ -8810,6 +8810,23 @@ dialog.login-screen[open]::backdrop { animation: login-backdrop-enter 220ms ease
   margin-top: 10px;
 }
 
+#jurisprudenceUf, #jurisprudenceSearch { display: block; width: 100%; min-height: 44px; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--bg-elevated); font: inherit; }
+#jurisprudenceDialog[open] { display: flex; flex-direction: column; overflow: hidden; width: min(980px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
+#jurisprudenceDialog .charge-faq-header { flex-shrink: 0; }
+#jurisprudenceDialog .ir-diseases-content { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+.jurisprudence-filters { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; }
+.jurisprudence-record, .jurisprudence-report { border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 12px 0; }
+.jurisprudence-record summary, .jurisprudence-report summary { cursor: pointer; min-height: 28px; color: var(--text); }
+.jurisprudence-record summary span { display: block; margin-top: 4px; color: var(--muted); }
+.jurisprudence-record p, .jurisprudence-report p { white-space: pre-wrap; }
+.jurisprudence-table { max-width: 100%; overflow-x: auto; margin: 16px 0; }
+.jurisprudence-table table { border-collapse: collapse; min-width: 600px; }
+.jurisprudence-table th, .jurisprudence-table td { border: 1px solid var(--line); padding: 10px; text-align: left; vertical-align: top; white-space: pre-wrap; }
+@media (max-width: 600px) {
+  .jurisprudence-filters { grid-template-columns: 1fr; gap: 10px; }
+  #jurisprudenceDialog .ir-diseases-content { padding: 0 16px 16px; }
+}
+
 .charge-faq-shell {
   display: grid;
   max-height: min(820px, calc(100vh - 32px));

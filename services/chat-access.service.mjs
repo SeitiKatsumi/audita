@@ -74,11 +74,11 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
     for (const row of rows) used[row.kind] = Number(row.total);
     return used;
   }
-  async function access(db, ids, auth) {
+  async function access(db, ids, auth, includeTestAccess = true) {
     if (hasUnlimitedAccess(auth)) {
       return { allowed: true, active: true, source: 'complimentary', unlimited: true, planId: null, limits: null, used: null, remaining: null };
     }
-    if (testBypassEnabled === true && testOwners.has(ids.join(':'))) {
+    if (includeTestAccess && testBypassEnabled === true && testOwners.has(ids.join(':'))) {
       return { allowed: true, active: true, source: 'test', planId: null, limits: null, used: null, remaining: null };
     }
     const row = await current(db, ids);
@@ -128,9 +128,9 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
     identifier(input.paymentId);
     return transaction(ids, (db, account) => insertGrant(db, ids, account, input));
   }
-  async function getAccess(auth) {
+  async function getAccess(auth, { includeTestAccess = true } = {}) {
     const ids = signed(auth);
-    return transaction(ids, async (db, account) => ({ ...await access(db, ids, auth),
+    return transaction(ids, async (db, account) => ({ ...await access(db, ids, auth, includeTestAccess),
       testBypassAvailable: testBypassEnabled === true,
       trialUsed: account.trial_used, trialAvailable: !account.trial_used }));
   }
