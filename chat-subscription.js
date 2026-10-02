@@ -60,7 +60,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   }
   function allowed(kind = "messages") {
     return Boolean(owner && owner === userId() && loaded && access?.active === true &&
-      (Number(access.remaining?.[kind]) > 0 || ((access.legacy === true || access.test === true) && access.remaining?.[kind] == null)));
+      (Number(access.remaining?.[kind]) > 0 || ((access.legacy === true || access.test === true || access.unlimited === true) && access.remaining?.[kind] == null)));
   }
   async function request(url, body) {
     const response = await fetch(url, { method: body === undefined ? "GET" : "POST", credentials: "same-origin",
@@ -86,6 +86,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     if (!owner) return "Escolha um plano para conversar e analisar documentos.";
     if (!loaded) return "Consultando acesso...";
     if (!access?.active) return "Nenhum plano de chat ativo.";
+    if (access.unlimited) return "Acesso ilimitado liberado · sem vencimento e sem cobrança de cotas.";
     if (access.test) return "Acesso de teste liberado · sem cobrança do plano.";
     const plan = PLANS.find(item => item.id === access.planId);
     const remaining = access.remaining;
@@ -120,10 +121,10 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       ? loaded ? "Pagamentos indispon\u00edveis: n\u00e3o foi poss\u00edvel verificar a configura\u00e7\u00e3o deste ambiente." : "Consultando disponibilidade dos pagamentos."
       : `${catalog.billing?.demoMode || catalog.billing?.mode === "test" ? "Ambiente de testes: sem cobran\u00e7a real. " : ""}${!PLANS.some(plan => available(plan.id)) ? "Pagamentos indispon\u00edveis neste ambiente: a configura\u00e7\u00e3o de cobran\u00e7a n\u00e3o est\u00e1 habilitada. Nenhuma compra pode ser conclu\u00edda." : ""}`;
     const testButton = dialog.querySelector('[data-test-access]');
-    testButton.hidden = !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable);
+    testButton.hidden = access?.unlimited || !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable);
     testButton.disabled = busy || Boolean(loading) || access?.test === true;
     testButton.textContent = access?.test ? 'Acesso de teste liberado' : 'Liberar acesso de teste (sem cobrança)';
-    manage.hidden = !(owner && (access?.active && !access.legacy && !access.test || billing?.canManage && billing?.subscription?.provider === "stripe"));
+    manage.hidden = !(owner && (access?.active && !access.legacy && !access.test && !access.unlimited || billing?.canManage && billing?.subscription?.provider === "stripe"));
     manage.disabled = busy;
     const legacy = billing?.subscription?.planId === "standard" ? billing.subscription : null;
     const legacyPlan = catalog?.plans?.find(plan => plan.id === "standard");
@@ -139,7 +140,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       const price = priceFor(plan.id);
       const cents = Number.isFinite(price?.cents) && price.cents > 0 ? price.cents : plan.cents;
       const current = access?.active && access.planId === plan.id;
-      const disabled = busy || !available(plan.id) || current || (experiment && access?.trialUsed);
+      const disabled = busy || access?.unlimited || !available(plan.id) || current || (experiment && access?.trialUsed);
       return `<article class="chat-subscription-plan${recommended ? " is-recommended" : ""}">
         <span class="chat-subscription-badge">${recommended ? "Recomendado" : current ? "Plano atual" : "&nbsp;"}</span>
         <h3>${plan.name}</h3><p class="chat-subscription-price"><strong>${escape(money(cents))}</strong><span>${experiment ? " / 30 dias" : " / m\u00eas"}</span></p>
@@ -365,12 +366,12 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       if (!prepared?.id || !Number.isInteger(prepared.pages) || prepared.pages <= 0) throw new Error("Contagem de p\u00e1ginas indispon\u00edvel. Nenhuma an\u00e1lise foi solicitada.");
       analysisRequestId = crypto.randomUUID();
       documentDialog.querySelector("[data-document-name]").textContent = file.name;
-      documentDialog.querySelector("[data-document-pages]").textContent = access.test
+      documentDialog.querySelector("[data-document-pages]").textContent = access.unlimited ? `${prepared.pages} unidade(s) de leitura. Acesso ilimitado, sem desconto de cotas.` : access.test
         ? `${prepared.pages} unidade(s) de processamento · acesso de teste, sem desconto de saldo.`
         : /\.(pdf|png|jpe?g)$/i.test(file.name)
         ? `${prepared.pages} página(s) serão descontadas do saldo ao analisar. Saldo atual: ${access.remaining?.pages ?? "-"}.`
         : `Este arquivo usa 1 unidade do saldo de páginas para processamento, sem representar a quantidade de páginas ou abas. Saldo atual: ${access.remaining?.pages ?? "-"}.`;
-      const insufficient = !((access.legacy || access.test) && access.remaining?.pages == null) && prepared.pages > Number(access.remaining?.pages ?? 0);
+      const insufficient = !((access.legacy || access.test || access.unlimited) && access.remaining?.pages == null) && prepared.pages > Number(access.remaining?.pages ?? 0);
       documentDialog.querySelector("[data-document-error]").textContent = insufficient ? "Saldo de p\u00e1ginas insuficiente para este documento." : "";
       documentDialog.querySelector("[data-analyze]").disabled = insufficient;
       documentDialog.querySelector("[data-analyze]").textContent = "Analisar documento";

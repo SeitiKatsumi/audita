@@ -1,3 +1,5 @@
+import { hasUnlimitedAccess } from './complimentary-access.mjs';
+
 const memoryWallets = new Map();
 const memoryLedger = new Map();
 
@@ -26,6 +28,7 @@ function publicWallet(wallet, enabled = creditsEnabled()) {
 
 export function createCreditsService({ getDb } = {}) {
   async function getWallet(authContext) {
+    if (hasUnlimitedAccess(authContext)) return { ...publicWallet(null, false), unlimited: true };
     const enabled = creditsEnabled();
     const initialBalance = integerEnv("AUDITA_INITIAL_CREDITS", 0);
     if (!enabled) {
@@ -59,6 +62,7 @@ export function createCreditsService({ getDb } = {}) {
 
   async function consume(authContext, { amount, referenceId, operation, metadata = {} }) {
     const cost = Number(amount);
+    if (hasUnlimitedAccess(authContext)) return { ok: true, state: 'complimentary', wallet: await getWallet(authContext), amount: 0 };
     if (!creditsEnabled() || !Number.isInteger(cost) || cost <= 0) {
       return { ok: true, state: "not_charged", wallet: await getWallet(authContext), amount: Math.max(0, cost || 0) };
     }

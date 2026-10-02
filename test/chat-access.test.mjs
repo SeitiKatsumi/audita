@@ -36,6 +36,25 @@ async function fixture(t, options = {}) {
     setTime: value => { clock = value; } };
 }
 
+test('permanent complimentary access survives restart, overrides exhausted quotas and remains user scoped', async t => {
+  const previous = process.env.AUDITA_UNLIMITED_ACCESS_EMAILS;
+  process.env.AUDITA_UNLIMITED_ACCESS_EMAILS = 'approved@example.test';
+  t.after(() => { if (previous === undefined) delete process.env.AUDITA_UNLIMITED_ACCESS_EMAILS; else process.env.AUDITA_UNLIMITED_ACCESS_EMAILS = previous; });
+  const approved = { ...auth, user: { ...auth.user, email: 'approved@example.test', role: 'member' } };
+  const { service, make, pg } = await fixture(t);
+  await service.grantPaidAccess(invoice());
+  await pg.query("INSERT INTO audita_chat_reservations(tenant_id,user_id,request_id,entitlement_id,kind,quantity,status) VALUES(1,1,'exhausted',1,'messages',100,'completed')");
+  assert.equal((await service.getAccess(approved)).unlimited, true);
+  assert.equal((await make().getAccess(approved)).source, 'complimentary');
+  const reserved = await service.reserve(approved, {requestId:'complimentary',kind:'pages',quantity:200});
+  assert.equal(reserved.entitlementId, null);
+  await service.complete(approved, {requestId:'complimentary'});
+  await assert.rejects(service.reserve(other, {requestId:'other',kind:'messages'}), {code:'chat_access_required'});
+  await assert.rejects(service.reserve(approved, {requestId:'oversize',kind:'pages',quantity:201}), {code:'chat_invalid_quantity'});
+  delete process.env.AUDITA_UNLIMITED_ACCESS_EMAILS;
+  assert.equal((await make().getAccess(approved)).remaining.messages, 0);
+});
+
 test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/trial unchanged', async t => {
   const { service: s, pg, make } = await fixture(t, { testBypassEnabled: true });
   const disabled = await fixture(t);

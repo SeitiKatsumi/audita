@@ -106,7 +106,7 @@ export function createChatDocumentsService({getDb, env = process.env, accessServ
     const pool = db();
     const quota = await accessService.getAccess(auth);
     check(quota.allowed === true, 'chat_access_required', 'Escolha um plano para enviar documentos.', 403);
-    check(['legacy', 'test'].includes(quota.source) || quota.remaining?.pages > 0, 'chat_quota_exceeded', 'Saldo de paginas esgotado.', 429);
+    check(quota.unlimited === true || ['legacy', 'test'].includes(quota.source) || quota.remaining?.pages > 0, 'chat_quota_exceeded', 'Saldo de paginas esgotado.', 429);
     check(typeof fileName === 'string' && fileName.trim() && fileName.length <= 180 && !/[\\/\x00-\x1f\x7f]/.test(fileName), 'invalid_file', 'Nome de arquivo invalido.');
     const {mime,pages} = await inspect(buffer,mimeType,fileName);
     const id = randomUUID();
