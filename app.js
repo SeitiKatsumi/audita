@@ -9730,4 +9730,4 @@ const chatSubscription = initChatSubscription({
 });
 document.querySelector("#chatSubscriptionButton")?.addEventListener("click", () => chatSubscription.open());
 generalChat = initGeneralChat({getLegacyThreads:()=>chatState.threads,getAuthState:()=>currentAuthState,subscription:chatSubscription,requestLogin:(message,resume)=>{pendingGuestAction=resume;showLogin(message);}});
-initServicesCatalog();
+initServicesCatalog(undefined, { openPlans: () => chatSubscription.open() });

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20260930-seller-steps" />
+    <link rel="stylesheet" href="styles.css?v=20261002-jurisprudence" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -332,6 +332,9 @@
                       <span class="service-detail"><b>Para quem é</b><span>Clientes que têm ou já tiveram conta, cartão Itaú, Itaucard ou cartão de marca parceira e querem entender cobranças que não reconhecem.</span></span>
                       <a class="service-action" href="?bandeiras=1#analise-cobrancas">Confira as 133 bandeiras no chat<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                       <span class="service-detail"><b>Como podemos ajudar</b><span>Orientamos a obtenção dos documentos e analisamos extratos e faturas para identificar cobranças que mereçam conferência e organizar os próximos passos.</span></span>
+                      <span class="service-detail"><b>Jurisprudências sobre cobranças bancárias</b><span>Conheça decisões judiciais sobre cobranças do banco e entenda como casos semelhantes foram analisados. Consulte os documentos disponíveis por estado. Acesso exclusivo para quem tem um plano ativo; decisões anteriores não garantem o resultado do seu caso.</span></span>
+                      <button class="secondary-action" type="button" data-jurisprudence-open aria-haspopup="dialog">Consultar jurisprudências</button>
+                      <span data-jurisprudence-notice role="status"></span>
                       <small class="service-note">Uma cobrança identificada não comprova irregularidade. A conclusão depende dos documentos e da análise do caso.</small>
                       <a class="service-action" href="#analise-cobrancas">Analisar minhas cobranças<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                     </div>
@@ -524,6 +527,23 @@
           </div>
           <div class="services-empty" data-service-empty hidden><h3>Nenhum serviço encontrado</h3><p>Tente outro termo ou escolha uma categoria diferente.</p><button class="secondary-action" type="button" data-service-clear>Limpar busca e filtros</button></div>
         </section>
+
+        <dialog class="charge-faq-dialog ir-diseases-dialog" id="jurisprudenceDialog" aria-labelledby="jurisprudenceTitle">
+          <header class="charge-faq-header">
+            <h2 id="jurisprudenceTitle">Jurisprudências sobre cobranças bancárias</h2>
+            <form method="dialog"><button class="charge-faq-close" aria-label="Fechar jurisprudências"><span aria-hidden="true">&times;</span></button></form>
+          </header>
+          <div class="ir-diseases-content">
+            <p>Leia os registros e relatórios aqui na Audita. O acervo reúne resumos fornecidos; não substitui a consulta aos autos. Decisões anteriores não garantem o resultado de outros casos.</p>
+            <div class="jurisprudence-filters">
+              <label for="jurisprudenceUf">Estado<select id="jurisprudenceUf"><option value="">Selecione um estado</option></select></label>
+              <label for="jurisprudenceSearch">Pesquisar neste estado<input type="search" id="jurisprudenceSearch" placeholder="Processo, banco ou assunto" maxlength="200" disabled></label>
+            </div>
+            <p data-jurisprudence-status role="status" aria-live="polite"></p>
+            <div data-jurisprudence-report></div>
+            <div data-jurisprudence-records></div>
+          </div>
+        </dialog>
 
         <dialog class="charge-faq-dialog ir-diseases-dialog" id="irDiseasesDialog" aria-labelledby="irDiseasesTitle" aria-describedby="irDiseasesNotice">
           <header class="charge-faq-header">
@@ -2158,7 +2178,7 @@
     <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20260930-seller-steps"></script>
+    <script type="module" src="app.js?v=20261002-jurisprudence"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

@@ -58,6 +58,8 @@ import { createDirectDataCourtService } from "./services/direct-data-court.servi
 import { createDirectDataCertificatesService } from "./services/direct-data-certificates.service.mjs";
 import {
   createDirectusLawyerKitService,
+  createLocalJurisprudenceService,
+  createSubscriberJurisprudenceService,
   DirectusLawyerKitError,
 } from "./services/directus-lawyer-kit.service.mjs";
 import {
@@ -1806,6 +1808,9 @@ const importHandler=createImportHandler({service:importService,getAuth:getTenant
 const pisPasepService=createPisPasepService({getDb:()=>({pool,dbReady})});
 const pisPasepHandler=createPisPasepHandler({service:pisPasepService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
 const directusLawyerKitService = createDirectusLawyerKitService();
+const jurisprudenceDirectory = process.env.AUDITA_JURISPRUDENCE_DIR || join(root, 'storage', 'jurisprudence');
+const subscriberJurisprudenceDocuments = existsSync(jurisprudenceDirectory)
+  ? createLocalJurisprudenceService(jurisprudenceDirectory) : directusLawyerKitService;
 const billingAdminService = createBillingAdminService({
   getDb: () => ({ pool, dbReady }),
   accessService: billingAccessService,
@@ -3399,6 +3404,24 @@ async function handleApi(request, response, pathname) {
             ? error.message
             : "Nao foi possivel iniciar o checkout.",
       });
+    }
+    return true;
+  }
+
+  if (pathname === "/api/jurisprudence" && request.method === "GET") {
+    try {
+      const auth = await getTenantIdForRequest(request);
+      const params = new URL(request.url, 'http://localhost').searchParams;
+      const read = createSubscriberJurisprudenceService({ accessService: chatAccessService, documents: subscriberJurisprudenceDocuments });
+      const result = await read(auth, { uf: params.get('uf') || '', order: params.get('order') || '', view: params.get('view') || '' });
+      response.setHeader('cache-control', 'private, no-store');
+      if (result.bytes) {
+        response.writeHead(200, { 'content-type': result.contentType, 'content-length': result.bytes.length,
+          'content-disposition': `attachment; filename="${result.fileName}"`, 'x-content-type-options': 'nosniff' });
+        response.end(result.bytes);
+      } else sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, error.statusCode || 503, { error: error.code || 'jurisprudence_unavailable' });
     }
     return true;
   }

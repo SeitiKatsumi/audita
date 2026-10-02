@@ -1,7 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {matchesService, initServicesCatalog} from '../services-catalog.js';
+import {matchesService, initServicesCatalog, filterJurisprudence} from '../services-catalog.js';
+
+test('jurisprudence reader searches original fields and renders within the app, without downloads', async () => {
+ const records = [{ process: '001-22', decision: 'Seguro do Banco Fictício', notes: 'Revisão', amount: 'Não informado' }, { process: '003-44', decision: 'Tarifa', outcome: 'Desfavorável' }];
+ assert.deepEqual(filterJurisprudence(records, 'BANCO revisao'), [records[0]]);
+ assert.deepEqual(filterJurisprudence(records, '003-44'), [records[1]]);
+ assert.equal(filterJurisprudence(records, 'ausente').length, 0);
+ assert.equal(filterJurisprudence(records, '').length, 2);
+ const script = await readFile(new URL('../services-catalog.js', import.meta.url), 'utf8');
+ assert.match(script, /view=read/);
+ assert.match(script, /node.textContent = text/);
+ assert.doesNotMatch(script, /innerHTML|createObjectURL|link.download/);
+});
+
+test('charge card exposes subscriber jurisprudence without inventing a collection size', async () => {
+ const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+ const card = html.slice(html.indexOf('id="services-bancario"'), html.indexOf('href="#dividas-bancarias"'));
+ assert.match(card, /Jurisprudências sobre cobranças bancárias/);
+ assert.match(card, /data-jurisprudence-open aria-haspopup="dialog"/);
+ assert.match(card, /plano ativo/);
+ assert.doesNotMatch(card, /milhares/);
+});
 
 test('property analysis and certificate issuance have separate categories and destinations', async () => {
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
