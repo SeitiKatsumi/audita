@@ -18,6 +18,14 @@ async function document(count){const pdf=await PDFDocument.create();for(let i=0;
 const response=data=>({status:'completed',output_text:JSON.stringify(data)});
 const pageIndex=input=>Number(input.input[1].content[0].text.match(/Página física (\d+)/)[1])-1;
 
+test('usage identifies model, response and failed billed completion',async()=>{
+ const used=[];const extract=createDebtExtractor({env,recordUsage:async usage=>used.push(usage),client:{responses:{create:async()=>({id:'resp_fictional',status:'incomplete',usage:{input_tokens:100,input_tokens_details:{cache_write_tokens:80},output_tokens:20,output_tokens_details:{reasoning_tokens:10}}})}}});
+ await assert.rejects(extract(await document(1),null),{status:422});
+ assert.equal(used.length,1);assert.equal(used[0].model,'gpt-6.1-sol');assert.equal(used[0].referenceId,'resp_fictional');
+ assert.equal(used[0].status,'failed');assert.equal(used[0].metadata.reasoningTokens,10);assert.equal(used[0].inputUnits,100);
+ assert.equal(used[0].metadata.cacheWriteTokens,80);
+});
+
 test('parallel reads stay ordered, cap API concurrency across cases, and reuse cached pages without tokens',async()=>{
  let active=0,maximum=0,calls=0,cache;const progress=[];
  const extract=createDebtExtractor({env,client:{responses:{create:async input=>{
@@ -33,9 +41,10 @@ test('parallel reads stay ordered, cap API concurrency across cases, and reuse c
  assert.deepEqual(result.entries.map(r=>r.page),[1,2,3,4,5,6]);assert.equal(result.closing.balanceCents,-1600);
  assert.deepEqual(progress,[0,1,2,3,4,5,6,6]);
  const reused=await extract(doc,null,{cache});assert.deepEqual(reused,result);assert.equal(calls,12);
- await extract({...doc,sha256:'changed-file'},null,{cache});assert.equal(calls,18);
+ await extract(doc,null,{cache:{...cache,version:'pages-3:gpt-5.4'}});assert.equal(calls,18);
+ await extract({...doc,sha256:'changed-file'},null,{cache});assert.equal(calls,24);
  const differentModel=createDebtExtractor({env:{...env,AUDITA_DEBT_MODEL:'test-model'},client:{responses:{create:async input=>{calls++;return response(page(pageIndex(input)));}}}});
- await differentModel(doc,null,{cache});assert.equal(calls,24);
+ await differentModel(doc,null,{cache});assert.equal(calls,30);
 });
 
 test('a failed page preserves other completed pages and drains requests before retry',async()=>{
@@ -51,13 +60,58 @@ test('a failed page preserves other completed pages and drains requests before r
 });
 
 test('only missing dates are reread with prior-page context, preserving financial rows',async()=>{
- let calls=0;
+ let calls=0;const models=[];
  const extract=createDebtExtractor({env,client:{responses:{create:async input=>{
-  calls++;const i=pageIndex(input),result=page(i),prompt=input.input[1].content[0].text;
+  calls++;models.push([input.model,input.reasoning.effort]);const i=pageIndex(input),result=page(i),prompt=input.input[1].content[0].text;
   if(i===1&&!prompt.includes('Data anterior: 2024-01-01'))result.rows.forEach(r=>{r.date=null;});
+  if(input.text.format.name==='dates')return response({dates:result.rows.map((r,n)=>({line:n+1,date:r.date}))});
   return response(result);
  }}}});
  const result=await extract(await document(2),null);
  assert.equal(calls,3);assert.equal(result.entries.length,2);assert.equal(result.entries[1].date,'2024-01-02');
  assert.equal(result.extractionAudit[0].accepted,true);assert.equal(result.checkpoints.length,0);
+ assert.deepEqual(models,[['gpt-6.1-sol','low'],['gpt-6.1-sol','low'],['gpt-6-luna','low']]);
+});
+
+test('Sol reviews only divergent pages, persists accepted rows and invalidates cache when review model changes',async()=>{
+ let cache;const calls=[],usage=[];
+ const client={responses:{create:async input=>{
+  calls.push([input.model,input.reasoning.effort]);const data=page(0);
+  if(!input.input[1].content[0].text.includes('RELEITURA'))data.rows[1].amountText='2,00-';
+  return {...response(data),id:`response-${calls.length}`};
+ }}};
+ const extract=createDebtExtractor({env,client,recordUsage:async item=>usage.push(item)}),doc=await document(1);
+ const result=await extract(doc,null,{saveCache:async value=>{cache=structuredClone(value);}});
+ assert.equal(result.checkpoints.length,0);assert.equal(result.extractionAudit[0].accepted,true);
+ assert.deepEqual(calls,[['gpt-6.1-sol','low'],['gpt-6.1-sol','low']]);
+ assert.equal(cache.pages[0].rows[1].amountText,'1,00-');assert.equal(usage[1].metadata.review,true);
+ await extract(doc,null,{cache});assert.equal(calls.length,2);
+ const changed=createDebtExtractor({env:{...env,AUDITA_DEBT_REVIEW_MODEL:'gpt-6-sol'},client});
+ await changed(doc,null,{cache});assert.equal(calls.length,4);assert.equal(calls.at(-1)[0],'gpt-6-sol');
+});
+
+test('date-only reviews run at most three together and reject duplicate or unrequested row indices',async()=>{
+ let active=0,maximum=0,bad=false,cache;
+ const extract=createDebtExtractor({env,client:{responses:{create:async input=>{
+  const i=pageIndex(input),data=page(i);
+  if(input.text.format.name!=='dates'){if(i)data.rows[1].date=null;return response(data);}
+  active++;maximum=Math.max(maximum,active);
+  try{await pause(5);return response({dates:bad?[{line:1,date:data.rows[1].date}]:[{line:2,date:data.rows[1].date}]});}finally{active--;}
+ }}}});
+ const doc=await document(7),result=await extract(doc,null);
+ assert.equal(maximum,3);assert.equal(result.entries.length,7);assert.equal(result.checkpoints.length,0);
+ assert.ok(result.extractionAudit.every(a=>a.accepted&&a.originalRows[1].amountText===a.rereadRows[1].amountText));
+ bad=true;await assert.rejects(extract(await document(2),null,{saveCache:async value=>{cache=value;}}),{status:422});
+ assert.equal(cache.pages[1].rows[1].date,null);assert.equal(cache.pages[1].rows[1].amountText,'1,00-');
+});
+
+test('financial rereads overlap without accepting changes out of document order',async()=>{
+ let active=0,maximum=0;const extract=createDebtExtractor({env,client:{responses:{create:async input=>{
+  const i=pageIndex(input),data=page(i);if(!input.input[1].content[0].text.includes('RELEITURA')){data.rows[1].amountText='2,00-';return response(data);}
+  active++;maximum=Math.max(maximum,active);try{await pause(i%2?5:20);return response(data);}finally{active--;}
+ }}}});
+ const result=await extract(await document(7),null);
+ assert.equal(maximum,3);assert.equal(result.checkpoints.length,0);assert.equal(result.extractionAudit.length,7);
+ assert.deepEqual(result.extractionAudit.map(r=>r.page),[1,2,3,4,5,6,7]);assert.ok(result.extractionAudit.every(r=>r.accepted));
+ assert.equal(result.closing.balanceCents,-1700);
 });

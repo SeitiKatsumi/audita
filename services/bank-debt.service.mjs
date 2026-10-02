@@ -24,7 +24,7 @@ export function createBankDebtService({getDb,checkout,paymentRequired=true,rateP
     const snapshot=await tx(async c=>{const r=await access(c,auth,id,true);owner(r,auth);
       debtRequire(input.consent===true,'Autorize a leitura dos documentos.');
       debtRequire(['triage','details','calculation_pending'].includes(r.status)&&r.revision===input.revision,'Atualize antes de analisar.',409);
-      debtRequire(!analyzing.has(id)&&(!r.payload.analysisPending||Date.now()-Date.parse(r.payload.analysisPending)>15*60*1000),'A leitura já está em andamento.',409);
+      debtRequire(!analyzing.has(id)&&(!r.payload.analysisPending||Date.now()-Date.parse(r.payload.analysisProgress?.updatedAt||r.payload.analysisPending)>15*60*1000),'A leitura já está em andamento.',409);
       r.payload.analysisPending=new Date().toISOString();r.payload.analysisProgress={percent:0,completed:0,total:0,stage:'preparing'};r.payload.documentConsent={at:now().toISOString()};r.payload.analysisError=null;await save(c,r,auth,'analysis_started');return view(c,r,auth);});
     // Trabalho externo fora da transação; revisão otimista impede publicar sobre arquivos alterados.
     void command(auth,id,{...input,revision:snapshot.revision}).catch(async()=>{
@@ -140,7 +140,7 @@ export function createBankDebtService({getDb,checkout,paymentRequired=true,rateP
     debtRequire(Buffer.isBuffer(bytes)&&bytes.length>0&&bytes.length<=10*1024*1024,'Envie um arquivo de até 10 MB.');
     const hash=debtHash(bytes);
     if((await c.query('SELECT id FROM audita_debt_documents WHERE case_id=$1 AND kind=$2 AND sha256=$3',[id,kind,hash])).rows.length)return view(c,r,auth);
-    debtRequire(!analyzing.has(id)&&(!r.payload.analysisPending||Date.now()-Date.parse(r.payload.analysisPending)>15*60*1000),'Aguarde a análise terminar antes de enviar novos documentos.',409);
+    debtRequire(!analyzing.has(id)&&(!r.payload.analysisPending||Date.now()-Date.parse(r.payload.analysisProgress?.updatedAt||r.payload.analysisPending)>15*60*1000),'Aguarde a análise terminar antes de enviar novos documentos.',409);
     let mime='';if(bytes.subarray(0,5).toString()==='%PDF-'){try{await PDFDocument.load(bytes);mime='application/pdf';}catch{debtRequire(false,'PDF inválido ou protegido.');}}
     else if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))mime='image/png';
     else if(bytes[0]===255&&bytes[1]===216&&bytes[2]===255)mime='image/jpeg';

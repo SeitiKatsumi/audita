@@ -30,7 +30,8 @@ const sdk={responses:{create:async(payload,options={})=>{
  if(!payload.stream)return {status:'completed',output_text:JSON.stringify({summary:'Documento fictício [p. 1]',pages:[{page:1,text:'Dados de teste',uncertain:false}]})};
  const text=payload.input.at(-1).content.find(p=>p.type==='input_text').text;
  return (async function*(){
-   if(text.includes('demorada')){slowReady?.();await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,5000);options.signal.addEventListener('abort',()=>{clearTimeout(timer);reject(Object.assign(new Error('cancelled'),{name:'AbortError'}));},{once:true});});}
+   if(/web/.test(text))yield {type:'response.web_search_call.searching'};
+   if(text.includes('demorada')){slowReady?.();await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,process.argv.includes('--serve')?20000:5000);options.signal.addEventListener('abort',()=>{clearTimeout(timer);reject(Object.assign(new Error('cancelled'),{name:'AbortError'}));},{once:true});});}
    const output=[];let answer='Resposta fictícia com contexto.';
    if(/PDF|arquivos/.test(text)){
      answer='Arquivos concluídos.\n```html\n'+('x'.repeat(220))+'\n```';
@@ -79,6 +80,11 @@ try{
    }catch(e){errors.push(e.message);if(!res.headersSent)res.writeHead(500);res.end();}
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
+ if(process.argv.includes('--serve')){
+   await fetch(base+'/api/chat/test-access',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
+   console.log('Fictional chat fixture for browser validation: '+base+'/#chat');
+   await new Promise(()=>{});
+ }
  browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'}),page=await context.newPage();
  page.on('pageerror',e=>errors.push(e.message));await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
  await mkdir('output/playwright',{recursive:true});await page.goto(base+'/#chat');
@@ -99,8 +105,14 @@ try{
  assert.equal((await pg.query('SELECT trial_used FROM audita_chat_accounts WHERE user_id=811')).rows[0].trial_used,false);
  assert.ok(!httpCalls.some(p=>p==='/api/billing/checkout'||p==='/api/billing/portal'),'no Stripe call for test access');
  assert.equal(await page.locator('#chatModelMode').count(),0,'model selection stays automatic without a selector');
- const ask=async text=>{await input.fill(text);await send.click();await page.locator('#chatStopButton').waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('#chatStopButton').hidden);};
+ const ask=async text=>{await input.fill(text);await send.click();await page.locator('#chatStopButton').waitFor({state:'visible'});assert.equal(await send.isVisible(),false);await page.waitForFunction(()=>document.querySelector('#chatStopButton').hidden);assert.equal(await send.isVisible(),true);};
  await ask('Olá');assert.equal(captures.at(-1).model,'gpt-6-luna');assert.deepEqual(captures.at(-1).tools,[],'simple text needs no tools');
+ assert.equal(await page.locator('#chatMessages [data-edit],.general-chat-controls').count(),0,'editing and the old toolbar are removed');
+ assert.equal(await page.locator('#chatMessages [data-copy] svg,#chatMessages [data-retry] svg').count(),2,'copy and retry use icons');
+ await context.grantPermissions(['clipboard-read','clipboard-write'],{origin:base});
+ await page.getByRole('button',{name:'Copiar resposta',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'Resposta fictícia com contexto.');await page.getByRole('button',{name:'Resposta copiada',exact:true}).waitFor();
+ const beforeRetry=captures.length;await page.getByRole('button',{name:'Tentar novamente',exact:true}).click();await page.locator('#chatStopButton').waitFor({state:'visible'});await page.waitForFunction(()=>!document.querySelector('#chatSendButton').hidden);assert.equal(captures.length,beforeRetry+1,'retry sends the preceding user message');
+ assert.ok(!/gpt-6/.test(await page.locator('#chatMessages').innerText()),'model names are not displayed');
  await ask('Crie PDF, HTML e CSV com estes dados');await page.locator('.general-chat-artifact').first().waitFor();
  assert.equal(captures.at(-1).model,'gpt-6.1-sol');assert.equal(await page.locator('.general-chat-artifact').count(),3);
  assert.ok(await page.locator('.chat-message-row.assistant .chat-message-content').first().evaluate(n=>n.getBoundingClientRect().width>300),'assistant content uses the full column');
@@ -125,6 +137,9 @@ try{
  slowStarted=new Promise(r=>slowReady=r);await input.fill('Faça outra tarefa demorada');await send.click();await slowStarted;const beforeBackground=captures.length;
  await page.reload();await page.getByText('Resposta fictícia com contexto.',{exact:true}).last().waitFor();
  await page.waitForFunction(()=>!document.querySelector('#chatSendButton').disabled);assert.equal(captures.length,beforeBackground,'reload resumes without duplicating the provider');
+ slowStarted=new Promise(r=>slowReady=r);await input.fill('Use a web em uma tarefa demorada');await send.click();await slowStarted;
+ assert.equal(await page.locator('.general-chat-thinking').innerText(),'Pesquisando fontes na web');assert.equal(await page.locator('.general-chat-thinking').evaluate(n=>getComputedStyle(n).animationName),'none','reduced motion disables shimmer');
+ await page.reload();await page.locator('#chatStopButton').waitFor({state:'visible'});assert.equal(await send.isVisible(),false);await page.locator('#chatStopButton').click();await page.waitForFunction(()=>document.querySelector('#chatStopButton').hidden);
  const threadId=(await(await fetch(base+'/api/chat/threads')).json()).threads[0].id;
  assert.equal((await fetch(base+'/api/chat/threads/'+threadId,{headers:{'x-test-owner':'812'}})).status,404);
  assert.equal((await fetch(base+'/api/chat/threads',{headers:{'x-test-owner':'anonymous'}})).status,401);
@@ -132,6 +147,9 @@ try{
  assert.ok(rows.length>0&&rows.every(r=>r.result.encrypted),'reservation results encrypted');
  await page.setViewportSize({width:390,height:844});await page.reload();await input.waitFor();await page.waitForFunction(()=>!document.querySelector('#chatSendButton').disabled);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'no mobile overflow');await page.screenshot({path:'output/playwright/general-chat-mobile.png',fullPage:true});
+ assert.equal(await page.locator('#chatMessages [data-edit],.general-chat-controls').count(),0);
+ assert.ok(await page.locator('#chatMessages [data-copy] svg,#chatMessages [data-retry] svg').count()>0);
+ assert.ok(!/gpt-6/.test(await page.locator('#chatMessages').innerText()));
  await page.getByRole('button',{name:'Abrir conversas',exact:true}).click();await page.locator('#chatThreads.general-history-open').waitFor();
  await page.locator('[data-general-thread]').first().click();await page.waitForFunction(()=>document.querySelector('#chatHistoryButton').getAttribute('aria-expanded')==='false');
  assert.deepEqual(errors,[]);console.log('PASS: authenticated test bypass, no Stripe/grants/trial purchase; real UI/HTTP/quota/encryption; streaming, modes, documents, downloads/previews, web, image, service links, cancel, reload/background, private history; desktop/mobile.');

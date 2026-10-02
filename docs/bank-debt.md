@@ -8,21 +8,23 @@ A extração valida datas, centavos, sinal, categoria, saldo e referência à p�
 
 ## Extrato insuficiente
 
-O cliente retorna ao envio inicial com aviso quando a leitura falha ou não permite calcular a oferta. Não há pedido de revisão nem espera pela equipe. Novo envio cria outro atendimento, preservando documentos e histórico anteriores. Pedidos antigos de revisão também retornam ao início ao serem abertos pelo proprietário. Com dados suficientes, a oferta mostra os juros extraídos e a contratação; pagamento confirmado libera o laudo de renegociação.
+Quando a leitura falha, a tela informa que os arquivos foram preservados e permite tentar novamente. Quando a leitura termina sem dados suficientes para a oferta, informa a conclusão e mostra "O que falta para continuar", com as pendências. Saldo final zero ou credor não prova quitação: o extrato histórico não substitui a cobrança atual e o demonstrativo da evolução da dívida. Não há pedido de revisão nem espera pela equipe. Novo envio cria outro atendimento, preservando documentos e histórico anteriores. Pedidos antigos de revisão também retornam ao início ao serem abertos pelo proprietário. Com dados suficientes, a oferta mostra os juros extraídos e a contratação.
 
 A análise versão 3 concilia saldo anterior zero com o fechamento impresso do documento anterior apenas quando banco, conta, modalidade, titularidade PF/PJ/MEI e data de fronteira coincidem, não há sobreposição e todos os saldos intermediários e o fechamento do documento seguinte conferem. Registra o saldo original e a origem da conciliação; mantém linhas e auditoria. Não infere o primeiro principal ausente. Aplicações/resgates explicitamente identificados de investimento automático são mantidos como movimentações; outros créditos/transferências e mora continuam exigindo conferência. A diferença inicial é quantificada, sem presumir que seja dívida ou juros. Extratos antigos não são tratados como saldo atual.
 
 A leitura ocorre página a página: a IA transcreve a coluna numérica literal e todos os saldos intermediários; o código converte centavos e classifica depois. O sinal impresso prevalece sobre a descrição da rubrica. Cada página com divergência aritmética recebe uma releitura, aceita somente se reduzir divergências sem aumentar pendências. A análise privada conserva linhas, páginas, saldos e tentativas para conferência. Não inventa saldo inicial nem presume quitação a partir de um crédito. O processamento continua em segundo plano; após reinício do servidor, uma leitura interrompida pode ser repetida depois de 15 minutos, sem retomada automática.
 
-Usa `AUDITA_DEBT_MODEL` (padrão `gpt-5.4`, raciocínio médio), separado do modelo do chat geral. Complementos sem coluna de valor não constituem novos lançamentos. Releituras não podem remover linhas financeiras ou saldos para aparentar reconciliação. Mantém as chaves e o registro de consumo da integração existente; não adiciona dependências.
+Usa `AUDITA_DEBT_MODEL` (padrão `gpt-6.1-sol`, raciocínio baixo) para transcrição e `AUDITA_DEBT_REVIEW_MODEL` (padrão `gpt-6.1-sol`, raciocínio baixo) para releituras de valores. Datas ausentes usam `gpt-6-luna` com resposta restrita a índices e datas; nenhum valor pode ser alterado por essa revisão. Os modelos ficam separados do chat geral; a classificação e os cálculos continuam determinísticos. Complementos sem coluna de valor não constituem novos lançamentos. Releituras não podem remover linhas financeiras ou saldos para aparentar reconciliação. Mantém as chaves e o registro de consumo da integração existente; não adiciona dependências.
+
+A extração `pages-8` vincula o cache aos modelos de transcrição, revisão financeira e datas; uma troca exige nova leitura. Lê folhas lado a lado da esquerda para a direita e preserva os sufixos CR/DV. O primeiro saldo datado antes dos movimentos abre o período mesmo se vier rotulado "SALDO EM"; não cria saldo quando o documento começa com movimentações. Padroniza separadores de agência/conta com dígito verificador sem unir números diferentes. Reconhece encargos do limite de crédito por rubrica; créditos positivos nessa rubrica permanecem créditos, não juros cobrados. Aceita até 20 mil linhas financeiras por documento dentro do limite existente de 100 páginas. Movimentos iguais dentro do mesmo extrato são preservados; suspeitas de sobreposição comparam documentos distintos. O registro de consumo usa o serviço `responses`, unidade `token`, modelo, referência da resposta e tokens de raciocínio; respostas incompletas também registram o consumo devolvido pelo provedor. Não registra texto do extrato nesse registro. A estimativa de custo no painel depende de uma tabela de preços cadastrada para o modelo utilizado; consumo sem preço permanece visível sem inventar custo.
 
 ## Leitura paralela, reaproveitamento e progresso
 
 Até três páginas são lidas simultaneamente por instância do extrator, inclusive
 entre atendimentos concorrentes. A ordem física é preservada na conferência.
-Datas ausentes recebem releitura com contexto da página anterior; só são aceitas
+Datas ausentes recebem releitura que devolve somente índices e datas, sem retranscrever valores. Até três revisões ocorrem em paralelo quando o final da página anterior já tem data; fronteiras dependentes permanecem sequenciais. Só são aceitas
 se os valores, tipos, descrições e datas já conhecidas permanecerem iguais.
-As releituras aritméticas e os bloqueios financeiros continuam ativos.
+Releituras de valores também usam até três chamadas paralelas, com aceitação na ordem do documento. Linhas de transporte de saldo não são movimentações; um débito efetivo com essa descrição permanece preservado. As releituras aritméticas e os bloqueios financeiros continuam ativos. O aviso de leitura interrompida e a liberação de uma nova tentativa consideram 15 minutos sem atualização de progresso, não apenas o tempo total da leitura.
 
 `audita_debt_documents.extraction_cache` guarda páginas concluídas e extração final
 no banco privado, vinculadas ao arquivo (SHA-256), versão da leitura e modelo.
@@ -37,7 +39,7 @@ otimista do atendimento. A UI consulta a cada 3 segundos durante a análise e
 preserva a área de documentos aberta. Até 90% representa páginas lidas; 95% é a
 conferência final/cálculo; 100% só aparece depois de salvar o resultado. A barra
 não avança por tempo decorrido. Não há percentual de aceleração real prometido:
-testes usam respostas sintéticas, sem enviar extratos de clientes ou consumir IA.
+testes automatizados usam respostas sintéticas. Validações reais autorizadas são feitas separadamente, em banco privado e com métricas reais do provedor.
 
 ## Comparação e contratação
 
@@ -130,4 +132,4 @@ A documentação técnica e os testes não substituem a validação da metodolog
 A contratação, negociação e assinatura permitem voltar aos documentos do mesmo atendimento. Um novo extrato antes da contratação preserva os anexos e invalida a oferta para recalcular. Arquivos duplicados mantêm a oferta existente. Análise inconclusiva preserva o atendimento para complementação. Durante pagamento pendente, os anexos ficam somente para consulta; após pagamento, documentos complementares não alteram a oferta contratada.
 
 ### Contratação sem cobrança (16/09/2026)
-O servidor configura paymentRequired=false apenas para dívidas bancárias. A contratação exige oferta válida e aceite e libera a negociação diretamente, com evento contracted_without_payment e paid.method=waived, amountCents=0. Não chama Stripe nem declara pagamento recebido. Sessões Stripe anteriores permanecem protegidas até expiração. Para restabelecer cobrança, configurar paymentRequired=true na criação do serviço. Extração pages-3 preserva saldo explicitamente devedor e reconhece utilização do cheque especial como débito; caches antigos são relidos.
+O servidor configura paymentRequired=false apenas para dívidas bancárias. A contratação exige oferta válida e aceite e libera a negociação diretamente, com evento contracted_without_payment e paid.method=waived, amountCents=0. Não chama Stripe nem declara pagamento recebido. Sessões Stripe anteriores permanecem protegidas até expiração. Para restabelecer cobrança, configurar paymentRequired=true na criação do serviço. Extração pages-4 preserva saldo explicitamente devedor e reconhece utilização do cheque especial como débito; caches antigos são relidos.

@@ -27,6 +27,9 @@ test('extratos preservam atendimento ao complementar e permitem voltar da oferta
  vm.runInContext(`current.analysisProgress={percent:95,completed:10,total:10,stage:'calculating'};render();`,context);
  assert.match(html(),/Conferindo saldos e preparando o resultado/);assert.doesNotMatch(html(),/>100%</);
  const pending=vm.runInContext('JSON.stringify(current)',context);
+ vm.runInContext(`current.analysisPending=null;current.analysis={bank:'Banco teste',closing:{date:'2024-01-31',balanceCents:0},totals:{interestCents:10000,lateCents:0},issues:[{message:'Envie a cobrança atual.'}],rows:[]};render();`,context);
+ assert.match(html(),/A leitura dos extratos foi concluída/);assert.match(html(),/31\/01\/2024/);assert.match(html(),/não foi presumida quitação/);
+ assert.doesNotMatch(html(),/Não foi possível concluir a análise/);
  for(const state of ["analysis={bank:'Banco teste',totals:{interestCents:10000,lateCents:0},issues:[],rows:[]}","manualReview={requestedAt:'2024-01-01'}","analysisError='Falha temporária'"]){
   vm.runInContext(`current=JSON.parse(${JSON.stringify(pending)});current.analysisPending=null;current.${state};render();`,context);
   assert.equal(vm.runInContext('current.id',context),'qa');
@@ -36,6 +39,8 @@ test('extratos preservam atendimento ao complementar e permitem voltar da oferta
  }
  vm.runInContext(`current=JSON.parse(${JSON.stringify(pending)});current.analysisPending=new Date(Date.now()-16*60*1000).toISOString();delete current.documentConsent;render();`,context);
  assert.match(html(),/Tentar novamente/);assert.doesNotMatch(html(),/name="consent"/);assert.match(html(),/Ao solicitar a análise/);assert.doesNotMatch(html(),/type="file"/);
+ vm.runInContext(`current.analysisProgress.updatedAt=new Date().toISOString();render();`,context);
+ assert.doesNotMatch(html(),/Tentar novamente|mais tempo que o esperado/);
  vm.runInContext("current.analysis={totals:{interestCents:10000},assumptions:[],issues:[],rows:[]}",context);
  vm.runInContext(`viewDocuments=false;current.analysisPending=null;current.status='offer';current.analysis.assumptions=[];current.docOffer={id:'offer',priceCents:19900,planName:'Plano de teste',range:{asOf:'2024-01-31',minCents:100000,maxCents:102000,chargedCents:120000,minReductionPercent:15,maxReductionPercent:16}};render();`,context);
  assert.doesNotMatch(html(),/debt-analysis-loader/);assert.match(html(),/Plano de teste/);assert.match(html(),/Juros identificados nos extratos/);assert.match(html(),/100,00/);assert.match(html(),/Contratar e continuar/);assert.doesNotMatch(html(),/type="file"|Enviar complemento/);
