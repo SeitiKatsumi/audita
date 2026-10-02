@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261002-jurisprudence" />
+    <link rel="stylesheet" href="styles.css?v=20261002-chat-controls" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -211,7 +211,6 @@
               </button>
             </section>
             <div class="chat-error hidden" id="chatError" role="alert"></div>
-            <div class="general-chat-controls"><span>Pesquisa, documentos, imagens e arquivos</span><button id="chatStopButton" type="button" hidden>Parar geração</button></div>
             <form class="chat-composer" id="chatForm">
               <div class="chat-attachment-preview hidden" id="chatAttachmentPreview"></div>
               <button
@@ -238,7 +237,8 @@
                 placeholder="Pergunte &agrave; IA AUDITA"
                 aria-label="Mensagem para a IA AUDITA"
               ></textarea>
-              <button class="chat-send-button" id="chatSendButton" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem">&#8593;</button>
+              <button class="chat-send-button" id="chatSendButton" type="submit" aria-label="Enviar mensagem" title="Enviar mensagem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg></button>
+              <button class="chat-send-button chat-stop-button" id="chatStopButton" type="button" aria-label="Parar geração" title="Parar geração" hidden><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
               <small>Até 6 arquivos: PDF, fotos, texto, Word e Excel. Até 12 MB por arquivo e 20 páginas por PDF. Serviços Audita disponíveis pela Central.</small>
             </form>
           </div>
@@ -2178,7 +2178,7 @@
     <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20261002-jurisprudence"></script>
+    <script type="module" src="app.js?v=20261002-chat-controls"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

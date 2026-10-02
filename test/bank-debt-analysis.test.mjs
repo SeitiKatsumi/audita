@@ -9,6 +9,8 @@ test('extratos: calcula faixa, preserva tarifas e bloqueia lacunas, ambiguidades
  const withFee=structuredClone(data);withFee.entries.unshift({date:'2024-01-15',page:1,description:'Tarifa',amountCents:-1000,kind:'fee',ratePercent:null,balanceCents:-101000});withFee.entries[1].balanceCents=-121000;withFee.closing.balanceCents=-121000;assert.ok((await run(withFee)).range.minCents>valid.range.minCents);
  for(const mutate of [d=>d.opening=null,d=>d.entries[0].kind='transfer',d=>d.entries[0].amountCents=-100,d=>d.person='unknown',d=>d.modality='loan',d=>d.issues.push('Página ilegível')]){const d=structuredClone(data);mutate(d);const r=await run(d);assert.equal(r.range,null);assert.ok(r.issues.length);}
  const duplicate=await analyzeStatements([{id:'a',data},{id:'b',data}],{rateProvider});assert.equal(duplicate.range,null);
+ const repeated=structuredClone(data);repeated.entries.unshift(...[1,2].map(()=>({date:'2024-01-15',page:1,description:'Tarifa',amountCents:-1000,kind:'fee',ratePercent:null,balanceCents:null})));repeated.entries.at(-1).balanceCents=-122000;repeated.closing.balanceCents=-122000;
+ assert.ok((await run(repeated)).range,'same value/date within one statement can be two legitimate charges');
  await assert.rejects(()=>run({...data,opening:{...data.opening,date:'2024-02-31'}}));
 });
 import {readFile} from 'node:fs/promises';
@@ -55,6 +57,10 @@ test('documentos até contratação e negociação: autenticação, revisão e w
  let c=await service.create(auth);const doc=await PDFDocument.create();doc.addPage();const bytes=Buffer.from(await doc.save());
  c=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio.pdf'});assert.equal(c.status,'calculation_pending');
  const duplicate=await service.upload(auth,c.id,{bytes,kind:'evidence',name:'ficticio (1).pdf'});assert.equal(duplicate.documents.length,1);assert.equal(duplicate.revision,c.revision);
+ await pg.query("UPDATE audita_debt_cases SET payload=payload||$2::jsonb WHERE id=$1",[c.id,{analysisPending:new Date(Date.now()-16*60*1000).toISOString(),analysisProgress:{updatedAt:new Date().toISOString()}}]);
+ await assert.rejects(service.startAnalysis(auth,c.id,{action:'analyze',revision:c.revision,consent:true}),{status:409});
+ await assert.rejects(service.upload(auth,c.id,{bytes:Buffer.concat([bytes,Buffer.from('\n')]),kind:'evidence',name:'outro.pdf'}),{status:409});
+ await pg.query("UPDATE audita_debt_cases SET payload=payload||$2::jsonb WHERE id=$1",[c.id,{analysisPending:null,analysisProgress:null}]);
  await pg.query("INSERT INTO audita_debt_documents(id,case_id,kind,name,mime,bytes,sha256) SELECT '00000000-0000-4000-8000-000000000001',case_id,kind,'copia-antiga.pdf',mime,bytes,sha256 FROM audita_debt_documents WHERE case_id=$1",[c.id]);
  assert.equal((await service.get(auth,c.id)).documents.length,1);
  await assert.rejects(service.command(auth,c.id,{action:'analyze',revision:c.revision,consent:false}));

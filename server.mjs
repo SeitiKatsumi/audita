@@ -1784,7 +1784,7 @@ const chatRequestService = createChatRequestService({
 });
 const bankDebtService = createBankDebtService({
   paymentRequired: false,
-  extractor: createDebtExtractor({recordUsage: async (usage, auth) => {if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'debt_statement_extraction',...usage});}}),
+  extractor: createDebtExtractor({recordUsage: async (usage, auth) => {if(auth)await apiUsageService.record(auth,{provider:'openai',service:'responses',unitName:'token',operation:'debt_statement_extraction',...usage});}}),
   getDb: () => ({ pool, dbReady }),
   checkout: (auth, proposal) => stripeBillingService.createDebtCheckoutSession(auth, proposal),
 });

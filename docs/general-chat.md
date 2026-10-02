@@ -7,7 +7,7 @@ Implementação local de 30/09/2026. O chat conversa e usa ferramentas gerais; s
 - Escolha sempre automática: `gpt-6-luna` para mensagens simples, `gpt-6.1-sol` para documentos, cálculos, pesquisa e criação. Não há seletor; a API também normaliza o modo para automático.
 - Variáveis opcionais: `AUDITA_CHAT_MAIN_MODEL`, `AUDITA_CHAT_QUICK_MODEL`, `AUDITA_CHAT_DOCUMENT_MODEL`, `AUDITA_CHAT_IMAGE_MODEL`. Padrão de imagens: `gpt-image-2.5-flare`.
 - Responses API com `web_search`, `code_interpreter` em contêiner hospedado e `image_generation`. Nenhuma ferramenta executa código ou fluxo no servidor Audita. Saudações e pedidos simples de tradução/revisão dispensam ferramentas.
-- Respostas transmitidas por SSE, com indicação da atividade, fontes, copiar, editar/reenviar e tentar novamente. Geração de PDF, HTML, CSV, XLSX, DOCX, PPTX e imagens conforme pedido; só há download quando a ferramenta efetivamente entrega um arquivo.
+- Respostas transmitidas por SSE, com indicação animada da atividade real e fontes. Copiar e tentar novamente usam icones discretos com rotulos acessiveis; nao ha editar mensagem nem nome do modelo. Durante a execucao, parar substitui enviar no compositor, inclusive ao retomar uma conversa em andamento. A animacao respeita reducao de movimento. Geração de PDF, HTML, CSV, XLSX, DOCX, PPTX e imagens conforme pedido; só há download quando a ferramenta efetivamente entrega um arquivo.
 - Até seis anexos por conversa: PDF, PNG/JPEG, TXT/MD/CSV/JSON/HTML, DOCX e XLSX. Validação de conteúdo, 12 MB/arquivo e 20 páginas/PDF. Texto limitado a 2 MB; arquivo Office expandido limitado a 128 MB. Texto e Office usam uma unidade do saldo de páginas, explicitada na confirmação; não é contagem física de páginas/abas.
 
 ## Persistência e segurança
@@ -32,6 +32,6 @@ Uma instância de aplicação é o limite atual do controle de tarefas em memór
 
 ## Validação
 
-`node --test test/general-chat.test.mjs test/chat-documents.test.mjs test/chat-request.test.mjs` e `node scripts/check-general-chat-ui.mjs` usam armazenamento temporário/PGlite e SDK fictício. O segundo serve a interface e os handlers reais; valida desktop/mobile, modelos, SSE, anexos, downloads, sandbox, fontes, imagem, links sem fluxo, cancelamento, retomada e isolamento. `AUDITA_UI_ASSET_ROOT` permite repetir com os arquivos consolidados da main.
+`node --test test/general-chat.test.mjs test/chat-documents.test.mjs test/chat-request.test.mjs` e `node scripts/check-general-chat-ui.mjs` usam armazenamento temporário/PGlite e SDK fictício. O segundo serve a interface e os handlers reais; valida desktop/mobile, modelos, SSE, anexos, downloads, sandbox, fontes, imagem, links sem fluxo, cancelamento, retomada e isolamento. `AUDITA_UI_ASSET_ROOT` permite repetir com os arquivos consolidados da main; `--serve` disponibiliza a mesma fixture para validacao pelo navegador conectado, sem lancar outro navegador.
 
 Chamadas reais de teste, com dados fictícios e sem banco de produção: modelos Sol/Luna, busca web, geração/edição de imagem, Word/Excel, cálculo e PDF/HTML/CSV. PDF comparativo renderizado e conferido. Publicação no GitHub/produção é uma etapa separada.

@@ -37,7 +37,7 @@ export async function analyzeStatements(documents,{rateProvider=fetchDebtRate}={
  const transfers=rows.filter(r=>r.kind==='transfer'&&!/^(APL\.?\s*INVEST FAC|RESGATE INV FAC)\b/i.test(r.description));
  if(transfers.length)add('Conferir a origem e a finalidade dos créditos ou transferências identificados; não presumir pagamento ou quitação.');
  if(rows.some(r=>r.kind==='unknown'))add('Conferir os lançamentos cuja natureza não foi identificada.');
- const seen=new Set();for(const r of rows){const key=[r.date,r.description,r.amountCents].join('|');if(seen.has(key))add('Há possíveis lançamentos repetidos entre documentos. A equipe precisa conferir a sobreposição.');seen.add(key);}
+ const seen=new Map();for(const r of rows){const key=[r.date,r.description,r.amountCents].join('|');if(seen.has(key)&&seen.get(key)!==r.documentId)add('Há possíveis lançamentos repetidos entre documentos. A equipe precisa conferir a sobreposição.');else seen.set(key,r.documentId);}
  const opening=ordered[0].data.opening,closing=ordered.at(-1).data.closing;
  let checkpoint=null;for(const row of rows){if(checkpoint!==null)checkpoint+=row.amountCents;if(row.balanceCents!==null){if(checkpoint!==null&&Math.abs(checkpoint-row.balanceCents)>2)add('Há um lançamento com sinal ou valor incompatível com os saldos impressos. A equipe precisa conferir a leitura.');checkpoint=row.balanceCents;}}
  if(rows.some(r=>r.page>files.find(f=>f.id===r.documentId).data.pages))add('A referência de página de um lançamento é inválida.');

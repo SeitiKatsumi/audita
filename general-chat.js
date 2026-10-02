@@ -3,6 +3,8 @@ const uuid = () => crypto.randomUUID();
 const recall=key=>{try{return sessionStorage.getItem(key);}catch{return null;}};
 const remember=(key,value)=>{try{sessionStorage.setItem(key,value);}catch{/* History remains available from the server. */}};
 const assistantAvatar='<span class="chat-message-avatar"><img src="assets/audita-logo-original.png" alt=""></span>';
+const copyIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
+const retryIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 6.1A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.9"/></svg>';
 const safeLink = value => {
   try {const url=new URL(value,location.origin);return ['http:','https:'].includes(url.protocol)?url.href:'';}catch{return '';}
 };
@@ -44,6 +46,8 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
  }
  function render(){
    if(!messages)return;
+   const busy=Boolean(active)||thread.processing?.status==='running';
+   const composerFocused=document.activeElement===send||document.activeElement===stop;
    empty.classList.toggle('hidden',thread.messages.length>0);
    messages.querySelectorAll('.chat-message-row').forEach(n=>n.remove());
    messages.insertAdjacentHTML('beforeend',thread.messages.map((m,index)=>`<article class="chat-message-row ${m.role==='user'?'user':'assistant'}">${m.role==='assistant'?assistantAvatar:''}<div class="chat-message-content">
@@ -51,13 +55,14 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
      ${m.documentIds?.length?'<small>Documentos vinculados a esta conversa</small>':''}
      ${(m.artifacts||[]).map(artifactHtml).join('')}
      ${m.sources?.length?`<details class="general-chat-sources"><summary>Fontes consultadas</summary>${m.sources.map(s=>safeLink(s.url)?`<a href="${escape(s.url)}" target="_blank" rel="noopener noreferrer">${escape(s.name)}</a>`:'').join('')}</details>`:''}
-     ${m.role==='assistant'?`<div class="general-chat-message-actions"><button type="button" data-copy="${index}">Copiar</button><button type="button" data-retry="${index}" ${active?'disabled':''}>Tentar novamente</button><small>${escape(m.model||'')}</small></div>`:`<button type="button" data-edit="${index}" ${active?'disabled':''}>Editar mensagem</button>`}
+     ${m.role==='assistant'?`<div class="general-chat-message-actions"><button type="button" data-copy="${index}" aria-label="Copiar resposta" title="Copiar resposta">${copyIcon}</button><button type="button" data-retry="${index}" aria-label="Tentar novamente" title="Tentar novamente" ${busy?'disabled':''}>${retryIcon}</button></div>`:''}
    </div></article>`).join(''));
-   if(thread.processing&&!active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status">${escape(thread.processing.message|| (thread.processing.status==='running'?'Continuando a tarefa...':'A tarefa foi interrompida. Tente novamente.'))}</small></div></article>`);
-   if(active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status">${escape(active.status)}</small><div class="chat-message-body" data-stream>${formatGeneralChat(active.text)}</div></div></article>`);
+   if(thread.processing&&!active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status" ${busy?'class="general-chat-thinking"':''}>${escape(thread.processing.message|| (thread.processing.status==='running'?'Continuando a tarefa...':'A tarefa foi interrompida. Tente novamente.'))}</small></div></article>`);
+   if(active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status" class="general-chat-thinking">${escape(active.status)}</small><div class="chat-message-body" data-stream>${formatGeneralChat(active.text)}</div></div></article>`);
    list.innerHTML=threads.map(t=>`<div class="chat-thread-item ${t.id===thread.id?'active':''}"><button type="button" data-general-thread="${escape(t.id)}">${escape(t.title)}</button><button type="button" data-general-delete="${escape(t.id)}" aria-label="Excluir conversa">×</button></div>`).join('');
    pending.classList.toggle('hidden',!files.length);pending.innerHTML=files.map((f,i)=>`<span><strong>${escape(f.name)}</strong><button type="button" data-remove-file="${i}" aria-label="Remover ${escape(f.name)}">×</button></span>`).join('');
-   send.disabled=Boolean(active)||thread.processing?.status==='running';attach.disabled=Boolean(active)||thread.processing?.status==='running';fileInput.disabled=Boolean(active);stop.hidden=!active;
+   send.disabled=busy;send.hidden=busy;attach.disabled=busy;fileInput.disabled=busy;stop.hidden=!busy;
+   if(composerFocused)(busy?stop:input).focus();
    requestAnimationFrame(()=>{messages.scrollTop=messages.scrollHeight;});
  }
  async function reload(){
@@ -133,8 +138,8 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
  form.addEventListener('submit',e=>{e.preventDefault();e.stopImmediatePropagation();void sendMessage();},true);
  input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();void sendMessage();}},true);
  stop.addEventListener('click',async()=>{
-   if(!active)return;const task=active;
-   try{await request('/api/chat/cancel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({threadId:task.threadId,requestId:task.requestId})});task.controller.abort();}
+   if(!active&&thread.processing?.status!=='running')return;const task=active||{threadId:thread.id,requestId:thread.processing.requestId};
+   try{await request('/api/chat/cancel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({threadId:task.threadId,requestId:task.requestId})});if(task.controller)task.controller.abort();else watch();}
    catch(e){showError(e.message);}
  });
  fileInput.addEventListener('change',e=>{e.stopImmediatePropagation();const next=[...fileInput.files];
@@ -148,10 +153,9 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
      else{thread=(await request('/api/chat/threads/'+button.dataset.generalThread)).thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))].slice(-6);files=[];remember('audita:general-chat:'+owner,thread.id);closeHistory();render();watch();}
    }catch(e){showError(e.message);}
  },true);
- messages.addEventListener('click',async e=>{const b=e.target.closest('[data-copy],[data-retry],[data-edit],[data-preview]');if(!b)return;e.stopImmediatePropagation();
+ messages.addEventListener('click',async e=>{const b=e.target.closest('[data-copy],[data-retry],[data-preview]');if(!b)return;e.stopImmediatePropagation();
    try{
-     if(b.dataset.copy!=null)await navigator.clipboard.writeText(thread.messages[Number(b.dataset.copy)].content);
-     if(b.dataset.edit!=null){input.value=thread.messages[Number(b.dataset.edit)].content;input.focus();}
+     if(b.dataset.copy!=null){await navigator.clipboard.writeText(thread.messages[Number(b.dataset.copy)].content);b.setAttribute('aria-label','Resposta copiada');b.title='Resposta copiada';b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg>';setTimeout(()=>{if(b.isConnected){b.innerHTML=copyIcon;b.setAttribute('aria-label','Copiar resposta');b.title='Copiar resposta';}},2000);}
      if(b.dataset.retry!=null){const previous=thread.messages.slice(0,Number(b.dataset.retry)).findLast(m=>m.role==='user');if(previous)void sendMessage(previous.content);}
      if(b.dataset.preview){const a=thread.messages.flatMap(m=>m.artifacts||[]).find(a=>a.id===b.dataset.preview);if(!a)return;
        const r=await fetch(a.url);if(!r.ok)throw new Error('Arquivo indisponível.');const bytes=await r.blob();preview.querySelector('strong').textContent=a.name;const target=preview.querySelector('section');target.replaceChildren();
