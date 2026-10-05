@@ -478,7 +478,7 @@ export function createStripeBillingService({
             const subscription = await stripeRequest(`/v1/subscriptions/${encodeURIComponent(stripeObjectId(current.subscription))}`, {}, { method: "GET" });
             finished = ["canceled", "incomplete_expired"].includes(subscription.status);
           } else {
-            const access = await requireChatAccess().getAccess(auth);
+            const access = await requireChatAccess().getAccess(auth, { includeTestAccess: false });
             finished = access.trialUsed === true && !access.active;
           }
         }
@@ -495,7 +495,7 @@ export function createStripeBillingService({
       if (now() / 1000 >= Number(row.checkout_params.expires_at) + 22 * 3600) {
         throw new StripeBillingError("chat_checkout_reconciliation_required", "Uncertain checkout needs reconciliation.", 503);
       }
-      const access = await requireChatAccess().getAccess(auth);
+      const access = await requireChatAccess().getAccess(auth, { includeTestAccess: false });
       if (access.active || (selection.kind === "chat_experiment" && !access.trialAvailable)) {
         throw new StripeBillingError("chat_plan_already_active", "Chat access changed before checkout.", 409);
       }
@@ -879,7 +879,7 @@ export function createStripeBillingService({
       if (input.demo === true) return { invalid: true, reason: "chat_demo_forbidden" };
       if (!authContext.user.id) return { unauthorized: true };
       if (!chatAccessService) return { unavailable: true, reason: "chat_access_unavailable" };
-      const access = await chatAccessService.getAccess(authContext);
+      const access = await chatAccessService.getAccess(authContext, { includeTestAccess: false });
       if (access?.active) return { invalid: true, reason: "chat_plan_already_active" };
       if (selection.kind === "chat_experiment" && access?.trialAvailable !== true) {
         return { invalid: true, reason: "chat_experiment_already_used" };

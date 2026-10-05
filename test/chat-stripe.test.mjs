@@ -2,12 +2,29 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { runInNewContext } from "node:vm";
 import { PGlite } from "@electric-sql/pglite";
 import { resolveBillingSelection } from "../services/billing-catalog.service.mjs";
 import { createStripeBillingService } from "../services/stripe-billing.service.mjs";
 import { createChatAccessService } from "../services/chat-access.service.mjs";
 
 const NOW = 1800000000000;
+test("checkout UI explains known failures without exposing backend messages", async () => {
+  const js = await readFile(new URL("../chat-subscription.js", import.meta.url), "utf8");
+  const source = js.slice(js.indexOf("  async function request("), js.indexOf("  function catalogPlan("));
+  for (const [code, expected] of [
+    ["chat_plan_already_active", /já tem um plano/],
+    ["chat_experiment_already_used", /já foi utilizado/],
+    ["chat_checkout_pending", /checkout pendente/],
+    ["private_provider_error", /Não foi possível concluir/],
+  ]) {
+    const request = runInNewContext(source + "; request", { fetch: async () => ({
+      ok: false, status: 409, json: async () => ({ error: code, message: "private details" }),
+    }) });
+    await assert.rejects(request("/api/billing/checkout", {}), expected);
+  }
+});
+
 const AUTH = { tenantId: "1", user: { id: "2", role: "member", email: "member@example.com" } };
 const ENV = {
   AUDITA_BILLING_ENABLED: "true", APP_URL: "https://audita.example",
@@ -130,6 +147,36 @@ test("active access and previously used experiments stop before Stripe; legacy a
   }
   const f = fixture({ ...await customerDatabase(t), access: { allowed: true, source: "legacy", trialAvailable: true } });
   assert.ok((await f.service.createCheckoutSession(AUTH, { kind: "chat_subscription", planId: "chat-essential" })).url);
+});
+
+test("free test access allows checkout but never hides a paid plan or a used experiment", async t => {
+  const db = await customerDatabase(t);
+  await db.pg.exec(await readFile(new URL("../db/migrations/20260922-chat-access.sql", import.meta.url), "utf8"));
+  const pool = { connect: async () => ({ query: (...args) => db.pg.query(...args), release() {} }) };
+  let time = NOW;
+  const accessService = createChatAccessService({ getDb: () => ({ pool, dbReady: true }),
+    now: () => new Date(time), testBypassEnabled: true });
+  await accessService.enableTestAccess(AUTH);
+  const f = fixture({ ...db, accessService, now: () => time });
+  const input = { kind: "chat_experiment", planId: "chat-experiment", interval: "once" };
+  assert.ok((await f.service.createCheckoutSession(AUTH, input)).url);
+  assert.equal((await accessService.getAccess(AUTH)).source, "test");
+  assert.equal((await accessService.getAccess(AUTH, { includeTestAccess: false })).active, false);
+  await accessService.grantPaidAccess({ tenantId: "1", userId: "2", planId: "chat-experiment",
+    paymentId: "pi_fixture", periodStart: new Date(time), periodEnd: new Date(time + 30 * 86400000) });
+  const calls = f.calls.length;
+  assert.equal((await f.service.createCheckoutSession(AUTH,
+    { kind: "chat_subscription", planId: "chat-essential" })).reason, "chat_plan_already_active");
+  time += 31 * 86400000;
+  assert.equal((await f.service.createCheckoutSession(AUTH, input)).reason, "chat_experiment_already_used");
+  assert.equal(f.calls.length, calls);
+  // Completed one-off checkout must be reconciled using paid access, not the free bypass.
+  const resumed = fixture({ ...db, accessService, now: () => time,
+    fetch: async url => url.includes("/checkout/sessions/")
+      ? { status: "complete" } : { id: "cs_monthly", url: "https://checkout.stripe.com/fake" } });
+  assert.ok((await resumed.service.createCheckoutSession(AUTH,
+    { kind: "chat_subscription", planId: "chat-essential" })).url);
+  assert.equal((await accessService.getAccess(AUTH)).source, "test");
 });
 
 test("chat demo activation is forbidden even when legacy demo mode is enabled", async () => {

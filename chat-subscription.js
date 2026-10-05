@@ -68,9 +68,14 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const error = new Error(response.status === 401 ? "Entre novamente para continuar." : response.status === 413
+      const checkoutMessage = url === "/api/billing/checkout" ? {
+        chat_plan_already_active: "Você já tem um plano de chat ativo. Atualize o acesso ou gerencie sua assinatura.",
+        chat_experiment_already_used: "O plano Experimente já foi utilizado nesta conta. Escolha um plano mensal.",
+        chat_checkout_pending: "Existe um checkout pendente. Retome o plano escolhido ou tente novamente após a expiração.",
+      }[data.error] : null;
+      const error = new Error(checkoutMessage || (response.status === 401 ? "Entre novamente para continuar." : response.status === 413
         ? "O arquivo excede o limite de 12 MB." : [402, 429].includes(response.status)
-          ? "Saldo insuficiente. Confira seu plano e o consumo." : "N\u00e3o foi poss\u00edvel concluir. Tente novamente.");
+          ? "Saldo insuficiente. Confira seu plano e o consumo." : "N\u00e3o foi poss\u00edvel concluir. Tente novamente."));
       error.status = response.status;
       throw error;
     }
