@@ -11,6 +11,21 @@ const plain = text => String(text || '').replace(/\s+/g, ' ').trim();
 const fail = (code, status = 400) => { throw Object.assign(new Error(code), { code, status }); };
 const scopeNotice = 'Análise limitada às fontes selecionadas e à data da coleta. Não substitui conferência jurídica, matrícula atualizada do imóvel, ônus, situação conjugal, poderes de representação ou débitos próprios do imóvel. Ausência de ocorrência em uma fonte não comprova ausência geral de dívidas.';
 
+export function calculateSellerSafetyScore(report) {
+  const sources = report.sources || [];
+  const person = report.subject?.documentType === 'cpf' || /^\d{3}\*{8}\d{2}$/.test(report.subject?.document || '') || String(report.subject?.document || '').replace(/\D/g, '').length === 11;
+  const linkedCompany = source => person && Boolean(source.subject?.document);
+  const usable = sources.filter(s => s.status === 'analyzed' && s.identity === 'compatible' && ['occurrences', 'no_occurrence_in_scope'].includes(s.outcome) && !linkedCompany(s));
+  if (!usable.length) return { value: null, band: 'yellow', label: 'Dados insuficientes para pontuar', high: 0, medium: 0, limited: true };
+  // ponytail: documented triage rules, not a probability or credit model; identical findings count once.
+  const findings = [...new Map(usable.flatMap(s => s.findings || []).filter(f => f.priority !== 'information').map(f => [plain(`${f.category}|${f.title}|${f.quote}`), f])).values()];
+  const high = findings.filter(f => f.priority === 'high').length;
+  const medium = findings.filter(f => f.priority === 'medium').length;
+  const limited = Boolean(report.gaps) || sources.some(s => s.status !== 'analyzed' || s.identity !== 'compatible' || s.outcome === 'inconclusive' || s.limitations?.length || (linkedCompany(s) && s.findings?.some(f => f.priority !== 'information')));
+  const value = Math.max(0, Math.min(limited ? 69 : 100, 100 - high * 60 - medium * 30));
+  return { value, band: value >= 80 ? 'green' : value >= 50 ? 'yellow' : 'red', label: value >= 80 ? 'Menor atenção documental' : value >= 50 ? 'Atenção antes de negociar' : 'Atenção elevada antes de negociar', high, medium, limited };
+}
+
 export async function extractSellerText(buffer) {
   const parser = createRequire(import.meta.url)('pdf-parse/lib/pdf-parse.js');
   let needsVision = false;
@@ -86,6 +101,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
   function view(stored) {
     if (!stored) return { status: 'not_started', progress: 0, aiReady: ai.ready() };
     const { token, fingerprint, checkpoints, ...publicState } = stored;
+    if (publicState.report) publicState.report = { ...publicState.report, safetyScore: calculateSellerSafetyScore(publicState.report) };
     if (stored.status === 'running' && now() - new Date(stored.updatedAt) > 180000) return { ...publicState, status: 'interrupted', message: 'A análise foi interrompida. Retome sem refazer as consultas.', aiReady: ai.ready() };
     return { ...publicState, aiReady: ai.ready() };
   }
@@ -196,4 +212,4 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
   return { get, start, pdf, ready: () => ai.ready() && Boolean(getDb()?.dbReady), wait: id => active.get(id) };
 }
 
-function rowSubject(audit) { return { name: audit.subjectName || 'Vendedor da consulta', document: audit.documento }; }
+function rowSubject(audit) { return { name: audit.subjectName || 'Vendedor da consulta', document: audit.documento, documentType: audit.tipoDocumento }; }
