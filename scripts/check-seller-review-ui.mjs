@@ -8,23 +8,26 @@ import { PGlite } from '@electric-sql/pglite';
 import { chromium } from 'playwright';
 import { PDFDocument } from 'pdf-lib';
 import { createAuditService, validateCnpj } from '../services/audit.service.mjs';
-import { normalizeDfSellerInput, buildDfSellerAuditRequest } from '../services/seller-analysis.service.mjs';
+import { normalizeDfSellerInput, normalizeSellerInput, buildDfSellerAuditRequest } from '../services/seller-analysis.service.mjs';
+import { normalizePersonBirthDate,personNamesMatch } from '../services/direct-data-person.service.mjs';
 import { planSellerDocuments, getSellerDocumentCoverage } from '../services/seller-documents.service.mjs';
 import { planAutonomousCertificates } from '../services/state-court-autonomous.service.mjs';
 import { createSellerReviewService } from '../services/seller-review.service.mjs';
 import { extractPdfText } from '../services/pdf.service.mjs';
 import { sellerStatePlans,sellerQueriesForState } from '../services/seller-state-plan.mjs';
 
-const sourceCoverage=getSellerDocumentCoverage({configured:true});sourceCoverage.queries=sourceCoverage.queries.filter(q=>['protestos','cndt','vinculos'].includes(q.id));
-const courtCoverage={ufs:['ES'],certificates:[{uf:'ES',type:'Cível',provider:'portal'}]};
-const fixtureCoverage={aiReady:true,...courtCoverage,sellerSources:sourceCoverage};fixtureCoverage.states=sellerStatePlans(fixtureCoverage);
+const serveOnly=process.argv.includes('--serve');
+const sourceCoverage=getSellerDocumentCoverage({configured:true});sourceCoverage.queries=sourceCoverage.queries.filter(q=>['protestos','cndt','vinculos','cndt-company','fgts-company'].includes(q.id));
+const courtCoverage={ufs:['ES','AP'],certificates:[{uf:'ES',type:'Cível',provider:'portal'},{uf:'AP',type:'Cível',provider:'direct_data'}]};
+const fixtureCoverage={aiReady:true,...courtCoverage,sellerSources:sourceCoverage};fixtureCoverage.states=sellerStatePlans(fixtureCoverage);fixtureCoverage.companyStates=sellerStatePlans(fixtureCoverage,'cnpj');
+const companyFixture=async input=>({status:'success',dados:{cnpj:input.documento,razaoSocial:'Empresa Fictícia Ltda',uf:'AP',qsa:[{nome:'Sócio Fictício',qualificacao:'Administrador'}]}});
 
 let base=process.env.AUDITA_BASE_URL||'http://localhost:3012';
 const appBase=base; let httpServer;
 assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
 const pg=new PGlite(); let browser;
 const auth={tenantId:1,user:{id:811,name:'Pessoa Fictícia',role:'member'}};
-let providerCalls=0,aiCalls=0,lastId;
+let providerCalls=0,aiCalls=0,identityCalls=0,lastId;
 const issuedPdf=await PDFDocument.create();issuedPdf.addPage().drawText('CERTIDAO FICTICIA - TESTE DE EMISSAO');const issuedBytes=Buffer.from(await issuedPdf.save());
 const source=await readFile(new URL('../server.mjs',import.meta.url),'utf8');
 const paths=['/api/seller-analysis','/api/seller-analysis/coverage'];
@@ -32,26 +35,24 @@ try {
  await pg.exec((await readFile(new URL('../db/schema.sql',import.meta.url),'utf8')).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;',''));
  await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,password_hash) VALUES(811,1,'ui-seller@example.test','Pessoa Fictícia','disabled')");
  let review;
- const audit=createAuditService({getDb:()=>({pool:pg,dbReady:true}),getAuthContext:async()=>auth,customCollectors:{seller_documents:{},tjdft:{collect:async()=>{providerCalls++;return {fonte:'tjdft',status:'success',resultado:'nada_consta',dados:{certidoes:[{tipo:'ES · Cível',status:'success',resultado:'nada_consta',pdfPath:'/private/ficticio.pdf'}]},rawText:''};}}},
+ const audit=createAuditService({getDb:()=>({pool:pg,dbReady:true}),getAuthContext:async()=>auth,customCollectors:{seller_documents:{collectCompany:companyFixture},tjdft:{collect:async()=>{providerCalls++;return {fonte:'tjdft',status:'success',resultado:'nada_consta',dados:{certidoes:[{tipo:'ES · Cível',status:'success',resultado:'nada_consta',pdfPath:'/private/ficticio.pdf'}]},rawText:''};}}},
    getSellerDocumentConfiguration:()=>({configured:true}),
    querySellerDocument:async input=>{providerCalls++;await new Promise(r=>setTimeout(r,600));if(input.endpoint==='VinculosSocietarios')return {result:{status:'success',payload:{retorno:{documentoConsultado:'52998224725',relacionamentos:[]}}}};if(input.endpoint!=='ProtestosOnline')return {reason:'provider_timeout'};return {result:{status:'success',queriedAt:new Date().toISOString(),providerReference:'fixture',payload:{retorno:{documentoConsultado:'52998224725',constamProtestos:true,numeroTotalProtestos:1,valorTotalProtestos:'R$ 1.250,00'}}}};},
    onSellerCollected:(id,a,request)=>review.start(id,a,request,true),logError:()=>{},
  });
- review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService:audit,ai:{ready:()=>true,read:async source=>{aiCalls++;await new Promise(r=>setTimeout(r,2500));return {summary:source.title.includes('Vínculos')?'Não foram identificadas empresas vinculadas no retorno.':'Há um protesto informado pela fonte.',identity:'compatible',outcome:source.title.includes('Vínculos')?'informational':'occurrences',issuedAt:null,validUntil:null,limitations:[],findings:source.title.includes('Vínculos')?[]:[{category:'credit',priority:'high',title:'Protesto informado',description:'Conferir valor e eventual baixa com o cartório.',quote:'R$ 1.250,00',amount:'R$ 1.250,00',date:null,recommendation:'Solicitar a certidão atualizada e o comprovante de baixa.'}]};}}});
- const sandbox=vm.createContext({URL,crypto:{randomUUID},sellerReviewService:review,auditService:audit,normalizeDfSellerInput,buildDfSellerAuditRequest,planSellerDocuments,planAutonomousCertificates,validateCnpj,
+ review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService:audit,ai:{ready:()=>true,read:async source=>{aiCalls++;await new Promise(r=>setTimeout(r,2500));const company=source.title.includes('cadastro e QSA'),links=source.title.includes('Vínculos');return {summary:company?'Cadastro empresarial e QSA obtidos.':links?'Não foram identificadas empresas vinculadas no retorno.':'Há um protesto informado pela fonte.',identity:'compatible',outcome:company||links?'informational':'occurrences',issuedAt:null,validUntil:null,limitations:[],findings:company||links?[]:[{category:'credit',priority:'high',title:'Protesto informado',description:'Conferir valor e eventual baixa com o cartório.',quote:'R$ 1.250,00',amount:'R$ 1.250,00',date:null,recommendation:'Solicitar a certidão atualizada e o comprovante de baixa.'}]};}}});
+ const sandbox=vm.createContext({URL,crypto:{randomUUID},sellerReviewService:review,auditService:audit,normalizeDfSellerInput,normalizeSellerInput,normalizePersonBirthDate,personNamesMatch,collectSellerCompany:companyFixture,buildDfSellerAuditRequest,planSellerDocuments,planAutonomousCertificates,validateCnpj,
    getSellerDocumentCoverage:()=>sourceCoverage,getAutonomousCertificateCoverage:()=>courtCoverage,sellerStatePlans,sellerQueriesForState,
-   directDataPersonService:{lookup:async()=>({reason:'fixture_unavailable'})},directDataCertificatesService:{getStatus:()=>({configured:true,allowedUfs:[]})},directDataSellerService:{getStatus:()=>({configured:true})},getTenantIdForRequest:async()=>auth,
+   directDataPersonService:{lookup:async input=>{identityCalls++;return {result:{document:input.cpf,fullName:'Vendedor Fictício',motherName:'Mãe Fictícia',birthDate:'1980-01-01',gender:'Masculino',rg:''}};}},directDataCertificatesService:{getStatus:()=>({configured:true,allowedUfs:['AP']})},directDataSellerService:{getStatus:()=>({configured:true})},getTenantIdForRequest:async()=>auth,
    readJsonBody:async req=>req.body,sendJson:(res,status,body)=>Object.assign(res,{status,body}),
  });
  const start=source.slice(source.indexOf('  if (["/api/seller-analysis/df"'),source.indexOf('  const publicAuditEvidenceMatch ='));
  vm.runInContext(`async function handle(pathname,request,response){${start}}`,sandbox);
- browser=await chromium.launch({headless:true});
- const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
- const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  const routeHandler=async route=>{
    const req=route.request(),url=new URL(req.url()),path=url.pathname;
    if(url.origin!==new URL(base).origin)return route.abort();
    if(path==='/api/auth/me')return route.fulfill({json:{authRequired:true,user:auth.user}});
+   if(serveOnly&&path==='/api/test/seller-metrics')return route.fulfill({json:{providerCalls,identityCalls,aiCalls,lastId}});
    if(path==='/api/seller-analysis/coverage')return route.fulfill({json:fixtureCoverage});
    if(path.startsWith('/api/seller-analysis')){
      const res={setHeader(){},writeHead(status,headers){Object.assign(this,{status,headers});},end(buffer){this.buffer=buffer;}};
@@ -72,10 +73,13 @@ try {
   try{await routeHandler(adapter);}catch(e){res.writeHead(500);res.end('Test fixture failed');console.error(e.message);}
  });
  await new Promise(resolve=>httpServer.listen(0,'127.0.0.1',resolve));base='http://127.0.0.1:'+httpServer.address().port;
+ if(serveOnly){console.log(JSON.stringify({fixtureUrl:base,fictionalProviders:true}));await new Promise(()=>{});}
+ browser=await chromium.launch({headless:true});
+ const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await mkdir('output/playwright',{recursive:true});
  await page.goto(base+'/#analise-vendedor');
  await page.locator('#sellerAnalysisCpf').fill('52998224725');
- await page.locator('#sellerAnalysisFullName').fill('Vendedor Fictício');
  await page.locator('#sellerAnalysisState').selectOption('SP');
  await page.locator('#sellerAnalysisAuthorization').check();
  await page.screenshot({path:'output/playwright/seller-input-desktop.png',fullPage:true});
@@ -113,8 +117,6 @@ try {
  await page.locator('#sellerAnalysisRg').fill('123456789');
  await page.locator('#sellerAnalysisGender').selectOption('Masculino');
  for(const id of ['sellerAnalysisPaid','sellerAnalysisAuthorization'])await page.locator('#'+id).check();
- await page.getByRole('button',{name:'Emitir certidões selecionadas',exact:true}).click();
- await page.locator('#sellerAnalysisMotherName').fill('Mãe Fictícia');
  await page.getByRole('button',{name:'Emitir certidões selecionadas',exact:true}).click();
  await page.locator('#sellerCollectionDetails > summary').click();
  await page.getByRole('link',{name:'Abrir PDF',exact:true}).waitFor();

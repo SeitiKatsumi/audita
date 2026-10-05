@@ -1,5 +1,13 @@
 # Deploy
 
+## Publicacao de vendedor CPF/CNPJ - 05/10/2026
+
+Usuario autorizou publicar a entrada por CNPJ e o enriquecimento cadastral por
+CPF. Preservar a correcao ca214fd do checkout de teste, configuracao de provedores,
+autenticacao e volumes privados. Sem nova dependencia ou migracao. Validar a
+versao servida, cobertura empresarial, formulario e acesso privado apos deploy;
+os testes completos usam dados e provedores ficticios, sem consultas pagas.
+
 ## Publicacao da analise documental - 29/09/2026
 
 Usuario autorizou publicar o fluxo consolidado de IA e PDF do vendedor. Reutiliza

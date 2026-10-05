@@ -6580,7 +6580,7 @@ function configureSellerFlow(page) {
   document.querySelector('#sellerFlowTitle').textContent = certificates ? 'Emissão de certidões diversas' : 'Análise de Vendedor';
   document.querySelector('#sellerFlowIntro').textContent = certificates
     ? 'Informe os dados do titular, selecione as certidões disponíveis e acompanhe a emissão. Ao concluir, você poderá abrir os documentos obtidos. Este serviço não inclui análise por IA.'
-    : 'Do CPF ao relatório: informe o estado e acompanhe a análise do vendedor e das empresas vinculadas.';
+    : 'Do CPF ou CNPJ ao relatório: informe o estado e acompanhe a análise do vendedor.';
   document.querySelector('#sellerFlowSteps').textContent = certificates ? 'Dados do titular → Seleção e emissão → Documentos disponíveis' : 'Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF';
   document.querySelector('.seller-analysis-form-heading strong').textContent=certificates?'Dados do titular':'Quem está vendendo o imóvel?';
   document.querySelector('.seller-analysis-form-heading small').textContent=certificates?'Informe o titular e selecione as certidões para emitir.':'Informe o vendedor e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente.';
@@ -6601,6 +6601,10 @@ function configureSellerFlow(page) {
   setSellerStep(1);
   sellerAnalysisError.textContent = '';
   sellerAnalysisResult.innerHTML = '<p>Selecione os documentos para iniciar.</p>';
+  if(certificates) document.querySelector('#sellerAnalysisDocumentType').value='cpf';
+  document.querySelector('#sellerDocumentTypeField').hidden=certificates;
+  resetSellerIdentity();
+  updateSellerDocumentType();
   document.querySelector('#sellerChangeData').hidden = true;
   const history = document.querySelector('#sellerReviewHistory');
   history.open = false;
@@ -6610,8 +6614,24 @@ function configureSellerFlow(page) {
 }
 document.addEventListener('audita:pagechange', event => configureSellerFlow(event.detail.page));
 let sellerCoverage = null;
+let sellerMissingIdentityFields = new Set();
+function sellerDocumentType() { return isCertificateOnly() ? 'cpf' : document.querySelector('#sellerAnalysisDocumentType')?.value || 'cpf'; }
+function resetSellerIdentity() {
+  sellerMissingIdentityFields.clear();
+  for(const id of ['sellerAnalysisFullName','sellerAnalysisBirthDate','sellerAnalysisMotherName','sellerAnalysisRg','sellerAnalysisGender']) { const field=document.getElementById(id); if(field) field.value=''; }
+}
+function updateSellerDocumentType() {
+  const company=sellerDocumentType()==='cnpj';
+  document.querySelector('#sellerDocumentLabel').textContent=company?'CNPJ do vendedor':'CPF do titular';
+  document.querySelector('#sellerFullNameLabel').textContent=company?'Razão social':'Nome completo';
+  sellerAnalysisCpf.maxLength=company?18:14;
+  sellerAnalysisCpf.placeholder=company?'00.000.000/0000-00':'000.000.000-00';
+  document.querySelector('#sellerIdentityHint').hidden=isCertificateOnly();
+  updateSellerMunicipalities();
+  updateSellerEstimate();
+}
 function selectedSellerState() {
-  return sellerCoverage?.states?.find(item=>item.uf===document.querySelector('#sellerAnalysisState')?.value);
+  return (sellerDocumentType()==='cnpj'?sellerCoverage?.companyStates:sellerCoverage?.states)?.find(item=>item.uf===document.querySelector('#sellerAnalysisState')?.value);
 }
 function setSellerStep(step) {
   const shell=document.querySelector('#sellerStepShell');
@@ -6627,19 +6647,20 @@ function setSellerStep(step) {
   if(changed) { const target=step===1?sellerAnalysisCpf:sellerAnalysisResult; if(step!==1) target?.setAttribute('tabindex','-1');target?.focus({preventScroll:true});shell.scrollIntoView({block:'start',behavior:'instant'}); }
 }
 function selectedSellerCertificates() {
+  if(sellerDocumentType()==='cnpj') return [];
   const ufs = isCertificateOnly()?[...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map(input=>input.value):[selectedSellerState()?.uf];
   return (sellerCoverage?.certificates || []).filter((item) => ufs.includes(item.uf));
 }
 function selectedSellerQueries() {
   if(!isCertificateOnly()) {
     const state=selectedSellerState(),city=document.querySelector('#sellerAnalysisMunicipality')?.value;
-    return (sellerCoverage?.sellerSources?.queries||[]).filter(item=>state?.queryIds.includes(item.id)||(state&&city&&item.documentTypes.includes('cpf')&&item.endpoint==='CertidaoNegativaDebitosMunicipal'&&item.params.MUNICIPIO===`${city}-${state.uf}`));
+    return (sellerCoverage?.sellerSources?.queries||[]).filter(item=>state?.queryIds.includes(item.id)||(state&&city&&item.documentTypes.includes(sellerDocumentType())&&item.endpoint==='CertidaoNegativaDebitosMunicipal'&&item.params.MUNICIPIO===`${city}-${state.uf}`));
   }
   const ids = [...document.querySelectorAll("#sellerAnalysisQueries input:checked")].map((input) => input.value);
   return (sellerCoverage?.sellerSources?.queries || []).filter((item) => ids.includes(item.id));
 }
 function sellerCompanyCnpjs() {
-  if(!isCertificateOnly()) return [];
+  if(!isCertificateOnly()) return sellerDocumentType()==='cnpj' ? [sellerAnalysisCpf.value.replace(/\D/g,'')].filter(Boolean) : [];
   return [...new Set(String(document.querySelector("#sellerAnalysisCompanyCnpjs")?.value || "")
     .split(/[;,\s]+/).filter(Boolean).map((value) => value.replace(/\D/g, "")))];
 }
@@ -6647,21 +6668,24 @@ function updateSellerEstimate() {
   const selected = selectedSellerCertificates();
   const queries = selectedSellerQueries();
   const paidCount = selected.filter((item) => item.provider === "direct_data").length;
-  const companyCount = sellerCompanyCnpjs().length;
+  const companyCount = sellerDocumentType()==='cnpj'?1:sellerCompanyCnpjs().length;
   const cost = paidCount * (sellerCoverage?.pdfQueryCostBrl || 0.54) + queries.reduce((sum, item) => sum + Number(item.costBrl || 0) * (item.documentTypes?.includes("cpf") ? 1 : companyCount), 0);
   const target = document.querySelector("#sellerAnalysisCost");
   const state=selectedSellerState();
-  const identityCost=selected.length&&!(sellerAnalysisMotherName?.value||'').trim() ? Number(sellerCoverage?.identityQueryCostBrl ?? .36) : 0;
+  const identityCost=sellerDocumentType()==='cpf'&&((selected.length&&!(sellerAnalysisMotherName?.value||'').trim())||(!isCertificateOnly()&&(!sellerAnalysisFullName.value.trim()||((selected.length||queries.some(item=>item.endpoint==='CertidaoConjuntaDebitosPessoaFisica'))&&!document.querySelector('#sellerAnalysisBirthDate').value)))) ? Number(sellerCoverage?.identityQueryCostBrl ?? .36) : 0;
   const companyCeiling=!isCertificateOnly()&&state?.discoversCompanies?state.maxCompanyCostBrl*state.companyLimit:0;
   const brl=value=>`R$ ${value.toFixed(2).replace('.',',')}`;
   if(target) target.innerHTML=!isCertificateOnly()&&!state?'Selecione o estado para calcular a estimativa.':`<small>Estimativa da extração</small><strong>${brl(cost+identityCost)}</strong>${companyCeiling?`<small>Empresas vinculadas: até ${brl(companyCeiling)} adicionais (máximo de cinco). Limite dos provedores: ${brl(cost+identityCost+companyCeiling)}.</small>`:''}${!isCertificateOnly()?'<small>Custo da IA apurado por uso, separadamente.</small>':''}`;
   for (const selector of ["#sellerAnalysisRg", "#sellerAnalysisGender"]) {
     const field = document.querySelector(selector);
-    if (field) field.required = selected.length > 0;
+    if (field) field.required = isCertificateOnly() ? selected.length > 0 : sellerMissingIdentityFields.has(selector==='#sellerAnalysisRg'?'rg':'gender');
   }
   const birthDate = document.querySelector("#sellerAnalysisBirthDate");
-  if (birthDate) birthDate.required = selected.length > 0 || queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica");
-  for(const [wrapper,field] of [['#sellerBirthDateField',birthDate],['#sellerRgField',document.querySelector('#sellerAnalysisRg')],['#sellerGenderField',document.querySelector('#sellerAnalysisGender')]]) {
+  if (birthDate) birthDate.required = isCertificateOnly() ? selected.length > 0 || queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica") : sellerMissingIdentityFields.has('birthDate');
+  const name=sellerAnalysisFullName;
+  if(name) name.required=isCertificateOnly()||sellerMissingIdentityFields.has('fullName');
+  if(sellerAnalysisMotherName) sellerAnalysisMotherName.required=sellerMissingIdentityFields.has('motherName');
+  for(const [wrapper,field] of [['#sellerBirthDateField',birthDate],['#sellerRgField',document.querySelector('#sellerAnalysisRg')],['#sellerGenderField',document.querySelector('#sellerAnalysisGender')],['#sellerFullNameField',name],['#sellerAnalysisMotherField',sellerAnalysisMotherName]]) {
     const element=document.querySelector(wrapper); if(element) element.hidden=!field?.required;
     if(field) field.disabled=!field.required;
   }
@@ -6714,6 +6738,7 @@ function updateSellerMunicipalities() {
 }
 document.querySelector('#sellerAnalysisState')?.addEventListener('change',()=>{updateSellerMunicipalities();updateSellerEstimate();});
 document.querySelector('#sellerAnalysisMunicipality')?.addEventListener('change',updateSellerEstimate);
+document.querySelector('#sellerAnalysisDocumentType')?.addEventListener('change',()=>{sellerAnalysisCpf.value='';resetSellerIdentity();updateSellerDocumentType();sellerAnalysisError.textContent='';sellerAnalysisCpf.focus();});
 sellerAnalysisAuthorization?.addEventListener('change',()=>{
   if(!isCertificateOnly()) for(const selector of ['#sellerAnalysisPaid','#sellerAnalysisAiConsent']) document.querySelector(selector).checked=sellerAnalysisAuthorization.checked;
 });
@@ -6730,6 +6755,17 @@ function isValidSellerAnalysisCpf(value) {
     return remainder === 10 ? 0 : remainder;
   };
   return calculateDigit(cpf.slice(0, 9)) === Number(cpf[9]) && calculateDigit(cpf.slice(0, 10)) === Number(cpf[10]);
+}
+
+function isValidSellerAnalysisCnpj(value) {
+  const cnpj=String(value||'').replace(/\D/g,'');
+  if(cnpj.length!==14||/^(\d)\1+$/.test(cnpj)) return false;
+  const digit=base=>{let weight=2,total=0;for(let index=base.length-1;index>=0;index--){total+=Number(base[index])*weight;weight=weight===9?2:weight+1;}const remainder=total%11;return remainder<2?0:11-remainder;};
+  return digit(cnpj.slice(0,12))===Number(cnpj[12])&&digit(cnpj.slice(0,13))===Number(cnpj[13]);
+}
+
+function formatSellerDocument(value) {
+  return sellerDocumentType()==='cnpj'?String(value||'').replace(/\D/g,'').slice(0,14).replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2}\.\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1/$2').replace(/(\d{4})(\d)/,'$1-$2'):formatJecCpf(value);
 }
 
 function getSellerCertificateStatus(certificate = {}, auditStatus = "pending", isCurrent = false) {
@@ -6800,6 +6836,7 @@ function renderSellerAnalysisFailure({ documento = "em preparação", message, d
 }
 
 function getSellerAnalysisStartError(data = {}, responseStatus = 0) {
+  if (data.error === 'seller_identity_fields_required' || data.missingFields?.some(field=>['fullName','birthDate','rg','gender','motherName'].includes(field))) return 'Não encontramos todos os dados exigidos. Preencha somente os campos indicados para continuar.';
   if (data.error === 'seller_ai_unavailable') return 'A análise por IA não está disponível neste ambiente. Nenhuma consulta foi iniciada. Tente novamente quando a integração estiver disponível.';
   if (data.error === "seller_name_mismatch") {
     return "O nome informado não corresponde ao cadastro do CPF. Confira os dados.";
@@ -9017,7 +9054,9 @@ cnibForm?.addEventListener("submit", async (event) => {
 });
 
 sellerAnalysisCpf?.addEventListener("input", () => {
-  sellerAnalysisCpf.value = formatJecCpf(sellerAnalysisCpf.value);
+  sellerAnalysisCpf.value = formatSellerDocument(sellerAnalysisCpf.value);
+  resetSellerIdentity();
+  updateSellerEstimate();
 });
 
 sellerAnalysisForm?.addEventListener("submit", async (event) => {
@@ -9029,6 +9068,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   const fullName = sellerAnalysisFullName?.value.trim() || "";
   const motherName = sellerAnalysisMotherName?.value.trim() || "";
   const automatic=flow==='seller',state=selectedSellerState();
+  const documentType=sellerDocumentType();
   const ufs = automatic?(state?.certificateCount?[state.uf]:[]):[...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map(input=>input.value);
   const sellerQueries = selectedSellerQueries().map((item) => item.id);
   const companyCnpjs = sellerCompanyCnpjs();
@@ -9042,7 +9082,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     document.querySelector("#sellerAnalysisCompanyCnpjs")?.focus();
     return;
   }
-  if (!companyCnpjs.length && selectedSellerQueries().some((item) => !item.documentTypes?.includes("cpf"))) {
+  if (documentType==='cpf' && !companyCnpjs.length && selectedSellerQueries().some((item) => !item.documentTypes?.includes("cpf"))) {
     sellerAnalysisError.textContent = "Informe os CNPJs para consultar as certidões empresariais selecionadas.";
     document.querySelector("#sellerAnalysisCompanyCnpjs")?.focus();
     return;
@@ -9051,12 +9091,12 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     sellerAnalysisError.textContent = "Confirme o custo das consultas selecionadas.";
     return;
   }
-  if (!isValidSellerAnalysisCpf(cpf)) {
-    if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe um CPF válido.";
+  if (!(documentType==='cnpj'?isValidSellerAnalysisCnpj(cpf):isValidSellerAnalysisCpf(cpf))) {
+    if (sellerAnalysisError) sellerAnalysisError.textContent = documentType==='cnpj'?'Informe um CNPJ válido.':"Informe um CPF válido.";
     sellerAnalysisCpf?.focus();
     return;
   }
-  if (!fullName) {
+  if (!fullName && (!automatic||sellerMissingIdentityFields.has('fullName'))) {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe o nome completo do vendedor.";
     sellerAnalysisFullName?.focus();
     return;
@@ -9075,7 +9115,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   setSellerStep(2);
   renderSellerAnalysisResult({
     status: "preparing",
-    documento: formatJecCpf(cpf),
+    documento: formatSellerDocument(cpf),
     resultados: [],
     createdAt: startedAt,
     updatedAt: startedAt,
@@ -9087,6 +9127,8 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
         cpf,
+        document:cpf,
+        documentType,
         fullName,
         motherName,
         flow,
@@ -9107,7 +9149,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
       showLogin("Entre para extrair as certidões do vendedor.");
       setSellerStep(1);
       renderSellerAnalysisFailure({
-        documento: formatJecCpf(cpf),
+        documento: formatSellerDocument(cpf),
         message: "É necessário entrar para iniciar a extração.",
       });
       return;
@@ -9115,6 +9157,11 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     if (!response.ok || !data.consultaId) {
       setSellerStep(1);
       const startError = getSellerAnalysisStartError(data, response.status);
+      const fields={fullName:'sellerAnalysisFullName',motherName:'sellerAnalysisMotherName',birthDate:'sellerAnalysisBirthDate',rg:'sellerAnalysisRg',gender:'sellerAnalysisGender'};
+      for(const [field,id] of Object.entries(fields)) if(typeof data.identity?.[field]==='string') document.getElementById(id).value=data.identity[field];
+      sellerMissingIdentityFields=new Set((data.missingFields||[]).filter(field=>Object.hasOwn(fields,field)));
+      if(data.motherNameRequired) sellerMissingIdentityFields.add('motherName');
+      updateSellerEstimate();
       if (sellerAnalysisError) {
         sellerAnalysisError.textContent = startError;
         if (data.motherNameRequired) {
@@ -9124,8 +9171,9 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
           sellerAnalysisMotherName?.focus();
         }
       }
+      document.getElementById(fields[[...sellerMissingIdentityFields][0]])?.focus();
       renderSellerAnalysisFailure({
-        documento: formatJecCpf(cpf),
+        documento: formatSellerDocument(cpf),
         message: startError,
         detail: data.billingVerificationRequired
           ? "A consulta pode ter sido recebida pelo provedor; não houve repetição automática."
@@ -9141,7 +9189,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
     setSellerStep(1);
     renderSellerAnalysisFailure({
-      documento: formatJecCpf(cpf),
+      documento: formatSellerDocument(cpf),
       message: "Falha de comunicação com a API da IA AUDITA.",
       detail: "A extração não permaneceu em execução silenciosamente.",
     });

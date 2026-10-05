@@ -64,8 +64,24 @@ export function normalizeDirectDataPersonResponse(payload = {}) {
   return {
     fullName: cleanText(source.nome, 180),
     motherName: cleanText(source.nomeMae, 180),
+    document: String(source.cpf || '').replace(/\D/g, ''),
+    birthDate: normalizePersonBirthDate(source.dataNascimento),
+    gender: normalizePersonGender(source.sexo),
+    rg: cleanText(source.rg, 30),
     providerReference: cleanText(metadata.consultaUid, 100),
   };
+}
+
+export function normalizePersonBirthDate(value) {
+  const text = cleanText(value, 40);
+  const iso = /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(text) ? text.slice(0, 10) : /^(\d{2})[/-](\d{2})[/-](\d{4})$/.test(text) ? text.split(/[/-]/).reverse().join('-') : '';
+  const date = new Date(`${iso}T00:00:00Z`);
+  return iso && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === iso && date <= new Date() ? iso : '';
+}
+
+export function normalizePersonGender(value) {
+  const gender = cleanText(value).toLowerCase();
+  return ['f', 'feminino', 'female'].includes(gender) ? 'Feminino' : ['m', 'masculino', 'male'].includes(gender) ? 'Masculino' : '';
 }
 
 export function createDirectDataPersonService({
@@ -189,11 +205,11 @@ export function createDirectDataPersonService({
     }
 
     const identity = normalizeDirectDataPersonResponse(payload);
-    if (!identity.fullName) {
+    if (!identity.fullName || (identity.document && identity.document !== cpf) || (payload?.metaDados?.resultadoId !== undefined && Number(payload.metaDados.resultadoId) !== 1)) {
       const result = {
         failed: true,
         status: "failed",
-        reason: "provider_empty_response",
+        reason: identity.document && identity.document !== cpf ? "provider_identity_mismatch" : "provider_empty_response",
         providerReference: identity.providerReference,
         configuration,
       };
@@ -240,7 +256,7 @@ export function createDirectDataPersonService({
     }
 
     const tenantScope = cleanText(authContext?.tenantId, 100) || "public";
-    const cacheKey = crypto.createHash("sha256").update(`${tenantScope}:${cpf}`).digest("hex");
+    const cacheKey = crypto.createHash("sha256").update(`${tenantScope}:${authContext?.user?.id || authContext?.userId || ''}:${cpf}`).digest("hex");
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.createdAt < cacheTtlMs) {
       return {

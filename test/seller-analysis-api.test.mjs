@@ -5,13 +5,13 @@ import test from "node:test";
 import vm from "node:vm";
 import { PGlite } from "@electric-sql/pglite";
 import { createAuditService, validateCnpj } from "../services/audit.service.mjs";
-import { normalizeDfSellerInput, buildDfSellerAuditRequest } from "../services/seller-analysis.service.mjs";
+import { normalizeDfSellerInput, normalizeSellerInput, buildDfSellerAuditRequest } from "../services/seller-analysis.service.mjs";
 import { planSellerDocuments,getSellerDocumentCoverage } from "../services/seller-documents.service.mjs";
 import { collectAutonomousCertificates, planAutonomousCertificates,getAutonomousCertificateCoverage } from "../services/state-court-autonomous.service.mjs";
 import { sellerStatePlans,sellerQueriesForState } from '../services/seller-state-plan.mjs';
 import { createDirectDataSellerService } from "../services/direct-data-seller.service.mjs";
 import { createSellerReviewService } from '../services/seller-review.service.mjs';
-import { personNamesMatch } from "../services/direct-data-person.service.mjs";
+import { personNamesMatch, normalizePersonBirthDate } from "../services/direct-data-person.service.mjs";
 
 test("seller POST validates selection and consent, persists the selected source and needs no unrelated identity fields", async () => {
   const pg = new PGlite();
@@ -45,7 +45,7 @@ test("seller POST validates selection and consent, persists the selected source 
     const sellerEnd = source.indexOf("  const publicAuditEvidenceMatch =", sellerStart);
     assert.ok(genericStart > 0 && genericEnd > genericStart && sellerStart > 0 && sellerEnd > sellerStart);
     const context = vm.createContext({
-      crypto, auditService, normalizeDfSellerInput, buildDfSellerAuditRequest, planSellerDocuments, planAutonomousCertificates, validateCnpj, personNamesMatch,
+      crypto, auditService, normalizeDfSellerInput, normalizeSellerInput, normalizePersonBirthDate, buildDfSellerAuditRequest, planSellerDocuments, planAutonomousCertificates, validateCnpj, personNamesMatch,
       getSellerDocumentCoverage,getAutonomousCertificateCoverage,sellerStatePlans,sellerQueriesForState,sellerReviewService:{ready:()=>true},
       getTenantIdForRequest: auth, readJsonBody: async (request) => request.body,
       directDataSellerService: provider,
@@ -137,4 +137,56 @@ test("seller POST validates selection and consent, persists the selected source 
   } finally {
     await pg.close();
   }
+});
+
+test('CPF enrichment asks only missing RG; CNPJ starts company sources and persists through report/PDF without PF data', async () => {
+  const pg=new PGlite();
+  try {
+    await pg.exec((await readFile(new URL('../db/schema.sql',import.meta.url),'utf8')).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;',''));
+    await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,password_hash) VALUES(812,1,'company-seller@example.test','Pessoa Ficticia','fixture')");
+    const owner={tenantId:1,user:{id:812},unauthorized:false}, auth=async request=>request.auth||{unauthorized:true};
+    const calls=[],courtInputs=[];let lookups=0;
+    const companyProfile={status:'success',dados:{cnpj:'04252011000110',razaoSocial:'Empresa Ficticia Ltda',uf:'AP',qsa:[{nome:'Socio Ficticio',qualificacao:'Administrador'}]}};
+    const auditService=createAuditService({getDb:()=>({pool:pg,dbReady:true}),getAuthContext:auth,logError:()=>{},
+      getSellerDocumentConfiguration:()=>({configured:true}),
+      customCollectors:{seller_documents:{collectCompany:async()=>companyProfile},tjdft:{collect:async input=>{courtInputs.push(input);return {status:'success',resultado:'nada_consta',dados:{certidoes:[{tipo:'AP Civel',status:'success',resultado:'nada_consta',rawText:'Certidao ficticia para teste sem apontamentos.'}]}};}}},
+      querySellerDocument:async input=>{calls.push(input);return {result:{status:'success',payload:{retorno:{documentoConsultado:input.parameters.CNPJ||input.parameters.CPF,possuemDebitos:false}}}};},
+    });
+    const review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService,ai:{ready:()=>true,read:async()=>({summary:'Cadastro empresarial obtido no material ficticio.',identity:'compatible',outcome:'informational',issuedAt:null,validUntil:null,limitations:[],findings:[]})}});
+    const code=await readFile(new URL('../server.mjs',import.meta.url),'utf8');
+    const sandbox=vm.createContext({crypto,auditService,normalizeDfSellerInput,normalizeSellerInput,normalizePersonBirthDate,buildDfSellerAuditRequest,planSellerDocuments,planAutonomousCertificates,validateCnpj,personNamesMatch,sellerStatePlans,sellerQueriesForState,getSellerDocumentCoverage,getAutonomousCertificateCoverage,sellerReviewService:review,
+      collectSellerCompany:async()=>companyProfile,
+      getTenantIdForRequest:auth,readJsonBody:async request=>request.body,sendJson:(response,status,body)=>Object.assign(response,{status,body}),
+      directDataSellerService:{getStatus:()=>({configured:true})},directDataCertificatesService:{getStatus:()=>({configured:true,allowedUfs:['AP']})},
+      directDataPersonService:{lookup:async()=>{lookups++;return {result:{document:'52998224725',fullName:'Pessoa Ficticia',motherName:'Mae Ficticia',birthDate:'1980-02-15',gender:'Feminino',rg:''}};}},
+    });
+    vm.runInContext(`async function handle(pathname,request,response){${code.slice(code.indexOf('  if (["/api/seller-analysis/df"'),code.indexOf('  const sellerReviewMatch ='))}}`,sandbox);
+    const post=async(body,actor=owner)=>{const response={};await sandbox.handle('/api/seller-analysis',{method:'POST',body,auth:actor},response);return response;};
+    const base={automatic:true,state:'AP',authorizationConfirmed:true,paidQueryConfirmed:true,aiConsent:true,flow:'seller'};
+    const cpf={...base,documentType:'cpf',document:'52998224725'};
+    const pending=await post({...cpf});assert.equal(pending.status,422);assert.deepEqual(Array.from(pending.body.missingFields),['rg']);assert.equal(pending.body.identity.birthDate,'1980-02-15');assert.equal(lookups,1);assert.equal(courtInputs.length,0);assert.equal(calls.length,0);
+    const completed=await post({...cpf,...pending.body.identity,rg:'12345678'});assert.equal(completed.status,202);assert.equal(lookups,1,'completed identity avoids another lookup');
+    const wait=async id=>{for(let i=0;i<150;i++){const result=await auditService.findAudit(id,{auth:owner});if(result.resultados?.length&&result.resultados.every(row=>!['running','pending'].includes(row.status)))return result;await new Promise(resolve=>setTimeout(resolve,10));}assert.fail('collection timed out');};
+    await wait(completed.body.consultaId);assert.equal(courtInputs[0].extraFields.stateCourtFields.birthDate,'15/02/1980');assert.equal(courtInputs[0].extraFields.stateCourtFields.gender,'Feminino');
+    const before=calls.length;
+    const company={...base,documentType:'cnpj',document:'04252011000110'};
+    assert.equal((await post({...company,document:'11111111111111'})).status,400);
+    assert.equal((await post({...company},null)).status,401);assert.equal(calls.length,before);
+    const start=await post({...company});assert.equal(start.status,202);
+    const result=await wait(start.body.consultaId);assert.equal(result.subjectName,'Empresa Ficticia Ltda');assert.equal(result.tipoDocumento,'cnpj');
+    assert.equal(courtInputs.length,1,'company uses company coverage, never PF court collectors');assert.equal(lookups,1);
+    assert.ok(calls.slice(before).length>0);assert.ok(calls.slice(before).every(call=>call.parameters.CNPJ==='04252011000110'&&!call.parameters.CPF&&!call.parameters.DATANASCIMENTO));
+    await review.start(start.body.consultaId,owner,{auth:owner},true);await review.wait(start.body.consultaId);
+    const report=await review.get(start.body.consultaId,owner);assert.equal(report.status,'completed');assert.equal(report.report.subject.name,'Empresa Ficticia Ltda');
+    assert.equal((await review.pdf(start.body.consultaId,owner)).subarray(0,5).toString(),'%PDF-');
+    const restored=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService,ai:{ready:()=>true}});
+    assert.equal((await restored.get(start.body.consultaId,owner)).status,'completed');
+    await assert.rejects(()=>restored.get(start.body.consultaId,{tenantId:1,user:{id:813}}),/seller_analysis_not_found/);
+    sandbox.directDataPersonService.lookup=async()=>{lookups++;return {unavailable:true,reason:'provider_temporarily_unavailable'};};
+    const fallback=await post({...cpf,state:'ES'});
+    assert.equal(fallback.status,503);assert.equal(fallback.body.motherNameRequired,false);
+    assert.deepEqual(Array.from(fallback.body.missingFields),['fullName']);
+    const manual=await post({...cpf,state:'ES',fullName:'Pessoa Ficticia'});
+    assert.equal(manual.status,202);assert.equal(lookups,2,'manual fallback avoids another lookup');await wait(manual.body.consultaId);
+  } finally {await pg.close();}
 });

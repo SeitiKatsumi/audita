@@ -5,6 +5,7 @@ import {
   createDirectDataPersonService,
   normalizeDirectDataPersonResponse,
   personNamesMatch,
+  normalizePersonBirthDate,
 } from "../services/direct-data-person.service.mjs";
 
 const configuredEnv = {
@@ -22,6 +23,8 @@ test("normalizes only the identity fields needed by the seller flow", () => {
         cpf: "52998224725",
         nome: "Maria da Silva",
         nomeMae: "Ana da Silva",
+        dataNascimento: '15/02/1980',
+        sexo: 'F',
         telefones: [{ telefoneComDDD: "11999999999" }],
         enderecos: [{ cidade: "Brasilia" }],
       },
@@ -29,9 +32,22 @@ test("normalizes only the identity fields needed by the seller flow", () => {
     {
       fullName: "Maria da Silva",
       motherName: "Ana da Silva",
+      document: '52998224725',
+      birthDate: '1980-02-15',
+      gender: 'Feminino',
+      rg: '',
       providerReference: "query-123",
     },
   );
+});
+
+test('rejects impossible/future birth dates and mismatched provider CPF without caching it', async () => {
+  assert.equal(normalizePersonBirthDate('31/02/1980'),'');
+  assert.equal(normalizePersonBirthDate('2099-01-01'),'');
+  assert.equal(normalizePersonBirthDate('1980-02-15T00:00:00'),'1980-02-15');
+  const service=createDirectDataPersonService({env:configuredEnv,fetchImpl:async()=>new Response(JSON.stringify({retorno:{cpf:'11144477735',nome:'Pessoa Diferente'}}))});
+  const result=await service.lookup({cpf:'52998224725',authorizationConfirmed:true},{tenantId:1,user:{id:1}});
+  assert.equal(result.failed,true);assert.equal(result.reason,'provider_identity_mismatch');
 });
 
 test("matches full names ignoring accents, case and repeated spacing", () => {

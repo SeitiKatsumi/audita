@@ -383,7 +383,7 @@ export function createAuditService({
 
   async function executeCollector(query, fonte) {
     const collector = fonte === "seller_documents" && customCollectors[fonte]
-      ? { collect: (input) => collectSellerDocuments(input, { query: querySellerDocument, configuration: getSellerDocumentConfiguration?.() }) }
+      ? { collect: (input) => collectSellerDocuments(input, { query: querySellerDocument, configuration: getSellerDocumentConfiguration?.(), collectCompany: customCollectors[fonte].collectCompany }) }
       : customCollectors[fonte];
     if (!collector) {
       await updateResult(query.consultaId, {
