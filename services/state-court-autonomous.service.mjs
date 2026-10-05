@@ -16,7 +16,8 @@ export function planAutonomousCertificates(ufs, configuration = {}) {
   const catalog = getAutonomousCertificateCoverage(configuration);
   if (!Array.isArray(ufs) || !ufs.length || ufs.some((uf) => !catalog.ufs.includes(uf))) throw new Error("unsupported_autonomous_uf");
   const certificates = catalog.certificates.filter((item) => ufs.includes(item.uf));
-  return { certificates, maxProviderCostBrl: Number((certificates.filter((item) => item.provider === "direct_data").length * catalog.pdfQueryCostBrl).toFixed(2)) };
+  const requiredIdentityFields=[...new Set(certificates.flatMap(item=>findStateCourtProfile(item.uf)?.requiredFields||[]))].filter(field=>['birthDate','motherName','rg','gender'].includes(field));
+  return { certificates, requiredIdentityFields, maxProviderCostBrl: Number((certificates.filter((item) => item.provider === "direct_data").length * catalog.pdfQueryCostBrl).toFixed(2)) };
 }
 
 export function certificatePdfMatches(buffer, text, document, fullName) {

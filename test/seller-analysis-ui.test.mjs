@@ -13,7 +13,7 @@ test("seller analysis is available in the property category of the service catal
 
 test("seller analysis route opens its introductory screen", () => {
   assert.match(indexHtml, /id="analise-vendedor" data-page="analise-vendedor emissao-certidoes"/);
-  assert.match(indexHtml, /certidões e consultas do vendedor pessoa física nas fontes habilitadas/);
+  assert.match(indexHtml, /certidões e consultas do vendedor pessoa física ou empresa nas fontes habilitadas/);
   assert.match(indexHtml, /Coleta de dados/);
   assert.match(indexHtml, /relatório em PDF com evidências e próximos passos/);
   assert.match(indexHtml, /id="sellerAnalysisState"/);
@@ -52,6 +52,7 @@ test("seller query groups start collapsed and birth date follows the selected so
       querySelectorAll: (selector) => (selector.includes("sellerAnalysisUfs") ? selected.ufs : selected.queries).map((value) => ({ value })),
     },
     sellerAnalysisMotherName: { required: false },
+    sellerAnalysisFullName: { required: false, value:'' },
     sellerAnalysisError:null,
     escapeHtml: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"),
     fetch: async () => ({ ok: true, json: async () => ({ ufs: ["AP"], certificates: [{ uf: "AP", type: "Cível", provider: "direct_data" }], sellerSources: { configured: true, queries: [

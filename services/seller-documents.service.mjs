@@ -176,7 +176,7 @@ export async function collectSellerDocuments(input, {
   const work = plan.queries.flatMap((item) => isCompanyQuery(item)
     ? companies.map((cnpj, companyIndex) => ({ item, document: cnpj, documentType: "cnpj", id: `${item.id}-empresa${companyIndex + 1}`, label: `${item.label} — empresa ${companyIndex + 1}` }))
     : [{ item, document, documentType: input.tipoDocumento, id: item.id, label: item.label }]);
-  work.push(...companies.map((cnpj,index)=>({company:cnpj,id:`company-${index+1}`,label:`Empresa ${index+1} — cadastro e QSA`})));
+  work.push(...companies.map((cnpj,index)=>({company:cnpj,id:`company-${index+1}`,label:input.tipoDocumento==='cnpj'&&cnpj===document?'Vendedor — cadastro e QSA':`Empresa ${index+1} — cadastro e QSA`})));
   function makeRow({item,id,label,document:target,documentType,company}) {
     return {id,tipo:label,kind:item?.kind||'data',scope:item?.scope||'Brasil',status:'pending',resultado:'indisponivel',provider:company?'Bases públicas de CNPJ':item.provider==='portal'?'SEFAZ-PE':'Direct Data',providerReference:'',subjectDocument:documentType==='cnpj'?target:company||'',details:documentType==='cnpj'?{'CNPJ consultado':target}:{},limitation:item?.limitation||''};
   }
@@ -239,6 +239,7 @@ export async function collectSellerDocuments(input, {
         const cnpj=work[index].company;
         const company = await collectCompany({ documento: cnpj, tipoDocumento: "cnpj", consultaId: input.consultaId, extraFields: {}, usageContext: input.usageContext, retries: 0, timeoutMs: 15000 });
         if (company?.status !== "success" || normalizeDocument(company.dados?.cnpj) !== cnpj || !clean(company.dados?.razaoSocial)) throw new Error("company_identity_unverified");
+        if(input.tipoDocumento==='cnpj'&&cnpj===document&&extra.stateCourtFields?.fullName&&compact(extra.stateCourtFields.fullName)!==compact(company.dados.razaoSocial)) throw new Error('evidence_name_mismatch');
         rows[index] = { ...rows[index], status: "success", details: companyDetails(company.dados), summary: "Cadastro empresarial e QSA obtidos. Situação cadastral não comprova regularidade fiscal.", checkedAt: new Date().toISOString(), providerReference: "" };
         rows[index].evidenceIdentityVerified=true;
         if(automaticCompanies) {

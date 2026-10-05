@@ -601,7 +601,7 @@
               </div>
             </div>
             <p class="seller-analysis-intro" id="sellerFlowIntro">
-              Reúna certidões e consultas do vendedor pessoa física nas fontes habilitadas. A IA confere os documentos e dados obtidos, identifica apontamentos e gera um relatório em PDF com evidências e próximos passos.
+              Reúna certidões e consultas do vendedor pessoa física ou empresa nas fontes habilitadas. A IA confere os documentos e dados obtidos, identifica apontamentos e gera um relatório em PDF com evidências e próximos passos.
             </p>
 
             <ol class="seller-step-nav" id="sellerStepNav" aria-label="Etapas da análise">
@@ -620,14 +620,18 @@
                     <small>Informe o vendedor e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente.</small>
                   </div>
                 </div>
+                <label id="sellerDocumentTypeField">Tipo de vendedor
+                  <select id="sellerAnalysisDocumentType"><option value="cpf">Pessoa física (CPF)</option><option value="cnpj">Empresa (CNPJ)</option></select>
+                </label>
                 <label>
-                  CPF do titular
+                  <span id="sellerDocumentLabel">CPF do titular</span>
                   <input id="sellerAnalysisCpf" type="text" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="000.000.000-00" required />
                 </label>
-                <label>
-                  Nome completo
+                <label id="sellerFullNameField" hidden>
+                  <span id="sellerFullNameLabel">Nome completo</span>
                   <input id="sellerAnalysisFullName" type="text" maxlength="180" autocomplete="name" placeholder="Nome completo do titular" required />
                 </label>
+                <small class="seller-analysis-privacy" id="sellerIdentityHint">Os dados disponíveis serão preenchidos pela consulta ao CPF ou CNPJ. Se uma fonte exigir alguma informação não encontrada, pediremos somente o que faltar.</small>
                 <label id="sellerStateField">Estado do vendedor<select id="sellerAnalysisState" required><option value="">Selecione o estado</option></select></label>
                 <label id="sellerMunicipalityField" hidden>Município — opcional<select id="sellerAnalysisMunicipality"><option value="">Não informado</option></select><small>Inclui as consultas municipais disponíveis para a cidade informada.</small></label>
                 <label id="sellerBirthDateField" hidden>Data de nascimento<input id="sellerAnalysisBirthDate" type="date" /><small>Necessária para emitir os documentos deste estado.</small></label>
@@ -2178,7 +2182,7 @@
     <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20261002-chat-controls"></script>
+    <script type="module" src="app.js?v=20261002-seller-cnpj"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

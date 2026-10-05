@@ -34,7 +34,9 @@ import { createDirectDataSellerService } from "./services/direct-data-seller.ser
 import {
   buildDfSellerAuditRequest,
   normalizeDfSellerInput,
+  normalizeSellerInput,
 } from "./services/seller-analysis.service.mjs";
+import { collect as collectSellerCompany } from './collectors/receita-federal.collector.mjs';
 import { sellerStatePlans, sellerQueriesForState } from './services/seller-state-plan.mjs';
 import { createApiUsageService } from "./services/api-usage.service.mjs";
 import { createOpenAIOfficialUsageService } from "./services/openai-official-usage.service.mjs";
@@ -65,6 +67,7 @@ import {
 import {
   createDirectDataPersonService,
   personNamesMatch,
+  normalizePersonBirthDate,
 } from "./services/direct-data-person.service.mjs";
 import { createPropertyAssetsService } from "./services/property-assets.service.mjs";
 import {
@@ -3921,14 +3924,14 @@ async function handleApi(request, response, pathname) {
       ...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
     };
-    sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage),identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl });
+    sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage), companyStates: sellerStatePlans(coverage,'cnpj'), identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl });
     return true;
   }
 
   if (["/api/seller-analysis/df", "/api/seller-analysis"].includes(pathname) && request.method === "POST") {
     try {
       const body = await readJsonBody(request);
-      const sellerInput = normalizeDfSellerInput(body);
+      const sellerInput = pathname === '/api/seller-analysis/df' ? normalizeDfSellerInput(body) : normalizeSellerInput(body);
       if (sellerInput.invalid) {
         sendJson(response, 400, {
           error: "invalid_seller_analysis_request",
@@ -3945,16 +3948,20 @@ async function handleApi(request, response, pathname) {
 
       let autonomousPlan = null;
       let statePlan = null;
+      let needsBirthDate = false;
+      const documentType = sellerInput.documentType || 'cpf';
+      const document = sellerInput.document || sellerInput.cpf;
+      const isCompany = documentType === 'cnpj';
       if(body.flow !== 'certificates' && body.automatic === true) {
         if(body.aiConsent!==true||body.paidQueryConfirmed!==true) {sendJson(response,400,{error:'seller_consent_required'});return true;}
         const coverage={...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),sellerSources:getSellerDocumentCoverage(directDataSellerService.getStatus())};
-        statePlan=sellerStatePlans(coverage).find(item=>item.uf===body.state);
+        statePlan=sellerStatePlans(coverage,documentType).find(item=>item.uf===body.state);
         if(!statePlan || (body.municipality && !statePlan.municipalities.includes(body.municipality))) {
           sendJson(response,400,{error:'invalid_seller_state'}); return true;
         }
         body.ufs=statePlan.certificateCount?[statePlan.uf]:[];
-        body.sellerQueries=sellerQueriesForState(coverage.sellerSources.queries,statePlan.uf,'cpf',body.municipality||'').map(item=>item.id);
-        body.companyCnpjs=[];
+        body.sellerQueries=sellerQueriesForState(coverage.sellerSources.queries,statePlan.uf,documentType,body.municipality||'').map(item=>item.id);
+        body.companyCnpjs=isCompany?[document]:[];
       }
       if (body.flow !== 'certificates' && body.aiConsent === true && !sellerReviewService.ready()) {
         sendJson(response, 503, { error: 'seller_ai_unavailable', message: 'A análise por IA não está configurada neste ambiente. Nenhuma consulta foi iniciada.' });
@@ -3965,9 +3972,13 @@ async function handleApi(request, response, pathname) {
       if (pathname === "/api/seller-analysis") {
         try {
           if (!Array.isArray(body.ufs)) throw new Error("invalid_ufs");
-          if (body.ufs.length) autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus());
+          if (body.ufs.length) {
+            if (isCompany) throw new Error('unsupported_company_court_selection');
+            autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus());
+          }
           if (!Array.isArray(companyCnpjs) || companyCnpjs.length > 5 || companyCnpjs.some((value) => !validateCnpj(value))) throw new Error("invalid_company_cnpjs");
           sellerDocumentPlan = planSellerDocuments(body.sellerQueries || [], directDataSellerService.getStatus(), companyCnpjs);
+          if (sellerDocumentPlan.queries.some(item => !item.documentTypes.includes(documentType) && !(documentType === 'cpf' && companyCnpjs.length && item.documentTypes.includes('cnpj')))) throw new Error('unsupported_seller_document_type');
           if (body.flow === 'certificates' && (sellerDocumentPlan.queries.some(item => item.kind !== 'certificate') || (!autonomousPlan && !sellerDocumentPlan.queries.length))) throw new Error('invalid_certificate_selection');
           if (!autonomousPlan && !sellerDocumentPlan.queries.length && !companyCnpjs.length) throw new Error("empty_selection");
         } catch {
@@ -3979,22 +3990,31 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 400, { error: "paid_query_confirmation_required", maxProviderCostBrl });
           return true;
         }
-        const date = new Date(`${body.birthDate}T00:00:00Z`);
-        const needsBirthDate = autonomousPlan || sellerDocumentPlan.queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica");
-        if ((needsBirthDate && (!/^\d{4}-\d{2}-\d{2}$/.test(body.birthDate || "") || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== body.birthDate || date > new Date())) || (autonomousPlan && (!String(body.rg || "").trim() || !["Masculino", "Feminino"].includes(body.gender)))) {
-          sendJson(response, 400, { error: "seller_birth_date_and_rg_required" });
-          return true;
-        }
+        needsBirthDate = Boolean(autonomousPlan?.requiredIdentityFields.includes('birthDate') || sellerDocumentPlan.queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica"));
       }
 
       let resolvedFullName = sellerInput.fullName;
       let resolvedMotherName = sellerInput.motherName;
       let identityEnriched = false;
+      body.birthDate = normalizePersonBirthDate(body.birthDate);
+      body.gender = ['Masculino','Feminino'].includes(body.gender) ? body.gender : '';
+      const requiredIdentity = [...new Set(['fullName', ...(needsBirthDate ? ['birthDate'] : []), ...(autonomousPlan?.requiredIdentityFields || []), ...(pathname === '/api/seller-analysis/df' ? ['motherName'] : [])])];
+      const identity = () => ({ fullName: resolvedFullName, motherName: resolvedMotherName, birthDate: body.birthDate, rg: String(body.rg || '').trim().slice(0,30), gender: ['Masculino','Feminino'].includes(body.gender) ? body.gender : '' });
+      const missingIdentity = () => requiredIdentity.filter(field => !identity()[field]);
 
-      if (!resolvedMotherName && (autonomousPlan || pathname === "/api/seller-analysis/df")) {
+      if (isCompany && !resolvedFullName) {
+        const company = await collectSellerCompany({documento:document,tipoDocumento:'cnpj',extraFields:{},retries:0,timeoutMs:15000});
+        if (company?.status === 'success' && String(company.dados?.cnpj || '').replace(/\D/g,'') === document) {
+          resolvedFullName = String(company.dados.razaoSocial || '').trim().slice(0,180);
+          identityEnriched = Boolean(resolvedFullName);
+        }
+      }
+
+      if (!isCompany && missingIdentity().some(field => field !== 'rg')) {
+        if (body.paidQueryConfirmed !== true) { sendJson(response,400,{error:'paid_query_confirmation_required'}); return true; }
         const enrichment = await directDataPersonService.lookup(
           {
-            cpf: sellerInput.cpf,
+            cpf: document,
             authorizationConfirmed: true,
             requestId: crypto.randomUUID(),
           },
@@ -4004,7 +4024,8 @@ async function handleApi(request, response, pathname) {
         if (enrichment.insufficientCredits) {
           sendJson(response, 402, {
             error: "insufficient_credits",
-            motherNameRequired: true,
+            motherNameRequired: missingIdentity().includes('motherName'),
+            missingFields: missingIdentity(),
             creditCost: enrichment.creditCost,
             wallet: enrichment.wallet,
           });
@@ -4014,37 +4035,37 @@ async function handleApi(request, response, pathname) {
           sendJson(response, enrichment.unavailable ? 503 : 502, {
             error: "seller_identity_enrichment_failed",
             reason: enrichment.reason || "provider_request_failed",
-            motherNameRequired: true,
+            motherNameRequired: missingIdentity().includes('motherName'),
+            missingFields: missingIdentity(),
             billingVerificationRequired: enrichment.billingVerificationRequired === true,
           });
           return true;
         }
-        if (!personNamesMatch(sellerInput.fullName, enrichment.result.fullName)) {
+        if ((enrichment.result.document && enrichment.result.document !== document) || (sellerInput.fullName && !personNamesMatch(sellerInput.fullName, enrichment.result.fullName))) {
           sendJson(response, 409, {
             error: "seller_name_mismatch",
             message: "O nome informado não corresponde ao cadastro retornado para o CPF.",
           });
           return true;
         }
-        if (!enrichment.result.motherName) {
-          sendJson(response, 422, {
-            error: "seller_mother_name_not_found",
-            motherNameRequired: true,
-          });
-          return true;
-        }
-
-        resolvedFullName = enrichment.result.fullName;
-        resolvedMotherName = enrichment.result.motherName;
+        resolvedFullName ||= enrichment.result.fullName;
+        resolvedMotherName ||= enrichment.result.motherName;
+        body.birthDate ||= normalizePersonBirthDate(enrichment.result.birthDate);
+        body.gender ||= enrichment.result.gender;
+        body.rg ||= enrichment.result.rg;
         identityEnriched = true;
       }
+      if (missingIdentity().length) {
+        sendJson(response,422,{error:'seller_identity_fields_required', missingFields:missingIdentity(), identity:identity(), motherNameRequired:missingIdentity().includes('motherName')});
+        return true;
+      }
 
-      const prepared = (autonomousPlan || pathname === "/api/seller-analysis/df") ? buildDfSellerAuditRequest({
-        cpf: sellerInput.cpf,
+      const prepared = pathname === "/api/seller-analysis/df" ? buildDfSellerAuditRequest({
+        cpf: document,
         fullName: resolvedFullName,
         motherName: resolvedMotherName,
         authorizationConfirmed: true,
-      }) : { invalid: false, requestBody: { tipoDocumento: "cpf", documento: sellerInput.cpf, fontes: [], authorizationConfirmed: true, extraFields: { stateCourtFields: { fullName: resolvedFullName } } } };
+      }) : { invalid: false, requestBody: { tipoDocumento: documentType, documento: document, fontes: autonomousPlan?['tjdft']:[], authorizationConfirmed: true, extraFields: { stateCourtFields: { firstName:resolvedFullName.split(/\s+/)[0], fullName: resolvedFullName, motherName:resolvedMotherName } } } };
       if (prepared.invalid) {
         sendJson(response, 400, {
           error: "invalid_seller_analysis_request",
