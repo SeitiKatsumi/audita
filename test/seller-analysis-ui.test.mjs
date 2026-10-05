@@ -6,6 +6,24 @@ import vm from "node:vm";
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
+test('completed seller reports show numeric score, all three bands and the private PDF link; unfinished reviews do not show a score', () => {
+  const code=appJs.slice(appJs.indexOf('function renderSellerReview('),appJs.indexOf('function validateCnibDocument('));
+  const context=vm.createContext({escapeHtml:value=>String(value)});
+  vm.runInContext(code,context);
+  for(const [value,band] of [[100,'green'],[70,'yellow'],[40,'red'],[null,'yellow']]) {
+    const target={innerHTML:'',querySelector:()=>null};
+    context.renderSellerReview(target,'test-id',{status:'completed',report:{conclusion:'Análise fictícia',analyzed:1,findings:[],sources:[],safetyScore:{value,band,label:'Teste',limited:value===null}}});
+    assert.match(target.innerHTML,new RegExp(`seller-safety-score--${band}`));
+    assert.ok(target.innerHTML.includes(value===null?'—':String(value)));
+    assert.match(target.innerHTML,/Baixar relatório completo em PDF/);
+    assert.match(target.innerHTML,/não é score de crédito nem garantia/);
+    assert.match(target.innerHTML,/Como calculamos o score/);
+  }
+  const target={innerHTML:'',querySelector:()=>null};
+  context.renderSellerReview(target,'test-id',{status:'running',progress:50});
+  assert.doesNotMatch(target.innerHTML,/seller-safety-score/);
+});
+
 test("seller analysis is available in the property category of the service catalog", () => {
   assert.match(indexHtml, /data-service-card data-categories="imoveis"[^>]*>\s*<a class="service-card-entry" href="#analise-vendedor"/);
   assert.match(indexHtml, /<strong>Análise de Vendedor<\/strong>/);

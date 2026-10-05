@@ -7,7 +7,7 @@ import { PDFDocument } from 'pdf-lib';
 import vm from 'node:vm';
 import { createAuditService } from '../services/audit.service.mjs';
 import { createSellerReviewAI } from '../services/seller-review-ai.mjs';
-import { createSellerReviewService, validateSellerReading, readSellerPdf } from '../services/seller-review.service.mjs';
+import { createSellerReviewService, validateSellerReading, readSellerPdf, calculateSellerSafetyScore } from '../services/seller-review.service.mjs';
 import { extractPdfText } from '../services/pdf.service.mjs';
 
 const owner = { tenantId: 1, user: { id: 811 } };
@@ -48,6 +48,8 @@ test('seller collection -> AI -> persisted report -> private PDF; source failure
     assert.equal(state.status,'completed');assert.equal(state.progress,100);
     assert.equal(state.report.subject.name,'Vendedor Fictício');
     assert.equal(state.report.analyzed,2);assert.equal(state.report.gaps,1);assert.equal(state.report.findings.length,1);
+    assert.equal(state.report.safetyScore.value,40);assert.equal(state.report.safetyScore.band,'red');
+    assert.equal(state.report.safetyScore.limited,true);
     assert.ok(!JSON.stringify(state).includes('test.pdf'));assert.ok(!('checkpoints' in state));
     assert.equal(f.calls.length,2);assert.ok(!f.calls.some(s=>s.buffer),'digital PDFs use text only');
     assert.equal(f.calls.find(s=>s.title==='CNDT').subject.document,'04252011000110','company evidence is analyzed against its CNPJ');
@@ -81,6 +83,29 @@ test('seller collection -> AI -> persisted report -> private PDF; source failure
     assert.equal((await invoke('POST',`${url}/review`,owner,'https://attacker.test')).status,403);
     assert.equal((await invoke('GET',`${url}/report.pdf`)).headers['cache-control'],'private, no-store');
   }finally{await f.db.close();}
+});
+
+test('documentary score uses grounded priorities, limits incomplete evidence and never attributes linked company debt to a person', () => {
+  const clear = {status:'analyzed',identity:'compatible',outcome:'no_occurrence_in_scope',limitations:[],findings:[]};
+  const high = {...clear,outcome:'occurrences',findings:reading.findings};
+  const medium = {...high,findings:reading.findings.map(f=>({...f,priority:'medium'}))};
+  const score = sources => calculateSellerSafetyScore({subject:{documentType:'cpf'},sources});
+  assert.deepEqual([score([clear]).value,score([clear]).band],[100,'green']);
+  assert.deepEqual([score([medium]).value,score([medium]).band],[70,'yellow']);
+  assert.deepEqual([score([high]).value,score([high]).band],[40,'red']);
+  assert.equal(score([high,high]).value,40,'duplicate evidence is not deducted twice');
+  assert.equal(score([high,{...high,findings:reading.findings.map(f=>({...f,title:'Outro apontamento',quote:'Outra evidência'}))}]).value,0);
+  assert.deepEqual([score([clear,{status:'unavailable'}]).value,score([clear,{status:'unavailable'}]).band],[69,'yellow']);
+  assert.equal(score([{...clear,limitations:['Conferir original']}]).value,69);
+  for(const unusable of [{...high,identity:'mismatch'}, {...high,identity:'uncertain'}, {...clear,outcome:'inconclusive'}, {...clear,outcome:'informational'}, {status:'unread'}]) {
+    assert.equal(score([unusable]).value,null);
+    assert.equal(score([clear,unusable]).band,unusable.outcome==='informational'?'green':'yellow');
+  }
+  const company = {...high,subject:{document:'04252011000110'}};
+  assert.equal(score([clear,company]).value,69);assert.equal(score([clear,company]).high,0);
+  assert.equal(calculateSellerSafetyScore({subject:{document:'529********25'},sources:[clear,company]}).value,69,'old reports also keep company debt separate');
+  assert.equal(calculateSellerSafetyScore({subject:{documentType:'cnpj'},sources:[company]}).value,40);
+  assert.equal(score([]).value,null);
 });
 
 test('interruption, failed AI reading, checkpoints and concurrent claims do not repeat completed sources',async()=>{
