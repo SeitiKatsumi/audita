@@ -1,5 +1,16 @@
 # Deploy
 
+## Publicacao dos segmentos comerciais - 06/10/2026
+
+Usuario autorizou publicar todos os oito novos segmentos e a versao consolidada.
+Reutilizam o fluxo de vendedor, com catalogo publico analysis-segments.js incluído
+no Dockerfile e na lista publica, finalidade da IA salva por consulta e historicos
+separados. Sem migracao, dependencia nova ou alteracao de chaves/volumes. Suite
+completa:540 testes aprovados em PGlite; Chrome validou CPF/CNPJ ate PDF com
+provedores ficticios. Conferir SHA servido, saude, catalogo/filtros e oito destinos
+em producao, preservando o acesso autenticado dos resultados. Imagem anterior
+audita:141 (5b7c0d1); rollback pela imagem anterior, sem restaurar banco.
+
 ## Publicacao de vendedor CPF/CNPJ - 05/10/2026
 
 Usuario autorizou publicar a entrada por CNPJ e o enriquecimento cadastral por
