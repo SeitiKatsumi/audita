@@ -1,3 +1,35 @@
+import { analysisSegments } from './analysis-segments.js';
+
+function addAnalysisServices(root) {
+  for (const segment of analysisSegments.filter(s => s.id !== 'analise-vendedor')) {
+    if (root.querySelector(`a[href="#${segment.id}"]`)) continue;
+    let heading = root.querySelector(`#services-${segment.category}`);
+    if (!heading) {
+      const group = document.createElement('section');
+      group.className = 'services-group'; group.dataset.serviceGroup = '';
+      group.setAttribute('aria-labelledby', `services-${segment.category}`);
+      group.innerHTML = `<h3 id="services-${segment.category}">${segment.categoryLabel}</h3><div class="services-grid"></div>`;
+      root.querySelector('#servicesGrid').append(group);
+      heading = group.querySelector('h3');
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'secondary-action'; button.dataset.serviceCategory = segment.category;
+      button.setAttribute('aria-pressed', 'false'); button.textContent = segment.categoryLabel;
+      root.querySelector('[data-service-category="all"]').parentElement.append(button);
+    }
+    const card = document.createElement('article');
+    card.className = 'home-module-action service-card service-card-explained';
+    card.dataset.serviceCard = ''; card.dataset.categories = segment.category;
+    card.innerHTML = `<a class="service-card-entry" href="#${segment.id}"><span class="home-module-icon"><img src="assets/nav-icons/building.svg" alt="" /></span><span class="home-module-copy"><small class="service-category-label">${segment.categoryLabel}</small><strong>${segment.title}</strong><small>${segment.description}</small></span></a>
+      <details class="service-disclosure"><summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary><div class="service-expanded"><span class="service-detail"><b>Como podemos ajudar</b><span>Coleta de documentos e dados, análise por IA com foco neste serviço, score documental e relatório completo em PDF.</span></span><small class="service-note">${segment.scope}</small><a class="service-action" href="#${segment.id}">Iniciar análise<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a></div></details>`;
+    heading.parentElement.querySelector('.services-grid').append(card);
+  }
+  const compare = (a, b) => a.localeCompare(b, 'pt-BR');
+  const groups = [...root.querySelectorAll('[data-service-group]')];
+  groups.sort((a,b) => compare(a.querySelector('h3').textContent,b.querySelector('h3').textContent)).forEach(g => root.querySelector('#servicesGrid').append(g));
+  for (const group of groups) [...group.querySelectorAll('[data-service-card]')].sort((a,b)=>compare(a.querySelector('strong').textContent,b.querySelector('strong').textContent)).forEach(card=>group.querySelector('.services-grid').append(card));
+  [...root.querySelectorAll('[data-service-category]')].filter(b=>b.dataset.serviceCategory !== 'all').sort((a,b)=>compare(a.textContent,b.textContent)).forEach(b=>root.querySelector('[data-service-category="all"]').parentElement.append(b));
+}
+
 export function matchesService(service, query, category) {
   const normalize = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   return service.enabled !== false && (category === 'all' || service.categories.includes(category)) &&
@@ -6,6 +38,7 @@ export function matchesService(service, query, category) {
 
 export function initServicesCatalog(root = document.querySelector('#central-servicos'), { openPlans } = {}) {
   if (!root) return;
+  addAnalysisServices(root);
   if (openPlans) initJurisprudence(root, openPlans);
   root.querySelector('[data-ir-diseases-open]')?.addEventListener('click', () => {
     document.querySelector('#irDiseasesDialog').showModal();

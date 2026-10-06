@@ -1,13 +1,16 @@
 import { validateCpf, isValidDocument } from "./audit.service.mjs";
+import { getAnalysisSegment } from '../analysis-segments.js';
 
 export function normalizeSellerInput(value = {}) {
   const documentType = value.documentType || value.tipoDocumento || (value.cnpj ? 'cnpj' : 'cpf');
   const rawDocument = String(value.document || value.documento || value.cnpj || value.cpf || '');
   const document = rawDocument.replace(/\D/g, '');
   const missingFields = [];
+  const segment = value.segment ?? 'analise-vendedor';
+  if (!getAnalysisSegment(segment)) missingFields.push('segment');
   if (!['cpf', 'cnpj'].includes(documentType) || !/^[\d.\-/\s]+$/.test(rawDocument) || !isValidDocument(documentType, document)) missingFields.push('document');
   if (value.authorizationConfirmed !== true) missingFields.push('authorizationConfirmed');
-  return { invalid: missingFields.length > 0, missingFields, documentType, document,
+  return { invalid: missingFields.length > 0, missingFields, documentType, document, segment,
     fullName: String(value.fullName || '').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180),
     motherName: String(value.motherName || '').replace(/\s+/g, ' ').trim().slice(0, 180),
   };

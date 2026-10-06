@@ -10,6 +10,7 @@ import * as cnib from "../collectors/cnib.collector.mjs";
 import * as imoveisOnr from "../collectors/imoveis-onr.collector.mjs";
 import { calculateRiskScore } from "./risk-score.service.mjs";
 import { collectSellerDocuments } from "./seller-documents.service.mjs";
+import { getAnalysisSegment } from '../analysis-segments.js';
 
 const collectors = {
   receita_federal: receitaFederal,
@@ -92,6 +93,7 @@ function envNumber(name, fallback) {
 function normalizeExtraFields(value) {
   return {
     sellerFlow: value.sellerFlow === 'certificates' ? 'certificates' : 'seller',
+    sellerSegment: getAnalysisSegment(value.sellerSegment)?.id || 'analise-vendedor',
     sellerAiConsent: value.sellerFlow !== 'certificates' && value.sellerAiConsent === true,
     sellerQueries: Array.isArray(value.sellerQueries) ? [...new Set(value.sellerQueries.map(String))].slice(0, 160) : [],
     sellerState: /^[A-Z]{2}$/.test(value.sellerState || '') ? value.sellerState : '',
@@ -283,6 +285,7 @@ export function createAuditService({
           fontes: query.fontes,
           sellerAiConsent: query.extraFields.sellerAiConsent === true,
           sellerFlow: query.extraFields.sellerFlow,
+          sellerSegment: query.extraFields.sellerSegment,
           extraFieldsProvided: Object.fromEntries(Object.keys(query.extraFields || {}).map((key) => [key, Boolean(query.extraFields[key])])),
         }),
         String(query.extraFields.stateCourtFields?.fullName || '').slice(0, 180) || null,
@@ -549,6 +552,7 @@ export function createAuditService({
     return {
       consultaId: query.consultaId,
       sellerFlow: query.extraFields?.sellerFlow || 'seller',
+      sellerSegment: query.extraFields?.sellerSegment || 'analise-vendedor',
       documento: query.documento,
       tipoDocumento: query.tipoDocumento,
       status: aggregateStatus(resultados),
@@ -593,6 +597,7 @@ export function createAuditService({
          aq.public_id,
          aq.document_masked,
          aq.request_payload->>'sellerFlow' AS seller_flow,
+         aq.request_payload->>'sellerSegment' AS seller_segment,
          aq.tipo_documento,
          aq.document_type,
          aq.status,
@@ -633,6 +638,7 @@ export function createAuditService({
       audits.push({
         consultaId: row.public_id,
         sellerFlow: row.seller_flow || 'seller',
+        sellerSegment: row.seller_segment || 'analise-vendedor',
         documento: row.document_masked,
         tipoDocumento: row.tipo_documento || row.document_type,
         status: aggregateStatus(resultados),
@@ -671,6 +677,7 @@ export function createAuditService({
       return {
         consultaId: memory.consultaId,
         sellerFlow: memory.extraFields.sellerFlow || 'seller',
+        sellerSegment: memory.extraFields.sellerSegment || 'analise-vendedor',
         documento: memory.documento,
         subjectName: memory.extraFields.stateCourtFields?.fullName || '',
         tipoDocumento: memory.tipoDocumento,
@@ -698,7 +705,7 @@ export function createAuditService({
     }
 
     const auditResult = await pool.query(
-      `SELECT public_id, request_payload->>'sellerFlow' AS seller_flow, subject_name, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos, created_at, updated_at
+      `SELECT public_id, request_payload->>'sellerFlow' AS seller_flow, request_payload->>'sellerSegment' AS seller_segment, subject_name, document_masked, tipo_documento, document_type, status, score_nivel, score_motivos, created_at, updated_at
        FROM audita_audits
        WHERE public_id = $1
          ${tenantFilter}
@@ -734,6 +741,7 @@ export function createAuditService({
     return {
       consultaId: audit.public_id,
       sellerFlow: audit.seller_flow || 'seller',
+      sellerSegment: audit.seller_segment || 'analise-vendedor',
       documento: audit.document_masked,
       subjectName: audit.subject_name || '',
       tipoDocumento: audit.tipo_documento || audit.document_type,

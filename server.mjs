@@ -4076,6 +4076,7 @@ async function handleApi(request, response, pathname) {
 
       request.body = prepared.requestBody;
       request.body.extraFields.sellerFlow = body.flow === 'certificates' ? 'certificates' : 'seller';
+      request.body.extraFields.sellerSegment = sellerInput.segment || 'analise-vendedor';
       request.body.extraFields.sellerAiConsent = body.flow !== 'certificates' && body.aiConsent === true;
       request.body.extraFields.authorizationConfirmed = true;
       if (sellerDocumentPlan && (sellerDocumentPlan.queries.length || companyCnpjs.length)) {
@@ -4131,7 +4132,7 @@ async function handleApi(request, response, pathname) {
         sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent));
       } else if (sellerReviewMatch[2] === 'report.pdf') {
         const buffer = await sellerReviewService.pdf(id, auth);
-        response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="analise-vendedor.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });
+        response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="relatorio-audita.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });
         response.end(buffer);
       } else {
         response.setHeader('cache-control', 'private, no-store');
@@ -6213,7 +6214,7 @@ const server = http.createServer(async (request, response) => {
 
   const requestedPath = uiRoute.path;
   // Keep private storage, configuration and server implementation outside the static surface.
-  const publicRootFiles = new Set(["import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
+  const publicRootFiles = new Set(["analysis-segments.js", "import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
     "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
     "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css", "general-chat.js"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");
