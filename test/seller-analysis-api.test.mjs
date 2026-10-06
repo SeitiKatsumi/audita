@@ -69,19 +69,20 @@ test("seller POST validates selection and consent, persists the selected source 
     };
     const body = { cpf: "52998224725", fullName: "Pessoa Teste", ufs: [], sellerQueries: ["protestos"], authorizationConfirmed: true, paidQueryConfirmed: true };
     assert.equal((await post({ ...body }, null)).status, 401);
-    for (const override of [{ authorizationConfirmed: false }, { paidQueryConfirmed: false }, { sellerQueries: ["unknown"] }, { sellerQueries: [] }, { ufs: ["XX"] }, { companyCnpjs: ["11111111111111"] }]) {
+    for (const override of [{segment:'arbitrary-prompt'}, { authorizationConfirmed: false }, { paidQueryConfirmed: false }, { sellerQueries: ["unknown"] }, { sellerQueries: [] }, { ufs: ["XX"] }, { companyCnpjs: ["11111111111111"] }]) {
       assert.equal((await post({ ...body, ...override })).status, 400);
     }
     assert.equal(providerCalls.length, 0);
     assert.equal(Number((await pg.query("SELECT count(*) AS count FROM audita_audits")).rows[0].count), 0);
 
-    const started = await post({ ...body });
+    const started = await post({ ...body,segment:'analise-de-socios' });
     assert.equal(started.status, 202);
     assert.equal(started.body.identityEnriched, false);
     assert.equal((await waitForAudit(started.body.consultaId)).status, "success");
     const persisted = (await pg.query("SELECT requested_by_user_id,authorization_confirmed,request_payload FROM audita_audits WHERE public_id=$1", [started.body.consultaId])).rows[0];
     assert.equal(persisted.requested_by_user_id, 811);
     assert.equal(persisted.authorization_confirmed, true);
+    assert.equal(persisted.request_payload.sellerSegment,'analise-de-socios');
     assert.deepEqual(persisted.request_payload.fontes, ["seller_documents"]);
     const executions = (await pg.query("SELECT fonte,status,dados_json FROM audita_audit_executions WHERE audit_id=(SELECT id FROM audita_audits WHERE public_id=$1)", [started.body.consultaId])).rows;
     assert.equal(executions.length, 1);

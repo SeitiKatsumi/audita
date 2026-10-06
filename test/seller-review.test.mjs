@@ -9,6 +9,7 @@ import { createAuditService } from '../services/audit.service.mjs';
 import { createSellerReviewAI } from '../services/seller-review-ai.mjs';
 import { createSellerReviewService, validateSellerReading, readSellerPdf, calculateSellerSafetyScore } from '../services/seller-review.service.mjs';
 import { extractPdfText } from '../services/pdf.service.mjs';
+import { analysisSegments } from '../analysis-segments.js';
 
 const owner = { tenantId: 1, user: { id: 811 } };
 export const reading = { summary: 'Protesto informado pela fonte; conferir situação atual.', identity: 'compatible', outcome: 'occurrences', issuedAt: null, validUntil: null, limitations: [], findings: [{ category: 'credit', priority: 'high', title: 'Protesto de R$ 1.250,00', description: 'A fonte informa um protesto. A exigibilidade e eventual baixa devem ser conferidas.', quote: 'R$ 1.250,00', amount: 'R$ 1.250,00', date: null, recommendation: 'Solicitar certidão atualizada e comprovante de baixa ao cartório.' }] };
@@ -83,6 +84,36 @@ test('seller collection -> AI -> persisted report -> private PDF; source failure
     assert.equal((await invoke('POST',`${url}/review`,owner,'https://attacker.test')).status,403);
     assert.equal((await invoke('GET',`${url}/report.pdf`)).headers['cache-control'],'private, no-store');
   }finally{await f.db.close();}
+});
+
+test('all analysis segments persist their purpose through collection, AI, restart, history and private PDF',async()=>{
+  const f=await fixture();
+  try {
+    const summaries=[];
+    f.ai.summarize=async report=>{summaries.push(report.segment);return [{text:'Resumo fictício específico do serviço.',sourceIds:['fixture'],quotes:['R$ 1.250,00']}];};
+    for(const segment of analysisSegments) {
+      f.request.body.extraFields.sellerSegment=segment.id;
+      const before=f.calls.length,id=await f.start(),state=await f.review.get(id,owner);
+      assert.equal(state.status,'completed');
+      assert.equal(state.report.segment,segment.id);assert.equal(state.report.title,segment.title);
+      assert.deepEqual(f.calls.slice(before).map(s=>s.segment),[segment.id,segment.id]);
+      assert.equal(state.report.safetyScore.value,40,'shared score uses existing evidence without an additional AI call');
+      const saved=await f.audit.findAudit(id,f.request);
+      assert.equal(saved.sellerSegment,segment.id);
+      const reopened=createSellerReviewService(f.options);
+      assert.deepEqual(await reopened.get(id,owner),state);
+      await reopened.start(id,owner,f.request,true);
+      assert.equal(f.calls.length,before+2,'reopen uses cached report');
+      const buffer=await reopened.pdf(id,owner),pdf=await PDFDocument.load(buffer),text=await extractPdfText(buffer);
+      assert.equal(pdf.getTitle(),segment.title);
+      assert.ok(text.includes(segment.title.toUpperCase()));
+      assert.ok(text.replace(/\s+/g,' ').includes(segment.id==='analise-vendedor'?'matrícula atualizada':segment.scope));
+      await assert.rejects(()=>reopened.pdf(id,{tenantId:2,user:{id:811}}));
+    }
+    const history=await f.audit.listAuditHistory(f.request);
+    assert.deepEqual(new Set(history.audits.map(a=>a.sellerSegment)),new Set(analysisSegments.map(s=>s.id)));
+    assert.deepEqual(summaries,analysisSegments.map(s=>s.id));
+  } finally {await f.db.close();}
 });
 
 test('documentary score uses grounded priorities, limits incomplete evidence and never attributes linked company debt to a person', () => {

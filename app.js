@@ -1,6 +1,13 @@
 import { initGeneralChat } from './general-chat.js';
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js";
+import { analysisSegments, getAnalysisSegment } from './analysis-segments.js';
+for (const element of document.querySelectorAll('[data-page], [data-nav-pages]')) {
+  for (const key of ['page', 'navPages']) {
+    const pages = (element.dataset[key] || '').split(/\s+/);
+    if (pages.includes('analise-vendedor')) element.dataset[key] = [...new Set([...pages, ...analysisSegments.map(s => s.id)])].join(' ');
+  }
+}
 const canvas = document.querySelector("#signalCanvas");
 const ctx = canvas?.getContext("2d");
 const riskScore = document.querySelector("#riskScore");
@@ -264,6 +271,7 @@ let apiUsageDashboardData = null;
 let currentAuthState = { authRequired: true, user: null };
 let pendingGuestAction = null;
 const publicPages = new Set(["home", "chat", "central-servicos", "analise-vendedor", "emissao-certidoes",
+  ...analysisSegments.map(segment => segment.id),
   "consulta-imoveis", "isencao-ir", "pis-pasep", "analise-cobrancas", "dividas-bancarias",
   "auditoria-importacao", "contas-de-luz", "consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]);
 const isGuest = () => currentAuthState.authRequired && !currentAuthState.user;
@@ -894,6 +902,7 @@ const auditSourceLabels = {
 };
 
 const pageMeta = {
+  ...Object.fromEntries(analysisSegments.map(s => [s.id, {title:s.title,eyebrow:s.eyebrow}])),
   advogados: {title: "Área dos Advogados", eyebrow: "Atendimentos da equipe"},
   "contas-de-luz": { title: "Auditoria de contas de luz", eyebrow: "Energia" },
   "auditoria-importacao": { title: "Auditoria de importação", eyebrow: "NCM · II · IPI" },
@@ -6566,24 +6575,27 @@ async function loadAuditResult(consultaId, attempts = 180) {
 
 let sellerFlowPage = null;
 function isCertificateOnly() { return getActivePage() === 'emissao-certidoes'; }
-function sellerHistoryKey(flow = isCertificateOnly() ? 'certificates' : 'seller') {
-  return flow === 'certificates' ? 'audita:lastCertificateAuditId' : 'audita:lastSellerAnalysisDfAuditId';
+function isSellerAnalysisPage(page = getActivePage()) { return page === 'emissao-certidoes' || Boolean(getAnalysisSegment(page)); }
+function activeAnalysisSegment() { return getAnalysisSegment(getActivePage()) || getAnalysisSegment(); }
+function sellerHistoryKey(flow = isCertificateOnly() ? 'certificates' : 'seller', segment = activeAnalysisSegment().id) {
+  return flow === 'certificates' ? 'audita:lastCertificateAuditId' : segment === 'analise-vendedor' ? 'audita:lastSellerAnalysisDfAuditId' : `audita:lastAnalysis:${segment}`;
 }
 function configureSellerFlow(page) {
   if (sellerFlowPage === page) return;
   sellerFlowPage = page;
   sellerCollectionRun++;
   sellerReviewRun++;
-  if (!['analise-vendedor', 'emissao-certidoes'].includes(page) || !sellerAnalysisForm) return;
+  if (!isSellerAnalysisPage(page) || !sellerAnalysisForm) return;
   const certificates = page === 'emissao-certidoes';
-  document.querySelector('#sellerFlowEyebrow').textContent = certificates ? 'Emissão de certidões' : 'Compra e venda de imóveis';
-  document.querySelector('#sellerFlowTitle').textContent = certificates ? 'Emissão de certidões diversas' : 'Análise de Vendedor';
+  const segment = activeAnalysisSegment();
+  document.querySelector('#sellerFlowEyebrow').textContent = certificates ? 'Emissão de certidões' : segment.eyebrow;
+  document.querySelector('#sellerFlowTitle').textContent = certificates ? 'Emissão de certidões diversas' : segment.title;
   document.querySelector('#sellerFlowIntro').textContent = certificates
     ? 'Informe os dados do titular, selecione as certidões disponíveis e acompanhe a emissão. Ao concluir, você poderá abrir os documentos obtidos. Este serviço não inclui análise por IA.'
-    : 'Do CPF ou CNPJ ao relatório: informe o estado e acompanhe a análise do vendedor.';
-  document.querySelector('#sellerFlowSteps').textContent = certificates ? 'Dados do titular → Seleção e emissão → Documentos disponíveis' : 'Dados do vendedor → Levantamento das fontes → Análise por IA e relatório PDF';
-  document.querySelector('.seller-analysis-form-heading strong').textContent=certificates?'Dados do titular':'Quem está vendendo o imóvel?';
-  document.querySelector('.seller-analysis-form-heading small').textContent=certificates?'Informe o titular e selecione as certidões para emitir.':'Informe o vendedor e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente.';
+    : `${segment.description} Do CPF ou CNPJ ao relatório: informe o estado e acompanhe a análise.`;
+  document.querySelector('#sellerFlowSteps').textContent = certificates ? 'Dados do titular → Seleção e emissão → Documentos disponíveis' : 'Dados do titular → Levantamento das fontes → Análise por IA e relatório PDF';
+  document.querySelector('.seller-analysis-form-heading strong').textContent=certificates?'Dados do titular':segment.question;
+  document.querySelector('.seller-analysis-form-heading small').textContent=certificates?'Informe o titular e selecione as certidões para emitir.':`Informe o CPF ou CNPJ e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente. ${segment.scope}`;
   document.querySelector('#sellerAiConsentLabel').hidden = true;
   const consent = document.querySelector('#sellerAnalysisAiConsent');
   consent.disabled = certificates;
@@ -6595,14 +6607,19 @@ function configureSellerFlow(page) {
   for(const selector of ['#sellerManualSelection','#sellerManualCompanies','#sellerPaidConsentLabel']) document.querySelector(selector).hidden=!certificates;
   document.querySelector('#sellerStateField').hidden=certificates;
   document.querySelector('#sellerAnalysisState').required=!certificates;
+  document.querySelector('#sellerStateField').firstChild.textContent = segment.id === 'analise-vendedor' ? 'Estado do vendedor' : 'Estado do titular';
   document.querySelector('#sellerAnalysisPaid').required=certificates;
-  document.querySelector('#sellerAuthorizationText').textContent=certificates?'Tenho autorização ou base legal para consultar este titular.':'Tenho autorização ou base legal para consultar este vendedor e autorizo o levantamento e a análise dos documentos pela IA da Audita (OpenAI).';
+  document.querySelector('#sellerAuthorizationText').textContent=certificates?'Tenho autorização ou base legal para consultar este titular.':'Tenho autorização ou base legal para consultar este titular e autorizo o levantamento e a análise dos documentos pela IA da Audita (OpenAI).';
   document.querySelector('#sellerStepNav li:last-child').hidden=certificates;
   setSellerStep(1);
   sellerAnalysisError.textContent = '';
   sellerAnalysisResult.innerHTML = '<p>Selecione os documentos para iniciar.</p>';
-  if(certificates) document.querySelector('#sellerAnalysisDocumentType').value='cpf';
+  document.querySelector('#sellerAnalysisDocumentType').value=certificates?'cpf':segment.defaultDocumentType;
+  sellerAnalysisCpf.value = '';
+  document.querySelector('#sellerAnalysisState').value = '';
+  document.querySelector('#sellerAnalysisAuthorization').checked = false;
   document.querySelector('#sellerDocumentTypeField').hidden=certificates;
+  document.querySelector('#sellerDocumentTypeField').firstChild.textContent = segment.id === 'analise-vendedor' ? 'Tipo de vendedor' : 'Tipo de titular';
   resetSellerIdentity();
   updateSellerDocumentType();
   document.querySelector('#sellerChangeData').hidden = true;
@@ -6622,7 +6639,7 @@ function resetSellerIdentity() {
 }
 function updateSellerDocumentType() {
   const company=sellerDocumentType()==='cnpj';
-  document.querySelector('#sellerDocumentLabel').textContent=company?'CNPJ do vendedor':'CPF do titular';
+  document.querySelector('#sellerDocumentLabel').textContent=company?(activeAnalysisSegment().id==='analise-vendedor'?'CNPJ do vendedor':'CNPJ para análise'):'CPF do titular';
   document.querySelector('#sellerFullNameLabel').textContent=company?'Razão social':'Nome completo';
   sellerAnalysisCpf.maxLength=company?18:14;
   sellerAnalysisCpf.placeholder=company?'00.000.000/0000-00':'000.000.000-00';
@@ -6857,7 +6874,7 @@ function getSellerAnalysisStartError(data = {}, responseStatus = 0) {
     return "Não foi possível localizar automaticamente o nome da mãe. Informe-o para continuar.";
   }
   if (responseStatus === 400) {
-    return "Confira os dados do vendedor, os CNPJs e as fontes selecionadas.";
+    return "Confira os dados do titular, os CNPJs e as fontes selecionadas.";
   }
   return "Não foi possível iniciar a extração agora.";
 }
@@ -6884,7 +6901,7 @@ function renderSellerAnalysisResult(audit) {
   const total = Math.max(expectedTypes.length, executions.reduce((sum, item) => sum + Number(item.dados?.progress?.total || item.dados?.certidoes?.length || 1), 0));
   const processing = !sellerAnalysisFinished(audit);
   const overallLabel = processing
-    ? audit?.status === "preparing" ? "Validando vendedor" : "Consultando"
+    ? audit?.status === "preparing" ? "Validando titular" : "Consultando"
     : available === total && total > 0
       ? "Concluído"
       : available
@@ -6981,7 +6998,7 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
       const response = await fetch(`/audit/${encodeURIComponent(consultaId)}`, { headers: { accept: "application/json" } });
       if (run !== sellerCollectionRun) return;
       if (response.status === 401) {
-        showLogin("Entre para acompanhar a análise do vendedor.");
+        showLogin("Entre para acompanhar esta análise.");
         renderSellerAnalysisFailure({ message: "É necessário entrar para acompanhar esta extração." });
         return;
       }
@@ -6991,6 +7008,12 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
         return;
       }
       const audit = await response.json();
+      if (run !== sellerCollectionRun) return;
+      if (!isCertificateOnly() && (audit.sellerSegment || 'analise-vendedor') !== activeAnalysisSegment().id) {
+        sellerAnalysisError.textContent = 'Esta consulta pertence a outro serviço. Abra o histórico do serviço correspondente.';
+        setSellerStep(1);
+        return;
+      }
       renderSellerAnalysisResult(audit);
       if (sellerAnalysisFinished(audit)) { if(changeData) changeData.hidden=false;if (!isCertificateOnly()) await loadSellerReview(consultaId); return; }
     } catch {
@@ -7009,13 +7032,14 @@ async function loadSellerReviewHistory() {
   const target = document.querySelector('#sellerReviewHistoryList');
   if (!target) return;
   const flow = isCertificateOnly() ? 'certificates' : 'seller';
+  const segment = activeAnalysisSegment().id;
   target.textContent = 'Carregando consultas salvas...';
   try {
     const response = await fetch('/audit');
     if (!response.ok) throw new Error();
     const { audits = [] } = await response.json();
-    if (flow !== (isCertificateOnly() ? 'certificates' : 'seller')) return;
-    const sellers = audits.filter(a => (a.sellerFlow || 'seller') === flow && a.fontes?.length && a.fontes.every(f => ['tjdft', 'seller_documents'].includes(f.fonte)));
+    if (flow !== (isCertificateOnly() ? 'certificates' : 'seller') || segment !== activeAnalysisSegment().id) return;
+    const sellers = audits.filter(a => (a.sellerFlow || 'seller') === flow && (flow === 'certificates' || (a.sellerSegment || 'analise-vendedor') === segment) && a.fontes?.length && a.fontes.every(f => ['tjdft', 'seller_documents'].includes(f.fonte)));
     target.innerHTML = sellers.length ? sellers.map(a => `<p><button type="button" class="secondary-action" data-seller-history="${escapeHtml(a.consultaId)}">${escapeHtml(a.documento)} · ${escapeHtml(new Date(a.createdAt).toLocaleString('pt-BR'))}</button></p>`).join('') : '<p>Nenhuma consulta deste serviço nas consultas recentes.</p>';
     target.querySelectorAll('[data-seller-history]').forEach(button => { button.onclick = () => {
       sessionStorage.setItem(sellerHistoryKey(), button.dataset.sellerHistory);
@@ -7064,7 +7088,7 @@ function renderSellerReview(target, id, state) {
       <details><summary>Como calculamos o score</summary><p>Partimos de 100 pontos. Cada apontamento de prioridade alta reduz 60 pontos; de prioridade média, 30 pontos. Apontamentos idênticos contam uma vez. A pontuação mínima é 0.</p><p>Fontes indisponíveis, leitura inconclusiva, identidade não confirmada ou limitações impedem o verde e limitam o score a 69. Dados apenas cadastrais não permitem pontuar. Dívidas de empresas vinculadas não são atribuídas automaticamente à pessoa física.</p><p>80–100: verde · 50–79: amarelo · 0–49: vermelho. O resultado considera somente as fontes e a data desta análise.</p></details></div>
     </section>` : ''}<p class="seller-report-summary"><strong>${escapeHtml(report.conclusion)}</strong></p><p>${report.analyzed} documentos e consultas analisados · ${report.findings.filter(f=>f.priority!=='information').length} pontos de atenção</p>
       ${state.status === 'completed' ? `<a class="primary-action" href="/api/seller-analysis/${encodeURIComponent(id)}/report.pdf" download>Baixar relatório completo em PDF</a>` : ''}
-      ${report.findings.some(f=>f.priority!=='information') ? `<details><summary>Ver pendências e próximos passos</summary>${report.findings.filter(f=>f.priority!=='information').map(f => `<article><h4>${escapeHtml(f.title)}</h4><p>${escapeHtml(f.description)}</p><small>Fonte: ${escapeHtml(f.sourceTitle)}</small>${f.identity !== 'compatible' ? '<p>Identidade não confirmada: confira o original antes de atribuir este registro ao vendedor.</p>' : ''}<p><strong>Próximo passo:</strong> ${escapeHtml(f.recommendation)}</p></article>`).join('')}</details>` : ''}
+      ${report.findings.some(f=>f.priority!=='information') ? `<details><summary>Ver pendências e próximos passos</summary>${report.findings.filter(f=>f.priority!=='information').map(f => `<article><h4>${escapeHtml(f.title)}</h4><p>${escapeHtml(f.description)}</p><small>Fonte: ${escapeHtml(f.sourceTitle)}</small>${f.identity !== 'compatible' ? '<p>Identidade não confirmada: confira o original antes de atribuir este registro ao titular.</p>' : ''}<p><strong>Próximo passo:</strong> ${escapeHtml(f.recommendation)}</p></article>`).join('')}</details>` : ''}
       <small class="seller-analysis-result-note">Resumo do material obtido, com as pendências encontradas e providências sugeridas.</small>` : ''}
     ${!running && (!report || canRetry) ? `<p>${state.message || state.current ? escapeHtml(state.message || state.current) : 'Confira as fontes obtidas e gere a análise consolidada.'}</p>${!state.aiReady ? '<p role="alert">A análise por IA ainda não está disponível neste ambiente. Os documentos obtidos permanecem acessíveis.</p>' : `<label class="seller-analysis-consent"><input type="checkbox" data-seller-review-consent /><span>Autorizo a análise destes documentos e dados pela OpenAI e Audita.</span></label><button type="button" class="primary-action" data-seller-review-start>${canRetry ? 'Retomar análise sem refazer consultas' : 'Analisar documentos e gerar relatório'}</button>`}` : ''}
     </section>`;
@@ -9066,6 +9090,7 @@ sellerAnalysisCpf?.addEventListener("input", () => {
 sellerAnalysisForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const flow = isCertificateOnly() ? "certificates" : "seller";
+  const segment = activeAnalysisSegment().id;
   if (sellerAnalysisError) sellerAnalysisError.textContent = "";
 
   const cpf = String(sellerAnalysisCpf?.value || "").replace(/\D/g, "");
@@ -9076,7 +9101,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   const ufs = automatic?(state?.certificateCount?[state.uf]:[]):[...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map(input=>input.value);
   const sellerQueries = selectedSellerQueries().map((item) => item.id);
   const companyCnpjs = sellerCompanyCnpjs();
-  if(automatic&&!state) {sellerAnalysisError.textContent='Selecione o estado do vendedor.';document.querySelector('#sellerAnalysisState').focus();return;}
+  if(automatic&&!state) {sellerAnalysisError.textContent='Selecione o estado do titular.';document.querySelector('#sellerAnalysisState').focus();return;}
   if (!ufs.length && !sellerQueries.length && (flow === "certificates" || !companyCnpjs.length)) {
     sellerAnalysisError.textContent = "Selecione ao menos uma fonte ou informe um CNPJ para consultar.";
     return;
@@ -9101,7 +9126,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     return;
   }
   if (!fullName && (!automatic||sellerMissingIdentityFields.has('fullName'))) {
-    if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe o nome completo do vendedor.";
+    if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe o nome completo do titular.";
     sellerAnalysisFullName?.focus();
     return;
   }
@@ -9136,6 +9161,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
         fullName,
         motherName,
         flow,
+        segment,
         automatic,state:state?.uf,municipality:automatic?document.querySelector('#sellerAnalysisMunicipality').value:'',
         aiConsent: flow !== 'certificates' && sellerAnalysisAuthorization.checked,
         ufs,
@@ -9149,8 +9175,12 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
       }),
     });
     const data = await response.json().catch(() => ({}));
+    if (segment !== activeAnalysisSegment().id || flow !== (isCertificateOnly() ? "certificates" : "seller")) {
+      if (response.ok && data.consultaId) sessionStorage.setItem(sellerHistoryKey(flow, segment), data.consultaId);
+      return;
+    }
     if (response.status === 401) {
-      showLogin("Entre para extrair as certidões do vendedor.");
+      showLogin("Entre para iniciar esta consulta.");
       setSellerStep(1);
       renderSellerAnalysisFailure({
         documento: formatSellerDocument(cpf),
@@ -9186,10 +9216,10 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
       return;
     }
 
-    sessionStorage.setItem(sellerHistoryKey(flow), data.consultaId);
-    if (flow !== (isCertificateOnly() ? "certificates" : "seller")) return;
+    sessionStorage.setItem(sellerHistoryKey(flow, segment), data.consultaId);
     await loadSellerAnalysisResult(data.consultaId);
   } catch {
+    if (segment !== activeAnalysisSegment().id || flow !== (isCertificateOnly() ? 'certificates' : 'seller')) return;
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Falha ao comunicar com a API de auditoria.";
     setSellerStep(1);
     renderSellerAnalysisFailure({
@@ -9699,7 +9729,7 @@ apiPricingList?.addEventListener("click", (event) => {
 
 window.addEventListener("hashchange", () => {
   setActivePage(getActivePage());
-  if (["analise-vendedor", "emissao-certidoes"].includes(getActivePage())) {
+  if (isSellerAnalysisPage()) {
     const sellerAuditId = sessionStorage.getItem(sellerHistoryKey());
     if (sellerAuditId) loadSellerAnalysisResult(sellerAuditId, 1);
   }
@@ -9758,7 +9788,7 @@ if (authState.authRequired && !authState.user) {
     setAuditWizardStep(3);
     await loadAuditResult(resumeAuditId, 1);
   }
-  if (["analise-vendedor", "emissao-certidoes"].includes(getActivePage())) {
+  if (isSellerAnalysisPage()) {
     const sellerAuditId = sessionStorage.getItem(sellerHistoryKey());
     if (sellerAuditId) await loadSellerAnalysisResult(sellerAuditId, 1);
   }

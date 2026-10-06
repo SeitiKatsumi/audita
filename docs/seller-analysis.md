@@ -1,5 +1,15 @@
 # Análise documental do vendedor
 
+## Aplicações comerciais compartilhadas
+
+`analysis-segments.js` é o catálogo único de rotas, textos, categorias e foco confiável da IA. As nove aplicações usam o mesmo formulário CPF/CNPJ, coletores por UF, enriquecimento, progresso, score, persistência e PDF. A Central organiza futuros sócios, fornecedores, parceiros, aquisição e reavaliação em **Empresas e parcerias**; diagnóstico em **Diagnóstico documental**; vendedor e locação em **Imóveis**; documentos para concorrências em **Licitações**. Os demais serviços permanecem disponíveis.
+
+O início da consulta aceita somente `segment` do catálogo. O servidor salva `sellerSegment` na consulta e inclui essa finalidade na leitura de cada fonte e no resumo consolidado; o PDF recebe título e alcance correspondentes. O navegador não envia um prompt próprio. O histórico e a retomada ficam separados por segmento. Consultas antigas sem marcador continuam como `analise-vendedor`, preservando o cache dos relatórios anteriores. Não há tabela nova, migração ou chamada extra de IA por causa da segmentação.
+
+O levantamento conserva a mesma cobertura documental disponível; o foco comercial não adiciona fontes ou comprova fatos fora dela. A análise para locação organiza documentos e esclarecimentos, sem decidir aprovação de locatários; a análise para licitações não substitui edital ou comprova habilitação; reavaliação é uma nova consulta, sem monitoramento ou comparação histórica automática. Emissão de certidões continua sem etapa de IA.
+
+Testes: `node --test test/analysis-segments.test.mjs test/seller-review.test.mjs test/seller-analysis-api.test.mjs test/seller-analysis-ui.test.mjs test/services-catalog.test.mjs`. Exercitam as nove finalidades, CPF/CNPJ, rejeição de segmentos arbitrários antes de chamadas, persistência, histórico, retomada sem reconsulta e PDF privado.
+
 ## Fluxo
 
 1. Tipo de vendedor (CPF ou CNPJ), documento e UF, sem seleção de documentos. A consulta cadastral preenche nome, data de nascimento, gênero e nome da mãe quando disponíveis; razão social vem do cadastro empresarial. Somente dados exigidos pelas fontes e não encontrados são pedidos manualmente. O RG não consta no contrato documentado da consulta básica: não se repete a consulta paga apenas por falta dele. Município é opcional nas UFs com consultas municipais validadas. Estimativa dos provedores junto ao botão; IA apurada separadamente por uso. Uma confirmação reúne base legal e processamento pela OpenAI.

@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { getPdfRoot } from './storage.service.mjs';
 import { sellerReadingSchema } from './seller-review-ai.mjs';
 import { sellerReportPdf } from './seller-review-pdf.mjs';
+import { getAnalysisSegment } from '../analysis-segments.js';
 
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const plain = text => String(text || '').replace(/\s+/g, ' ').trim();
@@ -73,7 +74,7 @@ export function validateSellerReading(value, source, text, scanned = false) {
   if (reading.outcome === 'occurrences' && !reading.findings.length) fail('missing_finding', 422);
   if (reading.identity !== 'compatible') {
     reading.outcome = 'inconclusive';
-    reading.limitations.push(reading.identity === 'mismatch' ? 'Identidade divergente: não atribuir os apontamentos ao vendedor sem conferência.' : 'Identidade não confirmada nesta leitura; conferir documento e sujeito.');
+    reading.limitations.push(reading.identity === 'mismatch' ? 'Identidade divergente: não atribuir os apontamentos ao titular sem conferência.' : 'Identidade não confirmada nesta leitura; conferir documento e sujeito.');
   }
   if (source.dataLimited) {
     reading.outcome = 'inconclusive';
@@ -120,13 +121,15 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
     if (!audit.resultados?.length || audit.resultados.some(r => ['pending', 'running', 'queued'].includes(r.status))) fail('seller_collection_pending', 409);
     if (audit.resultados.some(r => !['tjdft', 'seller_documents'].includes(r.fonte))) fail('not_seller_analysis', 422);
     const sources = sellerSources(audit);
-    const fingerprint = digest(sources);
+    const segment = getAnalysisSegment(row.request_payload.sellerSegment || 'analise-vendedor');
+    if (!segment) fail('invalid_analysis_segment', 422);
+    const fingerprint = segment.id === 'analise-vendedor' ? digest(sources) : digest({ segment: segment.id, sources });
     const previous = row.request_payload.sellerReview;
     if (previous?.status === 'completed' && previous.fingerprint === fingerprint && !previous.report.sources.some(s => s.status === 'unread')) return view(previous);
     if (active.has(id)) return get(id, auth);
     if (!ai.ready()) fail('seller_ai_unavailable', 503);
     if (sources.length > 300) fail('seller_too_many_sources', 422);
-    const state = { token: randomUUID(), fingerprint, status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
+    const state = { token: randomUUID(), fingerprint, segment: segment.id, status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
     const claimed = await pool().query(`UPDATE audita_audits SET request_payload=jsonb_set(jsonb_set(request_payload,'{sellerAiConsent}','true'::jsonb),'{sellerReview}',$4::jsonb)
       WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3
       AND (request_payload->'sellerReview'->>'status' IS DISTINCT FROM 'running' OR (request_payload->'sellerReview'->>'updatedAt')::timestamptz < $5::timestamptz)
@@ -165,7 +168,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
               const scanned = Boolean(buffer && (needsVision || plain(text).length < 80));
               if (!buffer && !plain(text) && !Object.keys(details).length) fail('empty_evidence', 422);
               if (plain(text).length + JSON.stringify(details).length > 180000) fail('source_too_large', 422);
-              const reading = validateSellerReading(await ai.read({ id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), source, text, scanned);
+              const reading = validateSellerReading(await ai.read({ segment: state.segment, id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), source, text, scanned);
               results[index] = { ...meta, status: 'analyzed', method: scanned ? 'Leitura visual por IA; confira a transcrição no original' : 'Texto e dados da fonte', ...reading };
             } catch {
               results[index] = { ...meta, status: 'unread', message: 'Não foi possível concluir a leitura desta fonte. Confira o original ou tente novamente.', outcome: 'inconclusive' };
@@ -182,7 +185,8 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
       const findings = results.flatMap(source => (source.findings || []).map(f => ({ ...f, sourceId: source.id, sourceTitle: source.title, identity: source.identity })));
       const analyzed = results.filter(r => r.status === 'analyzed').length;
       const gaps = results.filter(r => r.status !== 'analyzed' || r.outcome === 'inconclusive');
-      const report = { id, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
+      const segment = getAnalysisSegment(state.segment);
+      const report = { id, segment: segment.id, title: segment.title, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
         conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
       };
       report.executiveSummary=[report.conclusion,...findings.filter(f=>f.priority!=='information').map(f=>`${f.title}: ${f.description}`),...findings.filter(f=>f.category==='company'&&f.priority==='information').map(f=>f.description)].join('\n\n');
@@ -212,4 +216,4 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
   return { get, start, pdf, ready: () => ai.ready() && Boolean(getDb()?.dbReady), wait: id => active.get(id) };
 }
 
-function rowSubject(audit) { return { name: audit.subjectName || 'Vendedor da consulta', document: audit.documento, documentType: audit.tipoDocumento }; }
+function rowSubject(audit) { return { name: audit.subjectName || 'Titular da consulta', document: audit.documento, documentType: audit.tipoDocumento }; }

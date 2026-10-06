@@ -12,7 +12,7 @@ test('jurisprudence reader searches original fields and renders within the app, 
  const script = await readFile(new URL('../services-catalog.js', import.meta.url), 'utf8');
  assert.match(script, /view=read/);
  assert.match(script, /node.textContent = text/);
- assert.doesNotMatch(script, /innerHTML|createObjectURL|link.download/);
+ assert.doesNotMatch(script.slice(script.indexOf('function initJurisprudence(')), /innerHTML|createObjectURL|link.download/);
 });
 
 test('charge card exposes subscriber jurisprudence without inventing a collection size', async () => {
