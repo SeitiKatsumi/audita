@@ -92,12 +92,7 @@ para `/directus/uploads` e `/directus/extensions`. Ele se conecta ao mesmo
 PostgreSQL somente pela rede interna do CapRover e com credencial propria de
 menor privilegio.
 
-## Deploy
-
-## Publicacao dos encaminhamentos de 06/10 - 07/10/2026
-
-Usuario autorizou publicar app e site consolidados. Codigo77d53d4: selecao de certidoes por UF/Brasil, custo configurado20x, checkout Stripe antes da coleta e retorno com PDF privado; nenhuma migracao, dependencia, chave ou volume novo. Site bcc719e: CTAs das dez paginas encaminham aos modulos correspondentes. Validacao previa:560 testes Node/PGlite,15 do site, typecheck/build e Chrome ficticio ate PDF. Registrar backup, imagens anteriores, CI, SHA/health/assets e paginas publicas depois do deploy. Conferir eventos checkout.session.async_payment_succeeded, async_payment_failed e expired no endpoint existente; nao efetuar cobranca real para teste. Desconto40/50 e recarga Direct Data continuam sem regra/integracao confirmada.
- Docker atual
+## Deploy Docker atual
 
 O projeto possui uma primeira versao estatica pronta para build Docker via CapRover:
 O projeto possui uma primeira versao web com API Node.js e PostgreSQL pronta para build Docker via CapRover:
