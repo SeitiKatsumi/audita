@@ -8,6 +8,7 @@ import { createAuditService, validateCnpj } from "../services/audit.service.mjs"
 import { normalizeDfSellerInput, normalizeSellerInput, buildDfSellerAuditRequest } from "../services/seller-analysis.service.mjs";
 import { planSellerDocuments,getSellerDocumentCoverage } from "../services/seller-documents.service.mjs";
 import { collectAutonomousCertificates, planAutonomousCertificates,getAutonomousCertificateCoverage } from "../services/state-court-autonomous.service.mjs";
+import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER} from '../services/certificate-order.service.mjs';
 import { sellerStatePlans,sellerQueriesForState } from '../services/seller-state-plan.mjs';
 import { createDirectDataSellerService } from "../services/direct-data-seller.service.mjs";
 import { createSellerReviewService } from '../services/seller-review.service.mjs';
@@ -38,6 +39,7 @@ test("seller POST validates selection and consent, persists the selected source 
         tjdft: { collect: (input) => collectAutonomousCertificates(input, { configuration: { configured: true, allowedUfs: ["AP"] }, queryCertificate: async () => { courtCalls++; throw new Error("unexpected_court_call"); } }) },
       },
     });
+    const certificateOrderService=createCertificateOrderService({getDb:()=>({pool:pg,dbReady:true}),env:{AUDITA_PROFILE_ENCRYPTION_KEY:'fictional-certificate-secret-at-least-32-characters'},checkout:async()=>({id:'cs_fixture_api',url:'https://checkout.stripe.com/c/pay/fixture'}),startAudit:(r,o)=>auditService.startAudit(r,o)});
     const source = await readFile(new URL("../server.mjs", import.meta.url), "utf8");
     const genericStart = source.indexOf('  if (pathname === "/audit" && request.method === "POST")');
     const genericEnd = source.indexOf('  if (pathname === "/api/seller-analysis/coverage"', genericStart);
@@ -45,7 +47,7 @@ test("seller POST validates selection and consent, persists the selected source 
     const sellerEnd = source.indexOf("  const publicAuditEvidenceMatch =", sellerStart);
     assert.ok(genericStart > 0 && genericEnd > genericStart && sellerStart > 0 && sellerEnd > sellerStart);
     const context = vm.createContext({
-      crypto, auditService, normalizeDfSellerInput, normalizeSellerInput, normalizePersonBirthDate, buildDfSellerAuditRequest, planSellerDocuments, planAutonomousCertificates, validateCnpj, personNamesMatch,
+      crypto, auditService,certificateOrderService,CERTIFICATE_PRICE_MULTIPLIER,billingConfiguration:()=>({checkoutReady:true,webhookReady:true}), normalizeDfSellerInput, normalizeSellerInput, normalizePersonBirthDate, buildDfSellerAuditRequest, planSellerDocuments, planAutonomousCertificates, validateCnpj, personNamesMatch,
       getSellerDocumentCoverage,getAutonomousCertificateCoverage,sellerStatePlans,sellerQueriesForState,sellerReviewService:{ready:()=>true},
       getTenantIdForRequest: auth, readJsonBody: async (request) => request.body,
       directDataSellerService: provider,
@@ -108,8 +110,14 @@ test("seller POST validates selection and consent, persists the selected source 
     assert.equal(courtCalls, 0);
     assert.equal(enrichmentCalls, 0);
     assert.equal((await post({...body,flow:'certificates',aiConsent:true})).status,400,'data queries are not certificate issuance');
+    const courtSelection={...body,flow:'certificates',ufs:['AP'],courtCertificates:['AP:Cível'],sellerQueries:[],birthDate:'1980-01-01',motherName:'Mãe Fictícia',rg:'123456789',gender:'Masculino'};
+    assert.equal((await post({...courtSelection,courtCertificates:['AP:desconhecida']})).status,400);
+    const selective=await post(courtSelection);assert.equal(selective.status,202);assert.equal(selective.body.amountCents,1080);assert.equal(selective.body.documentCount,1);assert.equal(courtCalls,0);
     const issuance=await post({...body,flow:'certificates',aiConsent:true,sellerQueries:['cndt']});
     assert.equal(issuance.status,202,'issuance works without an AI integration');
+    assert.equal(issuance.body.checkoutRequired,true);assert.equal(issuance.body.amountCents,1080);assert.equal(providerCalls.length,1,'no collection before payment');
+    await certificateOrderService.paymentEvent({type:'checkout.session.completed',data:{object:{id:'cs_fixture_api',mode:'payment',currency:'brl',amount_total:1080,payment_status:'paid',metadata:{certificate_order_id:issuance.body.orderId,audita_tenant_id:'1',audita_user_id:'811'}}}});
+    issuance.body.consultaId=issuance.body.orderId;
     await waitForAudit(issuance.body.consultaId);
     const saved=(await pg.query('SELECT request_payload FROM audita_audits WHERE public_id=$1',[issuance.body.consultaId])).rows[0].request_payload;
     assert.equal(saved.sellerFlow,'certificates');assert.equal(saved.sellerAiConsent,false);

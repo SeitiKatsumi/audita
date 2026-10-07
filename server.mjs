@@ -30,6 +30,8 @@ import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
 import { createSellerReviewService } from './services/seller-review.service.mjs';
 import { createSellerReviewAI } from './services/seller-review-ai.mjs';
+import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER} from './services/certificate-order.service.mjs';
+import {billingConfiguration} from './services/billing-catalog.service.mjs';
 import { getPdfRoot } from "./services/storage.service.mjs";
 import { getAutonomousCertificateCoverage, planAutonomousCertificates } from "./services/state-court-autonomous.service.mjs";
 import { getSellerDocumentCoverage, planSellerDocuments } from "./services/seller-documents.service.mjs";
@@ -1774,7 +1776,11 @@ const stripeBillingService = createStripeBillingService({
   chatAccessService,
   onIrPaymentEvent: (event) => irExemptionService.paymentEvent(event),
   onDebtPaymentEvent: (event) => bankDebtService.paymentEvent(event),
+  onCertificatePaymentEvent: event => certificateOrderService.paymentEvent(event),
 });
+const certificateOrderService=createCertificateOrderService({getDb:()=>({pool,dbReady}),
+  checkout:(auth,order)=>stripeBillingService.createCertificateCheckoutSession(auth,order),
+  startAudit:(request,options)=>auditService.startAudit(request,options)});
 const chatDocumentsService = createChatDocumentsService({
   getDb: () => ({ pool, dbReady }), accessService: chatAccessService,
   recordUsage: (usage, auth) => apiUsageService.record(auth, { provider: "openai", service: "responses", model: process.env.AUDITA_CHAT_DOCUMENT_MODEL || process.env.AUDITA_CHAT_QUICK_MODEL || "gpt-6-luna", operation: "chat_document", ...usage }),
@@ -3929,12 +3935,14 @@ async function handleApi(request, response, pathname) {
       ...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
     };
-    sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage), companyStates: sellerStatePlans(coverage,'cnpj'), identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl });
+    sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage), companyStates: sellerStatePlans(coverage,'cnpj'), identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl,
+      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
     return true;
   }
 
   if (["/api/seller-analysis/df", "/api/seller-analysis"].includes(pathname) && request.method === "POST") {
     try {
+      if(request.headers && (!String(request.headers['content-type']).startsWith('application/json')||request.headers['sec-fetch-site']==='cross-site'||(request.headers.origin&&new URL(request.headers.origin).host!==request.headers.host))) {sendJson(response,403,{error:'same_origin_required'});return true;}
       const body = await readJsonBody(request);
       const sellerInput = pathname === '/api/seller-analysis/df' ? normalizeDfSellerInput(body) : normalizeSellerInput(body);
       if (sellerInput.invalid) {
@@ -3979,7 +3987,7 @@ async function handleApi(request, response, pathname) {
           if (!Array.isArray(body.ufs)) throw new Error("invalid_ufs");
           if (body.ufs.length) {
             if (isCompany) throw new Error('unsupported_company_court_selection');
-            autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus());
+            autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus(), body.flow==='certificates'?body.courtCertificates:undefined);
           }
           if (!Array.isArray(companyCnpjs) || companyCnpjs.length > 5 || companyCnpjs.some((value) => !validateCnpj(value))) throw new Error("invalid_company_cnpjs");
           sellerDocumentPlan = planSellerDocuments(body.sellerQueries || [], directDataSellerService.getStatus(), companyCnpjs);
@@ -4006,6 +4014,10 @@ async function handleApi(request, response, pathname) {
       const requiredIdentity = [...new Set(['fullName', ...(needsBirthDate ? ['birthDate'] : []), ...(autonomousPlan?.requiredIdentityFields || []), ...(pathname === '/api/seller-analysis/df' ? ['motherName'] : [])])];
       const identity = () => ({ fullName: resolvedFullName, motherName: resolvedMotherName, birthDate: body.birthDate, rg: String(body.rg || '').trim().slice(0,30), gender: ['Masculino','Feminino'].includes(body.gender) ? body.gender : '' });
       const missingIdentity = () => requiredIdentity.filter(field => !identity()[field]);
+
+      if(body.flow==='certificates'&&missingIdentity().length) {
+        sendJson(response,422,{error:'seller_identity_fields_required',missingFields:missingIdentity(),identity:identity(),motherNameRequired:missingIdentity().includes('motherName')});return true;
+      }
 
       if (isCompany && !resolvedFullName) {
         const company = await collectSellerCompany({documento:document,tipoDocumento:'cnpj',extraFields:{},retries:0,timeoutMs:15000});
@@ -4095,6 +4107,7 @@ async function handleApi(request, response, pathname) {
       }
       if (autonomousPlan) {
         request.body.extraFields.autonomousUfs = body.ufs;
+        if(body.flow==='certificates'&&body.courtCertificates!==undefined)request.body.extraFields.autonomousCertificates=body.courtCertificates;
         request.body.extraFields.paidQueryConfirmed = body.paidQueryConfirmed === true;
         Object.assign(request.body.extraFields.stateCourtFields, {
           birthDate: body.birthDate.split("-").reverse().join("/"),
@@ -4102,6 +4115,15 @@ async function handleApi(request, response, pathname) {
           email: String(body.email || "").trim().slice(0, 180),
           gender: body.gender === "Feminino" ? "Feminino" : "Masculino",
         });
+      }
+      const providerCostBrl=(autonomousPlan?.maxProviderCostBrl||0)+(sellerDocumentPlan?.maxProviderCostBrl||0);
+      if(body.flow==='certificates' && providerCostBrl>0) {
+        const catalog=billingConfiguration();
+        if(!catalog.checkoutReady||!catalog.webhookReady||!certificateOrderService.ready()) {
+          sendJson(response,503,{error:'billing_not_configured',message:'O pagamento está temporariamente indisponível. Nenhuma emissão foi iniciada.'});return true;
+        }
+        const order=await certificateOrderService.create(authContext,request.body,{providerCostBrl,documentCount:(autonomousPlan?.certificates.length||0)+(sellerDocumentPlan?.queries.length||0)});
+        sendJson(response,202,{...order,checkoutRequired:true});return true;
       }
       const result = await auditService.startAudit(request);
       if (result.unauthorized) {
@@ -4114,11 +4136,18 @@ async function handleApi(request, response, pathname) {
       }
       sendJson(response, 202, { ...result, identityEnriched });
     } catch (error) {
-      sendJson(response, 500, {
+      sendJson(response, error.statusCode || error.status || 500, {
         error: "seller_analysis_start_failed",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: 'Não foi possível preparar a consulta. Tente novamente ou contate a equipe.',
       });
     }
+    return true;
+  }
+
+  const certificateOrderMatch=pathname.match(/^\/api\/certificate-orders\/([0-9a-fA-F-]{36})$/);
+  if(certificateOrderMatch&&request.method==='GET') {
+    try {sendJson(response,200,await certificateOrderService.get(await getTenantIdForRequest(request),certificateOrderMatch[1]));}
+    catch(error){sendJson(response,error.statusCode||error.status||500,{error:error.code||'certificate_order_failed',message:'Não foi possível consultar o pagamento.'});}
     return true;
   }
 
@@ -6224,6 +6253,7 @@ const server = http.createServer(async (request, response) => {
     "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
     "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css", "general-chat.js"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");
+  publicRootFiles.add('certificate-selection.js');
   if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;
   }

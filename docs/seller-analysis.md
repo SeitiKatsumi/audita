@@ -45,6 +45,26 @@ Uma atualização atômica no PostgreSQL concede a execução por consulta, com 
 
 ## Emissão de certidões diversas
 
-A Central organiza Análise de Vendedor, Consulta de imóveis e Indisponibilidade de bens em **Imóveis**. **Emissão de certidões** abre `#emissao-certidoes`, reutilizando os coletores e controles de custo e autorização. Esse fluxo oferece somente as fontes de tipo certidão, entrega os PDFs e não inclui a etapa 3, consentimento OpenAI ou relatório de IA.
+A Central organiza Análise de Vendedor e Consulta de imóveis em **Imóveis**. **Emissão de certidões** abre `#emissao-certidoes`, reutilizando os coletores e controles de custo e autorização. Esse fluxo oferece somente as fontes de tipo certidão, entrega os PDFs e não inclui a etapa 3, consentimento OpenAI ou relatório de IA.
 
 A seleção é enviada com `flow: certificates`; o servidor força `sellerAiConsent=false`, restringe as fontes e persiste `sellerFlow` no JSON da consulta, sem migração. O início da análise de IA é recusado para uma emissão mesmo que solicitado diretamente à API. Históricos e retomadas do navegador são separados; consultas antigas sem marcador continuam no histórico de análise do vendedor. Não houve novas consultas pagas na validação.
+
+
+## Encaminhamentos da reunião de 06/10/2026, 16h13
+
+- Emissão: CPF/CNPJ, um ou vários estados ou pacote Brasil inteiro. A lista mostra apenas fontes habilitadas e aplicáveis, com seleção individual de tribunais estaduais e demais certidões; nacionais não se repetem. TRF/TRT informam estados de abrangência. Municípios são limitados aos endpoints publicados no catálogo, sem promessa de cobertura completa.
+- Preço ao cliente em centavos = custo configurado da seleção ×20. Exemplo: R$0,54 → R$10,80. O servidor recalcula a seleção; valores e flags de pagamento enviados pelo cliente não concedem acesso. Portais com custo configurado zero seguem gratuitamente. Análises por IA mantêm a cobrança anterior.
+- POST /api/seller-analysis com flow=certificates prepara pedido e checkout antes de consultar fontes pagas. GET /api/certificate-orders/:id é privado por tenant+usuário. O JSON certificateOrder fica em audita_audits; o pedido original permanece criptografado com AUDITA_PROFILE_ENCRYPTION_KEY para recuperação manual após interrupção, sem nova tabela/migração.
+- Stripe: preço dinâmico e idempotência por pedido. Webhook assinado valida sessão, proprietário, moeda BRL e valor exato. Somente payment_status=paid inicia coleta, inclusive se o usuário fechou a tela. Eventos concorrentes/repetidos não reiniciam o mesmo pedido. Não consome novamente a carteira do cliente após o checkout; o saldo contratado junto à Direct Data continua necessário.
+- Retorno, verificação automática/manual, cancelamento/expiração e retorno à seleção preservam o pedido. Não existe liberação por parâmetro de URL. Falha ambígua no início vira review_required; não há repetição automática de chamadas cobradas. Interrupções dos coletores existentes e falhas do fornecedor exigem conferência operacional; não foi adicionada uma fila durável nem reembolso automático.
+- Identidade: coletores só marcam evidência verificada após conferência de CPF/CNPJ/nome e abrangência. A leitura usa essa conferência quando a IA retorna uncertain; mismatch ou evidência não verificada continuam inconclusivos. Não apaga alertas de relatórios antigos nem faz novas chamadas de IA automaticamente.
+- Website: o componente compartilhado das oito LPs e as duas páginas de vendedor agora apontam diretamente aos módulos respectivos, preservando parâmetros de campanha. Commit local do site bcc719e; sem push/deploy.
+
+Validação: suíte geral Node/PGlite e testes de pagamento com HMAC, valor incorreto, pagamento pendente, eventos concorrentes, expiração, confirmação assíncrona tardia, reabertura e isolamento entre contas. Fixture --serve com handlers/serviços reais, PostgreSQL isolado e fornecedores fictícios validada no Chrome: seleção → checkout pendente (zero consultas) → webhook fictício → PDF privado (uma consulta; zero IA); reload mobile sem repetir consulta. Nenhuma cobrança ou emissão real usada como teste.
+
+### Dependências operacionais
+
+- Produção respondeu enabled=true/checkoutReady=true em /api/billing/plans em 07/10. Isso não prova emissão no checkout novo, entrega do webhook nem saldo do fornecedor. Configuração privada local da Stripe ausente; preservada. Para ativar o novo fluxo no ambiente real, publicar e homologar com Stripe sandbox, incluindo os eventos adicionais de docs/stripe-operacao.md.
+- Descontos 40%/50% e gratuitas para assinantes foram sugestões, sem percentual final; não ativados.
+- Revisada documentação oficial de https://apiv3.directd.com.br/ e https://api.app.directd.com.br/api/Documentation/pesquisa-avancada . Pesquisa Avançada é candidata a consolidar/enriquecer consultas; limites/precificação e compatibilidade devem ser homologados antes de substituir coletores. Não foi encontrado endpoint documentado de recarga automática na documentação consultada; confirmar mecanismo com o fornecedor antes de automatizar financiamento. Nenhuma transferência/recarregamento foi realizado.
+- Envio de link e alinhamento com pessoas mencionados na transcrição permanecem ações de comunicação; nenhum envio feito nesta tarefa.

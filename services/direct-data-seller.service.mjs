@@ -148,7 +148,7 @@ export function createDirectDataSellerService({
 
   async function execute(request, authContext) {
     const configuration = getStatus();
-    if (creditsService) {
+    if (creditsService && authContext.paidCertificateOrder !== true) {
       let wallet;
       try { wallet = await creditsService.getWallet(authContext); }
       catch { return { unavailable: true, reason: "credits_unavailable", configuration }; }
@@ -190,7 +190,7 @@ export function createDirectDataSellerService({
       reply = failure(error?.name === "AbortError" ? "provider_timeout" : "provider_connection_failed");
     }
     const providerSucceeded = Boolean(reply.result);
-    if (providerSucceeded && creditsService) {
+    if (providerSucceeded && creditsService && authContext.paidCertificateOrder !== true) {
       try {
         const charge = await creditsService.consume(authContext, { amount: creditCost, referenceId: providerReference || `seller:${text(authContext.user?.id || authContext.userId)}:${request.requestId}`, operation: "direct_data_seller_document", metadata: { endpoint: request.endpoint, uf: request.parameters.UF || "", region: request.parameters.REGIAO || "" } });
         if (!charge.ok) reply = { ...reply, insufficientCredits: true, reason: "insufficient_credits", creditCost, wallet: charge.wallet, providerCompleted: true, providerRequestSubmitted: true };

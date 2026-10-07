@@ -72,6 +72,7 @@ export function validateSellerReading(value, source, text, scanned = false) {
   if (!scanned && reading.findings.some(f => !evidence.includes(plain(f.quote)))) fail('ungrounded_finding', 422);
   if (!scanned && [reading.issuedAt, reading.validUntil, ...reading.findings.flatMap(f => [f.amount, f.date])].filter(Boolean).some(value => !evidence.includes(plain(value)))) fail('ungrounded_value', 422);
   if (reading.outcome === 'occurrences' && !reading.findings.length) fail('missing_finding', 422);
+  if (source.identityVerified && reading.identity === 'uncertain') reading.identity = 'compatible';
   if (reading.identity !== 'compatible') {
     reading.outcome = 'inconclusive';
     reading.limitations.push(reading.identity === 'mismatch' ? 'Identidade divergente: não atribuir os apontamentos ao titular sem conferência.' : 'Identidade não confirmada nesta leitura; conferir documento e sujeito.');

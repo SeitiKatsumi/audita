@@ -8,6 +8,13 @@ const PAYLOAD = { metaDados: { consultaUid: "test-query", resultadoId: 1, result
 const request = (overrides = {}) => ({ requestId: "test-request", endpoint: "TSTCertidaoNegativaDebitosTrabalhistas", parameters: { CPF: "529.982.247-25", GERARCOMPROVANTE: "Habilitar" }, authorizationConfirmed: true, paidQueryConfirmed: true, ...overrides });
 const response = (payload = PAYLOAD, status = 200) => new Response(JSON.stringify(payload), { status });
 
+test('a paid certificate order skips the customer wallet; a client body cannot request that bypass',async()=>{
+  let calls=0,charges=0;
+  const service=createDirectDataSellerService({env:ENV,fetchImpl:async()=>{calls++;return response();},creditsService:{getWallet:async()=>({enabled:true,balance:0}),consume:async()=>{charges++;throw Error('must not charge twice');}}});
+  assert.equal((await service.query(request({paidCertificateOrder:true}),AUTH)).insufficientCredits,true);assert.equal(calls,0);
+  assert.ok((await service.query(request(),{...AUTH,paidCertificateOrder:true})).result);assert.equal(calls,1);assert.equal(charges,0);
+});
+
 test("seller provider requires authorization, payment confirmation, identity, and documented parameters", async () => {
   let calls = 0;
   const service = createDirectDataSellerService({ env: ENV, fetchImpl: async () => { calls++; return response(); } });

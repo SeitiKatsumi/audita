@@ -8,14 +8,17 @@ const coverage = JSON.parse(readFileSync(new URL("../data/state-court-autonomous
 const compact = (value) => String(value || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 export function getAutonomousCertificateCoverage(configuration = {}) {
-  const certificates = coverage.certificates.filter((item) => item.provider === "portal" || (configuration.configured && configuration.allowedUfs?.includes(item.uf)));
+  const certificates = coverage.certificates.filter((item) => item.provider === "portal" || (configuration.configured && configuration.allowedUfs?.includes(item.uf)))
+    .map(item=>({...item,id:`${item.uf}:${item.type}`,requiredIdentityFields:(findStateCourtProfile(item.uf)?.requiredFields||[]).filter(field=>['birthDate','motherName','rg','gender'].includes(field))}));
   return { ...coverage, certificates, ufs: [...new Set(certificates.map((item) => item.uf))], pdfQueryCostBrl: configuration.pdfTotalCostBrl || 0.54 };
 }
 
-export function planAutonomousCertificates(ufs, configuration = {}) {
+export function planAutonomousCertificates(ufs, configuration = {}, ids) {
   const catalog = getAutonomousCertificateCoverage(configuration);
   if (!Array.isArray(ufs) || !ufs.length || ufs.some((uf) => !catalog.ufs.includes(uf))) throw new Error("unsupported_autonomous_uf");
-  const certificates = catalog.certificates.filter((item) => ufs.includes(item.uf));
+  const available = catalog.certificates.filter((item) => ufs.includes(item.uf));
+  if(ids!==undefined && (!Array.isArray(ids)||!ids.length||ids.some(id=>!available.some(c=>c.id===id))))throw new Error('invalid_autonomous_certificate_selection');
+  const certificates=ids===undefined?available:available.filter(c=>ids.includes(c.id));
   const requiredIdentityFields=[...new Set(certificates.flatMap(item=>findStateCourtProfile(item.uf)?.requiredFields||[]))].filter(field=>['birthDate','motherName','rg','gender'].includes(field));
   return { certificates, requiredIdentityFields, maxProviderCostBrl: Number((certificates.filter((item) => item.provider === "direct_data").length * catalog.pdfQueryCostBrl).toFixed(2)) };
 }
@@ -50,7 +53,7 @@ export async function downloadCertificateEvidence(url, fetchImpl = fetch) {
 export async function collectAutonomousCertificates(input, { collectPortal, closeAssisted, queryCertificate, configuration, download = downloadCertificateEvidence, savePdf = saveAndExtractPdfBuffer, readPdf = extractPdfText } = {}) {
   const extra = input.extraFields || {};
   if (extra.authorizationConfirmed !== true) throw new Error("authorization_required");
-  const plan = planAutonomousCertificates(extra.autonomousUfs, configuration);
+  const plan = planAutonomousCertificates(extra.autonomousUfs, configuration, extra.autonomousCertificates);
   if (input.tipoDocumento !== "cpf" || !extra.stateCourtFields?.fullName) throw new Error("invalid_autonomous_subject");
   if (plan.certificates.some((item) => item.provider === "direct_data") && extra.paidQueryConfirmed !== true) throw new Error("paid_query_confirmation_required");
   const rows = plan.certificates.map((item) => ({ uf: item.uf, tipo: `${item.uf} · ${item.type}`, status: "pending", resultado: "indisponivel", provider: item.provider }));
@@ -79,6 +82,7 @@ export async function collectAutonomousCertificates(input, { collectPortal, clos
         const saved = await savePdf({ consultaId: input.consultaId, fonte: "tjdft", fileName: `${item.uf}-${i}.pdf`, buffer });
         rows[i] = { ...rows[i], status: "success", pdfPath: saved.pdfPath, resultado: response.result.analysis.occurrence === true ? "consta" : response.result.analysis.occurrence === false ? "nada_consta" : "indisponivel", providerReference: response.result.providerReference };
       }
+      rows[i].evidenceIdentityVerified=true;
     } catch (error) {
       rows[i] = { ...rows[i], status: "failed", errorMessage: /^[a-z_]+$/.test(error.message) ? error.message : "certificate_unavailable" };
     }

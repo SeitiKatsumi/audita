@@ -270,6 +270,7 @@ export function createStripeBillingService({
   chatAccessService,
   onIrPaymentEvent,
   onDebtPaymentEvent,
+  onCertificatePaymentEvent,
   fetchImpl = globalThis.fetch,
   env = process.env,
   now = () => Date.now(),
@@ -852,6 +853,19 @@ export function createStripeBillingService({
     return {id: session.id, url: session.url, expiresAt: session.expires_at};
   }
 
+  async function createCertificateCheckoutSession(authContext, order) {
+    const config=configuration();
+    if(!config.checkoutReady||!config.appUrl) throw new StripeBillingError('billing_not_configured','Pagamento ainda não configurado.',503);
+    const metadata={purchase_kind:'certificate_order',audita_tenant_id:String(authContext.tenantId),audita_user_id:String(authContext.user.id),certificate_order_id:order.id};
+    const session=await stripeRequest('/v1/checkout/sessions',{
+      mode:'payment',customer_email:authContext.user.email,locale:'pt-BR',integration_identifier:config.integrationIdentifier,
+      success_url:`${config.appUrl}/?certificate_order=${order.id}#emissao-certidoes`,
+      cancel_url:`${config.appUrl}/?certificate_order=${order.id}&certificate_cancelled=1#emissao-certidoes`,
+      line_items:[{quantity:1,price_data:{currency:'brl',unit_amount:order.amountCents,product_data:{name:'Audita — emissão de certidões selecionadas'}}}],metadata,payment_intent_data:{metadata},
+    },{idempotencyKey:`audita-certificates-${order.id}`});
+    return {id:session.id,url:session.url,expiresAt:session.expires_at};
+  }
+
   async function createCheckoutSession(authContext, input = {}) {
     if (!authContext?.tenantId || !authContext?.user) {
       return { unauthorized: true };
@@ -1292,6 +1306,10 @@ export function createStripeBillingService({
 
   async function processEvent(event) {
     const object = event?.data?.object || {};
+    if(object.metadata?.purchase_kind==='certificate_order') {
+      if(!onCertificatePaymentEvent) throw new StripeBillingError('certificate_handler_unavailable','Emissão indisponível.',503);
+      return onCertificatePaymentEvent(event);
+    }
     if (object.metadata?.purchase_kind === "bank_debt") {
       if (!onDebtPaymentEvent) throw new StripeBillingError("debt_handler_unavailable", "Processamento de dívida indisponível.", 503);
       return onDebtPaymentEvent(event);
@@ -1406,6 +1424,7 @@ export function createStripeBillingService({
     handleWebhook,
     createIrCheckoutSession,
     createDebtCheckoutSession,
+    createCertificateCheckoutSession,
     setCancellationAtPeriodEnd,
   };
 }

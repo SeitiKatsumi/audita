@@ -511,7 +511,7 @@ export function createDirectDataCertificatesService({
       return { invalid: true, reason: validationError, configuration };
     }
 
-    if (creditsService) {
+    if (creditsService && authContext.paidCertificateOrder !== true) {
       const wallet = await creditsService.getWallet(authContext);
       if (wallet.enabled && wallet.balance < creditCost) {
         return {
@@ -634,7 +634,7 @@ export function createDirectDataCertificatesService({
       configuration,
     };
 
-    if (creditsService) {
+    if (creditsService && authContext.paidCertificateOrder !== true) {
       const charge = await creditsService.consume(authContext, {
         amount: creditCost,
         referenceId:

@@ -1,3 +1,4 @@
+import {certificateSelection} from '../certificate-selection.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -59,58 +60,30 @@ test("seller analysis selects validated states with cost and legal consent", () 
   assert.match(appJs, /renderSellerAnalysisFailure/);
 });
 
-test("seller query groups start collapsed and birth date follows the selected sources", async () => {
-  const elements = new Map(["#sellerAnalysisCoverage", "#sellerAnalysisUfs", "#sellerAnalysisQueries", "#sellerAnalysisCost", "#sellerAnalysisBirthDate", "#sellerAnalysisRg", "#sellerAnalysisGender", "#sellerAnalysisCompanyCnpjs"].map((selector) => [selector, { innerHTML: "", textContent: "", value: "", required: false }]));
-  const selected = { ufs: [], queries: [] };
-  const context = vm.createContext({
-    isCertificateOnly:()=>true,
-    updateSellerMunicipalities:()=>{},
-    document: {
-      querySelector: (selector) => elements.get(selector),
-      querySelectorAll: (selector) => (selector.includes("sellerAnalysisUfs") ? selected.ufs : selected.queries).map((value) => ({ value })),
-    },
-    sellerAnalysisMotherName: { required: false },
-    sellerAnalysisFullName: { required: false, value:'' },
-    sellerAnalysisError:null,
-    escapeHtml: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"),
-    fetch: async () => ({ ok: true, json: async () => ({ ufs: ["AP"], certificates: [{ uf: "AP", type: "Cível", provider: "direct_data" }], sellerSources: { configured: true, queries: [
-      { id: "fiscal",kind:'certificate',category: "Fiscal", label: "Fiscal", costBrl: 0.54, documentTypes: ["cpf"], limitation: "Não inclui <dívida ativa>" },
-      { id: "ccd",kind:'certificate',category: "Fiscal", label: "CND conjunta", endpoint: "CertidaoConjuntaDebitosPessoaFisica", documentTypes: ["cpf"] },
-      { id: "fgts",kind:'certificate',category: "Empresa", label: "FGTS", costBrl: 0.54, documentTypes: ["cnpj"] },
-    ] } }) }),
-  });
-  const start = appJs.indexOf("let sellerCoverage = null;");
-  const end = appJs.indexOf('document.querySelector("#sellerAnalysisUfs")?.addEventListener', start);
-  vm.runInContext(appJs.slice(start, end), context);
-  await context.loadSellerCoverage();
-  assert.match(elements.get("#sellerAnalysisQueries").innerHTML, /<details><summary>Fiscal \(2\)<\/summary>\s*<fieldset>/);
-  assert.doesNotMatch(elements.get("#sellerAnalysisQueries").innerHTML, /<details[^>]+open/);
-  assert.match(elements.get("#sellerAnalysisQueries").innerHTML, /Não inclui &lt;dívida ativa&gt;/);
-  assert.equal(elements.get("#sellerAnalysisBirthDate").required, false);
-  selected.queries = ["ccd"];
-  context.updateSellerEstimate();
-  assert.equal(elements.get("#sellerAnalysisBirthDate").required, true);
-  assert.equal(elements.get("#sellerAnalysisRg").required, false);
-  selected.queries = ["fgts"];
-  elements.get("#sellerAnalysisCompanyCnpjs").value = "04252011000110, 11444777000161, 04252011000110";
-  context.updateSellerEstimate();
-  assert.match(elements.get("#sellerAnalysisCost").innerHTML, /R\$ 1,08/);
-  assert.match(elements.get("#sellerAnalysisQueries").innerHTML, /por CNPJ informado/);
-  assert.equal(elements.get("#sellerAnalysisBirthDate").required, false);
-  selected.queries = ["ccd"];
-  selected.queries = ["fiscal"];
-  context.updateSellerEstimate();
-  assert.equal(elements.get("#sellerAnalysisBirthDate").required, false);
-  selected.ufs = ["AP"];
-  context.updateSellerEstimate();
-  assert.equal(elements.get("#sellerAnalysisBirthDate").required, true);
-  assert.equal(elements.get("#sellerAnalysisRg").required, true);
-  selected.ufs = [];
-  selected.queries = [];
-  elements.get("#sellerAnalysisCompanyCnpjs").value = "04252011000110";
-  context.updateSellerEstimate();
-  assert.equal(elements.get("#sellerAnalysisBirthDate").required, false);
-  assert.equal(elements.get("#sellerAnalysisRg").required, false);
+test("certificate groups show applicable sources, 20x prices and only required identity", async () => {
+  const elements=new Map(["#sellerAnalysisCoverage","#sellerAnalysisUfs","#sellerAnalysisQueries","#sellerAnalysisCost","#sellerAnalysisBirthDate","#sellerAnalysisRg","#sellerAnalysisGender","#sellerAnalysisDocumentType"].map(s=>[s,{innerHTML:'',value:'',required:false}]));
+  elements.get('#sellerAnalysisDocumentType').value='cpf';
+  const selected={ufs:[],queries:[],courts:[]};
+  const context=vm.createContext({certificateSelection,isCertificateOnly:()=>true,updateSellerMunicipalities:()=>{},
+    document:{querySelector:s=>elements.get(s),querySelectorAll:s=>(s.includes('sellerAnalysisUfs')?selected.ufs:s.includes('data-certificate-court')?selected.courts:selected.queries).map(value=>({value}))},
+    sellerAnalysisMotherName:{required:false},sellerAnalysisFullName:{required:false,value:''},sellerAnalysisCpf:{value:'04252011000110'},sellerAnalysisError:null,
+    location:{search:''},sessionStorage:{getItem:()=>null},escapeHtml:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),
+    fetch:async()=>({ok:true,json:async()=>({certificatePriceMultiplier:20,states:[{uf:'AP',name:'Amapá',queryIds:['fiscal','ccd']}],companyStates:[{uf:'AP',name:'Amapá',queryIds:['fgts']}],certificates:[{uf:'AP',type:'Cível',provider:'direct_data',requiredIdentityFields:['birthDate','rg','gender']}],sellerSources:{configured:true,queries:[
+      {id:'fiscal',kind:'certificate',category:'Fiscal',label:'Fiscal',costBrl:.54,documentTypes:['cpf'],scope:'AP',params:{},limitation:'Não inclui <dívida ativa>'},
+      {id:'ccd',kind:'certificate',category:'Fiscal',label:'CND conjunta',endpoint:'CertidaoConjuntaDebitosPessoaFisica',costBrl:.54,documentTypes:['cpf'],scope:'Brasil',params:{}},
+      {id:'fgts',kind:'certificate',category:'Empresa',label:'FGTS',costBrl:.54,documentTypes:['cnpj'],scope:'Brasil',params:{}}
+    ]}})})});
+  const start=appJs.indexOf('let sellerCoverage = null;'),end=appJs.indexOf('document.querySelector("#sellerAnalysisUfs")?.addEventListener',start);
+  vm.runInContext(appJs.slice(start,end),context);await context.loadSellerCoverage();
+  assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Escolha os estados/);
+  selected.ufs=['AP'];selected.courts=['AP:Cível'];selected.queries=['fiscal','ccd'];context.renderCertificateChoices();context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/<details open>/);assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Não inclui &lt;dívida ativa&gt;/);
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 32,40/);assert.equal(elements.get('#sellerAnalysisBirthDate').required,true);assert.equal(elements.get('#sellerAnalysisRg').required,true);
+  elements.get('#sellerAnalysisDocumentType').value='cnpj';selected.queries=['fgts'];context.renderCertificateChoices();context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 10,80/);assert.doesNotMatch(elements.get('#sellerAnalysisQueries').innerHTML,/value="fiscal"/);
+  assert.equal(elements.get('#sellerAnalysisBirthDate').required,false);assert.equal(elements.get('#sellerAnalysisRg').required,false);
+  elements.get('#sellerAnalysisDocumentType').value='cpf';selected.ufs=[];selected.queries=[];selected.courts=[];context.updateSellerEstimate();
+  assert.equal(elements.get('#sellerAnalysisBirthDate').required,false);assert.equal(elements.get('#sellerAnalysisRg').required,false);
 });
 
 test("seller results preserve every source, private PDF indices and pending queries", () => {

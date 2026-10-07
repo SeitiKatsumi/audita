@@ -101,6 +101,7 @@ function normalizeExtraFields(value) {
     companyCnpjs: Array.isArray(value.companyCnpjs) ? [...new Set(value.companyCnpjs.map(normalizeDocument))].slice(0, 5) : [],
     authorizationConfirmed: value.authorizationConfirmed === true,
     autonomousUfs: Array.isArray(value.autonomousUfs) ? [...new Set(value.autonomousUfs.map((uf) => String(uf).toUpperCase()))] : [],
+    autonomousCertificates: Array.isArray(value.autonomousCertificates)?[...new Set(value.autonomousCertificates.map(String))]:undefined,
     paidQueryConfirmed: value.paidQueryConfirmed === true,
     firstName: String(value.firstName || value.primeiroNome || "").trim(),
     motherName: String(value.motherName || value.nomeMae || "").trim(),
@@ -264,13 +265,17 @@ export function createAuditService({
       return;
     }
 
-    await pool.query(
+    const saved = await pool.query(
       `INSERT INTO audita_audits (
          public_id, tenant_id, requested_by_user_id, document_type, tipo_documento,
          document_hash, documento_hash, document_masked, status, score_nivel,
          score_motivos, authorization_confirmed, request_payload, subject_name
        )
-       VALUES ($1, $2, $3, $4, $4, $5, $5, $6, $7, $8, $9, true, $10, $11)`,
+       VALUES ($1, $2, $3, $4, $4, $5, $5, $6, $7, $8, $9, true, $10, $11)
+       ${query.paidCertificateOrder ? `ON CONFLICT(public_id) DO UPDATE SET status=EXCLUDED.status,
+         request_payload=audita_audits.request_payload || EXCLUDED.request_payload,updated_at=NOW()
+         WHERE audita_audits.tenant_id=EXCLUDED.tenant_id AND audita_audits.requested_by_user_id=EXCLUDED.requested_by_user_id
+         AND audita_audits.request_payload->'certificateOrder'->>'status'='starting'` : ''} RETURNING public_id`,
       [
         query.consultaId,
         authContext.tenantId,
@@ -292,6 +297,7 @@ export function createAuditService({
       ],
     );
 
+    if(query.paidCertificateOrder&&!saved.rows.length) throw new Error('certificate_order_claim_lost');
     for (const result of query.resultados) {
       await pool.query(
         `INSERT INTO audita_audit_executions (
@@ -447,6 +453,7 @@ export function createAuditService({
             tenantId: query.tenantId,
             userId: query.userId,
             user: query.usageUser || null,
+            paidCertificateOrder: query.paidCertificateOrder === true,
           },
           recordApiUsage,
         },
@@ -481,8 +488,8 @@ export function createAuditService({
     }
   }
 
-  async function startAudit(request) {
-    const authContext = await getAuthContext(request);
+  async function startAudit(request, options = {}) {
+    const authContext = options.paidCertificateOrder ? options.authContext : await getAuthContext(request);
     if (authContext.unauthorized) {
       return { unauthorized: true };
     }
@@ -498,7 +505,7 @@ export function createAuditService({
     }
 
     const documentoHash = hashDocument(authContext.tenantId, documentoNormalizado);
-    const consultaId = crypto.randomUUID();
+    const consultaId = options.paidCertificateOrder ? options.consultaId : crypto.randomUUID();
     const resultados = fontes.map((fonte) => ({
       fonte,
       status: "pending",
@@ -528,6 +535,7 @@ export function createAuditService({
             email: authContext.user.email,
           }
         : null,
+      paidCertificateOrder: options.paidCertificateOrder === true,
       resultados,
       scoreRisco: { nivel: "indefinido", motivos: ["Consulta ainda nao concluida."] },
       createdAt: new Date().toISOString(),

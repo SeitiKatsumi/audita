@@ -8,6 +8,8 @@ test("autonomous plan rejects unsupported coverage and deduplicates states", () 
   assert.throws(() => planAutonomousCertificates(["AP"], {}), /unsupported/);
   assert.equal(planAutonomousCertificates(["AP", "AP"], configuration).certificates.length, 2);
   assert.equal(planAutonomousCertificates(["AP"], configuration).maxProviderCostBrl, 1.08);
+  const selected=planAutonomousCertificates(['AP'],configuration,['AP:Cível']);assert.equal(selected.certificates.length,1);assert.equal(selected.maxProviderCostBrl,.54);
+  assert.throws(()=>planAutonomousCertificates(['AP'],configuration,['DF:Cível']),/invalid_autonomous_certificate_selection/);
 });
 
 test("autonomous batch keeps a failed certificate pending in the outcome and preserves verified PDFs", async () => {

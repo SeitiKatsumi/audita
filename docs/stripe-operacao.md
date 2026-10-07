@@ -49,6 +49,9 @@ Endpoint da aplicacao:
 Eventos necessarios:
 
 - `checkout.session.completed`
+- `checkout.session.async_payment_succeeded` (emissão: liberar somente depois da confirmação)
+- `checkout.session.async_payment_failed` (emissão: não coletar)
+- `checkout.session.expired` (emissão: fechar checkout pendente)
 - `invoice.paid`
 - `invoice.payment_failed`
 - `customer.subscription.created`
@@ -93,7 +96,7 @@ STRIPE_PRICE_CREDITS_500=<live price id>
    aceita os termos no Dashboard Stripe.
 2. Duplicar o catalogo aprovado no modo de producao.
 3. Criar chave restrita live com as tres permissoes minimas.
-4. Criar endpoint live com os seis eventos acima e copiar seu signing secret.
+4. Criar endpoint live com os eventos acima e copiar seu signing secret.
 5. Configurar todos os secrets no ambiente de producao.
 6. Aplicar migracoes PostgreSQL e confirmar `dbReady=true`.
 7. Publicar a versao validada e confirmar hash/health.

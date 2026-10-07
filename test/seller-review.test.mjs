@@ -162,6 +162,10 @@ test('AI grounding, ambiguous identity, file boundaries, strict JSON and refusal
   assert.throws(()=>validateSellerReading(reading,{details:{}},'Nothing about that debt'));
   const uncertain=validateSellerReading({...reading,identity:'mismatch'},{details:{amount:'R$ 1.250,00'}},'');
   assert.equal(uncertain.outcome,'inconclusive');
+  const trusted=validateSellerReading({...reading,identity:'uncertain'},{identityVerified:true,details:{amount:'R$ 1.250,00'}},'');
+  assert.equal(trusted.identity,'compatible');assert.equal(trusted.outcome,'occurrences');
+  assert.equal(validateSellerReading({...reading,identity:'mismatch'},{identityVerified:true,details:{amount:'R$ 1.250,00'}},'').outcome,'inconclusive');
+  assert.equal(validateSellerReading({...reading,identity:'uncertain'},{details:{amount:'R$ 1.250,00'}},'').outcome,'inconclusive');
   await assert.rejects(()=>readSellerPdf('../server.mjs'));
   let sent;
   const response={status:'completed',output_text:JSON.stringify(reading)};
