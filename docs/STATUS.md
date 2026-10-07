@@ -1,4 +1,5 @@
 # 2026-10-07 - Simplificacao do atendimento de isencao de IR
+- Glosas: removidos Retomar meus lotes e botoes inferiores Novo atendimento, Excluir lote salvo e Atualizar andamento, a pedido do usuario. Dados e rotas preservados. Oito testes de glosas e sintaxe passaram; localhost3000 atualizado. Commit/push solicitados; sem deploy executado.
 - Validacao da publicacao consolidada: suite Node com 557 testes, 555 passaram e 1 ignorado; unica falha era contagem desatualizada de migracoes (9 para 10 com glosas). Teste corrigido e aprovado em nova execucao. Sintaxe de app/server aprovada; nenhum segredo ou arquivo temporario incluido.
  - Publicacao adicional solicitada pelo usuario: inclui agora pagamentos e glosas, conciliados com origin/main e com os segmentos comerciais. Temporarios e dados privados excluidos. Nenhuma migracao ou deploy executado nesta publicacao.
 # 2026-10-05 - Automacao documental de glosas
