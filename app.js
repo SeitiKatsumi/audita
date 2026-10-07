@@ -273,7 +273,7 @@ let pendingGuestAction = null;
 const publicPages = new Set(["home", "chat", "central-servicos", "analise-vendedor", "emissao-certidoes",
   ...analysisSegments.map(segment => segment.id),
   "consulta-imoveis", "isencao-ir", "pis-pasep", "analise-cobrancas", "dividas-bancarias",
-  "auditoria-importacao", "contas-de-luz", "consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]);
+  "auditoria-glosas", "auditoria-importacao", "contas-de-luz", "consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]);
 const isGuest = () => currentAuthState.authRequired && !currentAuthState.user;
 let currentDocumentAiContext = null;
 let currentPropertySearch = null;
@@ -903,6 +903,7 @@ const auditSourceLabels = {
 
 const pageMeta = {
   ...Object.fromEntries(analysisSegments.map(s => [s.id, {title:s.title,eyebrow:s.eyebrow}])),
+  "auditoria-glosas": {title:"Auditoria de glosas",eyebrow:"Saúde · Conferência financeira"},
   advogados: {title: "Área dos Advogados", eyebrow: "Atendimentos da equipe"},
   "contas-de-luz": { title: "Auditoria de contas de luz", eyebrow: "Energia" },
   "auditoria-importacao": { title: "Auditoria de importação", eyebrow: "NCM · II · IPI" },

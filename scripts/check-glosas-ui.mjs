@@ -1,0 +1,57 @@
+import {createServer} from 'node:http';
+import {readFile,mkdir} from 'node:fs/promises';
+import {randomBytes} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {PGlite} from '@electric-sql/pglite';
+import {createGlosasService} from '../services/glosas.service.mjs';
+import {createGlosasHandler} from '../services/glosas-api.mjs';
+import {glosasPdf} from '../services/glosas-report.mjs';
+const db=new PGlite();let browser;
+let auth={tenantId:1,user:{id:1}};
+const sendJson=(res,status,data)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(data));};
+let aiCalls=0;
+const ai={available:()=>true,extract:async()=>{aiCalls++;return {operator:'Operadora fictícia',lot:'Lote de teste',truncated:false,warnings:[],facts:[],items:[{guide:'GUIA-FICTICIA',sequence:'1',code:null,reason:'Motivo fictício',category:'clinical',billed:10000,paid:6000,denied:3000,source:{page:1,locator:'linha 1',quote:'GUIA-FICTICIA 100,00 60,00 30,00'}}]};},analyze:async value=>({items:value.items.map(v=>({index:v.index,observation:'Sugestão fictícia para revisão.',evidenceIds:v.evidenceIds,missing:['Revisão profissional'],draft:'Minuta fictícia, não protocolada.',prevention:'Conferir documentos.'}))})};
+const handler=createGlosasHandler({service:createGlosasService({getDb:()=>({pool:db,dbReady:true}),env:{AUDITA_GLOSAS_ENCRYPTION_KEY:randomBytes(32).toString('hex')},ai}),getAuth:async()=>auth,sendJson,readJson:async req=>{let body='';for await(const c of req)body+=c;return JSON.parse(body);},readBuffer:async req=>{const chunks=[];for await(const c of req)chunks.push(c);return Buffer.concat(chunks);}});
+const server=createServer(async(req,res)=>{try{
+ const url=new URL(req.url,'http://localhost');
+ if(await handler(req,res,url))return;
+ if(url.pathname==='/api/auth/me')return sendJson(res,200,auth);
+ if(['glosas.js','audita-chat-motion.js','glosas.css','styles.css','assets/audita-logo-original.png','assets/audita-profile-assistant.png'].includes(url.pathname.slice(1))){res.writeHead(200,{'content-type':url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.png')?'image/png':'text/css'});return res.end(await readFile(new URL('..'+url.pathname,import.meta.url)));}
+ res.writeHead(200,{'content-type':'text/html; charset=utf-8'});res.end('<link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="glosas.css"><meta name="viewport" content="width=device-width,initial-scale=1"><body data-active-page="auditoria-glosas" style="padding:24px"><h1>Auditoria de glosas</h1><main id="glosasApp"></main><script type="module" src="glosas.js"></script>');
+ }catch{res.writeHead(500);res.end('Test server error');}});
+try{
+ await db.exec('CREATE TABLE audita_tenants(id BIGINT PRIMARY KEY);CREATE TABLE audita_users(id BIGINT PRIMARY KEY);INSERT INTO audita_tenants VALUES(1);INSERT INTO audita_users VALUES(1);');
+ await db.exec(await readFile(new URL('../db/glosas.sql',import.meta.url),'utf8'));
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:900}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(`http://127.0.0.1:${server.address().port}`);
+ await page.getByRole('button',{name:'Sim, vamos conferir minhas glosas'}).click();
+ await page.locator('[name=aiConsent]').check();await page.getByRole('button',{name:'Continuar para os documentos'}).click();
+ await page.locator('[name=file]').setInputFiles({name:'demonstrativo.pdf',mimeType:'application/pdf',buffer:await glosasPdf('GUIA-FICTICIA 100,00 60,00 30,00')});
+ await page.getByRole('button',{name:'Enviar documento',exact:true}).click();await page.getByRole('button',{name:'Ler e cruzar documentos'}).click();
+ await page.getByRole('heading',{name:'Confira o que encontrei nos documentos'}).waitFor();assert.equal(aiCalls,1);
+ assert.equal(await page.locator('[name=operator]').inputValue(),'Operadora fictícia');
+ await page.locator('[name=confirmed]').check();await page.getByRole('button',{name:'Confirmar e gerar análise'}).click();
+ await page.getByRole('button',{name:'Baixar relatório preliminar'}).waitFor();
+ assert.match(await page.locator('.glosas-totals').innerText(),/10,00/);
+ assert.match(await page.locator('[aria-label="Conferência salva"]').innerText(),/30%/);
+ const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Baixar relatório preliminar'}).click()]);assert.equal(download.suggestedFilename(),'glosas-preliminar.txt');
+ await page.getByRole('button',{name:'Revisar item 1',exact:true}).click();
+ await page.locator('[name=denied]').fill('80');await page.getByRole('button',{name:'Conferir este item'}).click();await page.getByRole('alert').filter({hasText:'excedem'}).waitFor();assert.equal(await page.locator('[name=denied]').inputValue(),'80.00');
+ await page.locator('[name=denied]').fill('30');await page.getByRole('button',{name:'Conferir este item'}).click();await page.locator('[name=confirmed]').check();await page.getByRole('button',{name:'Confirmar e gerar análise'}).click();await page.getByRole('button',{name:'Baixar relatório preliminar'}).waitFor();
+ const [pdfDownload]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Baixar relatório PDF'}).click()]);assert.equal(pdfDownload.suggestedFilename(),'glosas-preliminar.pdf');
+ await mkdir(new URL('../tmp/glosas/',import.meta.url),{recursive:true});await pdfDownload.saveAs(fileURLToPath(new URL('../tmp/glosas/report.pdf',import.meta.url)));
+ await page.getByText('Item 1 · análise e minuta',{exact:true}).click();assert.match(await page.locator('.glosas-draft').innerText(),/não protocolada/);
+ await mkdir(new URL('../tmp/glosas/',import.meta.url),{recursive:true});
+ await page.screenshot({path:fileURLToPath(new URL('../tmp/glosas/desktop.png',import.meta.url)),fullPage:true});
+ await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.screenshot({path:fileURLToPath(new URL('../tmp/glosas/mobile.png',import.meta.url)),fullPage:true});
+ await page.reload();await page.getByText('Retomar meus lotes',{exact:true}).click();await page.locator('#glosasSaved option:nth-child(2)').waitFor({state:'attached'});await page.locator('#glosasSaved').selectOption({label:'Lote de teste · Operadora fictícia'});await page.getByRole('button',{name:'Abrir lote',exact:true}).click();await page.getByRole('button',{name:'Baixar relatório preliminar'}).waitFor();
+ page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Excluir lote salvo',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('#glosasSaved option').length===1);
+ auth={user:null};await page.reload();await page.getByRole('button',{name:'Sim, vamos conferir minhas glosas'}).waitFor();
+ assert.equal(await page.locator('#glosasForm').count(),0);assert.equal(await page.getByText('Entre na sua conta para iniciar.',{exact:true}).count(),0);
+ assert.ok(await page.getByRole('heading',{name:'Podemos começar?'}).isVisible());
+ assert.deepEqual(errors,[]);console.log('Glosas automation UI passed: upload, extraction, confirmation, corrections, analysis, drafts, PDF/TXT export, reload, deletion, guest introduction, desktop/mobile. Real handler + isolated PGlite, simulated AI.');
+}finally{await browser?.close();await new Promise(r=>server.close(r));await db.close();}

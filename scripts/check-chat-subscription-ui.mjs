@@ -255,14 +255,16 @@ try {
   assert.equal(checkout.kind, "chat_experiment");
   assert.equal(checkout.interval, "once");
   assert.ok(checkout.requestId);
-  await boot("?checkout=success");
+  await boot("?chat_checkout=success");
   await login();
   assert.equal(await page.locator("#chatInput").inputValue(), "Rascunho ficticio");
   assert.equal(await page.evaluate(() => window.chat.ensureAccess()), false, "Query parameter must not grant access");
-  assert.match(await modal.locator("[data-notice]").innerText(), /ainda n/);
+  assert.match(await modal.locator("[data-notice]").innerText(), /Aguardando confirmação/);
   assert.equal(await page.evaluate(() => sessionStorage.getItem("audita:chat-checkout::user-a")), null);
+  access = { active: true, planId: "chat-essential", remaining: { messages: 100, pages: 20 }, legacy: false };
+  await page.waitForFunction(() => document.querySelector('[data-notice]').textContent.includes('Plano ativo confirmado'));
+  assert.equal(await choose('professional').isDisabled(), true, 'no second subscription while paid plan is active');
   await close();
-  await active();
   assert.equal(await page.evaluate(() => window.chat.ensureAccess()), true);
   assert.doesNotMatch(await modal.locator("[data-access]").textContent(), /usadas/);
   access.used = { messages: 12, pages: 3 };
@@ -336,6 +338,7 @@ try {
   await close();
   await active();
   await page.evaluate(() => { document.querySelector("#chatInput").value = "Privado A"; sessionStorage.setItem("audita:chat-checkout::user-a", JSON.stringify({text:"Privado A",expires:Date.now()+60000})); });
+  access = { active: false, remaining: null };
   await login("user-b");
   assert.equal(await page.locator("#chatInput").inputValue(), "");
   assert.equal(await page.evaluate(() => sessionStorage.getItem("audita:chat-checkout::user-a")), null);

@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/energy-audit.css">
   <link rel="stylesheet" href="/import-audit.css?v=20260922-document-check">
   <link rel="stylesheet" href="/chat-subscription.css">
+  <link rel="stylesheet" href="glosas.css?v=20261005" />
 </head>
   <body>
     <div class="app-boot" id="appBoot" role="status" aria-live="polite" aria-label="Carregando IA AUDITA">
@@ -89,7 +90,7 @@
             <span class="nav-label">IA AUDITA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
           </a>
-          <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
+          <a href="#central-servicos" data-nav-pages="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
             <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
             <span class="nav-label">Central de Serviços</span>
           </a>
@@ -122,7 +123,7 @@
       <nav class="mobile-bottom-nav" aria-label="Navegação principal mobile">
         <a href="#home"><img src="assets/audita-logo-original.png" alt="" /><span>Home</span></a>
         <a href="/chat" data-app-route="chat"><img class="nav-icon" src="assets/nav-icons/sparkles.svg" alt="" /><span>IA</span></a>
-        <a href="#central-servicos" data-nav-pages="auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
+        <a href="#central-servicos" data-nav-pages="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
         <a href="#planos"><img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" /><span>Planos</span></a>
         <a href="#meus-dados"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Meus Dados</span></a>
       </nav>
@@ -145,7 +146,7 @@
 <div class="module list-panel"><table><thead><tr><th>Atendimento</th><th>Serviço</th><th>Situação</th><th>Próximo passo</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="lawyer-caseRows"></tbody></table><p id="lawyer-empty" hidden>Nenhum atendimento nesta lista.</p></div>
 <section id="lawyer-details" class="panel" hidden tabindex="-1"><button class="secondary-action" id="lawyer-closeDetails">Voltar à lista</button><div id="lawyer-detailBody"></div></section></div>
 <aside class="activity"><section class="panel"><h2>Pendências de atenção</h2><div id="lawyer-attention"></div></section><section class="panel"><h2>Atualizações recentes</h2><div id="lawyer-recent"></div></section><p class="muted">Os prazos oficiais devem ser conferidos pela equipe nos canais responsáveis.</p></aside></div></div></section>
-        <nav class="service-return page-hidden" data-page="auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
+        <nav class="service-return page-hidden" data-page="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
           <a href="#central-servicos"><img src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />Voltar à Central de Serviços</a>
         </nav>
 
@@ -302,6 +303,7 @@
           </aside>
         </section>
 
+        <section id="auditoria-glosas" data-page="auditoria-glosas" class="page-hidden"><div id="glosasApp" aria-label="Auditoria de glosas"></div></section>
         <section id="contas-de-luz" data-page="contas-de-luz" class="page-hidden"><div id="energyApp" aria-label="Auditoria de contas de luz"></div></section>
         <section id="auditoria-importacao" data-page="auditoria-importacao" class="page-hidden"><div id="importApp" aria-label="Auditoria assistida de importação"></div></section>
         <section class="services-page page-hidden" id="central-servicos" data-page="central-servicos" aria-label="Central de Serviços">
@@ -314,6 +316,7 @@
             <button class="secondary-action" type="button" data-service-category="energia" aria-pressed="false">Energia</button>
             <button class="secondary-action" type="button" data-service-category="imoveis" aria-pressed="false">Imóveis</button>
             <button class="secondary-action" type="button" data-service-category="importacao" aria-pressed="false">Imposto de Importação</button>
+            <button class="secondary-action" type="button" data-service-category="saude" aria-pressed="false">Glosas</button>
             <button class="secondary-action" type="button" data-service-category="laudos" aria-pressed="false">Laudos</button>
           </div>
           <div class="services-heading"><h2>Explore os serviços</h2><p data-service-count role="status" aria-live="polite"></p></div>
@@ -489,6 +492,26 @@
                 </article>
               </div>
             </section>
+<section class="services-group" data-service-group aria-labelledby="services-glosas">
+  <h3 id="services-glosas">Saúde</h3>
+  <div class="services-grid">
+    <article class="home-module-action service-card service-card-explained" data-service-card data-categories="saude laudos" data-keywords="glosas saúde hospital clínica faturamento operadora">
+      <a class="service-card-entry" href="#auditoria-glosas">
+        <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
+        <span class="home-module-copy"><small class="service-category-label">Saúde · Auditoria assistida</small><strong>Auditoria de glosas</strong><small>Envie documentos para extrair itens, cruzar valores e preparar relatório e minutas com apoio da IA.</small></span>
+      </a>
+      <details class="service-disclosure">
+        <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
+        <div class="service-expanded">
+          <span class="service-detail"><b>Para quem é</b><span>Clínicas, hospitais e responsáveis pelo faturamento de serviços de saúde.</span></span>
+          <span class="service-detail"><b>Como podemos ajudar</b><span>Leitura de PDF e XML, referências documentais, conferência de divergências e minutas para revisão profissional.</span></span>
+          <small class="service-note">Leitura depende da integração de IA configurada. Não emite parecer médico, garante recuperação ou protocola recursos.</small>
+          <a class="service-action" href="#auditoria-glosas">Conferir glosas<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
+        </div>
+      </details>
+    </article>
+  </div>
+</section>
 <section class="services-group" data-service-group aria-labelledby="services-laudos">
               <h3 id="services-laudos">Laudos</h3>
               <div class="services-grid">
@@ -2183,6 +2206,7 @@
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
     <script type="module" src="app.js?v=20261006-analysis-segments"></script>
+    <script type="module" src="glosas.js?v=20261005"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>
   <script type="module" src="energy-audit.js?v=20260922-service-intros"></script>

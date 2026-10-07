@@ -18,6 +18,15 @@ Grants are process-local and must be enabled again after a server restart; disab
 the flag to remove both the button and the bypass. The flag defaults to false and
 must remain disabled for paid operation. AI provider costs still apply.
 
+An active paid chat entitlement takes precedence over free test access and
+clears that process-local test grant. Existing free reservations are preserved;
+new work uses paid quotas. Expiry/revocation does not restore that old grant.
+The chat checkout return uses `chat_checkout`; it opens the status dialog and
+checks server access every five seconds for up to two minutes. A URL never
+grants access. Delayed confirmation displays guidance not to buy again;
+manual refresh and returning to the tab still query the server. Active paid
+plans disable duplicate purchases; management remains in the billing portal.
+
 Apply `db/schema.sql`, then the three `db/migrations/20260922-chat-*.sql`
 files. The existing automatic migration bootstrap includes them when enabled.
 Do not run these against a shared database without authorization.

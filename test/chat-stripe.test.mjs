@@ -176,7 +176,7 @@ test("free test access allows checkout but never hides a paid plan or a used exp
       ? { status: "complete" } : { id: "cs_monthly", url: "https://checkout.stripe.com/fake" } });
   assert.ok((await resumed.service.createCheckoutSession(AUTH,
     { kind: "chat_subscription", planId: "chat-essential" })).url);
-  assert.equal((await accessService.getAccess(AUTH)).source, "test");
+  assert.equal((await accessService.getAccess(AUTH)).source, "none");
 });
 
 test("chat demo activation is forbidden even when legacy demo mode is enabled", async () => {

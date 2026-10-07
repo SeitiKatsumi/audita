@@ -53,6 +53,8 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   let owner = userId(), revision = 0, loaded = false, busy = false, loading = null;
   let pendingPlan = null, checkoutRequest = null, documentBusy = false, documentResolve = null;
   let prepared = null, analysisRequestId = null, destroyed = false;
+  let checkoutReturn = new URLSearchParams(location.search).get("chat_checkout");
+  let confirmationTimer = null, confirmationAttempts = 0;
 
   function userId() {
     const auth = getAuthState(), user = auth?.user;
@@ -126,7 +128,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       ? loaded ? "Pagamentos indispon\u00edveis: n\u00e3o foi poss\u00edvel verificar a configura\u00e7\u00e3o deste ambiente." : "Consultando disponibilidade dos pagamentos."
       : `${catalog.billing?.demoMode || catalog.billing?.mode === "test" ? "Ambiente de testes: sem cobran\u00e7a real. " : ""}${!PLANS.some(plan => available(plan.id)) ? "Pagamentos indispon\u00edveis neste ambiente: a configura\u00e7\u00e3o de cobran\u00e7a n\u00e3o est\u00e1 habilitada. Nenhuma compra pode ser conclu\u00edda." : ""}`;
     const testButton = dialog.querySelector('[data-test-access]');
-    testButton.hidden = access?.unlimited || !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable);
+    testButton.hidden = access?.unlimited || (access?.active && !access.test && !access.legacy) || !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable);
     testButton.disabled = busy || Boolean(loading) || access?.test === true;
     testButton.textContent = access?.test ? 'Acesso de teste liberado' : 'Liberar acesso de teste (sem cobrança)';
     manage.hidden = !(owner && (access?.active && !access.legacy && !access.test && !access.unlimited || billing?.canManage && billing?.subscription?.provider === "stripe"));
@@ -145,7 +147,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       const price = priceFor(plan.id);
       const cents = Number.isFinite(price?.cents) && price.cents > 0 ? price.cents : plan.cents;
       const current = access?.active && access.planId === plan.id;
-      const disabled = busy || access?.unlimited || !available(plan.id) || current || (experiment && access?.trialUsed);
+      const disabled = busy || access?.unlimited || (access?.active && !access.test && !access.legacy) || !available(plan.id) || (experiment && access?.trialUsed);
       return `<article class="chat-subscription-plan${recommended ? " is-recommended" : ""}">
         <span class="chat-subscription-badge">${recommended ? "Recomendado" : current ? "Plano atual" : "&nbsp;"}</span>
         <h3>${plan.name}</h3><p class="chat-subscription-price"><strong>${escape(money(cents))}</strong><span>${experiment ? " / 30 dias" : " / m\u00eas"}</span></p>
@@ -204,6 +206,8 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   }
   async function refresh() {
     if (destroyed) return null;
+    clearTimeout(confirmationTimer);
+    confirmationTimer = null;
     if (owner !== userId()) return onAuthChanged();
     if (loading) return loading;
     const version = revision;
@@ -221,16 +225,27 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
           billing = nextBilling;
         } else access = null;
         loaded = true;
-        const checkout = new URLSearchParams(location.search).get("checkout");
-        notice.textContent = checkout === "success" ? access?.active
-          ? "Acesso confirmado pelo servidor." : "Pagamento ainda n\u00e3o confirmado. Atualize o acesso em instantes."
-          : ["cancelled", "canceled"].includes(checkout) ? "Pagamento n\u00e3o conclu\u00eddo. Seu rascunho foi preservado." : "";
+        const confirmed = access?.active && PLANS.some(plan => plan.id === access.planId) && !access.test && !access.legacy && !access.unlimited;
+        notice.textContent = checkoutReturn === "success"
+          ? confirmed ? "Plano ativo confirmado pelo servidor. Seu acesso foi atualizado."
+            : !owner ? "Entre na conta usada na compra para verificar o pagamento."
+            : confirmationAttempts < 24 ? "Aguardando confirmação do pagamento. O acesso será atualizado automaticamente."
+            : "A confirmação está demorando. Não refaça a compra. Use Atualizar acesso ou contate o suporte."
+          : ["cancelled", "canceled"].includes(checkoutReturn) ? "Pagamento não concluído. Seu rascunho foi preservado." : "";
+        if (confirmed && checkoutReturn === "success") checkoutReturn = null;
         return access;
       } catch (error) {
         if (version === revision && owner === userId()) { access = catalog = null; loaded = true; notice.textContent = error.message; }
         return null;
       } finally {
-        if (version === revision) { loading = null; render(); }
+        if (version === revision) {
+          loading = null;
+          render();
+          if (!destroyed && owner && checkoutReturn === "success" && confirmationAttempts < 24 && !document.hidden) {
+            confirmationAttempts++;
+            confirmationTimer = setTimeout(() => void refresh(), 5000);
+          }
+        }
       }
     })();
     render();
@@ -260,6 +275,9 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     const next = userId();
     if (next !== owner) {
       const previous = owner;
+      clearTimeout(confirmationTimer);
+      confirmationTimer = null;
+      if (previous) checkoutReturn = null;
       revision++;
       loading = null;
       owner = next;
@@ -471,9 +489,10 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   listen(document, "visibilitychange", () => { if (!document.hidden) void refresh(); });
   restoreDraft();
   render();
-  void refresh();
+  if (checkoutReturn) open();
+  else void refresh();
   return { open, refresh, ensureAccess, onAuthChanged, handleAccessError, prepareDocument, analyzeDocument: prepareDocument,
     getAccess: () => owner === userId() ? access : null,
-    destroy() { destroyed = true; revision++; events.abort(); finishDocument(null); dialog.remove(); documentDialog.remove(); quota.remove(); },
+    destroy() { destroyed = true; clearTimeout(confirmationTimer); revision++; events.abort(); finishDocument(null); dialog.remove(); documentDialog.remove(); quota.remove(); },
   };
 }

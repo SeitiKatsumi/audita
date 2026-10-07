@@ -4,6 +4,9 @@ import {createDebtExtractor} from './services/bank-debt-ai.mjs';
 import {createImportAI} from './services/import-audit-ai.mjs';
 import {createImportService} from './services/import-audit.service.mjs';
 import {createImportHandler} from './services/import-audit-api.mjs';
+import {createGlosasService} from './services/glosas.service.mjs';
+import {createGlosasHandler} from './services/glosas-api.mjs';
+import {createGlosasAI} from './services/glosas-ai.mjs';
 import {refreshReferences} from './services/energy-audit-references.mjs';
 import {createEnergyService} from "./services/energy-audit.service.mjs";
 import {createEnergyHandler} from "./services/energy-audit-api.mjs";
@@ -568,6 +571,7 @@ async function initializeDatabase() {
       await pool.query(await readFile(join(root, "db", "bank-debt.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "energy-audit.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "import-audit.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "glosas.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-access.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-documents.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-customers.sql"), "utf8"));
@@ -1808,6 +1812,7 @@ const energyService=createEnergyService({getDb:()=>({pool,dbReady}),extractor:cr
 const energyHandler=createEnergyHandler({service:energyService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
 const importService=createImportService({getDb:()=>({pool,dbReady}),ai:createImportAI({recordUsage:async(usage,auth)=>{if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'import_audit',...usage});}})});
 const importHandler=createImportHandler({service:importService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
+const glosasHandler=createGlosasHandler({service:createGlosasService({getDb:()=>({pool,dbReady}),ai:createGlosasAI({recordUsage:async(usage,auth)=>{if(auth)await apiUsageService.record(auth,{provider:'openai',operation:'glosas_audit',...usage});}})}),getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
 const pisPasepService=createPisPasepService({getDb:()=>({pool,dbReady})});
 const pisPasepHandler=createPisPasepHandler({service:pisPasepService,getAuth:getTenantIdForRequest,readJson:readJsonBody,readBuffer:readBufferBody,sendJson});
 const directusLawyerKitService = createDirectusLawyerKitService();
@@ -6197,6 +6202,7 @@ const server = http.createServer(async (request, response) => {
   if (await pisPasepHandler(request, response, url)) return;
   if (await energyHandler(request, response, url)) return;
   if (await importHandler(request, response, url)) return;
+  if (await glosasHandler(request, response, url)) return;
   if (await bankDebtHandler(request, response, url)) return;
   if (await handleApi(request, response, url.pathname)) {
     return;
@@ -6214,7 +6220,7 @@ const server = http.createServer(async (request, response) => {
 
   const requestedPath = uiRoute.path;
   // Keep private storage, configuration and server implementation outside the static surface.
-  const publicRootFiles = new Set(["analysis-segments.js", "import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
+  const publicRootFiles = new Set(["analysis-segments.js", "glosas.js", "glosas.css", "import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
     "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
     "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css", "general-chat.js"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");

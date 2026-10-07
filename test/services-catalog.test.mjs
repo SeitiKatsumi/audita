@@ -97,6 +97,14 @@ test('catalog links keep existing services and collapse only their sidebar entri
 });
 
 
+test('glosas has a dedicated catalog filter and matching destination', async () => {
+ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/data-service-category="saude"[^>]*>Glosas/);
+ const card=html.match(/<article[^>]*data-categories="saude laudos"[^]*?<\/article>/)[0];
+ assert.ok(card.includes('href="#auditoria-glosas"'));
+ assert.equal(matchesService({text:card,categories:['saude','laudos']},'','saude'),true);
+});
+
 test('every service destination includes the shared return navigation', async () => {
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
  const nav=html.match(/<nav class="service-return[^]*?<\/nav>/)[0];
@@ -110,7 +118,7 @@ test('every service destination includes the shared return navigation', async ()
 test('all catalog cards have details and preserve destinations and searchable audiences', async () => {
  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
  const cards=[...html.matchAll(/<article class="home-module-action service-card service-card-explained"[^]*?<\/article>/g)].map(m=>m[0]);
- assert.equal(cards.length,11);
+ assert.equal(cards.length,12);
  for(const card of cards) {
   assert.ok(card.includes('<summary class="service-toggle">'));
   assert.ok(card.includes('Para quem é'));

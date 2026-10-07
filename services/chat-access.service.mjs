@@ -78,14 +78,15 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
     if (hasUnlimitedAccess(auth)) {
       return { allowed: true, active: true, source: 'complimentary', unlimited: true, planId: null, limits: null, used: null, remaining: null };
     }
-    if (includeTestAccess && testBypassEnabled === true && testOwners.has(ids.join(':'))) {
-      return { allowed: true, active: true, source: 'test', planId: null, limits: null, used: null, remaining: null };
-    }
     const row = await current(db, ids);
     if (row) {
+      testOwners.delete(ids.join(':'));
       const used = await usage(db, ids, row.id), limits = LIMITS[row.plan_id];
       return { allowed: true, active: true, source: 'entitlement', ...entitlement(row), limits, used,
         remaining: { messages: limits.messages - used.messages, pages: limits.pages - used.pages } };
+    }
+    if (includeTestAccess && testBypassEnabled === true && testOwners.has(ids.join(':'))) {
+      return { allowed: true, active: true, source: 'test', planId: null, limits: null, used: null, remaining: null };
     }
     const legacy = await getLegacyAccess(auth, db) === true;
     return { allowed: legacy, active: false, source: legacy ? 'legacy' : 'none', planId: legacy ? 'standard' : null,

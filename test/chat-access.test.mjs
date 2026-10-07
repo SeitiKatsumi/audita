@@ -73,8 +73,6 @@ test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/tria
   assert.equal((await s.getAccess(other)).allowed, false);
   assert.equal((await s.getAccess({ tenantId: '1', user: { id: '3' } })).allowed, false);
   assert.equal((await make().getAccess(auth)).allowed, false, 'restart requires a fresh test grant');
-  await s.grantPaidAccess(invoice());
-  assert.equal((await s.getAccess(auth, { includeTestAccess: false })).source, 'entitlement', 'a test grant must not hide a valid paid plan');
   for (const [kind, quantity] of [['messages', 1], ['pages', 30]]) {
     const reservation = await s.reserve(auth, { requestId: `test-${kind}`, kind, quantity });
     assert.equal(reservation.entitlementId, null);
@@ -82,10 +80,17 @@ test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/tria
     assert.equal((await s.reserve(auth, { requestId: `test-${kind}`, kind, quantity })).duplicate, true);
   }
   await assert.rejects(s.reserve(auth, { requestId: 'too-many', kind: 'pages', quantity: 201 }), { code: 'chat_invalid_quantity' });
+  await s.grantPaidAccess(invoice());
+  assert.equal((await s.getAccess(auth)).source, 'entitlement', 'paid access replaces the free test without restarting');
+  assert.equal((await s.enableTestAccess(auth)).source, 'entitlement', 'reenabling test cannot bypass paid quotas');
+  const reservation = await s.reserve(auth, { requestId: 'paid-message', kind: 'messages', quantity: 1 });
+  assert.notEqual(reservation.entitlementId, null);
   const paid = await make().getAccess(auth);
-  assert.deepEqual(paid.used, { messages: 0, pages: 0 });
+  assert.deepEqual(paid.used, { messages: 1, pages: 0 });
   assert.equal(paid.trialUsed, false);
   assert.equal((await pg.query('SELECT count(*)::int AS n FROM audita_chat_entitlements')).rows[0].n, 1, 'only the explicitly paid grant exists');
+  await s.revokeSubscription({ tenantId: '1', userId: '1', subscriptionId: 'subscription-1' });
+  assert.equal((await s.getAccess(auth)).active, false, 'revocation does not resurrect the old free bypass');
 });
 
 test('paid plans, invoice idempotency, nonoverlap and current half-open period', async t => {
