@@ -3,6 +3,68 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 
+test('IR uploads every selected medical file before confirming documents', async () => {
+  let submit;
+  const calls=[];
+  const node={setAttribute(){},focus(){}};
+  const root={querySelector:()=>node,querySelectorAll:()=>[],addEventListener:(name,fn)=>{if(name==='submit')submit=fn;}};
+  const context=vm.createContext({
+    document:{querySelector:()=>root,body:{dataset:{activePage:'home'}},addEventListener(){}},
+    window:{addEventListener(){}},Intl,URL,URLSearchParams,
+    FormData:class{get(){return 'medical';}getAll(){return [{name:'laudo.pdf',size:12},{name:'biopsia.png',size:24}];}},
+    createAuditaChatMotion:()=>({}),
+    record:(value)=>calls.push(value),
+  });
+  vm.runInContext((await readFile(new URL('../ir-exemption.js',import.meta.url),'utf8')).replace(/^import .*;\r?\n/,''),context);
+  vm.runInContext(`
+    state.case={id:'fixture',question:{type:'documents'}};
+    guarded=async fn=>fn();
+    api=async (url,options)=>{record(options.body.name);return {};};
+    updateCase=async ()=>{};
+    command=async (action,input)=>record(input.value);
+  `,context);
+  submit({target:{id:'uploadForm'},preventDefault(){}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,['laudo.pdf','biopsia.png','ready']);
+  calls.length=0;
+  vm.runInContext("api=async (url,options)=>{record(options.body.name);if(options.body.name==='biopsia.png')throw new Error('upload failed');return {};}; guarded=async fn=>{try{await fn();}catch{record('failed');}};",context);
+  submit({target:{id:'uploadForm'},preventDefault(){}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(calls,['laudo.pdf','biopsia.png','failed']);
+});
+
+test('IR integrates explicit consent with the benefit question, without a separate consent screen', async () => {
+  let submit;
+  const node={hidden:true,textContent:'',scrollIntoView(){},setAttribute(){},focus(){}};
+  const root={querySelector:()=>node,querySelectorAll:()=>[],addEventListener:(name,fn)=>{if(name==='submit')submit=fn;}};
+  const calls=[];
+  const context=vm.createContext({
+    document:{querySelector:()=>root,body:{dataset:{activePage:'home'}},addEventListener(){}},
+    window:{addEventListener(){}},Intl,URL,URLSearchParams,
+    FormData:class {constructor(form){this.form=form;}has(){return this.form.authorized;}get(){return '';}},
+    createAuditaChatMotion:()=>({cancelTyping(){},moveAssistantAvatar(){},scrollLatestAssistant(){},animateAssistant(){}}),
+    save:async(...args)=>{calls.push(args);},
+  });
+  vm.runInContext((await readFile(new URL('../ir-exemption.js',import.meta.url),'utf8')).replace(/^import .*;\r?\n/,''),context);
+  const html=vm.runInContext(`
+    command=save;
+    state.case={intakeVersion:2,answers:{role:'self'},permissions:{owner:true},steps:[
+      {key:'role',type:'choice',title:'Para quem?',options:[{value:'self',label:'Para mim'}]},
+      {key:'consent',type:'consent',title:'Podemos analisar suas informações?'},
+      {key:'benefits',type:'simple-benefits',title:'Você é aposentado, pensionista ou reformado?'}
+    ],question:{key:'consent',type:'consent'}};
+    chatView();
+  `,context);
+  assert.doesNotMatch(html,/Podemos analisar suas informações/);
+  assert.match(html,/Você é aposentado/);
+  assert.match(html,/name="authorize"[^>]*required/);
+  assert.doesNotMatch(html,/name="authorize"[^>]*checked/);
+  const event=authorized=>({target:{id:'benefitConsentForm',authorized},submitter:{value:'retirement'},preventDefault(){}});
+  submit(event(false));await new Promise(resolve=>setImmediate(resolve));assert.equal(calls.length,0);
+  submit(event(true));await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(calls.length,2);assert.equal(calls[0][1].key,'consent');assert.equal(calls[1][1].key,'benefits');
+});
+
 test('IR keeps confirmed answers in the chat when the next question changes', async () => {
   const elements = new Map();
   const element = selector => {
@@ -41,26 +103,54 @@ test('IR keeps confirmed answers in the chat when the next question changes', as
   assert.ok(!next.includes('ir-tabs'));
   assert.ok(!next.includes('etapas concluídas'));
   for(const action of ['documents','proposals','timeline']) assert.ok(!next.includes(`data-tab="${action}"`));
-  vm.runInContext('state.case.question=null; render();',context);
+  vm.runInContext("state.case.intakeVersion=2; state.case.answers.medical='available'; state.case.steps.push({key:'documents',type:'documents',title:'Envie seu laudo'}); state.case.question=null; render();",context);
+  const upload=element('#app').innerHTML;
+  assert.ok(upload.includes('id="uploadForm"'));
+  assert.ok(upload.includes('Envie os documentos'));
+  assert.ok(upload.includes('multiple required'));
+  assert.ok(!upload.includes('Tipo de documento'));
+  vm.runInContext("state.case.answers.medical='available'; state.case.question=identity; render();",context);
+  assert.ok(element('#app').innerHTML.includes('id="uploadForm"'));
+  vm.runInContext("state.case.question=null;",context);
+  assert.ok(!upload.includes('Checklist'));
+  assert.ok(!upload.includes('Como deseja continuar'));
+  assert.equal((upload.match(/id="uploadForm"/g)||[]).length,1);
+  assert.ok(!upload.includes('Sua triagem foi'));
+  assert.ok(!upload.includes('Finalizando sua triagem'));
+  vm.runInContext("state.case.answers.documents='later'; render();",context);
   const completed=element('#app').innerHTML;
-  assert.ok(completed.includes('Obrigado por compartilhar'));
-  assert.ok(completed.includes('id="uploadForm"'));
+  assert.ok(completed.includes('Finalizando sua triagem'));
+  assert.ok(!completed.includes('id="uploadForm"'));
   assert.ok(!completed.includes('Ver meu resumo'));
   assert.ok(!completed.includes('ir-chat-tools'));
   assert.ok(!completed.includes('id="irConversationPanel"'));
   assert.ok(!completed.includes('data-tab="proposals"'));
   vm.runInContext('state.case.analysis={state:"preliminary_indications",warnings:[],pending:[],estimate:{rows:[],notice:"Estimativa preliminar"},sources:[]}; state.case.proposals=[{kind:"adm",state:"paid"}]; render();',context);
   const reviewed=element('#app').innerHTML;
-  assert.ok(reviewed.includes('Há indícios para aprofundar'));
+  assert.ok(reviewed.includes('Sua triagem foi concluída'));
+  assert.ok(reviewed.includes('Pronto, &lt;script&gt;test&lt;/script&gt;!'));
+  assert.ok(reviewed.includes('<details class="ir-completion-upload">'));
+  assert.ok(reviewed.includes('Enviar meu laudo'));
+  assert.ok(!reviewed.includes('Há indícios para aprofundar'));
+  assert.ok(!reviewed.includes('Valores informados'));
   assert.ok(reviewed.includes('Proposta ADM'));
-  assert.ok(reviewed.indexOf('Obrigado por compartilhar')<reviewed.indexOf('Há indícios para aprofundar'));
-  assert.ok(reviewed.indexOf('Há indícios para aprofundar')<reviewed.indexOf('id="uploadForm"'));
+  assert.ok(reviewed.indexOf('Sua triagem foi concluída')<reviewed.indexOf('id="uploadForm"'));
   assert.ok(!reviewed.includes('data-tab="analysis"'));
 
 
   vm.runInContext("state.editing='role'; render();",context);
   assert.ok(!element('#app').innerHTML.includes('Iniciar nova análise'));
+  assert.ok(!element('#app').innerHTML.includes('qa@example.test'));
+  assert.ok(!element('#app').innerHTML.includes('data-edit="role"'));
+  assert.ok(!element('#app').innerHTML.includes('Proposta ADM'));
+  assert.ok(element('#app').innerHTML.includes('Retomar conversa'));
+  assert.equal(vm.runInContext('state.case.answers.identity.email',context),'qa@example.test');
+  vm.runInContext("state.editing='identity'; render();",context);
+  assert.ok(element('#app').innerHTML.includes('data-edit="role"'));
+  assert.ok(!element('#app').innerHTML.includes('data-edit="identity"'));
+  assert.ok(element('#app').innerHTML.includes('id="answerForm"'));
   vm.runInContext('state.editing=null; state.case.permissions.owner=false; render();',context);
+  assert.ok(element('#app').innerHTML.includes('qa@example.test'));
   assert.ok(!element('#app').innerHTML.includes('Iniciar nova análise'));
   const page=await readFile(new URL('../index.html',import.meta.url),'utf8');
   assert.ok(!page.includes('id="newCase"'));
@@ -140,7 +230,7 @@ test('IR automatically prepares a missing summary, preserves saved reviews and a
   context.fixture={id:'fixture',revision:5,answers:{},steps:[],question:null,permissions:{owner:true},documents:[],checklist:[]};
   await vm.runInContext('state.config={documentTypes:{}};state.case=fixture;completeSummary()',context);
   assert.deepEqual(calls,[{action:'analyze',revision:5}]);
-  assert.match(node('#app').innerHTML,/Há indícios para aprofundar/);
+  assert.match(node('#app').innerHTML,/Sua triagem foi concluída/);
   await vm.runInContext('completeSummary()',context);
   assert.equal(calls.length,1,'a saved summary/review must not be regenerated on resume');
   context.fetch=async()=>{throw Error('offline');};

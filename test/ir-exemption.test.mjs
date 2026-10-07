@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {PGlite} from '@electric-sql/pglite';
 import {PDFDocument} from 'pdf-lib';
 import {createIrExemptionService,queryDatajud} from '../services/ir-exemption.service.mjs';
-import {analyzeIr,validateAnswer,irKey,sealIr,openIr} from '../services/ir-exemption-domain.mjs';
+import {analyzeIr,validateAnswer,irSteps,irKey,sealIr,openIr} from '../services/ir-exemption-domain.mjs';
 import {createStripeBillingService} from '../services/stripe-billing.service.mjs';
 
 let dir,pg,pool,service,env;
@@ -41,6 +41,36 @@ test('estimativa não extrapola meses, exclui salário, anterior ao direito e j�
  const result=analyzeIr(a,[],new Date('2026-09-10'));assert.equal(result.estimate.documentedCents,15000);assert.equal(result.estimate.futureSavingsCents,null);assert.ok(result.estimate.rows[1].reason);assert.equal(result.state,'preliminary_indications');
  a.diagnosis.date=null;a.diagnosis.year=2020;assert.equal(analyzeIr(a).estimate.documentedCents,0);
 });
+test('triagem curta prioriza perguntas simples, preserva legado e nao inventa dados',async()=>{
+ assert.deepEqual(irSteps({role:'self'},2).filter(s=>!s.optional).map(s=>s.key),['role','consent','benefits','taxes','conditions','medical','identity']);
+ assert.equal(irSteps({role:'self'})[2].key,'identity');
+ assert.equal(irSteps({role:'self'}).find(s=>s.key==='diagnosis').optional,undefined);
+ const short={...sample,benefits:[{type:'retirement',payer:null,start:null}],medical:'available',taxes:{withheld:'no',periods:[]}};
+ delete short.diagnosis;delete short.prior;delete short.documents;
+ let c=await intake(short);
+ assert.equal(c.intakeVersion,2);assert.equal(c.question,null);
+ c=await action(c,owner,'analyze');
+ assert.equal(c.analysis.state,'preliminary_indications');assert.equal(c.analysis.estimate.documentedCents,0);
+ assert.equal(c.answers.benefits[0].payer,null);assert.equal(c.answers.diagnosis,undefined);
+ assert.equal((await service.get(owner,c.id)).question,null);
+ c=await action(c,owner,'answer',{key:'benefits',value:[{type:'pension',payer:null,start:null}]});
+ assert.equal(c.question.key,'taxes');assert.equal(c.analysis,null);
+});
+
+test('voltar ao laudo reinicia documentos e contato sem pular respostas',async()=>{
+ let c=await intake();
+ c=await action(c,owner,'answer',{key:'medical',value:'obtain',restartFollowing:true});
+ assert.equal(c.answers.identity,undefined);
+ assert.equal(c.answers.documents,undefined);
+ assert.equal(c.question.key,'identity');
+ assert.ok(c.answers.conditions);
+ c=await service.get(owner,c.id);
+ assert.equal(c.question.key,'identity');
+ c=await action(c,owner,'answer',{key:'medical',value:'available',restartFollowing:true});
+ c=await action(c,owner,'answer',{key:'documents',value:'ready'});
+ assert.equal(c.question.key,'identity');
+});
+
 test('cadastro exige usuário mesmo sem autenticação global e segue ordem do servidor',async()=>{
  await assert.rejects(()=>service.create({tenantId:1}),{code:'authentication_required'});
  const c=await service.create(owner);await assert.rejects(()=>action(c,owner,'answer',{key:'identity',value:sample.identity}),{code:'invalid_step'});
@@ -68,7 +98,7 @@ test('arquivos criptografados e sugestões nunca alteram respostas automaticamen
  const disk=await readFile(join(dir,'files',`${id}.bin`));assert.notEqual(disk.subarray(0,5).toString(),'%PDF-');
  await assert.rejects(()=>service.download(stranger,c.id,id),{code:'case_not_found'});
  const file=await service.download(owner,c.id,id);assert.equal(file.buffer.subarray(0,5).toString(),'%PDF-');
- c=await service.extract(owner,c.id,id);assert.deepEqual(c.answers.diagnosis,sample.diagnosis);assert.equal(c.extractions[0].candidates.length,1);
+ const savedDiagnosis=c.answers.diagnosis;c=await service.extract(owner,c.id,id);assert.deepEqual(c.answers.diagnosis,savedDiagnosis);assert.equal(c.extractions[0].candidates.length,1);
  const before=c.answers.diagnosis;c=await action(c,owner,'answer',{key:'diagnosis',value:c.extractions[0].candidates[0].value});assert.notDeepEqual(before,c.answers.diagnosis);
  await assert.rejects(()=>service.upload(owner,c.id,{buffer:Buffer.from('<script>bad</script>'),name:'fake.pdf',type:'medical'}),{code:'invalid_file'});
 });

@@ -46,17 +46,17 @@ export const IR_ANSWER_SCHEMAS = {
   consent:z.object({analysis:z.literal(true),representation:z.literal(true)}).strict(),
   identity,
   subject:z.object({name:text,cpf}).strict(),
-  benefits:z.array(z.object({type:z.enum(['retirement','pension','military','private','salary','unknown']),payer:text,start:unknownDate}).strict()).min(1).max(12),
+  benefits:z.array(z.object({type:z.enum(['retirement','pension','military','private','salary','unknown']),payer:text.nullable(),start:unknownDate}).strict()).min(1).max(12),
   conditions:z.array(z.enum(IR_CONDITIONS.map(([id])=>id))).min(1).max(18).transform(v=>[...new Set(v)]),
   diagnosis:z.object({date:unknownDate,year:z.number().int().min(1900).max(new Date().getFullYear()).nullable(),remission:z.enum(['yes','no','unknown'])}).strict(),
-  medical:z.enum(['official','private','obtain','unknown']),
+  medical:z.enum(['official','private','available','obtain','unknown']),
   taxes:z.object({withheld:z.enum(['yes','no','unknown']),periods:z.array(z.object({benefitIndex:z.number().int().min(0).max(11),month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).refine(v=>v<=new Date().toISOString().slice(0,7)&&v>='1900-01'),paidCents:money,refundedCents:money}).strict().refine(v=>v.refundedCents<=v.paidCents,'Restituído excede o recolhido')).max(240)}).strict(),
   prior:z.enum(['none','pending','denied','exempt','unknown']),
   heir:z.object({deathDate:date,relationship:text,estate:z.enum(['open','closed','none','unknown']),representative:z.enum(['yes','no','unknown'])}).strict(),
   documents:z.enum(['ready','later']),
 };
 const choices = pairs=>pairs.map(([value,label])=>({value,label}));
-export function irSteps(answers={}) {
+export function irSteps(answers={},intakeVersion=1) {
   const steps = [
     {key:'role',title:'Vamos começar. Para quem você está buscando a análise?',type:'choice',options:choices([['self','Para mim'],['representative','Represento uma pessoa viva'],['heir','Sou herdeiro(a)']])},
     {key:'consent',title:'Podemos analisar suas informações?',type:'consent',help:'Seus dados cadastrais e de saúde serão usados na análise preliminar e acessados pela equipe responsável. Ao representar alguém, confirme que tem autorização.'},
@@ -73,7 +73,20 @@ export function irSteps(answers={}) {
   );
   if (answers.role==='heir') steps.push({key:'heir',title:'Sobre o falecimento e a representação do espólio',type:'heir'});
   steps.push({key:'documents',title:'Vamos organizar os documentos?',type:'documents',help:'Anexe os arquivos disponíveis na área Documentos. Você pode continuar com pendências e complementar depois.'});
-  return steps;
+  if(intakeVersion!==2)return steps;
+  const ordered=['role','consent','benefits','taxes','conditions','medical','documents','identity','subject','heir'];
+  // Keep already-confirmed detailed answers visible and editable without requiring them in the short intake.
+  ordered.push('diagnosis','prior');
+  return ordered.map(key=>steps.find(s=>s.key===key)).filter(Boolean).map(s=>{
+    if(['diagnosis','prior','documents'].includes(s.key))return {...s,optional:true};
+    if(s.key==='role')return {...s,title:'Para quem é a análise?'};
+    if(s.key==='benefits')return {...s,type:'simple-benefits',title:answers.role==='self'?'Você é aposentado, pensionista ou reformado?':'Qual benefício o titular recebe?',help:null};
+    if(s.key==='taxes')return {...s,type:'simple-taxes',title:'Há ou já houve desconto de Imposto de Renda nesse benefício?',help:null};
+    if(s.key==='conditions')return {...s,title:'Você tem ou já teve alguma destas condições?',help:'Marque as condições informadas por um médico, mesmo que estejam em tratamento ou controladas.'};
+    if(s.key==='medical')return {...s,title:'Tem laudo, biópsia ou relatório médico?',help:'Pode ser antigo, de médico particular ou da rede pública.',options:choices([['available','Sim, tenho'],['obtain','Ainda não'],['unknown','Não sei']])};
+    if(s.key==='identity')return {...s,title:'Como a equipe pode falar com você?',help:'Seus dados ficam protegidos neste atendimento.'};
+    return s;
+  });
 }
 export function validateAnswer(key,value,answers={}) {
   const schema=Object.hasOwn(IR_ANSWER_SCHEMAS,key)?IR_ANSWER_SCHEMAS[key]:null;
@@ -97,8 +110,8 @@ export function documentChecklist(answers={}) {
   if(answers.role==='heir') types.push('death','estate');
   return types.map(type=>({type,label:IR_DOCUMENT_TYPES[type]}));
 }
-export function analyzeIr(answers={},documents=[],now=new Date()) {
-  const missing=irSteps(answers).filter(s=>answers[s.key]===undefined).map(s=>s.key);
+export function analyzeIr(answers={},documents=[],now=new Date(),intakeVersion=1) {
+  const missing=irSteps(answers,intakeVersion).filter(s=>!s.optional&&answers[s.key]===undefined).map(s=>s.key);
   const warnings=[];
   const pending=documentChecklist(answers).filter(d=>!documents.some(x=>x.type===d.type)).map(d=>d.label);
   const supported=answers.benefits?.some(b=>['retirement','pension','military','private'].includes(b.type));

@@ -57,6 +57,23 @@ revisão, não substitui diagnóstico médico ou decisão jurídica.
 
 ## Interface integrada
 
+Novos atendimentos usam intakeVersion=2 no payload criptografado: autorização,
+benefício, desconto atual ou anterior, condições, laudo e contato ao final.
+Fonte pagadora e início desconhecidos ficam nulos, não presumidos. Diagnóstico,
+pedidos anteriores e períodos detalhados não bloqueiam a triagem; continuam
+editáveis quando já informados ou sugeridos para confirmação. Documentos são
+enviados logo após a pergunta sobre laudos, quando disponíveis, antes do contato.
+O envio aceita vários arquivos médicos. Voltar e responder novamente reinicia
+as respostas posteriores, preservando os arquivos. Nenhuma conclusão jurídica é automática.
+Casos sem versão mantêm a sequência original e respostas; sem migração.
+Referência de linguagem: perguntas diretas, opções curtas, mais condições em
+lista expansível, seleção múltipla sem repetir perguntas. Cadastro/CPF e
+representação permanecem exigidos antes da conclusão e revisão profissional.
+
+Sem desconto informado não implica encerramento automático nem promessa de
+restituição; a equipe confere o histórico e os documentos. Orientação consultada:
+https://www.gov.br/receitafederal/pt-br/assuntos/meu-imposto-de-renda/preenchimento/molestia-grave
+
 No IR, somente a conversa tem rolagem: retorno à Central, identidade da assistente e ajuda permanecem visíveis, inclusive com navegação inferior no celular. Resumo, documentos, propostas e acompanhamento aparecem em mensagens, sem painel separado para o cliente.
 
 Ao concluir ou retomar uma triagem completa sem análise, o cliente prepara automaticamente o resumo pela ação existente `analyze`. Análises/revisões já salvas não são regeneradas na retomada. Falhas preservam respostas e oferecem nova tentativa; correções e documentos continuam usando a invalidação existente. Não há envio a órgão externo nem concessão automática. Operadores mantêm seu painel e permissões.

@@ -24,7 +24,7 @@ async function loadCase(id){state.tab='chat';state.case=(await api(`/cases/${enc
 async function updateCase(result,animate=false){state.case=result.case;state.editing=null;state.summaryError=false;await render(animate);await completeSummary();}
 async function completeSummary(){
   const c=state.case;
-  if(!c||c.question||c.analysis||!c.permissions.owner)return;
+  if(!c||currentQuestion()||c.analysis||!c.permissions.owner)return;
   state.summaryError=false;
   try{
     const result=await post(`/cases/${c.id}/actions`,{action:'analyze',revision:c.revision});
@@ -36,24 +36,29 @@ async function completeSummary(){
     notice('Suas respostas estão salvas, mas não foi possível preparar o resumo. Tente novamente.');
   }
 }
-async function command(action,extra={}){await updateCase(await post(`/cases/${state.case.id}/actions`,{action,revision:state.case.revision,...extra}),action==='answer');}
+async function command(action,extra={}){await updateCase(await post(`/cases/${state.case.id}/actions`,{action,revision:state.case.revision,restartFollowing:action==='answer'&&state.editing===extra.key,...extra}),action==='answer');}
 async function startCase(){if(!state.user){document.querySelector('#loginButton')?.click();return;}if(!state.config.ready){notice('O atendimento será liberado assim que o armazenamento seguro estiver configurado.');return;}state.tab='chat';const result=await post('/cases');await loadCase(result.case.id);}
 function assistantBubble(content){return `<div class="charge-analysis-message assistant charge-analysis-intro-message"><span class="charge-analysis-avatar-anchor" aria-hidden="true"></span><div class="charge-analysis-bubble">${content}</div></div>`;}
 const {moveAssistantAvatar,scrollLatestAssistant,animateAssistant,cancelTyping}=createAuditaChatMotion({getStage:()=>$('#app'),getConversation:()=>$('.charge-analysis-conversation'),isActive:()=>document.body.dataset.activePage==='isencao-ir'});
-function landing(){return assistantBubble(`<p><strong>Entenda se o seu caso pode seguir para análise de isenção e restituição de IR</strong></p><p>Este atendimento oferece uma triagem inicial para aposentados, pensionistas e pessoas na reserva ou reforma com histórico de doença grave. Você pode buscar orientação para si, como representante ou como herdeiro.</p><p>Vou fazer algumas perguntas e, quando necessário, solicitar documentos para entender a situação, os rendimentos e a representação. Essas informações ajudam a preparar o caso para revisão da equipe. A triagem é gratuita e não confirma o direito à isenção nem garante restituição.</p><p class="charge-analysis-intro-question"><strong>Para quem você está buscando a análise?</strong></p><div class="charge-analysis-actions">${Object.entries({self:'Para mim',representative:'Represento uma pessoa viva',heir:'Sou herdeiro(a)'}).map(([role,label])=>`<button type="button" data-start-role="${role}"><strong>${label}</strong></button>`).join('')}</div>${!state.user?'<p class="ir-micro">Entre na sua conta para salvar e retomar o atendimento.</p>':''}`)+(state.config?.staffRole==='super_admin'?staffSection():'');}
+function landing(){return assistantBubble(`<p>Olá! Vou fazer algumas perguntas rápidas sobre o benefício, os descontos de IR e a saúde do titular.</p><p>A equipe vai revisar as respostas e os documentos antes de concluir a análise.</p><p class="charge-analysis-intro-question"><strong>Para quem você está buscando a análise?</strong></p><div class="charge-analysis-actions">${Object.entries({self:'Para mim',representative:'Represento uma pessoa viva',heir:'Sou herdeiro(a)'}).map(([role,label])=>`<button type="button" data-start-role="${role}"><strong>${label}</strong></button>`).join('')}</div>${!state.user?'<p class="ir-micro">Entre na sua conta para salvar e retomar o atendimento.</p>':''}`)+(state.config?.staffRole==='super_admin'?staffSection():'');}
 function input(name,label,value='',type='text',required=false){return `<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${type==='number'?'step="0.01" min="0"':''}></label>`;}
 function select(name,label,options,value){return `<label>${esc(label)}<select name="${name}">${Object.entries(options).map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;}
 function check(name,label,checked=false){return `<label class="ir-check"><input type="checkbox" name="${name}" ${checked?'checked':''} required><span>${esc(label)}</span></label>`;}
 function form(id,contents,submit='Enviar resposta'){return `<form id="${id}" class="ir-form">${contents}<div class="ir-toolbar"><button type="submit" class="ir-primary">${submit} <span aria-hidden="true">→</span></button></div></form>`;}
 function benefitRow(b={}){return `<div class="ir-array-row" data-row="benefit">${select('type','Tipo de rendimento',benefitTypes,b.type||'retirement')}${input('payer','Fonte pagadora (ex.: INSS)',b.payer||'','text',true)}${input('start','Início do benefício (opcional)',b.start||'','date')}<button type="button" class="ir-remove" data-action="remove-row">Remover fonte</button></div>`;}
 function periodRow(p={}){return `<div class="ir-array-row" data-row="period">${select('benefitIndex','Fonte pagadora',Object.fromEntries((state.case.answers.benefits||[]).map((b,i)=>[i,`${i+1}. ${b.payer}`])),String(p.benefitIndex||0))}${input('month','Mês do recolhimento',p.month||'','month',true)}<div class="ir-field-row">${input('paid','IR recolhido (R$)',p.paidCents==null?'':p.paidCents/100,'number',true)}${input('refunded','Já restituído (R$)',(p.refundedCents||0)/100,'number',true)}</div><button type="button" class="ir-remove" data-action="remove-row">Remover período</button></div>`;}
-function questionFields(q,v){switch(q.type){
+function questionFields(q,v){
+  if(q.type==='documents')return documentUpload();
+  switch(q.type){
+case 'benefit-consent':return `<form id="benefitConsentForm" class="ir-form">${check('authorize','Autorizo o uso dos dados cadastrais, financeiros e de saúde pela equipe Audita nesta análise e confirmo que sou o titular ou tenho autorização para representá-lo.')}<div class="charge-analysis-actions">${Object.entries({...benefitTypes,salary:'Nenhum desses / trabalho na ativa'}).map(([value,label])=>`<button type="submit" name="benefit" value="${value}"><strong>${esc(label)}</strong></button>`).join('')}</div></form>`;
+case 'simple-benefits':return v?.some(b=>b.payer||b.start)||v?.length>1?questionFields({...q,type:'benefits'},v):`<div class="charge-analysis-actions">${Object.entries({...benefitTypes,salary:'Nenhum desses / trabalho na ativa'}).map(([value,label])=>`<button type="button" data-benefit="${value}"><strong>${esc(label)}</strong></button>`).join('')}</div>`;
+case 'simple-taxes':return v?.periods?.length?questionFields({...q,type:'taxes'},v):`<div class="charge-analysis-actions">${Object.entries({yes:'Sim',no:'Não',unknown:'Não sei'}).map(([value,label])=>`<button type="button" data-tax="${value}"><strong>${label}</strong></button>`).join('')}</div>`;
 case 'choice':return `<div class="charge-analysis-actions">${q.options.map(o=>`<button data-answer-key="${q.key}" data-answer-value="${o.value}"><strong>${esc(o.label)}</strong></button>`).join('')}</div>`;
 case 'consent':return form('answerForm',check('analysis','Autorizo o tratamento dos dados cadastrais, financeiros e de saúde para esta análise e o acesso da equipe responsável.',v?.analysis)+check('representation','Confirmo que sou o titular ou tenho autorização para representar a pessoa ou o espólio.',v?.representation));
 case 'identity':return form('answerForm',input('name','Nome completo',v?.name||state.user?.name||'','text',true)+input('cpf','CPF',v?.cpf||'','text',true)+input('phone','Telefone / WhatsApp',v?.phone||'','tel',true)+input('email','E-mail',v?.email||state.user?.email||'','email',true));
 case 'subject':return form('answerForm',input('name','Nome do titular',v?.name||'','text',true)+input('cpf','CPF do titular',v?.cpf||'','text',true));
 case 'benefits':return form('answerForm',`<div id="benefitRows">${(v?.length?v:[{}]).map(benefitRow).join('')}</div><button type="button" class="ir-secondary" data-action="add-benefit">+ Adicionar outra fonte</button>`);
-case 'multi':return form('answerForm',`<div class="ir-check-grid">${q.options.map(o=>`<label class="ir-check"><input type="checkbox" name="conditions" value="${o.value}" ${v?.includes(o.value)?'checked':''}><span>${esc(o.label)}</span></label>`).join('')}</div>`);
+case 'multi':{const common=['cancer','blindness','heart','parkinson','kidney','aids','other','unknown'];const items=options=>options.map(o=>`<label class="ir-check"><input type="checkbox" name="conditions" value="${o.value}" ${v?.includes(o.value)?'checked':''}><span>${esc(o.label)}</span></label>`).join('');return form('answerForm',`<p>Você pode marcar mais de uma.</p><div class="ir-check-grid">${items(q.options.filter(o=>common.includes(o.value)))}</div><details ${v?.some(x=>!common.includes(x))?'open':''}><summary>Ver mais condições</summary><div class="ir-check-grid">${items(q.options.filter(o=>!common.includes(o.value)))}</div></details>`,'Continuar');}
 case 'diagnosis':return form('answerForm',`<div class="ir-field-row">${input('date','Data comprovada (opcional)',v?.date||'','date')}${input('year','Ou ano aproximado (opcional)',v?.year||'','number')}</div>${select('remission','A condição está em remissão / controle?',{unknown:'Não sei',yes:'Sim',no:'Não'},v?.remission||'unknown')}<p class="ir-micro">Se não souber a data ou o ano, deixe os campos em branco.</p>`);
 case 'taxes':return form('answerForm',select('withheld','Há ou houve desconto?',{unknown:'Não sei',yes:'Sim',no:'Não'},v?.withheld||'unknown')+`<fieldset><legend>Períodos conhecidos (opcional)</legend><div id="periodRows">${(v?.periods||[]).map(periodRow).join('')}</div><button type="button" class="ir-secondary" data-action="add-period">+ Informar um período</button></fieldset>`);
 case 'heir':return form('answerForm',input('deathDate','Data do óbito',v?.deathDate||'','date',true)+input('relationship','Seu vínculo com o titular',v?.relationship||'','text',true)+select('estate','Situação do inventário / espólio',{unknown:'Não sei',open:'Em andamento',closed:'Encerrado',none:'Não iniciado / sem bens'},v?.estate||'unknown')+select('representative','Você possui representação formal?',{unknown:'Não sei',yes:'Sim',no:'Ainda não'},v?.representative||'unknown'));
@@ -67,20 +72,48 @@ function answerLabel(step,value){
     case 'consent':return 'Autorizo a análise e confirmo que tenho autorização para este atendimento.';
     case 'identity':return `${value.name}\nCPF: ${value.cpf}\n${value.phone} · ${value.email}`;
     case 'subject':return `${value.name}\nCPF: ${value.cpf}`;
-    case 'benefits':return value.map(b=>`${benefitTypes[b.type]} · ${b.payer}${b.start?' · Desde '+b.start:''}`).join('\n');
+    case 'simple-benefits':case 'benefits':return value.map(b=>`${benefitTypes[b.type]}${b.payer?' · '+b.payer:''}${b.start?' · Desde '+b.start:''}`).join('\n');
     case 'diagnosis':return `${value.date||value.year||'Não sei a data do diagnóstico'}\nRemissão ou controle: ${yesNo[value.remission]}`;
-    case 'taxes':return `Desconto de IR: ${yesNo[value.withheld]}${value.periods.length?'\n'+value.periods.map(p=>`${p.month}: ${money(p.paidCents)} recolhidos; ${money(p.refundedCents)} já restituídos`).join('\n'):''}`;
+    case 'simple-taxes':case 'taxes':return `Desconto de IR: ${yesNo[value.withheld]}${value.periods.length?'\n'+value.periods.map(p=>`${p.month}: ${money(p.paidCents)} recolhidos; ${money(p.refundedCents)} já restituídos`).join('\n'):''}`;
     case 'heir':return `Óbito: ${value.deathDate}\nVínculo: ${value.relationship}\nInventário: ${{unknown:'Não sei',open:'Em andamento',closed:'Encerrado',none:'Não iniciado / sem bens'}[value.estate]}\nRepresentação formal: ${yesNo[value.representative]}`;
     case 'documents':return value==='ready'?'Enviei os documentos disponíveis.':'Vou complementar os documentos depois.';
     default:return readable(value);
   }
 }
+function documentUpload(){
+  return form('uploadForm','<input type="hidden" name="type" value="medical"><label>Selecione seus laudos, biópsias ou relatórios médicos<input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple required></label><small>Você pode selecionar mais de um arquivo. PDF, PNG ou JPEG · Até 10 MB por arquivo.</small>','Enviar documentos');
+}
+function completionView(){
+  const c=state.case,name=c.answers.identity?.name?.trim().split(/\s+/)[0];
+  if(!c.analysis)return `<p id="questionTitle" tabindex="-1"><strong>${state.summaryError?'Suas respostas estão salvas.':'Finalizando sua triagem…'}</strong></p>${state.summaryError?'<p>Não foi possível finalizar agora.</p><button type="button" class="ir-secondary" data-action="analyze">Tentar preparar o resumo novamente</button>':''}`;
+  const received=c.documents.some(d=>d.type==='medical');
+  return `<p id="questionTitle" tabindex="-1"><strong>Pronto${name?', '+esc(name):''}! Sua triagem foi concluída.</strong></p><p><strong>Equipe Audita</strong><br>Revisão do seu caso</p><p>${received?'Seu documento médico foi recebido. A equipe poderá conferir os próximos passos.':'Envie seu laudo ou relatório médico para a equipe avaliar seu caso.'}</p>${c.permissions.owner?`<details class="ir-completion-upload"><summary class="ir-primary">${received?'Ver ou complementar documentos':'Enviar meu laudo'}</summary>${documentsView()}</details>`:''}`;
+}
+function currentQuestion(){
+  const c=state.case;
+  if(!c)return null;
+  if(state.editing)return c.steps.find(s=>s.key===state.editing);
+  if(c.intakeVersion===2&&c.permissions.owner&&['available','official','private'].includes(c.answers.medical)&&c.answers.documents===undefined)return c.steps.find(s=>s.key==='documents')||c.question;
+  return c.question;
+}
 function chatView(){
-  const c=state.case,q=state.editing?c.steps.find(s=>s.key===state.editing):c.question;
-  const history=c.steps.filter(s=>c.answers[s.key]!==undefined).map(s=>`${assistantBubble(`<p>${esc(s.title)}</p>`)}<div class="charge-analysis-message user"><div class="charge-analysis-bubble"><p class="ir-readable">${esc(answerLabel(s,c.answers[s.key]))}</p>${c.permissions.owner?`<button class="ir-text-button" data-edit="${s.key}" aria-label="Voltar à pergunta: ${esc(shortSteps[s.key])}">Voltar</button>`:''}</div></div>`).join('');
-  const next=q?`<p id="questionTitle" tabindex="-1"><strong>${state.editing?'Vamos voltar a esta pergunta. ':''}${esc(q.title)}</strong></p>${q.help?`<p>${esc(q.type==='documents'?'Envie os arquivos nesta conversa. Você pode continuar com pendências e complementar depois.':q.help)}</p>`:''}${c.permissions.owner?questionFields(q,c.answers[q.key]):'<p>Aguardo a confirmação do solicitante para continuar.</p>'}${state.editing?'<button class="ir-text-button" data-action="cancel-edit">Retomar conversa</button>':''}`:`<p id="questionTitle" tabindex="-1"><strong>Obrigado por compartilhar essas informações.</strong></p><p>${c.analysis?'Organizei abaixo seu resumo preliminar para a revisão da equipe. Você pode corrigir suas respostas acima e enviar os documentos aqui na conversa.':state.summaryError?'Não consegui preparar o resumo agora. Suas respostas continuam salvas.':'Estou organizando seu resumo para a revisão da equipe.'}</p>${state.summaryError?'<button type="button" class="ir-secondary" data-action="analyze">Tentar preparar o resumo novamente</button>':''}`;
-  const completed=!q,documents=(completed||q?.type==='documents')&&(c.permissions.owner||c.permissions.operator);
-  return `<div class="charge-analysis-conversation ir-chat-log" aria-label="Conversa com a assistente virtual Audita">${history}${assistantBubble(next)}${completed&&c.analysis?assistantBubble(analysisView()):''}${completed&&c.proposals?.length?assistantBubble(proposalsView()):''}${completed&&(c.tasks?.length||c.protocols?.length||Object.keys(c.outcomes||{}).length||c.events?.some(e=>['note','status_updated'].includes(e.kind)))?assistantBubble(timelineView()):''}${documents?assistantBubble(documentsView()):''}${c.permissions.operator?assistantBubble('<button class="ir-text-button" data-tab="operator">Painel da equipe</button>'):''}${state.tab==='operator'&&c.permissions.operator?assistantBubble('<div id="irConversationPanel" tabindex="-1"><button class="ir-text-button" data-tab="chat">Voltar à conversa</button>'+operatorView()+'</div>'):''}</div>`;
+  const c={...state.case};let q=currentQuestion();
+  if(c.intakeVersion===2){
+    const documentStep=c.steps.find(s=>s.key==='documents');
+    c.steps=c.steps.filter(s=>s.key!=='documents');
+    if(documentStep)c.steps.splice(c.steps.findIndex(s=>s.key==='medical')+1,0,documentStep);
+  }
+  if(q?.type==='documents')q={...q,title:'Envie os documentos médicos que comprovam a condição informada',help:null};
+  const combinedConsent=c.intakeVersion===2&&q?.key==='consent'&&!c.answers.benefits;
+  if(combinedConsent)q={...c.steps.find(s=>s.key==='benefits'),type:'benefit-consent',help:null};
+  if(state.editing){
+    const index=c.steps.findIndex(s=>s.key===state.editing);
+    if(index>=0)c.steps=c.steps.slice(0,index);
+  }
+  const history=c.steps.filter(s=>c.answers[s.key]!==undefined&&!(c.intakeVersion===2&&s.key==='consent')).map(s=>`${assistantBubble(`<p>${esc(s.title)}</p>`)}<div class="charge-analysis-message user"><div class="charge-analysis-bubble"><p class="ir-readable">${esc(answerLabel(s,c.answers[s.key]))}</p>${c.permissions.owner?`<button class="ir-text-button" data-edit="${s.key}" aria-label="Voltar à pergunta: ${esc(shortSteps[s.key])}">Voltar</button>`:''}</div></div>`).join('');
+  const next=q?`<p id="questionTitle" tabindex="-1"><strong>${state.editing?'Vamos voltar a esta pergunta. ':''}${esc(q.title)}</strong></p>${q.help?`<p>${esc(q.type==='documents'?'Envie os arquivos nesta conversa. Você pode continuar com pendências e complementar depois.':q.help)}</p>`:''}${c.permissions.owner?questionFields(q,c.answers[q.key]):'<p>Aguardo a confirmação do solicitante para continuar.</p>'}${state.editing?'<button class="ir-text-button" data-action="cancel-edit">Retomar conversa</button>':''}`:completionView();
+  const completed=!q,documents=q?.type==='documents'&&!c.permissions.owner&&c.permissions.operator;
+  return `<div class="charge-analysis-conversation ir-chat-log" aria-label="Conversa com a assistente virtual Audita">${history}${assistantBubble(next)}${completed&&c.analysis&&c.permissions.operator?assistantBubble(analysisView()):''}${completed&&c.proposals?.length?assistantBubble(proposalsView()):''}${completed&&(c.tasks?.length||c.protocols?.length||Object.keys(c.outcomes||{}).length||c.events?.some(e=>['note','status_updated'].includes(e.kind)))?assistantBubble(timelineView()):''}${documents?assistantBubble(documentsView()):''}${c.permissions.operator?assistantBubble('<button class="ir-text-button" data-tab="operator">Painel da equipe</button>'):''}${state.tab==='operator'&&c.permissions.operator?assistantBubble('<div id="irConversationPanel" tabindex="-1"><button class="ir-text-button" data-tab="chat">Voltar à conversa</button>'+operatorView()+'</div>'):''}</div>`;
 
 }
 
@@ -99,14 +132,16 @@ function render(animate=false){
   moveAssistantAvatar($('.charge-analysis-conversation'));
 }
 async function init(){const [auth,config]=await Promise.all([api('/api/auth/me'),api('/config')]);state.user=auth.user;state.config=config;if(['super_admin','manager'].includes(config.staffRole))state.staff=(await api('/staff')).staff;const id=new URLSearchParams(location.search).get('case');if(id&&state.user&&config.ready)await loadCase(id);else await render(true);}
-async function submitAnswer(formEl){const q=state.editing?state.case.steps.find(s=>s.key===state.editing):state.case.question,f=new FormData(formEl),get=k=>String(f.get(k)||'');let value;
- switch(q.type){case 'consent':value={analysis:f.has('analysis'),representation:f.has('representation')};break;case 'identity':value={name:get('name'),cpf:get('cpf'),phone:get('phone'),email:get('email')};break;case 'subject':value={name:get('name'),cpf:get('cpf')};break;case 'benefits':value=$$('[data-row=benefit]',formEl).map(r=>({type:$('[name=type]',r).value,payer:$('[name=payer]',r).value,start:$('[name=start]',r).value||null}));break;case 'multi':value=f.getAll('conditions');break;case 'diagnosis':value={date:get('date')||null,year:get('year')?Number(get('year')):null,remission:get('remission')};break;case 'taxes':value={withheld:get('withheld'),periods:$$('[data-row=period]',formEl).map(r=>({benefitIndex:Number($('[name=benefitIndex]',r).value),month:$('[name=month]',r).value,paidCents:Math.round(Number($('[name=paid]',r).value)*100),refundedCents:Math.round(Number($('[name=refunded]',r).value)*100)}))};break;case 'heir':value={deathDate:get('deathDate'),relationship:get('relationship'),estate:get('estate'),representative:get('representative')};break;case 'documents':value=get('documents');break;default:return;}
+async function submitAnswer(formEl){const q=currentQuestion(),f=new FormData(formEl),get=k=>String(f.get(k)||'');let value;
+ switch(q.type){case 'consent':value={analysis:f.has('analysis'),representation:f.has('representation')};break;case 'identity':value={name:get('name'),cpf:get('cpf'),phone:get('phone'),email:get('email')};break;case 'subject':value={name:get('name'),cpf:get('cpf')};break;case 'simple-benefits':case 'benefits':value=$$('[data-row=benefit]',formEl).map(r=>({type:$('[name=type]',r).value,payer:$('[name=payer]',r).value,start:$('[name=start]',r).value||null}));break;case 'multi':value=f.getAll('conditions');break;case 'diagnosis':value={date:get('date')||null,year:get('year')?Number(get('year')):null,remission:get('remission')};break;case 'simple-taxes':case 'taxes':value={withheld:get('withheld'),periods:$$('[data-row=period]',formEl).map(r=>({benefitIndex:Number($('[name=benefitIndex]',r).value),month:$('[name=month]',r).value,paidCents:Math.round(Number($('[name=paid]',r).value)*100),refundedCents:Math.round(Number($('[name=refunded]',r).value)*100)}))};break;case 'heir':value={deathDate:get('deathDate'),relationship:get('relationship'),estate:get('estate'),representative:get('representative')};break;case 'documents':value=get('documents');break;default:return;}
  await command('answer',{key:q.key,value});$('#questionTitle')?.focus({preventScroll:true});}
 irRoot.addEventListener('click',event=>{const el=event.target.closest('button,[data-tab]');if(!el)return;
  if(el.dataset.startRole){guarded(async()=>{await startCase();if(state.case){await command('answer',{key:'role',value:el.dataset.startRole});$('#questionTitle')?.focus({preventScroll:true});}});return;}
  if(el.dataset.tab){state.tab=el.dataset.tab;state.editing=null;render();(state.tab==='chat'?$('#questionTitle'):$('#irConversationPanel'))?.focus();return;}
  if(el.dataset.edit){state.tab='chat';state.editing=el.dataset.edit;render();$('#questionTitle')?.focus({preventScroll:true});scrollLatestAssistant();return;}
  if(el.dataset.answerKey){guarded(async()=>{await command('answer',{key:el.dataset.answerKey,value:el.dataset.answerValue});$('#questionTitle')?.focus({preventScroll:true});});return;}
+ if(el.dataset.benefit){guarded(()=>command('answer',{key:'benefits',value:[{type:el.dataset.benefit,payer:null,start:null}]}));return;}
+ if(el.dataset.tax){guarded(()=>command('answer',{key:'taxes',value:{withheld:el.dataset.tax,periods:[]}}));return;}
  if(el.dataset.checkout){guarded(async()=>{const r=await post(`/cases/${state.case.id}/proposals/${el.dataset.checkout}/checkout`);const u=new URL(r.url);if(u.protocol!=='https:')throw new Error('Endereço de pagamento inválido.');location.assign(u.href);});return;}
  if(el.dataset.extract){guarded(async()=>{await updateCase(await post(`/cases/${state.case.id}/documents/${el.dataset.extract}/extract`));state.tab='documents';render();});return;}
  if(el.dataset.candidate){const [id,index]=el.dataset.candidate.split(':'),candidate=state.case.extractions.find(x=>x.id===id)?.candidates[Number(index)];if(!candidate)return;state.editing=candidate.key;state.tab='chat';render();const q=state.case.steps.find(s=>s.key===candidate.key);$('#answerForm')?.replaceWith(document.createRange().createContextualFragment(questionFields(q,candidate.value)));notice('Confira os campos sugeridos com o documento. Só serão salvos ao confirmar a resposta.');return;}
@@ -120,9 +155,22 @@ irRoot.addEventListener('click',event=>{const el=event.target.closest('button,[d
  if(action==='analyze')guarded(completeSummary);
  if(action==='refresh')guarded(()=>loadCase(state.case.id));
 });
-irRoot.addEventListener('submit',event=>{const f=event.target;event.preventDefault();guarded(async()=>{const data=new FormData(f),s=k=>String(data.get(k)||'');
- if(f.id==='answerForm')await submitAnswer(f);
- else if(f.id==='uploadForm'){const file=data.get('file');await updateCase(await api(`/cases/${state.case.id}/documents?type=${encodeURIComponent(s('type'))}&name=${encodeURIComponent(file.name)}`,{method:'POST',body:file,headers:{'content-type':'application/octet-stream'}}));}
+irRoot.addEventListener('submit',event=>{const f=event.target,benefit=event.submitter?.value;event.preventDefault();guarded(async()=>{const data=new FormData(f),s=k=>String(data.get(k)||'');
+ if(f.id==='benefitConsentForm'){
+   if(!data.has('authorize')||!Object.hasOwn(benefitTypes,benefit))return;
+   await command('answer',{key:'consent',value:{analysis:true,representation:true}});
+   await command('answer',{key:'benefits',value:[{type:benefit,payer:null,start:null}]});
+ }
+ else if(f.id==='answerForm')await submitAnswer(f);
+ else if(f.id==='uploadForm'){
+   const finish=currentQuestion()?.type==='documents',files=data.getAll('file').filter(file=>file.size>0);
+   if(!files.length)throw new Error('Selecione pelo menos um arquivo.');
+   if(files.some(file=>file.size>10*1024*1024))throw new Error('Cada arquivo deve ter no máximo 10 MB.');
+   for(const file of files){
+     await updateCase(await api(`/cases/${state.case.id}/documents?type=${encodeURIComponent(s('type'))}&name=${encodeURIComponent(file.name)}`,{method:'POST',body:file,headers:{'content-type':'application/octet-stream'}}));
+   }
+   if(finish)await command('answer',{key:'documents',value:'ready'});
+ }
  else if(f.id==='reviewForm')await command('review',{note:s('note'),confirmed:data.has('confirmed'),reviewedCents:s('reviewed')?Math.round(Number(s('reviewed'))*100):null});
  else if(f.id==='proposalForm')await updateCase(await post(`/cases/${state.case.id}/proposals`,{revision:state.case.revision,kind:s('kind'),amountCents:Math.round(Number(s('amount'))*100),scope:s('scope'),terms:s('terms'),rationale:s('rationale'),additional:data.has('additional')}));
  else if(f.id.startsWith('accept-')){const p=state.case.proposals.find(p=>p.id===f.id.slice(7));await updateCase(await post(`/cases/${state.case.id}/proposals/${p.id}/accept`,{version:p.version,accepted:data.has('accepted')}));}

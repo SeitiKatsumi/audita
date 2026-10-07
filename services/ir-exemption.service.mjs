@@ -37,7 +37,7 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
   async function view(db,a,auth) {
     const docs=await documents(db,a.row.id), offers=await proposals(db,a.row.id);
     const history=(await db.query(`SELECT * FROM audita_ir_events WHERE case_id=$1 ${a.operator?'':'AND internal=FALSE'} ORDER BY created_at DESC LIMIT 200`,[a.row.id])).rows.map(r=>({id:r.id,kind:r.kind,internal:r.internal,createdAt:r.created_at,...decrypt('event',r)}));
-    const steps=irSteps(a.payload.answers),index=steps.findIndex(s=>a.payload.answers[s.key]===undefined);
+    const steps=irSteps(a.payload.answers,a.payload.intakeVersion),index=steps.findIndex(s=>!s.optional&&a.payload.answers[s.key]===undefined);
     return {id:a.row.id,revision:a.row.revision,status:a.row.status,createdAt:a.row.created_at,updatedAt:a.row.updated_at,assignedUserId:a.row.assigned_user_id,
       permissions:{owner:a.owner,operator:a.operator,assign:a.role==='super_admin'||a.role==='manager'},
       ...a.payload,documents:docs,proposals:offers,events:history,steps,question:index===-1?null:steps[index],progress:{completed:index===-1?steps.length:index,total:steps.length},checklist:documentChecklist(a.payload.answers)};
@@ -54,7 +54,7 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
     else if(role==='lawyer'){query='SELECT * FROM audita_ir_cases WHERE (tenant_id=$1 AND user_id=$2) OR assigned_user_id=$2';}
     return (await pool.query(`${query} ORDER BY updated_at DESC LIMIT 100`,args)).rows.map(r=>({id:r.id,status:r.status,updatedAt:r.updated_at,title:decrypt('case',r).answers?.identity?.name||'Nova análise',assignedUserId:r.assigned_user_id}));
   }
-  async function create(auth) {signed(auth);return transaction(async db=>{const id=uuid();await db.query('INSERT INTO audita_ir_cases(id,tenant_id,user_id,encrypted_payload) VALUES($1,$2,$3,$4)',[id,auth.tenantId,auth.user.id,encrypt('case',id,{answers:{},analysis:null,review:null,protocols:[],tasks:[],outcomes:{},extractions:[]})]);await event(db,{id},auth,'case_created',{message:'Atendimento iniciado.'});return view(db,await access(db,auth,id),auth);});}
+  async function create(auth) {signed(auth);return transaction(async db=>{const id=uuid();await db.query('INSERT INTO audita_ir_cases(id,tenant_id,user_id,encrypted_payload) VALUES($1,$2,$3,$4)',[id,auth.tenantId,auth.user.id,encrypt('case',id,{intakeVersion:2,answers:{},analysis:null,review:null,protocols:[],tasks:[],outcomes:{},extractions:[]})]);await event(db,{id},auth,'case_created',{message:'Atendimento iniciado.'});return view(db,await access(db,auth,id),auth);});}
   async function get(auth,id) {return transaction(async db=>{const a=await access(db,auth,id);await event(db,a.row,auth,'case_viewed',{},true);return view(db,a,auth);});}
   async function command(auth,id,input={}) {
     return transaction(async db=>{
@@ -63,12 +63,15 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
       const action=input.action;
       if(action==='answer') {
         requireIr(a.owner,'owner_required','Somente o solicitante confirma as respostas.',403);
-        const steps=irSteps(p.answers),target=steps.findIndex(s=>s.key===input.key),next=steps.findIndex(s=>p.answers[s.key]===undefined);
+        const steps=irSteps(p.answers,p.intakeVersion),target=steps.findIndex(s=>s.key===input.key),next=steps.findIndex(s=>!s.optional&&p.answers[s.key]===undefined);
         requireIr(target>=0&&(next===-1||target<=next),'invalid_step','Conclua a pergunta atual primeiro.');
         requireIr(p.answers.consent||['role','consent'].includes(input.key),'consent_required','Confirme a autorização antes de informar dados.');
         const accepted=(await db.query("SELECT id FROM audita_ir_proposals WHERE case_id=$1 AND state IN ('accepted','payment_pending')",[id])).rows;
         requireIr(!accepted.length,'payment_in_progress','Finalize o pagamento pendente antes de alterar as informações.',409);
         p.answers[input.key]=validateAnswer(input.key,input.value,p.answers);
+        if(input.restartFollowing===true){
+          for(const step of steps.slice(target+1))delete p.answers[step.key];
+        }
         if(input.key==='role') {delete p.answers.subject;delete p.answers.heir;delete p.answers.consent;}
         if(input.key==='benefits')delete p.answers.taxes;
         p.analysis=null;p.review=null;
@@ -77,7 +80,7 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
         await save(db,a.row,p,['triage','documents_pending','review'].includes(a.row.status)?'triage':a.row.status);
       } else if(action==='analyze') {
         requireIr(p.answers.consent,'consent_required','Confirme a autorização.');
-        p.analysis=analyzeIr(p.answers,await documents(db,id),now());p.review=null;
+        p.analysis=analyzeIr(p.answers,await documents(db,id),now(),p.intakeVersion);p.review=null;
         requireIr(!p.analysis.missing.length,'intake_incomplete','Responda às perguntas antes de concluir.');
         await save(db,a.row,p,['triage','documents_pending','review'].includes(a.row.status)?(p.analysis.pending.length?'documents_pending':'review'):a.row.status);
         await event(db,a.row,auth,'analysis_created',{message:'Análise preliminar disponível.',version:IR_VERSION});
