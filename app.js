@@ -6673,7 +6673,8 @@ function setSellerStep(step) {
 function selectedSellerCertificates() {
   if(sellerDocumentType()==='cnpj') return [];
   const ufs = isCertificateOnly()?[...document.querySelectorAll("#sellerAnalysisUfs input:checked")].map(input=>input.value):[selectedSellerState()?.uf];
-  return (sellerCoverage?.certificates || []).filter((item) => ufs.includes(item.uf));
+  const ids = isCertificateOnly() ? new Set([...document.querySelectorAll('#sellerAnalysisQueries input[data-certificate-court]:checked')].map(input=>input.value)) : null;
+  return (sellerCoverage?.certificates || []).filter((item) => ufs.includes(item.uf) && (!ids || ids.has(item.id || item.uf+':'+item.type)));
 }
 function selectedSellerQueries() {
   if(!isCertificateOnly()) {
