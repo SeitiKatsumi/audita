@@ -1,4 +1,4 @@
-import {certificateSelection} from '../certificate-selection.js';
+import {certificateSelection,certificateQuote} from '../certificate-selection.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -60,15 +60,17 @@ test("seller analysis selects validated states with cost and legal consent", () 
   assert.match(appJs, /renderSellerAnalysisFailure/);
 });
 
-test("certificate groups show applicable sources, 20x prices and only required identity", async () => {
+test("certificate groups show applicable sources, 30x prices and only required identity", async () => {
   const elements=new Map(["#sellerAnalysisCoverage","#sellerAnalysisUfs","#sellerAnalysisQueries","#sellerAnalysisCost","#sellerAnalysisBirthDate","#sellerAnalysisRg","#sellerAnalysisGender","#sellerAnalysisDocumentType"].map(s=>[s,{innerHTML:'',value:'',required:false}]));
   elements.get('#sellerAnalysisDocumentType').value='cpf';
   const selected={ufs:[],queries:[],courts:[]};
-  const context=vm.createContext({certificateSelection,isCertificateOnly:()=>true,updateSellerMunicipalities:()=>{},
+  const context=vm.createContext({certificateSelection,certificateQuote,isCertificateOnly:()=>true,updateSellerMunicipalities:()=>{},
     document:{querySelector:s=>elements.get(s),querySelectorAll:s=>(s.includes('sellerAnalysisUfs')?selected.ufs:s.includes('data-certificate-court')?selected.courts:selected.queries).map(value=>({value}))},
     sellerAnalysisMotherName:{required:false},sellerAnalysisFullName:{required:false,value:''},sellerAnalysisCpf:{value:'04252011000110'},sellerAnalysisError:null,
     location:{search:''},sessionStorage:{getItem:()=>null},escapeHtml:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),
-    fetch:async()=>({ok:true,json:async()=>({certificatePriceMultiplier:20,states:[{uf:'AP',name:'Amapá',queryIds:['fiscal','ccd']}],companyStates:[{uf:'AP',name:'Amapá',queryIds:['fgts']}],certificates:[{uf:'AP',type:'Cível',provider:'direct_data',requiredIdentityFields:['birthDate','rg']},{uf:'AP',type:'Criminal',provider:'direct_data',requiredIdentityFields:['gender']}],sellerSources:{configured:true,queries:[
+    fetch:async()=>({ok:true,json:async()=>({certificatePriceMultiplier:30,states:[{uf:'AP',name:'Amapá',queryIds:['fiscal','ccd','protestos','cadin']}],companyStates:[{uf:'AP',name:'Amapá',queryIds:['fgts']}],certificates:[{uf:'AP',type:'Cível',provider:'direct_data',requiredIdentityFields:['birthDate','rg']},{uf:'AP',type:'Criminal',provider:'direct_data',requiredIdentityFields:['gender']}],sellerSources:{configured:true,queries:[
+      {id:'protestos',kind:'data',category:'Protestos',label:'Protestos',costBrl:3.5,documentTypes:['cpf'],scope:'Brasil',params:{}},
+      {id:'cadin',kind:'data',includePdf:true,category:'CADIN',label:'CADIN',costBrl:.54,documentTypes:['cpf'],scope:'AP',params:{}},
       {id:'fiscal',kind:'certificate',category:'Fiscal',label:'Fiscal',costBrl:.54,documentTypes:['cpf'],scope:'AP',params:{},limitation:'Não inclui <dívida ativa>'},
       {id:'ccd',kind:'certificate',category:'Fiscal',label:'CND conjunta',endpoint:'CertidaoConjuntaDebitosPessoaFisica',costBrl:.54,documentTypes:['cpf'],scope:'Brasil',params:{}},
       {id:'fgts',kind:'certificate',category:'Empresa',label:'FGTS',costBrl:.54,documentTypes:['cnpj'],scope:'Brasil',params:{}}
@@ -78,16 +80,35 @@ test("certificate groups show applicable sources, 20x prices and only required i
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Escolha os estados/);
   selected.ufs=['AP'];selected.courts=['AP:Cível'];selected.queries=['fiscal','ccd'];context.renderCertificateChoices();context.updateSellerEstimate();
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/<details open>/);assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Não inclui &lt;dívida ativa&gt;/);
-  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 32,40/);assert.equal(elements.get('#sellerAnalysisBirthDate').required,true);assert.equal(elements.get('#sellerAnalysisRg').required,true);
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 48,60/);assert.equal(elements.get('#sellerAnalysisBirthDate').required,true);assert.equal(elements.get('#sellerAnalysisRg').required,true);
   assert.equal(elements.get('#sellerAnalysisGender').required,false);
+  assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Consulta de dados — sem PDF oficial/);
+  assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Comprovante de consulta em PDF/);
+  assert.doesNotMatch(elements.get('#sellerAnalysisQueries').innerHTML,/value="(?:protestos|cadin)" checked/);
+  selected.queries=['protestos','cadin'];selected.courts=[];context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 51,20/);
+  vm.runInContext('sellerCoverage.certificateSubscriber=true',context);context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 35,84/);assert.match(elements.get('#sellerAnalysisCost').innerHTML,/30% de desconto/);
+  vm.runInContext('sellerCoverage.certificateSubscriber=false',context);
+  assert.equal(elements.get('#sellerAnalysisBirthDate').required,false);
+  selected.courts=['AP:Cível'];
   assert.equal(JSON.stringify(context.selectedSellerCertificates().map(c=>c.uf+':'+c.type)),JSON.stringify(['AP:Cível']));
-  selected.queries=[];context.updateSellerEstimate();assert.match(elements.get('#sellerAnalysisCost').innerHTML,/1 certidões selecionadas/);assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 10,80/);
+  selected.queries=[];context.updateSellerEstimate();assert.match(elements.get('#sellerAnalysisCost').innerHTML,/1 fontes selecionadas/);assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 16,20/);
   selected.courts=[];context.updateSellerEstimate();assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 0,00/);assert.equal(elements.get('#sellerAnalysisRg').required,false);
   elements.get('#sellerAnalysisDocumentType').value='cnpj';selected.queries=['fgts'];context.renderCertificateChoices();context.updateSellerEstimate();
-  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 10,80/);assert.doesNotMatch(elements.get('#sellerAnalysisQueries').innerHTML,/value="fiscal"/);
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 16,20/);assert.doesNotMatch(elements.get('#sellerAnalysisQueries').innerHTML,/value="fiscal"/);
   assert.equal(elements.get('#sellerAnalysisBirthDate').required,false);assert.equal(elements.get('#sellerAnalysisRg').required,false);
   elements.get('#sellerAnalysisDocumentType').value='cpf';selected.ufs=[];selected.queries=[];selected.courts=[];context.updateSellerEstimate();
   assert.equal(elements.get('#sellerAnalysisBirthDate').required,false);assert.equal(elements.get('#sellerAnalysisRg').required,false);
+});
+
+test('Brazil package preserves optional data queries unchecked',()=>{
+  const handlers={},ufs=[{checked:false}],queries=[{checked:true},{checked:false}];
+  const context=vm.createContext({document:{getElementById:id=>({addEventListener:(_,fn)=>handlers[id]=fn}),querySelectorAll:s=>s.includes('Ufs')?ufs:queries},isCertificateOnly:()=>true,renderCertificateChoices:()=>{queries[0].checked=true;queries[1].checked=false;},updateSellerEstimate:()=>{}});
+  const start=appJs.indexOf('for (const [id, checked] of [["sellerAnalysisSelectAll"'),end=appJs.indexOf('loadSellerCoverage();',start);
+  vm.runInContext(appJs.slice(start,end),context);handlers.sellerAnalysisSelectAll();
+  assert.equal(ufs[0].checked,true);assert.deepEqual(queries.map(q=>q.checked),[true,false]);
+  handlers.sellerAnalysisClearAll();assert.equal(ufs[0].checked,false);assert(queries.every(q=>!q.checked));
 });
 
 test("seller results preserve every source, private PDF indices and pending queries", () => {

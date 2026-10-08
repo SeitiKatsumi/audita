@@ -30,7 +30,7 @@ import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
 import { createSellerReviewService } from './services/seller-review.service.mjs';
 import { createSellerReviewAI } from './services/seller-review-ai.mjs';
-import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER} from './services/certificate-order.service.mjs';
+import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER,certificateQuote} from './services/certificate-order.service.mjs';
 import {billingConfiguration} from './services/billing-catalog.service.mjs';
 import { getPdfRoot } from "./services/storage.service.mjs";
 import { getAutonomousCertificateCoverage, planAutonomousCertificates } from "./services/state-court-autonomous.service.mjs";
@@ -1781,6 +1781,11 @@ const stripeBillingService = createStripeBillingService({
 const certificateOrderService=createCertificateOrderService({getDb:()=>({pool,dbReady}),
   checkout:(auth,order)=>stripeBillingService.createCertificateCheckoutSession(auth,order),
   startAudit:(request,options)=>auditService.startAudit(request,options)});
+async function certificateBenefits(auth) {
+  if(auth.unauthorized||!auth.user)return {subscriber:false,complimentary:false};
+  const access=await chatAccessService.getAccess(auth,{includeTestAccess:false});
+  return {subscriber:access.source==='entitlement'&&access.active===true||access.source==='legacy'&&access.allowed===true,complimentary:access.source==='complimentary'};
+}
 const chatDocumentsService = createChatDocumentsService({
   getDb: () => ({ pool, dbReady }), accessService: chatAccessService,
   recordUsage: (usage, auth) => apiUsageService.record(auth, { provider: "openai", service: "responses", model: process.env.AUDITA_CHAT_DOCUMENT_MODEL || process.env.AUDITA_CHAT_QUICK_MODEL || "gpt-6-luna", operation: "chat_document", ...usage }),
@@ -3910,6 +3915,8 @@ async function handleApi(request, response, pathname) {
   if (pathname === "/audit" && request.method === "POST") {
     try {
       request.body = await readJsonBody(request);
+      const extra=request.body.extraFields||request.body.dadosExtras||{};
+      if(extra.sellerQueries?.length||extra.autonomousUfs?.length||extra.sellerAiConsent===true){sendJson(response,409,{error:'seller_checkout_required'});return true;}
       const result = await auditService.startAudit(request);
       if (result.unauthorized) {
         sendJson(response, 401, { error: "authentication_required" });
@@ -3930,13 +3937,14 @@ async function handleApi(request, response, pathname) {
   }
 
   if (pathname === "/api/seller-analysis/coverage" && request.method === "GET") {
+    const benefits=await certificateBenefits(await getTenantIdForRequest(request));
     const coverage = {
       aiReady: sellerReviewService.ready(),
       ...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
     };
     sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage), companyStates: sellerStatePlans(coverage,'cnpj'), identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl,
-      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
+      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateSubscriber:benefits.subscriber,certificateComplimentary:benefits.complimentary,certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
     return true;
   }
 
@@ -3968,12 +3976,15 @@ async function handleApi(request, response, pathname) {
       if(body.flow !== 'certificates' && body.automatic === true) {
         if(body.aiConsent!==true||body.paidQueryConfirmed!==true) {sendJson(response,400,{error:'seller_consent_required'});return true;}
         const coverage={...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()),sellerSources:getSellerDocumentCoverage(directDataSellerService.getStatus())};
-        statePlan=sellerStatePlans(coverage,documentType).find(item=>item.uf===body.state);
+        const available=sellerStatePlans(coverage,documentType),ufs=body.states??[body.state];
+        if(!Array.isArray(ufs)||!ufs.length||ufs.length>27||ufs.some(uf=>!available.some(s=>s.uf===uf))) {sendJson(response,400,{error:'invalid_seller_state'});return true;}
+        body.states=[...new Set(ufs)];body.state=body.states[0];
+        statePlan=available.find(item=>item.uf===body.state);
         if(!statePlan || (body.municipality && !statePlan.municipalities.includes(body.municipality))) {
           sendJson(response,400,{error:'invalid_seller_state'}); return true;
         }
-        body.ufs=statePlan.certificateCount?[statePlan.uf]:[];
-        body.sellerQueries=sellerQueriesForState(coverage.sellerSources.queries,statePlan.uf,documentType,body.municipality||'').map(item=>item.id);
+        body.ufs=body.states.filter(uf=>available.find(s=>s.uf===uf).certificateCount);
+        body.sellerQueries=[...new Set(body.states.flatMap(uf=>sellerQueriesForState(coverage.sellerSources.queries,uf,documentType,uf===body.state?body.municipality||'':'').filter(q=>!q.manualOnly).map(item=>item.id)))];
         body.companyCnpjs=isCompany?[document]:[];
       }
       if (body.flow !== 'certificates' && body.aiConsent === true && !sellerReviewService.ready()) {
@@ -3992,7 +4003,7 @@ async function handleApi(request, response, pathname) {
           if (!Array.isArray(companyCnpjs) || companyCnpjs.length > 5 || companyCnpjs.some((value) => !validateCnpj(value))) throw new Error("invalid_company_cnpjs");
           sellerDocumentPlan = planSellerDocuments(body.sellerQueries || [], directDataSellerService.getStatus(), companyCnpjs);
           if (sellerDocumentPlan.queries.some(item => !item.documentTypes.includes(documentType) && !(documentType === 'cpf' && companyCnpjs.length && item.documentTypes.includes('cnpj')))) throw new Error('unsupported_seller_document_type');
-          if (body.flow === 'certificates' && (sellerDocumentPlan.queries.some(item => item.kind !== 'certificate') || (!autonomousPlan && !sellerDocumentPlan.queries.length))) throw new Error('invalid_certificate_selection');
+          if (body.flow === 'certificates' && (sellerDocumentPlan.queries.some(item => !['certificate','data'].includes(item.kind)) || (!autonomousPlan && !sellerDocumentPlan.queries.length))) throw new Error('invalid_certificate_selection');
           if (!autonomousPlan && !sellerDocumentPlan.queries.length && !companyCnpjs.length) throw new Error("empty_selection");
         } catch {
           sendJson(response, 400, { error: "invalid_seller_selection" });
@@ -4101,7 +4112,7 @@ async function handleApi(request, response, pathname) {
         Object.assign(request.body.extraFields, {
           sellerQueries: sellerDocumentPlan.queries.map((item) => item.id),
           companyCnpjs, authorizationConfirmed: true, paidQueryConfirmed: body.paidQueryConfirmed === true,
-          ...(statePlan ? {sellerState:statePlan.uf,discoverCompanies:statePlan.discoversCompanies} : {}),
+          ...(statePlan ? {sellerState:statePlan.uf,sellerStates:body.states,discoverCompanies:statePlan.discoversCompanies} : {}),
         });
         request.body.extraFields.stateCourtFields.birthDate = String(body.birthDate || "").split("-").reverse().join("/");
       }
@@ -4117,24 +4128,18 @@ async function handleApi(request, response, pathname) {
         });
       }
       const providerCostBrl=(autonomousPlan?.maxProviderCostBrl||0)+(sellerDocumentPlan?.maxProviderCostBrl||0);
-      if(body.flow==='certificates' && providerCostBrl>0) {
+      {
+        const benefits=await certificateBenefits(authContext);
+        const costs=[...(autonomousPlan?.certificates||[]).map(c=>c.provider==='direct_data'?directDataCertificatesService.getStatus().pdfTotalCostBrl||.54:0),...(sellerDocumentPlan?.queries||[]).flatMap(q=>Array(q.documentTypes.includes('cpf')?1:companyCnpjs.length).fill(Number(q.costBrl)))];
+        if(!costs.length)costs.push(0);
+        const quote=certificateQuote(costs,benefits.subscriber);
         const catalog=billingConfiguration();
-        if(!catalog.checkoutReady||!catalog.webhookReady||!certificateOrderService.ready()) {
+        if(!certificateOrderService.ready()||quote.amountCents>0&&!benefits.complimentary&&(!catalog.checkoutReady||!catalog.webhookReady)) {
           sendJson(response,503,{error:'billing_not_configured',message:'O pagamento está temporariamente indisponível. Nenhuma emissão foi iniciada.'});return true;
         }
-        const order=await certificateOrderService.create(authContext,request.body,{providerCostBrl,documentCount:(autonomousPlan?.certificates.length||0)+(sellerDocumentPlan?.queries.length||0)});
-        sendJson(response,202,{...order,checkoutRequired:true});return true;
+        const order=await certificateOrderService.create(authContext,request.body,{providerCostBrl,costs,...benefits,documentCount:(autonomousPlan?.certificates.length||0)+(sellerDocumentPlan?.queries.length||0)||1});
+        sendJson(response,202,{...order,checkoutRequired:order.status!=='started',identityEnriched});return true;
       }
-      const result = await auditService.startAudit(request);
-      if (result.unauthorized) {
-        sendJson(response, 401, { error: "authentication_required" });
-        return true;
-      }
-      if (result.invalid) {
-        sendJson(response, 400, { error: "invalid_seller_analysis_request" });
-        return true;
-      }
-      sendJson(response, 202, { ...result, identityEnriched });
     } catch (error) {
       sendJson(response, error.statusCode || error.status || 500, {
         error: "seller_analysis_start_failed",

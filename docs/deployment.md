@@ -1,5 +1,9 @@
 # Deploy
 
+## Publicacao da reuniao de07/10 -08/10/2026
+
+Publicacao autorizada de app/site: conciliar main6847c3 e trabalho local preservado. Regras30x/10x porfonte, zero10/gratis assinante, desconto30%, dois protestos/dossie, analisesmultiUF com checkout e retorno ao segmento. Reusa JSON criptografado, assinatura/acesso e checkout; sem migracao, novas dependencias, chaves ou volumes. Pedidos antigos mantem preco salvo. Antes/depois: backup PostgreSQL/config, env/volumes, CI, testes/PGlite, Chrome ficticio ate PDF, SHA/assets/health/autenticacao. Sem cobranca/emissao real como teste. Fonte gratuita somente para beneficio vigente validado no servidor, bypass nao qualifica; acesso individual existente preservado. Custos de empresas vinculadas inclusos no pacote, nao adicionar cobranca silenciosa. Sponsor/chaves Audita e franquia cincoCPF dependem de especificacao.
+
 ## Publicacao dos encaminhamentos de 06/10 - 07/10/2026
 
 Usuario autorizou publicar app e site consolidados. Codigo77d53d4: selecao de certidoes por UF/Brasil, custo configurado20x, checkout Stripe antes da coleta e retorno com PDF privado; nenhuma migracao, dependencia, chave ou volume novo. Site bcc719e: CTAs das dez paginas encaminham aos modulos correspondentes. Validacao previa:560 testes Node/PGlite,15 do site, typecheck/build e Chrome ficticio ate PDF. Registrar backup, imagens anteriores, CI, SHA/health/assets e paginas publicas depois do deploy. Conferir eventos checkout.session.async_payment_succeeded, async_payment_failed e expired no endpoint existente; nao efetuar cobranca real para teste. Desconto40/50 e recarga Direct Data continuam sem regra/integracao confirmada.

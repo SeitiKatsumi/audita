@@ -21,11 +21,11 @@ export function sellerStatePlans(coverage, documentType='cpf') {
   const queries=coverage.sellerSources?.queries||[];
   const maxCompanyCostBrl=Math.max(0,...Object.keys(SELLER_STATES).flatMap(uf=> {
     const cities=queries.filter(q=>q.endpoint==='CertidaoNegativaDebitosMunicipal'&&q.params.MUNICIPIO.endsWith('-'+uf)).map(q=>q.params.MUNICIPIO.slice(0,q.params.MUNICIPIO.lastIndexOf('-')));
-    return ['',...cities].map(city=>cost(sellerQueriesForState(queries,uf,'cnpj',city)));
+    return ['',...cities].map(city=>cost(sellerQueriesForState(queries,uf,'cnpj',city).filter(q=>!q.manualOnly)));
   }));
   return Object.entries(SELLER_STATES).map(([uf,name])=> {
     const certificates=documentType==='cpf'?coverage.certificates.filter(item=>item.uf===uf):[],personal=sellerQueriesForState(queries,uf,documentType);
     const municipalities=[...new Set(queries.filter(q=>q.documentTypes.includes(documentType)&&q.endpoint==='CertidaoNegativaDebitosMunicipal'&&q.params.MUNICIPIO.endsWith('-'+uf)).map(q=>q.params.MUNICIPIO.slice(0,q.params.MUNICIPIO.lastIndexOf('-'))))];
-    return {uf,name,queryIds:personal.map(q=>q.id),certificateCount:certificates.length,requiresCourtData:certificates.length>0,municipalities,baseCostBrl:cost(personal)+certificates.filter(q=>q.provider==='direct_data').length*(coverage.pdfQueryCostBrl||.54),maxCompanyCostBrl,companyLimit:documentType==='cpf'?5:0,discoversCompanies:documentType==='cpf'&&personal.some(q=>q.id==='vinculos')};
+    return {uf,name,queryIds:personal.map(q=>q.id),certificateCount:certificates.length,requiresCourtData:certificates.length>0,municipalities,baseCostBrl:cost(personal.filter(q=>!q.manualOnly))+certificates.filter(q=>q.provider==='direct_data').length*(coverage.pdfQueryCostBrl||.54),maxCompanyCostBrl,companyLimit:documentType==='cpf'?5:0,discoversCompanies:documentType==='cpf'&&personal.some(q=>q.id==='vinculos')};
   });
 }

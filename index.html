@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261007-certificates-payment-selection" />
+    <link rel="stylesheet" href="styles.css?v=20261008-meeting" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -689,13 +689,15 @@
                   <input id="sellerAnalysisCompanyCnpjs" type="text" maxlength="500" autocomplete="off" placeholder="Separe os CNPJs por vírgula" />
                   <small>Até cinco CNPJs. Cadastro e quadro societário gratuitos; selecione abaixo as certidões empresariais pagas desejadas. A consulta de vínculos por CPF é uma opção separada.</small>
                 </label>
-                <div class="seller-analysis-privacy" id="sellerManualSelection" hidden>
+                <details id="sellerStatesChoice" class="seller-analysis-privacy"><summary>Outros estados ou Brasil inteiro — opcional</summary>
                 <fieldset id="sellerAnalysisUfs" class="seller-analysis-ufs seller-analysis-privacy"><legend>Certidões estaduais</legend></fieldset>
-                <div id="sellerAnalysisQueries" class="seller-analysis-privacy" aria-live="polite">Carregando outras consultas...</div>
                 <div class="seller-analysis-privacy">
                   <button id="sellerAnalysisSelectAll" type="button" class="secondary-action">Pacote Brasil inteiro — todos os estados</button>
                   <button id="sellerAnalysisClearAll" type="button" class="secondary-action">Desmarcar todas</button>
                 </div>
+                </details>
+                <div class="seller-analysis-privacy" id="sellerManualSelection" hidden>
+                <div id="sellerAnalysisQueries" class="seller-analysis-privacy" aria-live="polite">Carregando outras consultas...</div>
                 <p><button id="certificateAudienceOpen" type="button" class="certificate-audience-link" aria-haspopup="dialog" aria-controls="certificateAudienceDialog">Para quem é este serviço?</button></p>
                 </div>
                 <label class="seller-analysis-consent" id="sellerPaidConsentLabel" hidden><input id="sellerAnalysisPaid" type="checkbox" /><span>Autorizo o custo informado para as consultas.</span></label>
@@ -2227,7 +2229,7 @@
     <script type="module" src="/ir-exemption.js?v=20260925-contained-chat"></script>
     <script type="module" src="/bank-debt.js?v=20260922-service-intros"></script>
     <script type="module" src="charge-analysis.js?v=20260922-service-intros"></script>
-    <script type="module" src="app.js?v=20261007-certificates-payment-selection"></script>
+    <script type="module" src="app.js?v=20261008-meeting"></script>
     <script type="module" src="glosas.js?v=20261005"></script>
     <script type="module" src="import-audit.js?v=20260922-document-check"></script>
       <script type="module" src="/pis-pasep.js?v=20260925-consultation-guide"></script>

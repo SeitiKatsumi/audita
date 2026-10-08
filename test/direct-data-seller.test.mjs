@@ -39,7 +39,7 @@ test("seller provider requires authorization, payment confirmation, identity, an
     [request({ endpoint: "CertidaoNegativaDebitosMunicipal", parameters: { CPF: "52998224725", MUNICIPIO: "São Paulo" } }), AUTH, "invalid_municipality"],
   ]) assert.equal((await service.query(input, auth)).reason, reason);
   assert.equal(calls, 0);
-  assert.equal(DIRECT_DATA_SELLER_ENDPOINTS.length, 18);
+  assert.equal(DIRECT_DATA_SELLER_ENDPOINTS.length, 20);
   assert.equal((await createDirectDataSellerService({ env: {} }).query(request(), AUTH)).unavailable, true);
 });
 
@@ -77,10 +77,16 @@ test("seller provider normalizes formatted dates, accepts documented CNPJ and al
     ["ProcessosJudiciaisAgrupada", { CPF: "52998224725" }],
     ["ProcessosJudiciaisSimplificada", { CPF: "52998224725" }],
     ["ProcessosJudiciaisCompleta", { CNPJ: "04252011000110" }],
+    ["ProtestosOnline", { CNPJ: "04252011000110" }],
+    ["ProtestosBasica", { CPF: "52998224725" }],
+    ["ProtestosBasica", { CNPJ: "04252011000110" }],
+    ["DossieCreditoCompleto", { CNPJ: "04252011000110" }],
+    ["DossieCreditoCompleto", { CPF: "52998224725" }],
   ];
-  for (const [endpoint, parameters] of cases) assert.equal((await service.query(request({ requestId: endpoint, endpoint, parameters }), AUTH)).result.status, "success");
+  for (const [index, [endpoint, parameters]] of cases.entries()) assert.equal((await service.query(request({ requestId: endpoint+'-'+index, endpoint, parameters }), AUTH)).result.status, "success");
   assert.equal(calls[0].searchParams.get("DATANASCIMENTO"), "01/01/2000");
   assert.equal(calls[2].searchParams.get("CNPJ"), "04252011000110");
+  assert(calls.slice(8).every(url=>!url.searchParams.has('GERARCOMPROVANTE')));
 });
 
 test("seller async queries poll history without issuing another paid request and accept provider casing", async () => {

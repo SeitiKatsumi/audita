@@ -7,11 +7,18 @@ import { PDFDocument } from 'pdf-lib';
 import vm from 'node:vm';
 import { createAuditService } from '../services/audit.service.mjs';
 import { createSellerReviewAI } from '../services/seller-review-ai.mjs';
-import { createSellerReviewService, validateSellerReading, readSellerPdf, calculateSellerSafetyScore } from '../services/seller-review.service.mjs';
+import { createSellerReviewService, validateSellerReading, readSellerPdf, calculateSellerSafetyScore,sellerAdditionalStates } from '../services/seller-review.service.mjs';
 import { extractPdfText } from '../services/pdf.service.mjs';
 import { analysisSegments } from '../analysis-segments.js';
 
 const owner = { tenantId: 1, user: { id: 811 } };
+test('other-state suggestion requires verified company evidence, omits already selected states and never starts a query',()=>{
+  const source={identityVerified:true,subject:{document:'04252011000110'},details:{UF:'SP'}};
+  assert.deepEqual(sellerAdditionalStates([source,source],['ES'],'cpf'),['SP']);
+  assert.deepEqual(sellerAdditionalStates([source],['ES','SP'],'cpf'),[]);
+  assert.deepEqual(sellerAdditionalStates([source],['ES'],'cnpj'),[]);
+  assert.deepEqual(sellerAdditionalStates([{...source,identityVerified:false},{...source,details:{UF:'XX'}}],['ES'],'cpf'),[]);
+});
 export const reading = { summary: 'Protesto informado pela fonte; conferir situação atual.', identity: 'compatible', outcome: 'occurrences', issuedAt: null, validUntil: null, limitations: [], findings: [{ category: 'credit', priority: 'high', title: 'Protesto de R$ 1.250,00', description: 'A fonte informa um protesto. A exigibilidade e eventual baixa devem ser conferidas.', quote: 'R$ 1.250,00', amount: 'R$ 1.250,00', date: null, recommendation: 'Solicitar certidão atualizada e comprovante de baixa ao cartório.' }] };
 
 async function fixture() {

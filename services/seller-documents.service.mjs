@@ -89,7 +89,7 @@ export function summarizeSellerData(endpoint, data) {
   }
   let outcome;
   let summary = "Documento obtido. O retorno não permite concluir sobre a existência de pendências.";
-  if (endpoint === "ProtestosOnline") {
+  if (["ProtestosOnline", "ProtestosBasica"].includes(endpoint)) {
     outcome = field(data, "constamProtestos");
     for (const [label, key] of [["Total de protestos", "numeroTotalProtestos"], ["Valor total informado", "valorTotalProtestos"]]) {
       if (clean(field(data, key))) details[label] = clean(field(data, key));
@@ -112,12 +112,19 @@ export function summarizeSellerData(endpoint, data) {
     else if (Array.isArray(field(data, "relacionamentos"))) details["Empresas vinculadas"] = "Nenhuma empresa com CNPJ identificada no retorno.";
     const partners = list(field(data, "socios")).slice(0, 50).map((entry) => [clean(field(entry, "nomeNomeEmpresarial") || field(entry, "nomeEntidade"), 150), clean(field(entry, "qualificacao"), 100)].filter(Boolean).join(" — ")).filter(Boolean);
     if (partners.length) details["Sócios e administradores"] = partners.join("; ");
-  } else if (endpoint === "DetalhamentoNegativo") {
-    const debt = field(field(data, "pessoaFisica") || field(data, "pessoaJuridica"), "pendenciaFinanceira");
+  } else if (["DetalhamentoNegativo", "DossieCreditoCompleto"].includes(endpoint)) {
+    const company = normalizeDocument(field(data, "documentoConsultado")).length === 14;
+    const subject = endpoint === "DossieCreditoCompleto" ? field(data, company ? "entidadeJuridica" : "entidadeFisica") : field(data, "pessoaFisica") || field(data, "pessoaJuridica");
+    const debt = field(subject, "pendenciaFinanceira");
     if (clean(field(debt, "status"))) details["Situação informada"] = clean(field(debt, "status"));
     if (clean(field(debt, "totalPendencia"))) details["Total de pendências financeiras informado"] = clean(field(debt, "totalPendencia"));
     for (const [label, key] of [["Registros de protesto", "protestos"], ["Registros de ações judiciais", "acoesJudiciais"], ["Registros de recuperação/falência", "recuperacoesJudiciaisFalencia"], ["Registros de cheques sem fundo", "chequesSemFundo"]]) {
       if (Array.isArray(field(debt, key))) details[label] = String(field(debt, key).length);
+    }
+    if (endpoint === "DossieCreditoCompleto") {
+      const scores = field(subject, "scoreEntidade") || field(subject, "scoreEntidades");
+      const score = field(field(scores, company ? "entidadeJuridica" : "entidadeFisica"), "score");
+      if (typeof score === "number" && Number.isFinite(score)) details["Score de crédito QUOD (provedor)"] = String(score);
     }
     summary = "Consulta de crédito QUOD obtida. Os registros retornados precisam de análise; não substitui certidão oficial.";
   } else if (endpoint.startsWith("ProcessosJudiciais")) {
@@ -246,7 +253,7 @@ export async function collectSellerDocuments(input, {
           const companyUf=clean(company.dados.uf||company.dados.endereco?.uf,2).toUpperCase();
           const municipality=clean(company.dados.municipio||company.dados.cidade||company.dados.endereco?.municipio,100);
           const available=getSellerDocumentCoverage(configuration).queries;
-          const selected=Object.hasOwn(SELLER_STATES,companyUf)?sellerQueriesForState(available,companyUf,'cnpj',municipality):available.filter(item=>item.documentTypes.includes('cnpj')&&item.scope==='Brasil');
+          const selected=(Object.hasOwn(SELLER_STATES,companyUf)?sellerQueriesForState(available,companyUf,'cnpj',municipality):available.filter(item=>item.documentTypes.includes('cnpj')&&item.scope==='Brasil')).filter(item=>!item.manualOnly);
           for(const item of selected) appendJob({item,document:cnpj,documentType:'cnpj',id:`${item.id}-${work[index].id}`,label:`${item.label} — ${clean(company.dados.razaoSocial,100)}`});
           rows[index].details['Certidões da empresa']=companyUf?`Consultas nacionais e aplicáveis a ${companyUf}.`:'Somente consultas nacionais: UF cadastral não identificada.';
         }

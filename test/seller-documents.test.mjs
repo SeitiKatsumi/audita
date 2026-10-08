@@ -9,7 +9,8 @@ test('automatic state plans include federal jurisdictions and only matching muni
   const states=sellerStatePlans(coverage);
   assert.equal(states.length,27);
   const sp=states.find(s=>s.uf==='SP');
-  assert.equal(sp.queryIds.length,13);
+  assert.equal(sp.queryIds.length,15);
+  assert.ok(sp.queryIds.includes('protestos-basica')&&sp.queryIds.includes('dossie-credito-completo'));
   assert.equal(sp.baseCostBrl,16.44);
   assert.ok(sp.queryIds.includes('vinculos'));
   const queries=coverage.sellerSources.queries;
@@ -64,6 +65,7 @@ test('CPF discovery deduplicates and caps companies, then uses each company UF w
   assert.equal(rows.filter(r=>r.id.startsWith('cnd-rj-company')).length,5);
   assert.ok(!rows.some(r=>r.id.startsWith('cnd-sp-company')||r.id.startsWith('trf3-')));
   assert.ok(requested.slice(1).every(r=>companies.slice(0,5).includes(r.parameters.CNPJ)));
+  assert.ok(requested.every(r=>!['ProtestosBasica','DossieCreditoCompleto'].includes(r.endpoint)),'optional reports do not expand automatically');
   assert.ok(rows.filter(r=>r.status==='failed').every(r=>r.resultado==='indisponivel'&&r.subjectDocument));
   assert.equal(updates.at(-1).completed,updates.at(-1).total);
   assert.equal(updates.at(-1).stage,'completed');
@@ -83,6 +85,29 @@ test("seller plans contain only explicitly selected, available entries and dedup
   assert.throws(() => planSellerDocuments(["cndt"], {}), /unsupported_seller_query/);
   assert.throws(() => planSellerDocuments(undefined, configuration), /invalid_seller_queries/);
   assert.throws(() => planSellerDocuments(Array(161).fill("cndt"), configuration), /invalid_seller_queries/);
+});
+
+test('IEPTB basic and complete QUOD are optional CPF/CNPJ data products with validated identity and no PDF',async()=>{
+  const entries=getSellerDocumentCoverage(configuration).queries;
+  for(const id of ['protestos-basica','dossie-credito-completo']){
+    const item=entries.find(q=>q.id===id);
+    assert.deepEqual(item.documentTypes,['cpf','cnpj']);assert.equal(item.kind,'data');assert.equal(item.manualOnly,true);assert.notEqual(item.includePdf,true);
+  }
+  assert.deepEqual(entries.find(q=>q.id==='protestos').documentTypes,['cpf','cnpj']);
+  assert.equal(planSellerDocuments(['protestos-basica','dossie-credito-completo'],configuration).maxProviderCostBrl,9.94);
+  for(const [type,document]of [['cpf',CPF],['cnpj',CNPJ]]){
+    const sent=[];
+    const query=async request=>{
+      sent.push(request);assert.equal(request.parameters[type.toUpperCase()],document);assert.equal(request.parameters.GERARCOMPROVANTE,undefined);
+      return result(request.endpoint==='ProtestosBasica'?{documentoConsultado:document,constamProtestos:false,numeroTotalProtestos:0,valorTotalProtestos:'0,00'}:{documentoConsultado:document,[type==='cpf'?'entidadeFisica':'entidadeJuridica']:{[type==='cpf'?'scoreEntidade':'scoreEntidades']:{[type==='cpf'?'entidadeFisica':'entidadeJuridica']:{score:0}},pendenciaFinanceira:{status:'Consulta fictícia',totalPendencia:2,protestos:[],acoesJudiciais:[]},dadosCadastrais:{endereco:'private address',telefone:'private phone'}}});
+    };
+    const output=await collectSellerDocuments({...input({sellerQueries:['protestos-basica','dossie-credito-completo']}),tipoDocumento:type,documento:document},dependencies({query,download:async()=>{throw Error('data has no PDF');}}));
+    assert.equal(output.dados.consultasObtidas,2);assert.equal(output.dados.certidoesBaixadas,0);assert.equal(sent.length,2);
+    assert.equal(output.dados.certidoes[0].resultado,'nada_consta');
+    const dossier=output.dados.certidoes[1];assert.equal(dossier.resultado,'indisponivel');assert.equal(dossier.details['Score de crédito QUOD (provedor)'],'0');assert.equal(dossier.details['Total de pendências financeiras informado'],'2');assert.doesNotMatch(JSON.stringify(dossier.details),/private/);
+  }
+  const bad=await collectSellerDocuments(input({sellerQueries:['dossie-credito-completo']}),dependencies({query:async()=>result({documentoConsultado:CNPJ,entidadeFisica:{}})}));
+  assert.equal(bad.dados.certidoes[0].status,'failed');assert.equal(bad.dados.certidoes[0].errorMessage,'evidence_identity_mismatch');
 });
 
 test("seller collection validates authorization, selections and companies before any provider call", async () => {

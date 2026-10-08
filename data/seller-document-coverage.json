@@ -22,7 +22,7 @@
     },
     {
       "id": "protestos",
-      "label": "Protestos nacionais — IEPTB",
+      "label": "Protestos nacionais — IEPTB Online",
       "category": "Protestos",
       "scope": "Brasil",
       "endpoint": "ProtestosOnline",
@@ -30,9 +30,36 @@
       "costBrl": 3.5,
       "kind": "data",
       "documentTypes": [
-        "cpf"
+        "cpf",
+        "cnpj"
       ],
       "limitation": "Consulta estruturada do provedor. Não é uma certidão cartorária em PDF."
+    },
+    {
+      "id": "protestos-basica",
+      "label": "Protestos nacionais — IEPTB Básica",
+      "category": "Protestos",
+      "scope": "Brasil",
+      "endpoint": "ProtestosBasica",
+      "params": {},
+      "costBrl": 2.95,
+      "kind": "data",
+      "documentTypes": ["cpf", "cnpj"],
+      "manualOnly": true,
+      "limitation": "Consulta básica de dados, sem certidão ou comprovante em PDF. O resultado se limita à base consultada pelo provedor."
+    },
+    {
+      "id": "dossie-credito-completo",
+      "label": "Dossiê de crédito completo — QUOD",
+      "category": "Crédito",
+      "scope": "Brasil",
+      "endpoint": "DossieCreditoCompleto",
+      "params": {},
+      "costBrl": 6.99,
+      "kind": "data",
+      "documentTypes": ["cpf", "cnpj"],
+      "manualOnly": true,
+      "limitation": "Dossiê QUOD com dados e score do provedor; não é Serasa, certidão oficial ou aprovação de negócio. Sem PDF oficial; protestos conforme a base QUOD, sem substituir IEPTB."
     },
     {
       "id": "cnd-ac",

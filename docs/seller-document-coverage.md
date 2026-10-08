@@ -1,5 +1,13 @@
 # Documentos e consultas da análise do vendedor
 
+## Atualização de 08/10/2026 — consultas opcionais
+
+- A emissão manual oferece **IEPTB Básica** (`protestos-basica`, API `ProtestosBasica`, custo do provedor R$2,95) e **Dossiê de crédito completo QUOD** (`dossie-credito-completo`, API `DossieCreditoCompleto`, R$6,99) para CPF/CNPJ. São dados estruturados, sem certidão/comprovante oficial em PDF; começam somente após seleção e confirmação de pagamento. As duas opções são `manualOnly`: não entram em análises automáticas nem na expansão de empresas vinculadas.
+- **IEPTB Online** (`ProtestosOnline`, R$3,50) passa a aceitar CNPJ além do CPF. O contrato oficial confirma ambos; isso não transforma a consulta em certidão de cartório nem prova disponibilidade contínua.
+- Contratos e preços conferidos nas páginas oficiais [IEPTB Básica](https://www.directd.com.br/central-de-ajuda/apis/catalogo/ProtestosNacionalBasica), [IEPTB Online](https://www.directd.com.br/central-de-ajuda/apis/catalogo/ProtestosOnline) e [Dossiê QUOD completo](https://www.directd.com.br/central-de-ajuda/apis/catalogo/DossieCreditoCompleto), e no [OpenAPI v3](https://apiv3.directd.com.br/swagger/v3-scalar/swagger.json). A página comercial da básica cita `ProtestosNacionalBasica`, mas o OpenAPI atual publica `/api/ProtestosBasica`, com exatamente um parâmetro CPF ou CNPJ por requisição; a integração segue o OpenAPI. Não há tentativa automática de outra rota paga.
+- O resumo do dossiê distingue o score QUOD retornado pelo provedor do indicador documental da Audita. Ausência de informações financeiras conclusivas continua inconclusiva; score zero é preservado, não convertido em aprovação ou inexistência de dívida.
+- Nenhuma consulta real paga foi executada nesta atualização. Contratos documentados e testes fictícios não são homologação de resposta real; os números e a evidência de homologação de 28/09 abaixo permanecem como registro daquela rodada. O catálogo atual contém 102 opções únicas (71 aplicáveis a CPF, 34 a CNPJ, com três compartilhadas).
+
 Validação em 28/09/2026. Registro da ampliação solicitada após a [reunião Audita de 25/09/2026](https://docs.google.com/document/d/1FhORlCTOSrDy76PkURCpbzE00o-TtZgzhvAowStRYEQ/edit).
 
 **Integrado e verificado na main local, em `localhost:3000`.** A conferência registrou saúde HTTP 200, banco pronto, autenticação exigida e cobertura de 100 consultas da ampliação, além das 30 certidões estaduais anteriores. A suíte completa registrou 500 testes aprovados; outros 45 testes pertinentes passaram após a correção final de concorrência nas consultas pagas. Esta entrega é local; publicação no GitHub e implantação em produção são etapas separadas.

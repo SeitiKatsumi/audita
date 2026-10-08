@@ -14,22 +14,33 @@ import { planSellerDocuments, getSellerDocumentCoverage } from '../services/sell
 import { planAutonomousCertificates } from '../services/state-court-autonomous.service.mjs';
 import { createSellerReviewService } from '../services/seller-review.service.mjs';
 import { extractPdfText } from '../services/pdf.service.mjs';
-import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER} from '../services/certificate-order.service.mjs';
+import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER,certificateQuote} from '../services/certificate-order.service.mjs';
 import {createStripeBillingService} from '../services/stripe-billing.service.mjs';
 import { sellerStatePlans,sellerQueriesForState } from '../services/seller-state-plan.mjs';
 
 const serveOnly=process.argv.includes('--serve');
-const sourceCoverage=getSellerDocumentCoverage({configured:true});sourceCoverage.queries=sourceCoverage.queries.filter(q=>['protestos','cndt','vinculos','cndt-company','fgts-company'].includes(q.id));
-const courtCoverage={ufs:['ES','AP'],certificates:[{uf:'ES',type:'Cível',provider:'portal'},{id:'AP:Cível',uf:'AP',type:'Cível',provider:'direct_data',requiredIdentityFields:['birthDate','motherName','rg','gender']}]};
-const fixtureCoverage={aiReady:true,certificatePriceMultiplier:20,certificateCheckoutReady:true,...courtCoverage,sellerSources:sourceCoverage};fixtureCoverage.states=sellerStatePlans(fixtureCoverage);fixtureCoverage.companyStates=sellerStatePlans(fixtureCoverage,'cnpj');
+const sourceCoverage=getSellerDocumentCoverage({configured:true});sourceCoverage.queries=sourceCoverage.queries.filter(q=>['protestos','cndt','vinculos','cndt-company','fgts-company'].includes(q.id)||(serveOnly&&q.kind==='data'));
+const courtCoverage={ufs:['ES','AP'],certificates:[{id:'ES:Cível',uf:'ES',type:'Cível',provider:'portal'},{id:'AP:Cível',uf:'AP',type:'Cível',provider:'direct_data',requiredIdentityFields:['birthDate','motherName','rg','gender']}]};
+const fixtureCoverage={aiReady:true,certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateCheckoutReady:true,...courtCoverage,sellerSources:sourceCoverage};fixtureCoverage.states=sellerStatePlans(fixtureCoverage);fixtureCoverage.companyStates=sellerStatePlans(fixtureCoverage,'cnpj');
+const planFixtureCertificates=(ufs,configuration={},ids)=>{
+  if(!Array.isArray(ufs)||ufs.some(uf=>!courtCoverage.ufs.includes(uf)))throw Error('unsupported_autonomous_uf');
+  const available=courtCoverage.certificates.filter(c=>ufs.includes(c.uf));
+  if(ids!==undefined&&(!Array.isArray(ids)||!ids.length||ids.some(id=>!available.some(c=>c.id===id))))throw Error('invalid_autonomous_certificate_selection');
+  const validated=planAutonomousCertificates(ufs,configuration,ids);
+  const certificates=validated.certificates.filter(c=>available.some(item=>item.id===c.id)).map(c=>({...c,...available.find(item=>item.id===c.id)}));
+  return {certificates,requiredIdentityFields:[...new Set(certificates.flatMap(c=>c.requiredIdentityFields||[]))],maxProviderCostBrl:certificates.filter(c=>c.provider==='direct_data').length*(configuration.pdfTotalCostBrl||.54)};
+};
+assert.equal(planFixtureCertificates(['ES']).certificates.length,1);
+assert.deepEqual(planFixtureCertificates(['AP'],{configured:true,allowedUfs:['AP']}).requiredIdentityFields,['birthDate','motherName','rg','gender']);
+assert.throws(()=>planFixtureCertificates(['ES'],{},['ES:Criminal']),/invalid_autonomous_certificate_selection/);
 const companyFixture=async input=>({status:'success',dados:{cnpj:input.documento,razaoSocial:'Empresa Fictícia Ltda',uf:'AP',qsa:[{nome:'Sócio Fictício',qualificacao:'Administrador'}]}});
 
-let base=process.env.AUDITA_BASE_URL||'http://localhost:3012';
+let base=process.env.AUDITA_BASE_URL||'http://localhost:3000';
 const appBase=base; let httpServer;
 assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
 const pg=new PGlite(); let browser;
 const auth={tenantId:1,user:{id:811,name:'Pessoa Fictícia',role:'member'}};
-let providerCalls=0,aiCalls=0,identityCalls=0,lastId;
+let providerCalls=0,aiCalls=0,identityCalls=0,lastId,subscriber=false;
 const issuedPdf=await PDFDocument.create();issuedPdf.addPage().drawText('CERTIDAO FICTICIA - TESTE DE EMISSAO');const issuedBytes=Buffer.from(await issuedPdf.save());
 const source=await readFile(new URL('../server.mjs',import.meta.url),'utf8');
 const paths=['/api/seller-analysis','/api/seller-analysis/coverage'];
@@ -47,13 +58,13 @@ try {
  let orderService;
  const stripe=createStripeBillingService({env:paymentEnv,getDb:()=>({pool:pg,dbReady:true}),onCertificatePaymentEvent:event=>orderService.paymentEvent(event),fetchImpl:async()=>new Response(JSON.stringify({id:'cs_ui_fixture',url:'https://checkout.stripe.com/c/pay/fictional-ui-fixture'}),{status:200})});
  orderService=createCertificateOrderService({getDb:()=>({pool:pg,dbReady:true}),env:paymentEnv,checkout:(a,o)=>stripe.createCertificateCheckoutSession(a,o),startAudit:(r,o)=>audit.startAudit(r,o)});
- const sandbox=vm.createContext({certificateOrderService:orderService,CERTIFICATE_PRICE_MULTIPLIER,billingConfiguration:()=>({checkoutReady:true,webhookReady:true}),URL,crypto:{randomUUID},sellerReviewService:review,auditService:audit,normalizeDfSellerInput,normalizeSellerInput,normalizePersonBirthDate,personNamesMatch,collectSellerCompany:companyFixture,buildDfSellerAuditRequest,planSellerDocuments,planAutonomousCertificates,validateCnpj,
+ const sandbox=vm.createContext({certificateOrderService:orderService,CERTIFICATE_PRICE_MULTIPLIER,certificateQuote,chatAccessService:{getAccess:async(_,options)=>{assert.equal(options.includeTestAccess,false);return {source:subscriber?'entitlement':'test',active:true};}},billingConfiguration:()=>({checkoutReady:true,webhookReady:true}),URL,crypto:{randomUUID},sellerReviewService:review,auditService:audit,normalizeDfSellerInput,normalizeSellerInput,normalizePersonBirthDate,personNamesMatch,collectSellerCompany:companyFixture,buildDfSellerAuditRequest,planSellerDocuments,planAutonomousCertificates:planFixtureCertificates,validateCnpj,
    getSellerDocumentCoverage:()=>sourceCoverage,getAutonomousCertificateCoverage:()=>courtCoverage,sellerStatePlans,sellerQueriesForState,
    directDataPersonService:{lookup:async input=>{identityCalls++;return {result:{document:input.cpf,fullName:'Vendedor Fictício',motherName:'Mãe Fictícia',birthDate:'1980-01-01',gender:'Masculino',rg:''}};}},directDataCertificatesService:{getStatus:()=>({configured:true,allowedUfs:['AP']})},directDataSellerService:{getStatus:()=>({configured:true})},getTenantIdForRequest:async()=>auth,
    readJsonBody:async req=>req.body,sendJson:(res,status,body)=>Object.assign(res,{status,body}),
  });
  const start=source.slice(source.indexOf('  if (["/api/seller-analysis/df"'),source.indexOf('  const publicAuditEvidenceMatch ='));
- vm.runInContext(`async function handle(pathname,request,response){${start}}`,sandbox);
+ vm.runInContext(`${source.slice(source.indexOf('async function certificateBenefits('),source.indexOf('const chatDocumentsService ='))} async function handle(pathname,request,response){${start}}`,sandbox);
  async function confirmCertificateOrder(id){
    const order=await orderService.get(auth,id),event={id:'evt-ui-'+id,type:'checkout.session.completed',data:{object:{id:'cs_ui_fixture',mode:'payment',currency:'brl',amount_total:order.amountCents,payment_status:'paid',metadata:{purchase_kind:'certificate_order',audita_tenant_id:'1',audita_user_id:'811',certificate_order_id:id}}}};
    const raw=Buffer.from(JSON.stringify(event)),time=Math.floor(Date.now()/1000),signature=createHmac('sha256',paymentEnv.STRIPE_WEBHOOK_SECRET).update(time+'.').update(raw).digest('hex');
@@ -63,9 +74,15 @@ try {
    const req=route.request(),url=new URL(req.url()),path=url.pathname;
    if(url.origin!==new URL(base).origin)return route.abort();
    if(path==='/api/auth/me')return route.fulfill({json:{authRequired:true,user:auth.user}});
-   if(serveOnly&&path==='/api/test/seller-metrics')return route.fulfill({json:{providerCalls,identityCalls,aiCalls,lastId}});
-   if(serveOnly&&path==='/api/test/certificate-payment'&&req.method()==='POST') {await confirmCertificateOrder(req.postDataJSON().orderId);return route.fulfill({json:{ok:true}});}
-   if(path==='/api/seller-analysis/coverage')return route.fulfill({json:fixtureCoverage});
+   if(serveOnly&&path==='/api/test/seller-metrics')return route.fulfill({json:{providerCalls,identityCalls,aiCalls,lastId,subscriber}});
+   if(serveOnly&&path==='/api/test/certificate-payment'&&req.method()==='POST') {await confirmCertificateOrder(req.postDataJSON().orderId||lastId);return route.fulfill({json:{ok:true}});}
+   if(serveOnly&&path==='/api/test/subscription'&&req.method()==='POST'){subscriber=!subscriber;return route.fulfill({json:{subscriber}});}
+   if(path==='/api/seller-analysis/coverage')return route.fulfill({json:{...fixtureCoverage,certificateSubscriber:subscriber,certificateComplimentary:false}});
+   if(['/', '/index.html','/app.js','/styles.css','/certificate-selection.js'].includes(path)){
+     const file=path==='/'?'index.html':path.slice(1);let text=await readFile(new URL('../'+file,import.meta.url),'utf8');
+     if(serveOnly&&file==='index.html')text=text.replace('</body>',`<aside style="position:fixed;right:8px;top:8px;z-index:99999;background:#17283d;padding:8px;border:1px solid #ffcf60;font-size:12px"><strong>TESTE — provedores fictícios</strong> <button type="button" id="fixtureSubscription">${subscriber?'Simular não assinante':'Simular assinante'}</button> <button type="button" id="fixturePayment">Confirmar pagamento fictício</button></aside><script>document.getElementById('fixtureSubscription').onclick=async()=>{await fetch('/api/test/subscription',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});location.reload()};document.getElementById('fixturePayment').onclick=async()=>{const response=await fetch('/api/test/certificate-payment',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({orderId:sessionStorage.getItem('auditaCertificateOrder')})});if(response.ok)location.reload()};</script></body>`);
+     return route.fulfill({status:200,headers:{'content-type':file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css':'text/javascript'},body:text});
+   }
    if(path.startsWith('/api/seller-analysis')||path.startsWith('/api/certificate-orders')){
      const res={setHeader(){},writeHead(status,headers){Object.assign(this,{status,headers});},end(buffer){this.buffer=buffer;}};
      await sandbox.handle(path,{method:req.method(),body:req.method()==='POST'?req.postDataJSON():{},headers:{'content-type':'application/json',host:new URL(base).host,origin:base}},res);
@@ -84,7 +101,7 @@ try {
   const adapter={request:()=>({url:()=>base+req.url,method:()=>req.method,postDataJSON:()=>JSON.parse(data||'{}')}),abort:()=>{res.writeHead(403);res.end();},fulfill:async options=>{const headers={...(options.headers||{})};let body=options.body;if(options.json!==undefined){headers['content-type']='application/json';body=JSON.stringify(options.json);}res.writeHead(options.status||200,headers);res.end(body);},continue:async()=>{const r=await fetch(appBase+req.url);res.writeHead(r.status,{'content-type':r.headers.get('content-type')||'text/plain'});res.end(Buffer.from(await r.arrayBuffer()));}};
   try{await routeHandler(adapter);}catch(e){res.writeHead(500);res.end('Test fixture failed');console.error(e.message);}
  });
- await new Promise(resolve=>httpServer.listen(0,'127.0.0.1',resolve));base='http://127.0.0.1:'+httpServer.address().port;
+ await new Promise(resolve=>httpServer.listen(serveOnly?3012:0,'127.0.0.1',resolve));base='http://127.0.0.1:'+httpServer.address().port;
  if(serveOnly){console.log(JSON.stringify({fixtureUrl:base,fictionalProviders:true}));await new Promise(()=>{});}
  browser=await chromium.launch({headless:true});
  const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
@@ -96,6 +113,8 @@ try {
  await page.locator('#sellerAnalysisAuthorization').check();
  await page.screenshot({path:'output/playwright/seller-input-desktop.png',fullPage:true});
  await page.locator('#sellerAnalysisSubmit').click();
+ await page.getByRole('heading',{name:'Pagamento da análise',exact:true}).waitFor();
+ assert.equal(providerCalls,0,'analysis waits for confirmed payment');await confirmCertificateOrder(lastId);
  await page.getByRole('heading',{name:'3. Analisando documentos e dados'}).waitFor();
  await page.screenshot({path:'output/playwright/seller-progress-desktop.png',fullPage:true});
  const download=page.getByRole('link',{name:'Baixar relatório completo em PDF'});

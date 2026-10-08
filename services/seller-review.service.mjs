@@ -6,11 +6,16 @@ import { getPdfRoot } from './storage.service.mjs';
 import { sellerReadingSchema } from './seller-review-ai.mjs';
 import { sellerReportPdf } from './seller-review-pdf.mjs';
 import { getAnalysisSegment } from '../analysis-segments.js';
+import { SELLER_STATES } from './seller-state-plan.mjs';
 
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const plain = text => String(text || '').replace(/\s+/g, ' ').trim();
 const fail = (code, status = 400) => { throw Object.assign(new Error(code), { code, status }); };
 const scopeNotice = 'Análise limitada às fontes selecionadas e à data da coleta. Não substitui conferência jurídica, matrícula atualizada do imóvel, ônus, situação conjugal, poderes de representação ou débitos próprios do imóvel. Ausência de ocorrência em uma fonte não comprova ausência geral de dívidas.';
+export function sellerAdditionalStates(sources,selectedStates,documentType) {
+  if(documentType!=='cpf'||!selectedStates?.length)return [];
+  return [...new Set(sources.filter(s=>s.identityVerified&&s.subject?.document).map(s=>s.details?.UF).filter(uf=>Object.hasOwn(SELLER_STATES,uf)&&!selectedStates.includes(uf)))];
+}
 
 export function calculateSellerSafetyScore(report) {
   const sources = report.sources || [];
@@ -130,7 +135,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
     if (active.has(id)) return get(id, auth);
     if (!ai.ready()) fail('seller_ai_unavailable', 503);
     if (sources.length > 300) fail('seller_too_many_sources', 422);
-    const state = { token: randomUUID(), fingerprint, segment: segment.id, status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
+    const state = { token: randomUUID(), fingerprint, segment: segment.id, selectedStates:row.request_payload.sellerStates||[], status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
     const claimed = await pool().query(`UPDATE audita_audits SET request_payload=jsonb_set(jsonb_set(request_payload,'{sellerAiConsent}','true'::jsonb),'{sellerReview}',$4::jsonb)
       WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3
       AND (request_payload->'sellerReview'->>'status' IS DISTINCT FROM 'running' OR (request_payload->'sellerReview'->>'updatedAt')::timestamptz < $5::timestamptz)
@@ -196,6 +201,8 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
         try {report.summaryParagraphs=await ai.summarize(report,auth);report.executiveSummary=report.summaryParagraphs.map(p=>p.text).join('\n\n');report.summaryStatus='completed';}
         catch {report.summaryStatus='source_readings';}
       }
+      report.additionalStates=sellerAdditionalStates(sources,state.selectedStates,audit.tipoDocumento);
+      if(report.additionalStates.length)report.executiveSummary+=`\n\nUma empresa vinculada tem cadastro em ${report.additionalStates.join(', ')}. Avalie consultar também o CPF nesses estados. Nenhuma consulta ou cobrança adicional foi iniciada.`;
       state.report = report;
       state.status = analyzed ? 'completed' : 'failed';
       state.progress = analyzed ? 100 : 0;

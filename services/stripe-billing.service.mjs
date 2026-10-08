@@ -859,9 +859,9 @@ export function createStripeBillingService({
     const metadata={purchase_kind:'certificate_order',audita_tenant_id:String(authContext.tenantId),audita_user_id:String(authContext.user.id),certificate_order_id:order.id};
     const session=await stripeRequest('/v1/checkout/sessions',{
       mode:'payment',customer_email:authContext.user.email,locale:'pt-BR',integration_identifier:config.integrationIdentifier,
-      success_url:`${config.appUrl}/?certificate_order=${order.id}#emissao-certidoes`,
-      cancel_url:`${config.appUrl}/?certificate_order=${order.id}&certificate_cancelled=1#emissao-certidoes`,
-      line_items:[{quantity:1,price_data:{currency:'brl',unit_amount:order.amountCents,product_data:{name:'Audita — emissão de certidões selecionadas'}}}],metadata,payment_intent_data:{metadata},
+      success_url:`${config.appUrl}/?certificate_order=${order.id}#${order.flow==='seller'?order.segment:'emissao-certidoes'}`,
+      cancel_url:`${config.appUrl}/?certificate_order=${order.id}&certificate_cancelled=1#${order.flow==='seller'?order.segment:'emissao-certidoes'}`,
+      line_items:[{quantity:1,price_data:{currency:'brl',unit_amount:order.amountCents,product_data:{name:order.flow==='seller'?'Audita — análise documental':'Audita — certidões e consultas selecionadas'}}}],metadata,payment_intent_data:{metadata},
     },{idempotencyKey:`audita-certificates-${order.id}`});
     return {id:session.id,url:session.url,expiresAt:session.expires_at};
   }
