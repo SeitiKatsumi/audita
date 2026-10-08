@@ -1,8 +1,8 @@
 const PLANS = [
-  { id: "chat-experiment", name: "Experimente", cents: 990, messages: 20, pages: 5 },
-  { id: "chat-essential", name: "Essencial", cents: 4990, messages: 100, pages: 20 },
-  { id: "chat-professional", name: "Profissional", cents: 9990, messages: 300, pages: 80 },
-  { id: "chat-premium", name: "Premium", cents: 19990, messages: 700, pages: 200 },
+  { id: "chat-experiment", name: "Experimente", cents: 990, messages: 20, pages: null },
+  { id: "chat-essential", name: "Essencial", cents: 4990, messages: 100, pages: null },
+  { id: "chat-professional", name: "Profissional", cents: 9990, messages: 300, pages: null },
+  { id: "chat-premium", name: "Premium", cents: 19990, messages: 700, pages: null },
 ];
 const money = cents => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
@@ -24,7 +24,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     <p data-access role="status"></p><section class="chat-quota" data-quota hidden aria-label="Cotas restantes"></section><p data-notice role="status" aria-live="polite"></p>
     <p data-payment-status role="status"></p><section data-legacy hidden></section><div class="chat-subscription-plans"></div>
     <section class="chat-subscription-rules" aria-label="O que o plano inclui e regras de uso">
-      <p><strong>Inclui:</strong> conversa, pesquisa na web, análise de documentos e fotos, geração de imagens e arquivos. A leitura inicial consome páginas; perguntas posteriores consomem mensagens.</p>
+      <p><strong>Inclui:</strong> conversa, pesquisa na web, análise de documentos e fotos, geração de imagens e arquivos. Documentos sem limite de páginas ou quantidade; perguntas consomem mensagens.</p>
       <p><strong>N\u00e3o inclui:</strong> consultas externas, certid\u00f5es, servi\u00e7os especializados ou honor\u00e1rios profissionais.</p>
       <p><strong>Uso individual, sem compartilhamento.</strong> Planos mensais renovam no anivers\u00e1rio da contrata\u00e7\u00e3o. Saldos n\u00e3o acumulam entre per\u00edodos e n\u00e3o h\u00e1 cobran\u00e7a autom\u00e1tica por excedentes. Experimente: compra \u00fanica, sem renova\u00e7\u00e3o.</p>
     </section>
@@ -62,7 +62,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   }
   function allowed(kind = "messages") {
     return Boolean(owner && owner === userId() && loaded && access?.active === true &&
-      (Number(access.remaining?.[kind]) > 0 || ((access.legacy === true || access.test === true || access.unlimited === true) && access.remaining?.[kind] == null)));
+      (kind === "pages" || Number(access.remaining?.[kind]) > 0 || ((access.legacy === true || access.test === true || access.unlimited === true) && access.remaining?.[kind] == null)));
   }
   async function request(url, body) {
     const response = await fetch(url, { method: body === undefined ? "GET" : "POST", credentials: "same-origin",
@@ -97,7 +97,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     if (access.test) return "Acesso de teste liberado · sem cobrança do plano.";
     const plan = PLANS.find(item => item.id === access.planId);
     const remaining = access.remaining;
-    let text = `${plan?.name || (access.legacy ? "Acesso legado" : "Chat ativo")} \u00b7 ${remaining?.messages ?? "-"} mensagens e ${remaining?.pages ?? "-"} p\u00e1ginas restantes`;
+    let text = `${plan?.name || (access.legacy ? "Acesso legado" : "Chat ativo")} \u00b7 ${remaining?.messages ?? "-"} mensagens restantes · documentos sem limite de páginas`;
     for (const [kind, label] of [["messages", "Mensagens"], ["pages", "P\u00e1ginas"]]) {
       if (Number.isFinite(access.used?.[kind]) && Number.isFinite(access.limits?.[kind])) {
         text += ` \u00b7 ${label}: ${access.used[kind]}/${access.limits[kind]} usadas`;
@@ -151,7 +151,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       return `<article class="chat-subscription-plan${recommended ? " is-recommended" : ""}">
         <span class="chat-subscription-badge">${recommended ? "Recomendado" : current ? "Plano atual" : "&nbsp;"}</span>
         <h3>${plan.name}</h3><p class="chat-subscription-price"><strong>${escape(money(cents))}</strong><span>${experiment ? " / 30 dias" : " / m\u00eas"}</span></p>
-        <ul><li>${plan.messages} mensagens</li><li>${plan.pages} p\u00e1ginas de documentos</li></ul>
+        <ul><li>${plan.messages} mensagens</li><li>Documentos sem limite de páginas ou quantidade</li></ul>
         <p class="chat-subscription-terms">${experiment ? "Compra \u00fanica por conta. V\u00e1lido por 30 dias, sem renova\u00e7\u00e3o autom\u00e1tica." : "Renova\u00e7\u00e3o mensal autom\u00e1tica. Gerencie ou cancele no portal de pagamento."}</p>
         <button type="button" data-plan="${plan.id}" ${disabled ? "disabled" : ""}>${current ? "Plano atual" : busy ? "Aguarde..." : !available(plan.id) ? "Indispon\u00edvel" : experiment ? "Experimentar" : `Escolher ${plan.name}`}</button></article>`;
     }).join("");
@@ -389,14 +389,9 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       if (!prepared?.id || !Number.isInteger(prepared.pages) || prepared.pages <= 0) throw new Error("Contagem de p\u00e1ginas indispon\u00edvel. Nenhuma an\u00e1lise foi solicitada.");
       analysisRequestId = crypto.randomUUID();
       documentDialog.querySelector("[data-document-name]").textContent = file.name;
-      documentDialog.querySelector("[data-document-pages]").textContent = access.unlimited ? `${prepared.pages} unidade(s) de leitura. Acesso ilimitado, sem desconto de cotas.` : access.test
-        ? `${prepared.pages} unidade(s) de processamento · acesso de teste, sem desconto de saldo.`
-        : /\.(pdf|png|jpe?g)$/i.test(file.name)
-        ? `${prepared.pages} página(s) serão descontadas do saldo ao analisar. Saldo atual: ${access.remaining?.pages ?? "-"}.`
-        : `Este arquivo usa 1 unidade do saldo de páginas para processamento, sem representar a quantidade de páginas ou abas. Saldo atual: ${access.remaining?.pages ?? "-"}.`;
-      const insufficient = !((access.legacy || access.test || access.unlimited) && access.remaining?.pages == null) && prepared.pages > Number(access.remaining?.pages ?? 0);
-      documentDialog.querySelector("[data-document-error]").textContent = insufficient ? "Saldo de p\u00e1ginas insuficiente para este documento." : "";
-      documentDialog.querySelector("[data-analyze]").disabled = insufficient;
+      documentDialog.querySelector("[data-document-pages]").textContent = `${prepared.pages} página(s) de leitura. Sem limite de páginas e sem desconto de saldo.`;
+      documentDialog.querySelector("[data-document-error]").textContent = "";
+      documentDialog.querySelector("[data-analyze]").disabled = false;
       documentDialog.querySelector("[data-analyze]").textContent = "Analisar documento";
       documentDialog.removeAttribute("aria-busy");
       for (const button of documentDialog.querySelectorAll("[data-close], [data-cancel]")) button.disabled = false;
@@ -483,7 +478,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   listen(documentDialog.querySelector("[data-analyze]"), "click", () => void analyze());
   for (const selector of ["[data-close]", "[data-cancel]"]) listen(documentDialog.querySelector(selector), "click", () => { if (!documentBusy) documentDialog.close(); });
   listen(documentDialog, "cancel", event => { if (documentBusy) event.preventDefault(); });
-  listen(documentDialog, "close", () => finishDocument(null));
+  listen(documentDialog, "close", () => { if (!documentDialog.open) finishDocument(null); });
   listen(window, "audita:auth-changed", () => void onAuthChanged());
   listen(window, "pageshow", () => void refresh());
   listen(document, "visibilitychange", () => { if (!document.hidden) void refresh(); });

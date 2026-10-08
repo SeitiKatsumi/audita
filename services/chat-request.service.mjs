@@ -31,7 +31,7 @@ export function createChatRequestService({ accessService, getDocumentContext } =
     check(typeof run === 'function', 'chat_runner_unavailable', 503);
     check(body.threadId == null || id(body.threadId),'chat_invalid_thread');
     check(body.mode == null || ['auto','quick','deep'].includes(body.mode),'chat_invalid_mode');
-    check(body.documentIds == null || (Array.isArray(body.documentIds)&&body.documentIds.length<=6&&body.documentIds.every(id)&&new Set(body.documentIds).size===body.documentIds.length),'chat_invalid_document_ids');
+    check(body.documentIds == null || (Array.isArray(body.documentIds)&&body.documentIds.every(id)&&new Set(body.documentIds).size===body.documentIds.length),'chat_invalid_document_ids');
     const input = { threadId:body.threadId,mode:'auto',documentIds:body.documentIds||[], requestId: body.requestId, messages, caseContext,
       browserSessionId: body.browserSessionId ?? null, documentId: body.documentId ?? null, documentContext: '' };
     const held = await accessService.reserve(auth, { requestId: input.requestId, kind: 'messages', quantity: 1 });

@@ -74,14 +74,14 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
        await request('/api/chat/threads',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({threads:legacy.map(t=>({title:t.title,messages:t.messages.slice(-40).map(m=>({role:m.role,content:String(m.content).slice(0,3000)}))}))})});
        remember('audita:chat-imported:'+owner,'1');data=await request('/api/chat/threads');
      }if(run!==version||owner!==account())return;threads=data.threads||[];
-     const saved=recall('audita:general-chat:'+owner);if(saved&&threads.some(t=>t.id===saved)){const restored=(await request('/api/chat/threads/'+saved)).thread;if(run!==version||owner!==account())return;thread=restored;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))].slice(-6);}
+     const saved=recall('audita:general-chat:'+owner);if(saved&&threads.some(t=>t.id===saved)){const restored=(await request('/api/chat/threads/'+saved)).thread;if(run!==version||owner!==account())return;thread=restored;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];}
      if(run===version&&owner===account()){render();watch();}
    }catch(e){if(run===version)showError(e.message);}
  }
  function watch(){
    clearTimeout(monitor);if(thread.processing?.status!=='running')return;
    const id=thread.id,run=version;
-   monitor=setTimeout(async()=>{try{const data=await request('/api/chat/threads/'+id);if(run!==version||thread.id!==id)return;thread=data.thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))].slice(-6);render();watch();}catch(e){if(run===version)showError(e.message);}},2000);
+   monitor=setTimeout(async()=>{try{const data=await request('/api/chat/threads/'+id);if(run!==version||thread.id!==id)return;thread=data.thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];render();watch();}catch(e){if(run===version)showError(e.message);}},2000);
  }
  function newThread(){if(active)return;closeHistory();clearTimeout(monitor);thread={id:uuid(),title:'Nova conversa',messages:[]};files=[];showError();render();input.focus();}
  async function sendMessage(raw=input.value){
@@ -96,7 +96,6 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
      const docIds=[...(localThread.documentIds||[])];
      for(const file of [...files]){active.status=`Lendo ${file.name}`;render();const doc=await subscription.analyzeDocument(file);if(!doc)throw Object.assign(new Error('Leitura cancelada.'),{cancelled:true});if(!docIds.includes(doc.id))docIds.push(doc.id);localThread.documentIds=[...docIds];files=files.filter(f=>f!==file);}
      if(run!==version||accountId!==account())return;
-     if(docIds.length>6)throw new Error('Use até seis documentos por conversa. Abra outra conversa para enviar mais arquivos.');
      localThread.documentIds=docIds;userMessage.documentIds=docIds;
      const fingerprint=JSON.stringify([userMessage.content,docIds,'auto']);
      if(localThread.pendingRequest?.fingerprint===fingerprint)userMessage.id=localThread.pendingRequest.id;
@@ -143,14 +142,13 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    catch(e){showError(e.message);}
  });
  fileInput.addEventListener('change',e=>{e.stopImmediatePropagation();const next=[...fileInput.files];
-   if(files.length+next.length+(thread.documentIds?.length||0)>6){showError('Use até seis arquivos por conversa.');return;}
    if(next.some(f=>f.size>12*1024*1024)){showError('Cada arquivo pode ter até 12 MB.');return;}
    files.push(...next);showError();render();},true);
  pending.addEventListener('click',e=>{const b=e.target.closest('[data-remove-file]');if(b){e.stopImmediatePropagation();files.splice(Number(b.dataset.removeFile),1);render();}},true);
  for(const id of ['chatNewButton','chatMobileNewButton'])document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();newThread();},true);
  list.addEventListener('click',async e=>{const button=e.target.closest('[data-general-thread],[data-general-delete]');if(!button)return;e.stopImmediatePropagation();if(active)return;
    try{if(button.dataset.generalDelete){await request('/api/chat/threads/'+button.dataset.generalDelete,{method:'DELETE'});threads=threads.filter(t=>t.id!==button.dataset.generalDelete);if(thread.id===button.dataset.generalDelete)newThread();render();}
-     else{thread=(await request('/api/chat/threads/'+button.dataset.generalThread)).thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))].slice(-6);files=[];remember('audita:general-chat:'+owner,thread.id);closeHistory();render();watch();}
+     else{thread=(await request('/api/chat/threads/'+button.dataset.generalThread)).thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];files=[];remember('audita:general-chat:'+owner,thread.id);closeHistory();render();watch();}
    }catch(e){showError(e.message);}
  },true);
  messages.addEventListener('click',async e=>{const b=e.target.closest('[data-copy],[data-retry],[data-preview]');if(!b)return;e.stopImmediatePropagation();

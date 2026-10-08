@@ -27,7 +27,7 @@ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42
 const artifactBytes={pdf:pdfBytes,html:Buffer.from('<!doctype html><html><h1>Prévia fictícia</h1><script>parent.window.previewEscaped=true</script></html>'),csv:Buffer.from('item,valor\nEconomia,30\n')};
 const sdk={responses:{create:async(payload,options={})=>{
  captures.push(payload);
- if(!payload.stream)return {status:'completed',output_text:JSON.stringify({summary:'Documento fictício [p. 1]',pages:[{page:1,text:'Dados de teste',uncertain:false}]})};
+ if(!payload.stream){const data=payload.input[1].content[0].file_data;const count=data?.startsWith('data:application/pdf;')?(await PDFDocument.load(Buffer.from(data.split(',')[1],'base64'))).getPageCount():1;return {status:'completed',output_text:JSON.stringify({summary:'Documento fictício [p. 1]',pages:Array.from({length:count},(_,i)=>({page:i+1,text:'Dados de teste',uncertain:false}))})};}
  const text=payload.input.at(-1).content.find(p=>p.type==='input_text').text;
  return (async function*(){
    if(/web/.test(text))yield {type:'response.web_search_call.searching'};
@@ -43,7 +43,7 @@ const sdk={responses:{create:async(payload,options={})=>{
    yield {type:'response.output_text.delta',delta:answer.slice(12)};
    yield {type:'response.completed',response:{status:'completed',output_text:answer,output,usage:{input_tokens:20,output_tokens:10}}};
  })();
-}},containers:{files:{content:{retrieve:async id=>new Response(artifactBytes[id])}}}};
+}},files:{create:async()=>({id:'file-'+randomUUID()}),delete:async()=>{}},containers:{files:{content:{retrieve:async id=>new Response(artifactBytes[id])}}}};
 try{
  await pg.exec('CREATE TABLE audita_tenants(id BIGINT PRIMARY KEY); CREATE TABLE audita_users(id BIGINT PRIMARY KEY,tenant_id BIGINT); INSERT INTO audita_tenants VALUES(1),(2); INSERT INTO audita_users VALUES(811,1),(812,1);');
  for(const name of ['20260922-chat-access.sql','20260922-chat-documents.sql'])await pg.exec(await readFile(new URL('../db/migrations/'+name,import.meta.url),'utf8'));

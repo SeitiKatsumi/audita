@@ -38,7 +38,7 @@ function reservation(row, duplicate = false) {
 // Grant/revoke methods are trusted billing primitives, not public HTTP handlers.
 export function createChatAccessService({ getDb, now = () => new Date(), getLegacyAccess = async () => false,
   testBypassEnabled = false,
-  maxReservationQuantity = { messages: 1, pages: 200 } } = {}) {
+  maxReservationQuantity = { messages: 1, pages: 2147483647 } } = {}) {
   // ponytail: test grants belong to this process; reenable after restart, shared storage only if testing multiple replicas.
   const testOwners = new Set();
   const bounds = { ...maxReservationQuantity };
@@ -83,7 +83,7 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
       testOwners.delete(ids.join(':'));
       const used = await usage(db, ids, row.id), limits = LIMITS[row.plan_id];
       return { allowed: true, active: true, source: 'entitlement', ...entitlement(row), limits, used,
-        remaining: { messages: limits.messages - used.messages, pages: limits.pages - used.pages } };
+        remaining: { messages: limits.messages - used.messages, pages: null } };
     }
     if (includeTestAccess && testBypassEnabled === true && testOwners.has(ids.join(':'))) {
       return { allowed: true, active: true, source: 'test', planId: null, limits: null, used: null, remaining: null };
@@ -156,7 +156,7 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
       }
       const allowed = await access(db, ids, auth);
       check(allowed.allowed, 'chat_access_required', 403);
-      check(!allowed.remaining || quantity <= allowed.remaining[kind], 'chat_quota_exceeded', 429);
+      check(kind==='pages' || !allowed.remaining || quantity <= allowed.remaining[kind], 'chat_quota_exceeded', 429);
       const row = (await db.query(`INSERT INTO audita_chat_reservations
         (tenant_id,user_id,request_id,entitlement_id,kind,quantity) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,
       [...ids, requestId, allowed.id ?? null, kind, quantity])).rows[0];
