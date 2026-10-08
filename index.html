@@ -551,6 +551,27 @@
           <div class="services-empty" data-service-empty hidden><h3>Nenhum serviço encontrado</h3><p>Tente outro termo ou escolha uma categoria diferente.</p><button class="secondary-action" type="button" data-service-clear>Limpar busca e filtros</button></div>
         </section>
 
+        <dialog class="charge-faq-dialog ir-diseases-dialog" id="certificateAudienceDialog" aria-labelledby="certificateAudienceTitle">
+          <header class="charge-faq-header">
+            <h2 id="certificateAudienceTitle">Para quem é a emissão de certidões?</h2>
+            <form method="dialog"><button class="charge-faq-close" aria-label="Fechar público-alvo" autofocus><span aria-hidden="true">&times;</span></button></form>
+          </header>
+          <div class="ir-diseases-content">
+            <p>Para pessoas e empresas que precisam reunir certidões de um CPF ou CNPJ em um ou mais estados, em um só atendimento.</p>
+            <ul>
+              <li><strong>Compradores de imóveis e investidores:</strong> conferir a documentação do vendedor antes de uma compra.</li>
+              <li><strong>Empresas e equipes de fusões e aquisições:</strong> levantar certidões para uma aquisição ou parceria.</li>
+              <li><strong>Advogados e equipes de compliance:</strong> organizar documentos de clientes, fornecedores e parceiros.</li>
+              <li><strong>Bancos, fintechs e credores:</strong> obter documentos de tomadores e garantidores como apoio, sem substituir a avaliação de crédito.</li>
+              <li><strong>Empresas participantes de licitações:</strong> reunir certidões disponíveis conforme as exigências do edital.</li>
+              <li><strong>Famílias e responsáveis por inventários:</strong> apoiar o levantamento documental com orientação profissional.</li>
+            </ul>
+            <h3>Quando escolher o pacote Brasil inteiro?</h3>
+            <p>Quando precisar de fontes em diferentes estados, por exemplo, para avaliar uma empresa com filiais ou um vendedor que atua em outras regiões.</p>
+            <p>O pacote seleciona as fontes disponíveis e aplicáveis ao CPF ou CNPJ. Confira a seleção e o preço antes de pagar. A emissão depende de cada órgão e não garante cobertura de todos os registros, ausência de pendências ou aprovação do negócio. Este serviço não inclui análise por IA.</p>
+          </div>
+        </dialog>
+
         <dialog class="charge-faq-dialog ir-diseases-dialog" id="jurisprudenceDialog" aria-labelledby="jurisprudenceTitle">
           <header class="charge-faq-header">
             <h2 id="jurisprudenceTitle">Jurisprudências sobre cobranças bancárias</h2>
@@ -675,6 +696,7 @@
                   <button id="sellerAnalysisSelectAll" type="button" class="secondary-action">Pacote Brasil inteiro — todos os estados</button>
                   <button id="sellerAnalysisClearAll" type="button" class="secondary-action">Desmarcar todas</button>
                 </div>
+                <p><button id="certificateAudienceOpen" type="button" class="certificate-audience-link" aria-haspopup="dialog" aria-controls="certificateAudienceDialog">Para quem é este serviço?</button></p>
                 </div>
                 <label class="seller-analysis-consent" id="sellerPaidConsentLabel" hidden><input id="sellerAnalysisPaid" type="checkbox" /><span>Autorizo o custo informado para as consultas.</span></label>
                 <label class="seller-analysis-consent">

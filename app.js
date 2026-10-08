@@ -6791,6 +6791,13 @@ document.querySelector("#sellerAnalysisUfs")?.addEventListener("change",()=>{if(
 document.querySelector("#sellerAnalysisQueries")?.addEventListener("change", updateSellerEstimate);
 document.querySelector("#sellerAnalysisCompanyCnpjs")?.addEventListener("input", updateSellerEstimate);
 sellerAnalysisMotherName?.addEventListener('input',updateSellerEstimate);
+const certificateAudienceOpen = document.querySelector('#certificateAudienceOpen');
+const certificateAudienceDialog = document.querySelector('#certificateAudienceDialog');
+certificateAudienceOpen?.addEventListener('click', () => {
+  if (certificateAudienceDialog && !certificateAudienceDialog.open) certificateAudienceDialog.showModal();
+});
+certificateAudienceDialog?.addEventListener('close', () => certificateAudienceOpen?.focus({preventScroll:true}));
+
 for (const [id, checked] of [["sellerAnalysisSelectAll", true], ["sellerAnalysisClearAll", false]]) {
   document.getElementById(id)?.addEventListener("click", () => {
     document.querySelectorAll("#sellerAnalysisUfs input").forEach((input) => { input.checked = checked; });

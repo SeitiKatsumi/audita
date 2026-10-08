@@ -12388,3 +12388,19 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 #sellerAnalysisQueries details {margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:8px}
 #sellerAnalysisQueries summary {cursor:pointer;font-weight:700;padding:4px 0}
 #sellerAnalysisQueries fieldset {border:0;padding:12px 0;min-width:0}
+
+.certificate-audience-link {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: #91d8ff;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.certificate-audience-link:hover { color: #c6f8ff; }
+.certificate-audience-link:focus-visible { outline: 2px solid #67e8f9; outline-offset: 4px; border-radius: 3px; }
+#certificateAudienceDialog[open] { display: flex; flex-direction: column; max-height: calc(100dvh - 32px); overflow: hidden; }
+#certificateAudienceDialog .charge-faq-header { flex-shrink: 0; }
+#certificateAudienceDialog .ir-diseases-content { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
