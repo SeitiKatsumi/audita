@@ -33,10 +33,10 @@ function money(cents) {
 }
 
 export const CHAT_PLANS = Object.freeze([
-  { id: "chat-experiment", name: "Experimente", kind: "chat_experiment", price: { currency: "BRL", cents: 990 }, messages: 20, pages: 5, days: 30, priceEnv: "STRIPE_PRICE_CHAT_EXPERIMENT" },
-  { id: "chat-essential", name: "Essencial", kind: "chat_subscription", price: { currency: "BRL", cents: 4990 }, messages: 100, pages: 20, priceEnv: "STRIPE_PRICE_CHAT_ESSENTIAL" },
-  { id: "chat-professional", name: "Profissional", kind: "chat_subscription", price: { currency: "BRL", cents: 9990 }, messages: 300, pages: 80, recommended: true, priceEnv: "STRIPE_PRICE_CHAT_PROFESSIONAL" },
-  { id: "chat-premium", name: "Premium", kind: "chat_subscription", price: { currency: "BRL", cents: 19990 }, messages: 700, pages: 200, priceEnv: "STRIPE_PRICE_CHAT_PREMIUM" },
+  { id: "chat-experiment", name: "Experimente", kind: "chat_experiment", price: { currency: "BRL", cents: 990 }, messages: 20, pages: null, days: 30, priceEnv: "STRIPE_PRICE_CHAT_EXPERIMENT" },
+  { id: "chat-essential", name: "Essencial", kind: "chat_subscription", price: { currency: "BRL", cents: 4990 }, messages: 100, pages: null, priceEnv: "STRIPE_PRICE_CHAT_ESSENTIAL" },
+  { id: "chat-professional", name: "Profissional", kind: "chat_subscription", price: { currency: "BRL", cents: 9990 }, messages: 300, pages: null, recommended: true, priceEnv: "STRIPE_PRICE_CHAT_PROFESSIONAL" },
+  { id: "chat-premium", name: "Premium", kind: "chat_subscription", price: { currency: "BRL", cents: 19990 }, messages: 700, pages: null, priceEnv: "STRIPE_PRICE_CHAT_PREMIUM" },
 ]);
 
 export const BILLING_PLANS = Object.freeze([

@@ -4,6 +4,14 @@ import { createChatRequestService } from '../services/chat-request.service.mjs';
 
 const auth = { tenantId: '1', user: { id: '1' } };
 const body = { requestId: 'request-1', messages: [{ role: 'user', content: 'Hello' }] };
+test('more than six attachments reach the conversation while duplicate IDs remain invalid', async () => {
+  const {service,calls}=fixture(),documentIds=Array.from({length:8},(_,i)=>`doc-${i}`);
+  await assert.rejects(service.execute(auth,{...body,documentIds:['doc-1','doc-1']},()=>{}),{statusCode:400});
+  assert.equal(calls.length,0);
+  await service.execute(auth,{...body,documentIds},async input=>{
+    assert.deepEqual(input.documentIds,documentIds);return {answer:'ok'};
+  });
+});
 function fixture(extra = {}) {
   const rows = new Map(), calls = [];
   const accessService = {

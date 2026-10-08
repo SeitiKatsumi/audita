@@ -1,6 +1,6 @@
-import { initGeneralChat } from './general-chat.js';
+import { initGeneralChat } from './general-chat.js?v=20261008-chat-documents';
 import { initServicesCatalog } from "./services-catalog.js";
-import { initChatSubscription } from "./chat-subscription.js";
+import { initChatSubscription } from "./chat-subscription.js?v=20261008-chat-documents";
 import { analysisSegments, getAnalysisSegment } from './analysis-segments.js';
 import {certificateSelection,certificateQuote} from './certificate-selection.js?v=20261008-meeting';
 for (const element of document.querySelectorAll('[data-page], [data-nav-pages]')) {

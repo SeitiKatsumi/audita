@@ -8,6 +8,19 @@ import {PDFDocument} from 'pdf-lib';
 import {createGeneralChatStorage} from '../services/general-chat-storage.service.mjs';
 import {createGeneralChatService,selectChatModel,GENERAL_CHAT_MODULES} from '../services/general-chat.service.mjs';
 const auth={tenantId:1,user:{id:5}},other={tenantId:1,user:{id:6}},env={AUDITA_CHAT_DOCUMENTS_ENCRYPTION_KEY:'fictitious-key-'.repeat(4)};
+test('large PDFs and all eight originals reach the Python container and temporary uploads are deleted',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'audita-general-')),storage=createGeneralChatStorage({root,env});
+ try{
+  const documentIds=Array.from({length:8},(_,i)=>`doc-${i}`),uploaded=[],deleted=[];let payload;
+  const sdk={files:{create:async({file,purpose})=>{assert.equal(purpose,'user_data');uploaded.push(file.name);return {id:`file-${uploaded.length}`};},delete:async id=>deleted.push(id)},responses:{create:async p=>{payload=p;return (async function*(){yield {type:'response.completed',response:{status:'completed',output_text:'Dados conferidos.',output:[]}};})();}}};
+  const service=createGeneralChatService({storage,env,client:sdk,documents:{getInput:async(a,id)=>{assert.equal(a,auth);return {fileName:id+'.pdf',mime:'application/pdf',pages:id==='doc-0'?241:1,buffer:Buffer.from('fictional original'),summary:'Reference only'};}}});
+  const body={threadId:randomUUID(),requestId:randomUUID(),messages:[{role:'user',content:'Compare todos os documentos'}],documentIds};
+  await service.run(auth,body);
+  assert.equal(uploaded.length,8);assert.equal(payload.input.at(-1).content.filter(p=>p.type==='input_file').length,0);
+  assert.deepEqual(payload.tools.find(t=>t.type==='code_interpreter').container.file_ids,deleted);
+  assert.equal(deleted.length,8);assert.deepEqual((await storage.getThread(auth,body.threadId)).messages[0].documentIds,documentIds);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
 
 test('general chat streams hosted tools, preserves files/history privately and only links services',async()=>{
  const root=await mkdtemp(join(tmpdir(),'audita-general-'));const storage=createGeneralChatStorage({root,env});

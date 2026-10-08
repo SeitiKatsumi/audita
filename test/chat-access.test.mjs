@@ -50,7 +50,7 @@ test('permanent complimentary access survives restart, overrides exhausted quota
   assert.equal(reserved.entitlementId, null);
   await service.complete(approved, {requestId:'complimentary'});
   await assert.rejects(service.reserve(other, {requestId:'other',kind:'messages'}), {code:'chat_access_required'});
-  await assert.rejects(service.reserve(approved, {requestId:'oversize',kind:'pages',quantity:201}), {code:'chat_invalid_quantity'});
+  await assert.rejects(service.reserve(approved, {requestId:'oversize',kind:'pages',quantity:2147483648}), {code:'chat_invalid_quantity'});
   delete process.env.AUDITA_UNLIMITED_ACCESS_EMAILS;
   assert.equal((await make().getAccess(approved)).remaining.messages, 0);
 });
@@ -79,7 +79,7 @@ test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/tria
     await s.complete(auth, { requestId: `test-${kind}`, result: 'fictional result' });
     assert.equal((await s.reserve(auth, { requestId: `test-${kind}`, kind, quantity })).duplicate, true);
   }
-  await assert.rejects(s.reserve(auth, { requestId: 'too-many', kind: 'pages', quantity: 201 }), { code: 'chat_invalid_quantity' });
+  await assert.rejects(s.reserve(auth, { requestId: 'too-many', kind: 'pages', quantity: 2147483648 }), { code: 'chat_invalid_quantity' });
   await s.grantPaidAccess(invoice());
   assert.equal((await s.getAccess(auth)).source, 'entitlement', 'paid access replaces the free test without restarting');
   assert.equal((await s.enableTestAccess(auth)).source, 'entitlement', 'reenabling test cannot bypass paid quotas');
@@ -96,8 +96,8 @@ test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/tria
 test('paid plans, invoice idempotency, nonoverlap and current half-open period', async t => {
   const { service: s, setTime } = await fixture(t);
   assert.deepEqual(Object.fromEntries(CHAT_PLANS.map(({ id, messages, pages }) => [id, { messages, pages }])), {
-    'chat-experiment': { messages: 20, pages: 5 }, 'chat-essential': { messages: 100, pages: 20 },
-    'chat-professional': { messages: 300, pages: 80 }, 'chat-premium': { messages: 700, pages: 200 },
+    'chat-experiment': { messages: 20, pages: null }, 'chat-essential': { messages: 100, pages: null },
+    'chat-professional': { messages: 300, pages: null }, 'chat-premium': { messages: 700, pages: null },
   });
   assert.equal((await s.getAccess(auth)).allowed, false);
   const first = await s.grantPaidAccess(invoice());
@@ -122,9 +122,9 @@ test('concurrent quota and retry accounting persist across service instances', a
   await s.grantPaidAccess(invoice());
   const attempts = await Promise.allSettled(Array.from({ length: 25 }, (_, n) =>
     (n % 2 ? s : make()).reserve(auth, { requestId: `page-${n}`, kind: 'pages', quantity: 1 })));
-  assert.equal(attempts.filter(r => r.status === 'fulfilled').length, 20);
-  assert.equal(attempts.filter(r => r.reason?.code === 'chat_quota_exceeded').length, 5);
-  assert.equal((await s.getAccess(auth)).remaining.pages, 0);
+  assert.equal(attempts.filter(r => r.status === 'fulfilled').length, 25);
+  assert.equal(attempts.filter(r => r.reason?.code === 'chat_quota_exceeded').length, 0);
+  assert.equal((await s.getAccess(auth)).remaining.pages, null);
   const original = await s.reserve(auth, { requestId: 'message', kind: 'messages' });
   assert.equal(original.duplicate, false);
   const retries = await Promise.all(Array.from({ length: 8 }, () => make().reserve(auth, { requestId: 'message', kind: 'messages' })));
@@ -137,9 +137,9 @@ test('concurrent quota and retry accounting persist across service instances', a
   await assert.rejects(s.release(auth, { requestId: 'message' }), { code: 'chat_reservation_finalized' });
   await s.release(auth, { requestId: 'page-0' });
   assert.equal((await s.release(auth, { requestId: 'page-0' })).duplicate, true);
-  assert.equal((await s.getAccess(auth)).remaining.pages, 1);
+  assert.equal((await s.getAccess(auth)).remaining.pages, null);
   await assert.rejects(s.reserve(auth, { requestId: 'page-0', kind: 'pages' }), { code: 'chat_reservation_finalized', statusCode: 409 });
-  assert.equal((await s.getAccess(auth)).remaining.pages, 1);
+  assert.equal((await s.getAccess(auth)).remaining.pages, null);
   await assert.rejects(s.complete(auth, { requestId: 'page-0', result: {} }), { code: 'chat_reservation_finalized' });
   assert.equal((await s.getAccess(auth)).used.messages, 1);
   const saved = await pg.dumpDataDir();
@@ -198,7 +198,7 @@ test('legacy is explicit, bounded and recorded; owner isolation and validation f
   assert.equal(access.limits, null);
   await s.reserve(auth, { requestId: 'legacy', kind: 'pages', quantity: 200 });
   assert.equal((await pg.query('SELECT COUNT(*) AS n FROM audita_chat_reservations')).rows[0].n, 1);
-  await assert.rejects(s.reserve(auth, { requestId: 'too-big', kind: 'pages', quantity: 201 }), { code: 'chat_invalid_quantity' });
+  await assert.rejects(s.reserve(auth, { requestId: 'too-big', kind: 'pages', quantity: 2147483648 }), { code: 'chat_invalid_quantity' });
   for (const quantity of [0, -1, 1.5, NaN, '1']) await assert.rejects(s.reserve(auth, { requestId: 'bad', kind: 'messages', quantity }), { code: 'chat_invalid_quantity' });
   await assert.rejects(s.reserve(auth, { requestId: '', kind: 'messages' }), { code: 'chat_invalid_identifier' });
   await assert.rejects(s.reserve(auth, { requestId: 'bad', kind: 'tokens' }), { code: 'chat_invalid_kind' });

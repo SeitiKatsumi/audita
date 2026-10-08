@@ -53,9 +53,9 @@ revocation/expiry blocks future work. Renewals create a new non-overlapping peri
 
 ## Accounting and recovery
 
-One successful reply consumes one message; the initial document summary consumes
-pages only. PDF/image page counts and explicit confirmation are enforced on the
-server. Limits: PDF/PNG/JPEG, 12 MB and 20 pages per upload. Documents, extracted
+One successful reply consumes one message; initial document pages are recorded
+without a page quota. PDF/image page counts and explicit confirmation are enforced on the
+server. No file-count or PDF-page cap; content validation and 12 MB per upload remain. Documents, extracted
 context and summaries are encrypted with owner-bound authenticated encryption.
 External queries, certificates, specialized services and professional fees are
 not included; their existing separate authorization and billing remain in place.

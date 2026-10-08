@@ -75,7 +75,9 @@ async function fixture(t) {
   const client = {responses:{create:async request => {
     state.calls.push(request);
     if (state.failure) throw Error('provider secret');
-    return state.response || output(state.pages);
+    const file=request.input[1].content[0].file_data;
+    const count=file?.startsWith('data:application/pdf;')?(await PDFDocument.load(Buffer.from(file.split(',')[1],'base64'))).getPageCount():state.pages;
+    return state.response || output(count);
   }}};
   const options = {getDb:() => ({pool,dbReady:true}),env:{AUDITA_IR_ENCRYPTION_KEY:randomBytes(32).toString('hex')},accessService,client,recordUsage:async () => { state.usage++; }};
   return {pg,pool,state,options,service:createChatDocumentsService(options)};
@@ -86,7 +88,7 @@ test('complimentary access can prepare documents without a page balance, retaini
   options.accessService.getAccess = async () => ({allowed:true,unlimited:true,source:'complimentary',remaining:null});
   const service = createChatDocumentsService(options);
   assert.equal((await service.prepare(auth, await pdf(2))).pages, 2);
-  await assert.rejects(service.prepare(auth, await pdf(21)));
+  assert.equal((await service.prepare(auth, await pdf(21))).pages,21);
 });
 
 test('prepare counts the entire PDF without AI or quota consumption; encrypts private metadata and bytes',async t => {
@@ -94,7 +96,7 @@ test('prepare counts the entire PDF without AI or quota consumption; encrypts pr
   const input = await pdf(20);
   const prepared = await service.prepare(auth,{...input,pages:1});
   assert.equal(prepared.pages,20);
-  assert.equal(prepared.pagesAvailable,20);
+  assert.equal(prepared.pagesAvailable,null);
   assert.equal(state.calls.length,0);assert.equal(state.reservations.size,0);
   const row = (await pg.query('SELECT * FROM audita_chat_documents')).rows[0];
   assert.equal(row.pages,20);
@@ -110,7 +112,6 @@ test('unpaid and exhausted accounts cannot parse or store uploads; insufficient 
   const {service,options,state,pg} = await fixture(t);
   for (const [quota,code] of [
     [{allowed:false,source:'none',remaining:null},'chat_access_required'],
-    [{allowed:true,source:'entitlement',remaining:{pages:0}},'chat_quota_exceeded'],
   ]) {
     const blocked = createChatDocumentsService({...options,accessService:{...options.accessService,getAccess:async () => quota}});
     await assert.rejects(blocked.prepare(auth,{buffer:Buffer.from('not even a PDF'),fileName:'bad.pdf',mimeType:'application/pdf'}),{code});
@@ -118,7 +119,7 @@ test('unpaid and exhausted accounts cannot parse or store uploads; insufficient 
   assert.equal((await pg.query('SELECT COUNT(*) AS n FROM audita_chat_documents')).rows[0].n,0);
   state.balance = 1;
   const prepared = await service.prepare(auth,await pdf(2));
-  assert.equal(prepared.pages,2);assert.equal(prepared.pagesAvailable,1);
+  assert.equal(prepared.pages,2);assert.equal(prepared.pagesAvailable,null);
   await assert.rejects(service.analyze(auth,prepared.id,{confirmed:true}),{code:'chat_quota_exceeded'});
   assert.equal(state.calls.length,0);
 });
@@ -160,7 +161,7 @@ test('owner isolation includes same-tenant peers and administrators; missing DB/
   assert.equal(state.calls.length,0);
 });
 
-test('file boundaries, MIME mismatch, malformed PDFs, page limit and image dimensions are server validated',async t => {
+test('file boundaries, MIME mismatch, malformed PDFs and image dimensions remain validated without a page cap',async t => {
   const {service,state} = await fixture(t);
   const valid = await pdf();
   const bad = [
@@ -170,7 +171,7 @@ test('file boundaries, MIME mismatch, malformed PDFs, page limit and image dimen
     {buffer:Buffer.from([255,216,255,217]),fileName:'bad.jpg',mimeType:'image/jpeg'},
   ];
   for (const input of bad) await assert.rejects(service.prepare(auth,input),{code:'invalid_file'});
-  await assert.rejects(service.prepare(auth,await pdf(21)),{code:'page_limit'});
+  assert.equal((await service.prepare(auth,await pdf(21))).pages,21);
   const image = {buffer:png,fileName:'pixel.png',mimeType:'image/png'};
   assert.equal((await service.prepare(auth,image)).pages,1);
   const bomb = Buffer.from(png);bomb.writeUInt32BE(10001,16);
@@ -226,6 +227,45 @@ test('simultaneous requests and failed quota completion do not repeat AI or refu
   assert.equal(concurrent.filter(r => r.status === 'fulfilled').length,1);
   assert.equal(concurrent.find(r => r.status === 'rejected').reason.code,'document_busy');
   assert.equal(state.calls.length,2);assert.equal(state.balance,18);
+});
+
+test('large PDFs read every batch with paid access, no page quota, and replay without new AI calls',async t=>{
+  const {pg,options,state}=await fixture(t);
+  await pg.exec('ALTER TABLE audita_users ADD COLUMN tenant_id BIGINT DEFAULT 1;');
+  await pg.exec(await readFile(new URL('../db/migrations/20260922-chat-access.sql',import.meta.url),'utf8'));
+  const accessService=createChatAccessService({getDb:options.getDb,now:()=>new Date('2026-10-08')});
+  await accessService.grantPaidAccess({tenantId:1,userId:1,planId:'chat-essential',paymentId:'fictional',periodStart:'2026-10-01',periodEnd:'2026-11-01'});
+  const service=createChatDocumentsService({...options,accessService});
+  const prepared=await service.prepare(auth,await pdf(241));
+  const result=await service.analyze(auth,prepared.id,{confirmed:true});
+  assert.equal(result.extractedPages.length,241);
+  assert.deepEqual(result.extractedPages.map(p=>p.page),Array.from({length:241},(_,i)=>i+1));
+  assert.match(result.summary,/\[p\. 241\]/);
+  assert.equal(state.calls.length,13);
+  assert.equal((await accessService.getAccess(auth)).remaining.pages,null);
+  assert.equal((await accessService.getAccess(auth)).used.messages,0);
+  assert.equal((await accessService.getAccess(auth)).used.pages,241);
+  await service.analyze(auth,prepared.id,{confirmed:true});
+  assert.equal(state.calls.length,13);
+});
+
+test('document migration preserves encrypted rows and a failed later PDF batch cannot publish a partial reading',async t=>{
+  const {pg,options,state}=await fixture(t),service=createChatDocumentsService(options);
+  const existing=await service.prepare(auth,await pdf());
+  const before=(await pg.query('SELECT * FROM audita_chat_documents')).rows;
+  await pg.exec('ALTER TABLE audita_chat_documents DROP CONSTRAINT audita_chat_documents_pages_check; ALTER TABLE audita_chat_documents ADD CONSTRAINT audita_chat_documents_pages_check CHECK(pages BETWEEN 1 AND 20);');
+  await pg.exec(await readFile(new URL('../db/migrations/20260922-chat-documents.sql',import.meta.url),'utf8'));
+  assert.deepEqual((await pg.query('SELECT * FROM audita_chat_documents')).rows,before);
+  assert.equal((await service.prepare(auth,await pdf(21))).pages,21);
+  state.balance=21;const prepared=await service.prepare(auth,await pdf(21));
+  const create=options.client.responses.create;options.client.responses.create=async request=>{
+    if(state.calls.length===1)throw Error('Fictional later batch failure');return create(request);
+  };
+  await assert.rejects(service.analyze(auth,prepared.id,{confirmed:true}),{code:'document_analysis_failed'});
+  await assert.rejects(service.getInput(auth,prepared.id),{code:'analysis_required'});
+  assert.equal(state.balance,21);
+  assert.equal([...state.reservations.values()][0].status,'released');
+  assert.equal((await pg.query('SELECT id FROM audita_chat_documents WHERE id=$1',[existing.id])).rows.length,1);
 });
 
 test('real quota service works with a single-connection pool and never charges a message',async t => {
