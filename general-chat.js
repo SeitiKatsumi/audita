@@ -142,7 +142,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    catch(e){showError(e.message);}
  });
  fileInput.addEventListener('change',e=>{e.stopImmediatePropagation();const next=[...fileInput.files];
-   if(next.some(f=>f.size>12*1024*1024)){showError('Cada arquivo pode ter até 12 MB.');return;}
+   if(next.some(f=>f.size>50*1024*1024)){showError('Cada arquivo pode ter até 50 MB.');return;}
    files.push(...next);showError();render();},true);
  pending.addEventListener('click',e=>{const b=e.target.closest('[data-remove-file]');if(b){e.stopImmediatePropagation();files.splice(Number(b.dataset.removeFile),1);render();}},true);
  for(const id of ['chatNewButton','chatMobileNewButton'])document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();newThread();},true);

@@ -80,3 +80,7 @@ Validação: suíte geral Node/PGlite e testes de pagamento com HMAC, valor inco
 - Descontos 40%/50% e gratuitas para assinantes foram sugestões, sem percentual final; não ativados.
 - Revisada documentação oficial de https://apiv3.directd.com.br/ e https://api.app.directd.com.br/api/Documentation/pesquisa-avancada . Pesquisa Avançada é candidata a consolidar/enriquecer consultas; limites/precificação e compatibilidade devem ser homologados antes de substituir coletores. Não foi encontrado endpoint documentado de recarga automática na documentação consultada; confirmar mecanismo com o fornecedor antes de automatizar financiamento. Nenhuma transferência/recarregamento foi realizado.
 - Envio de link e alinhamento com pessoas mencionados na transcrição permanecem ações de comunicação; nenhum envio feito nesta tarefa.
+
+## Análise opcional após emissão (09/10)
+
+Após coleta, assinantes IA ativos podem informar um objetivo e gerar análise/PDF privado dos documentos obtidos, sem nova consulta ou cobrança. Consentimento e assinatura conferidos no servidor, orçamento de IA respeitado, objetivo integrado ao fingerprint de recuperação. Não gera score genérico para esse objetivo personalizado; score dos demais segmentos permanece. Consulta não inicia IA automaticamente. [Decisões e validação](meeting-20261008.md).

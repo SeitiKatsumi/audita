@@ -41,7 +41,7 @@ assert.ok(['localhost','127.0.0.1'].includes(new URL(base).hostname));
 const pg=new PGlite(); let browser;
 const auth={tenantId:1,user:{id:811,name:'Pessoa Fictícia',role:'member'}};
 let providerCalls=0,aiCalls=0,identityCalls=0,lastId,subscriber=false;
-const issuedPdf=await PDFDocument.create();issuedPdf.addPage().drawText('CERTIDAO FICTICIA - TESTE DE EMISSAO');const issuedBytes=Buffer.from(await issuedPdf.save());
+const issuedPdf=await PDFDocument.create();issuedPdf.addPage().drawText('CERTIDAO FICTICIA - Nada consta no escopo consultado.');const issuedBytes=Buffer.from(await issuedPdf.save({useObjectStreams:false}));
 const source=await readFile(new URL('../server.mjs',import.meta.url),'utf8');
 const paths=['/api/seller-analysis','/api/seller-analysis/coverage'];
 try {
@@ -53,7 +53,7 @@ try {
    querySellerDocument:async input=>{providerCalls++;await new Promise(r=>setTimeout(r,600));if(input.endpoint==='VinculosSocietarios')return {result:{status:'success',payload:{retorno:{documentoConsultado:'52998224725',relacionamentos:[]}}}};if(input.endpoint!=='ProtestosOnline')return {reason:'provider_timeout'};return {result:{status:'success',queriedAt:new Date().toISOString(),providerReference:'fixture',payload:{retorno:{documentoConsultado:'52998224725',constamProtestos:true,numeroTotalProtestos:1,valorTotalProtestos:'R$ 1.250,00'}}}};},
    onSellerCollected:(id,a,request)=>review.start(id,a,request,true),logError:()=>{},
  });
- review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService:audit,ai:{ready:()=>true,read:async source=>{aiCalls++;await new Promise(r=>setTimeout(r,2500));const company=source.title.includes('cadastro e QSA'),links=source.title.includes('Vínculos');return {summary:company?'Cadastro empresarial e QSA obtidos.':links?'Não foram identificadas empresas vinculadas no retorno.':'Há um protesto informado pela fonte.',identity:'compatible',outcome:company||links?'informational':'occurrences',issuedAt:null,validUntil:null,limitations:[],findings:company||links?[]:[{category:'credit',priority:'high',title:'Protesto informado',description:'Conferir valor e eventual baixa com o cartório.',quote:'R$ 1.250,00',amount:'R$ 1.250,00',date:null,recommendation:'Solicitar a certidão atualizada e o comprovante de baixa.'}]};}}});
+ review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService:audit,readPdf:async()=>issuedBytes,getAnalysisAccess:async()=>subscriber,ai:{ready:()=>true,read:async source=>{aiCalls++;await new Promise(r=>setTimeout(r,2500));const company=source.title.includes('cadastro e QSA'),links=source.title.includes('Vínculos'),certificate=source.title.includes('Cível');return {summary:certificate?'Nada consta no escopo consultado.':company?'Cadastro empresarial e QSA obtidos.':links?'Não foram identificadas empresas vinculadas no retorno.':'Há um protesto informado pela fonte.',identity:'compatible',outcome:certificate?'no_occurrence_in_scope':company||links?'informational':'occurrences',issuedAt:null,validUntil:null,limitations:[],findings:company||links||certificate?[]:[{category:'credit',priority:'high',title:'Protesto informado',description:'Conferir valor e eventual baixa com o cartório.',quote:'R$ 1.250,00',amount:'R$ 1.250,00',date:null,recommendation:'Solicitar a certidão atualizada e o comprovante de baixa.'}]};}}});
  const paymentEnv={AUDITA_PROFILE_ENCRYPTION_KEY:'fictional-ui-certificate-key-at-least-32-characters',AUDITA_BILLING_ENABLED:'true',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:'whsec_fixture',APP_URL:base};
  let orderService;
  const stripe=createStripeBillingService({env:paymentEnv,getDb:()=>({pool:pg,dbReady:true}),onCertificatePaymentEvent:event=>orderService.paymentEvent(event),fetchImpl:async()=>new Response(JSON.stringify({id:'cs_ui_fixture',url:'https://checkout.stripe.com/c/pay/fictional-ui-fixture'}),{status:200})});
@@ -94,6 +94,7 @@ try {
    if(path.includes('/documents/tjdft/'))return route.fulfill({status:200,headers:{'content-type':'application/pdf'},body:issuedBytes});
    if(path.startsWith('/audit/'))return route.fulfill({json:await audit.findAudit(path.split('/')[2],{})});
    if(path.startsWith('/api/'))return route.fulfill({json:path.endsWith('/cases')?{cases:[]}:{}});
+   if(serveOnly&&/^\/[\w/.-]+\.(js|css|svg|png)$/.test(path)&&!path.includes('..'))return route.fulfill({status:200,headers:{'content-type':path.endsWith('.js')?'text/javascript':path.endsWith('.css')?'text/css':path.endsWith('.svg')?'image/svg+xml':'image/png'},body:await readFile(new URL('../'+path.slice(1),import.meta.url))});
    return route.continue();
  };
  httpServer=createServer(async(req,res)=>{

@@ -9,7 +9,7 @@ const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": 
 const DRAFT_PREFIX = "audita:chat-checkout:";
 
 // requestLogin(message, resume) must call resume after getAuthState() reflects login.
-// prepareDocument resolves the server's analyzed document, or null on cancellation.
+// Sending a message authorizes the initial reading; no per-file confirmation.
 export function initChatSubscription({ getAuthState, requestLogin }) {
   const input = document.querySelector("#chatInput");
   const form = document.querySelector("#chatForm");
@@ -29,14 +29,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       <p><strong>Uso individual, sem compartilhamento.</strong> Planos mensais renovam no anivers\u00e1rio da contrata\u00e7\u00e3o. Saldos n\u00e3o acumulam entre per\u00edodos e n\u00e3o h\u00e1 cobran\u00e7a autom\u00e1tica por excedentes. Experimente: compra \u00fanica, sem renova\u00e7\u00e3o.</p>
     </section>
     <footer><button type="button" data-test-access hidden>Liberar acesso de teste (sem cobrança)</button><button type="button" data-refresh>Atualizar acesso</button><button type="button" data-manage hidden>Gerenciar assinatura</button></footer>`;
-  const documentDialog = document.createElement("dialog");
-  documentDialog.id = "chatDocumentDialog";
-  documentDialog.className = "chat-subscription-dialog chat-document-dialog";
-  documentDialog.setAttribute("aria-labelledby", "chatDocumentTitle");
-  documentDialog.innerHTML = `<header><h2 id="chatDocumentTitle">Confirmar an\u00e1lise</h2><button type="button" data-close aria-label="Fechar documento" title="Fechar">&#215;</button></header>
-    <p data-document-name></p><p data-document-pages></p><p data-document-error role="alert"></p>
-    <footer><button type="button" data-cancel>Cancelar</button><button type="button" data-analyze>Analisar documento</button></footer>`;
-  document.body.append(dialog, documentDialog);
+  document.body.append(dialog);
   const quota = document.createElement("section");
   quota.className = "chat-quota chat-quota-inline";
   quota.setAttribute("aria-label", "Cotas restantes");
@@ -51,8 +44,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   const cards = dialog.querySelector(".chat-subscription-plans");
   let access = null, catalog = null, billing = null;
   let owner = userId(), revision = 0, loaded = false, busy = false, loading = null;
-  let pendingPlan = null, checkoutRequest = null, documentBusy = false, documentResolve = null;
-  let prepared = null, analysisRequestId = null, destroyed = false;
+  let pendingPlan = null, checkoutRequest = null, documentBusy = false, destroyed = false;
   let checkoutReturn = new URLSearchParams(location.search).get("chat_checkout");
   let confirmationTimer = null, confirmationAttempts = 0;
 
@@ -62,6 +54,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   }
   function allowed(kind = "messages") {
     return Boolean(owner && owner === userId() && loaded && access?.active === true &&
+      (!access.cost || (!access.cost.unpriced && access.cost.remainingCents > 0)) &&
       (kind === "pages" || Number(access.remaining?.[kind]) > 0 || ((access.legacy === true || access.test === true || access.unlimited === true) && access.remaining?.[kind] == null)));
   }
   async function request(url, body) {
@@ -75,8 +68,9 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
         chat_experiment_already_used: "O plano Experimente já foi utilizado nesta conta. Escolha um plano mensal.",
         chat_checkout_pending: "Existe um checkout pendente. Retome o plano escolhido ou tente novamente após a expiração.",
       }[data.error] : null;
-      const error = new Error(checkoutMessage || (response.status === 401 ? "Entre novamente para continuar." : response.status === 413
-        ? "O arquivo excede o limite de 12 MB." : [402, 429].includes(response.status)
+      const costMessage = {chat_cost_budget_exceeded:'Limite de processamento do período atingido. Aguarde a renovação ou contate o suporte.',chat_cost_unavailable:'Não foi possível conferir o consumo. Atualize o acesso ou contate o suporte.'}[data.error];
+      const error = new Error(checkoutMessage || costMessage || (response.status === 401 ? "Entre novamente para continuar." : response.status === 413
+        ? "O arquivo excede o limite de 50 MB." : [402, 429].includes(response.status)
           ? "Saldo insuficiente. Confira seu plano e o consumo." : "N\u00e3o foi poss\u00edvel concluir. Tente novamente."));
       error.status = response.status;
       throw error;
@@ -113,6 +107,8 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     const focusedPlan = cards.contains(document.activeElement) ? document.activeElement.dataset.plan : null;
     const text = accessText();
     dialog.querySelector("[data-access]").textContent = text;
+    if(access?.cost?.remainingCents===0) dialog.querySelector("[data-access]").textContent += " · Limite de processamento do período atingido. Aguarde a renovação ou contate o suporte.";
+    if(access?.cost?.unpriced) dialog.querySelector("[data-access]").textContent += " · Não foi possível conferir o consumo. Atualize o acesso ou contate o suporte.";
     const quotaHtml = owner && owner === userId() && loaded && access?.active ? [["messages", "Mensagens"], ["pages", "P\u00e1ginas"]].map(([kind, label]) => {
       const limit = access.limits?.[kind], remaining = access.remaining?.[kind];
       if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(remaining)) return "";
@@ -260,6 +256,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   async function ensureAccess(kind = "messages") {
     await refresh();
     if (allowed(kind)) return true;
+    if(access?.cost?.unpriced) notice.textContent="Não foi possível conferir o consumo de processamento. Atualize o acesso ou contate o suporte.";
     open();
     return false;
   }
@@ -285,8 +282,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       loaded = false;
       checkoutRequest = null;
       if (previous) { input.value = ""; pendingPlan = null; purgeDrafts(); }
-      finishDocument(null);
-      if (documentDialog.open) documentDialog.close();
+      documentBusy = false;
       restoreDraft();
     }
     await refresh();
@@ -361,17 +357,10 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       if (version === revision && account === userId()) notice.textContent = error.message;
     } finally { busy = false; render(); }
   }
-  function finishDocument(value) {
-    const resolve = documentResolve;
-    documentResolve = null;
-    prepared = null;
-    documentBusy = false;
-    resolve?.(value);
-  }
   async function prepareDocument(file) {
-    if (documentBusy || documentResolve) throw new Error("Aguarde o documento atual.");
-    if (!file || !(/\.(pdf|png|jpe?g|txt|md|csv|json|html|docx|xlsx)$/i.test(file.name))) throw new Error("Use PDF, fotos, texto, Word ou Excel.");
-    if (!file.size || file.size > 12 * 1024 * 1024) throw new Error(file.size ? "O arquivo excede o limite de 12 MB." : "O arquivo est\u00e1 vazio.");
+    if (documentBusy) throw new Error("Aguarde o documento atual.");
+    if (!file || !(/\.(pdf|png|jpe?g|txt|md|csv|json|html|docx|xlsx|wav|mp3|webm|m4a|mp4)$/i.test(file.name))) throw new Error("Use PDF, fotos, texto, Word, Excel ou áudio.");
+    if (!file.size || file.size > 50 * 1024 * 1024) throw new Error(file.size ? "O arquivo excede o limite de 50 MB." : "O arquivo está vazio.");
     documentBusy = true;
     const version = revision, account = userId();
     try {
@@ -379,65 +368,23 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       const contentBase64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result).split(",")[1]);
-        reader.onerror = () => reject(new Error("N\u00e3o foi poss\u00edvel ler o arquivo."));
+        reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
         reader.readAsDataURL(file);
       });
       if (version !== revision || account !== userId()) return null;
       const result = await request("/api/chat/documents/prepare", { fileName: file.name, mimeType: file.type, contentBase64 });
       if (version !== revision || account !== userId()) return null;
-      prepared = result.document;
-      if (!prepared?.id || !Number.isInteger(prepared.pages) || prepared.pages <= 0) throw new Error("Contagem de p\u00e1ginas indispon\u00edvel. Nenhuma an\u00e1lise foi solicitada.");
-      analysisRequestId = crypto.randomUUID();
-      documentDialog.querySelector("[data-document-name]").textContent = file.name;
-      documentDialog.querySelector("[data-document-pages]").textContent = `${prepared.pages} página(s) de leitura. Sem limite de páginas e sem desconto de saldo.`;
-      documentDialog.querySelector("[data-document-error]").textContent = "";
-      documentDialog.querySelector("[data-analyze]").disabled = false;
-      documentDialog.querySelector("[data-analyze]").textContent = "Analisar documento";
-      documentDialog.removeAttribute("aria-busy");
-      for (const button of documentDialog.querySelectorAll("[data-close], [data-cancel]")) button.disabled = false;
-      if (dialog.open) dialog.close();
-      documentDialog.showModal();
-      return new Promise(resolve => { documentResolve = resolve; });
+      const prepared = result.document;
+      if (!prepared?.id || !Number.isInteger(prepared.pages) || prepared.pages <= 0) throw new Error("Contagem de páginas indisponível.");
+      const analyzed = await request(`/api/chat/documents/${encodeURIComponent(prepared.id)}/analyze`, { confirmed: true, requestId: crypto.randomUUID() });
+      if (version !== revision || account !== userId()) return null;
+      if (!analyzed.document?.id) throw new Error("Resultado da análise indisponível.");
+      return analyzed.document;
     } catch (error) {
       if (version !== revision || account !== userId()) return null;
       if (handleAccessError(error.status)) return null;
       throw error;
     } finally { if (version === revision) documentBusy = false; }
-  }
-  async function analyze() {
-    if (documentBusy || !prepared || !documentResolve) return;
-    documentBusy = true;
-    const version = revision, account = userId();
-    const button = documentDialog.querySelector("[data-analyze]");
-    button.disabled = true;
-    button.textContent = "Analisando...";
-    documentDialog.setAttribute("aria-busy", "true");
-    for (const cancel of documentDialog.querySelectorAll("[data-close], [data-cancel]")) cancel.disabled = true;
-    documentDialog.querySelector("[data-document-error]").textContent = "";
-    try {
-      const result = await request(`/api/chat/documents/${encodeURIComponent(prepared.id)}/analyze`, { confirmed: true, requestId: analysisRequestId });
-      if (version !== revision || account !== userId()) return;
-      if (!result.document?.id) throw new Error("Resultado da an\u00e1lise indispon\u00edvel. Tente novamente.");
-      finishDocument(result.document);
-      documentDialog.close();
-      await refresh();
-    } catch (error) {
-      if (version !== revision || account !== userId()) return;
-      documentDialog.querySelector("[data-document-error]").textContent = error.message;
-      if ([402, 429].includes(error.status)) {
-        finishDocument(null);
-        documentDialog.close();
-        handleAccessError(error.status);
-      } else if ([401, 403].includes(error.status)) { access = null; void refresh(); }
-    } finally {
-      if (version === revision) {
-        documentBusy = false;
-        button.disabled = false;
-        button.textContent = "Analisar documento";
-        documentDialog.removeAttribute("aria-busy");
-        for (const cancel of documentDialog.querySelectorAll("[data-close], [data-cancel]")) cancel.disabled = false;
-      }
-    }
   }
   function gate(event) {
     const target = event.target;
@@ -445,13 +392,13 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     const matched = (target === input && ["beforeinput", "paste"].includes(event.type)) ||
       (event.type === "keydown" && target === input && event.key === "Enter" && !event.shiftKey) ||
       (event.type === "submit" && target === form) || (event.type === "click" && (attachment || target.closest?.("#chatSendButton, [data-chat-prompt]")));
-    if (!matched || allowed(attachment ? "pages" : "messages")) return;
+    if (!matched || !loaded || loading || allowed(attachment ? "pages" : "messages")) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     open();
   }
   function listen(target, name, callback, capture = false) { target.addEventListener(name, callback, { capture, signal: events.signal }); }
-  for (const modal of [dialog, documentDialog]) listen(modal, "keydown", event => {
+  for (const modal of [dialog]) listen(modal, "keydown", event => {
     if (event.key !== "Tab") return;
     const buttons = [...modal.querySelectorAll("button:not(:disabled)")].filter(button => button.getClientRects().length);
     const first = buttons[0], last = buttons.at(-1);
@@ -475,19 +422,15 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
   listen(manage, "click", () => void checkout(null, true));
   listen(dialog.querySelector('[data-test-access]'), 'click', () => void enableTestAccess());
   listen(cards, "click", event => { const button = event.target.closest("[data-plan]"); if (button && !button.disabled) void checkout(button.dataset.plan); });
-  listen(documentDialog.querySelector("[data-analyze]"), "click", () => void analyze());
-  for (const selector of ["[data-close]", "[data-cancel]"]) listen(documentDialog.querySelector(selector), "click", () => { if (!documentBusy) documentDialog.close(); });
-  listen(documentDialog, "cancel", event => { if (documentBusy) event.preventDefault(); });
-  listen(documentDialog, "close", () => { if (!documentDialog.open) finishDocument(null); });
   listen(window, "audita:auth-changed", () => void onAuthChanged());
   listen(window, "pageshow", () => void refresh());
   listen(document, "visibilitychange", () => { if (!document.hidden) void refresh(); });
   restoreDraft();
   render();
-  if (checkoutReturn) open();
+  if (checkoutReturn) void refresh().then(() => { if (checkoutReturn && !destroyed) open(); });
   else void refresh();
   return { open, refresh, ensureAccess, onAuthChanged, handleAccessError, prepareDocument, analyzeDocument: prepareDocument,
     getAccess: () => owner === userId() ? access : null,
-    destroy() { destroyed = true; clearTimeout(confirmationTimer); revision++; events.abort(); finishDocument(null); dialog.remove(); documentDialog.remove(); quota.remove(); },
+    destroy() { destroyed = true; clearTimeout(confirmationTimer); revision++; events.abort(); dialog.remove(); quota.remove(); },
   };
 }

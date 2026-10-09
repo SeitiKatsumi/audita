@@ -83,6 +83,22 @@ async function fixture(t) {
   return {pg,pool,state,options,service:createChatDocumentsService(options)};
 }
 
+test('audio is encrypted, transcribed once and supplied to the conversation as text; invalid media is rejected',async t=>{
+  const f=await fixture(t);
+  const wav=Buffer.alloc(52);wav.write('RIFF');wav.writeUInt32LE(44,4);wav.write('WAVE',8);wav.write('fmt ',12);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(8,40);
+  let calls=0,usage;
+  f.options.recordUsage=async event=>{usage=event;};
+  f.options.client.audio={transcriptions:{create:async()=>{calls++;return {text:'Olá, explique os documentos.',usage:{type:'duration',seconds:2}};}}};
+  const service=createChatDocumentsService(f.options);
+  const prepared=await service.prepare(auth,{fileName:'voz-ficticia.wav',mimeType:'audio/wav',buffer:wav});
+  await service.analyze(auth,prepared.id,{confirmed:true});
+  await service.analyze(auth,prepared.id,{confirmed:true});
+  const input=await service.getInput(auth,prepared.id);
+  assert.equal(calls,1);assert.equal(input.mime,'text/plain');assert.equal(input.buffer.toString(),'Olá, explique os documentos.');
+  assert.equal(usage.quantity,2);assert.equal(usage.actualCost,2*.0045/60);
+  await assert.rejects(service.prepare(auth,{fileName:'fake.mp3',mimeType:'audio/mpeg',buffer:Buffer.from('not audio')}),{code:'invalid_file'});
+});
+
 test('complimentary access can prepare documents without a page balance, retaining file limits', async t => {
   const {options} = await fixture(t);
   options.accessService.getAccess = async () => ({allowed:true,unlimited:true,source:'complimentary',remaining:null});

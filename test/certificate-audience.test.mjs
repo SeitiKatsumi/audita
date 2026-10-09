@@ -11,7 +11,7 @@ test('audience link opens a native dialog without submitting or changing selecti
   assert.match(html, /id="certificateAudienceDialog" aria-labelledby="certificateAudienceTitle"/);
   const markup=html.match(/<dialog[^>]*id="certificateAudienceDialog"[\s\S]*?<\/dialog>/)[0];
   assert.match(markup,/method="dialog"/);
-  assert.match(markup,/não inclui análise por IA/);
+  assert.match(markup,/assinantes IA podem solicitar uma análise personalizada/);
   const events={};let focused=false,opened=0;
   const trigger={addEventListener:(event,fn)=>events[event]=fn,focus:()=>{focused=true;}};
   const dialog={open:false,showModal(){this.open=true;opened++;},addEventListener:(event,fn)=>events[event]=fn};

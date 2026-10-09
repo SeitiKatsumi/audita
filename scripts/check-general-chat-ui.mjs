@@ -43,7 +43,7 @@ const sdk={responses:{create:async(payload,options={})=>{
    yield {type:'response.output_text.delta',delta:answer.slice(12)};
    yield {type:'response.completed',response:{status:'completed',output_text:answer,output,usage:{input_tokens:20,output_tokens:10}}};
  })();
-}},files:{create:async()=>({id:'file-'+randomUUID()}),delete:async()=>{}},containers:{files:{content:{retrieve:async id=>new Response(artifactBytes[id])}}}};
+}},audio:{transcriptions:{create:async()=>({text:'Áudio fictício: explique os documentos.',usage:{type:'duration',seconds:3}})}},files:{create:async()=>({id:'file-'+randomUUID()}),delete:async()=>{}},containers:{files:{content:{retrieve:async id=>new Response(artifactBytes[id])}}}};
 try{
  await pg.exec('CREATE TABLE audita_tenants(id BIGINT PRIMARY KEY); CREATE TABLE audita_users(id BIGINT PRIMARY KEY,tenant_id BIGINT); INSERT INTO audita_tenants VALUES(1),(2); INSERT INTO audita_users VALUES(811,1),(812,1);');
  for(const name of ['20260922-chat-access.sql','20260922-chat-documents.sql'])await pg.exec(await readFile(new URL('../db/migrations/'+name,import.meta.url),'utf8'));
@@ -69,7 +69,7 @@ try{
  server=createServer(async(req,res)=>{
    try{
      const path=new URL(req.url,'http://localhost').pathname;httpCalls.push(path);
-     if(path.startsWith('/api/chat')){let body='';for await(const part of req)body+=part;req.body=body;await sandbox.handle(path,req,res);return;}
+     if(path.startsWith('/api/chat')){if(path==='/api/chat/access'&&process.argv.includes('--paid'))await new Promise(r=>setTimeout(r,1500));let body='';for await(const part of req)body+=part;req.body=body;await sandbox.handle(path,req,res);return;}
      if(path.startsWith('/api/')||path==='/audit'){
        const data=path==='/api/auth/me'?{authRequired:true,user:auth.user}:path==='/api/billing/plans'?{plans:[],chatPlans:CHAT_PLANS,chatTestBypassAvailable:true}:
          path==='/api/billing/subscription'?{subscription:{planId:'standard',status:'active'}}:path.endsWith('/cases')?{cases:[]}:{};
@@ -81,7 +81,8 @@ try{
  });
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  if(process.argv.includes('--serve')){
-   await fetch(base+'/api/chat/test-access',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
+   if(process.argv.includes('--paid'))await access.grantPaidAccess({tenantId:1,userId:811,planId:'chat-experiment',paymentId:'pi_fictional_ui',periodStart:new Date(),periodEnd:new Date(Date.now()+30*86400000)});
+   else await fetch(base+'/api/chat/test-access',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
    console.log('Fictional chat fixture for browser validation: '+base+'/#chat');
    await new Promise(()=>{});
  }
@@ -129,8 +130,7 @@ try{
  assert.equal(await page.locator('#chatMessages form').count(),0);assert.ok(!httpCalls.some(p=>p.startsWith('/api/itau')||p.startsWith('/api/seller-analysis/df')));
  await page.locator('#chatAttachment').setInputFiles([{name:'documento.pdf',mimeType:'application/pdf',buffer:pdfBytes},{name:'dados.csv',mimeType:'text/csv',buffer:Buffer.from('item,valor\nTeste,100')}]);
  await input.fill('Compare os dois arquivos');await send.click();
- for(const name of ['documento.pdf','dados.csv']){await page.locator('#chatDocumentDialog[open] [data-document-name]').filter({hasText:name}).waitFor();assert.ok((await page.locator('#chatDocumentDialog [data-document-pages]').innerText()).includes('sem desconto de saldo'));await page.locator('#chatDocumentDialog [data-analyze]').click();}
- await page.locator('#chatDocumentDialog').waitFor({state:'hidden'});
+ assert.equal(await page.locator('#chatDocumentDialog').count(),0,'attachments are read after Send, without a second confirmation');
  await page.waitForFunction(()=>document.querySelector('#chatStopButton').hidden);
  const payload=captures.at(-1);assert.equal(payload.input.at(-1).content.filter(p=>p.type==='input_file').length,1);assert.ok(payload.input.at(-1).content.some(p=>p.text?.includes('item,valor')));
  slowStarted=new Promise(r=>slowReady=r);await input.fill('Faça uma tarefa demorada');await send.click();await slowStarted;await page.locator('#chatStopButton').click();await page.waitForFunction(()=>document.querySelector('#chatStopButton').hidden);
