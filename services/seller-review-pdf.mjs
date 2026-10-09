@@ -4,7 +4,7 @@ import { getAnalysisSegment } from '../analysis-segments.js';
 const category = { fiscal: 'Fiscal e tributário', judicial: 'Judicial', labor: 'Trabalhista', credit: 'Crédito e protestos', company: 'Empresas relacionadas', identity: 'Identificação', other: 'Outros' };
 export async function sellerReportPdf(report) {
   const pdf = await PDFDocument.create();
-  const segment = getAnalysisSegment(report.segment) || getAnalysisSegment();
+  const segment = report.purpose ? {title:report.title,scope:report.scopeNotice} : getAnalysisSegment(report.segment) || getAnalysisSegment();
   const font = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   pdf.setTitle(segment.title); pdf.setAuthor('Audita');
   let page, y;
@@ -32,6 +32,7 @@ export async function sellerReportPdf(report) {
     function draw(line) { if(y < 65) next(); page.drawText(line,{x:44,y,font:face,size,color:ink}); y-=15; }
   }
   text('Relatório de análise documental', true);
+  if(report.purpose) text('Objetivo da análise: '+report.purpose);
   text(`${report.subject.name}\nDocumento: ${report.subject.document}\nConsulta: ${report.id}\nGerado em: ${new Date(report.generatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})} (Brasília)`);
   text('Resumo da análise',true);
   text(report.executiveSummary || report.conclusion);

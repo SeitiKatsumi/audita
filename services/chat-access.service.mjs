@@ -36,7 +36,7 @@ function reservation(row, duplicate = false) {
 }
 
 // Grant/revoke methods are trusted billing primitives, not public HTTP handlers.
-export function createChatAccessService({ getDb, now = () => new Date(), getLegacyAccess = async () => false,
+export function createChatAccessService({ getDb, now = () => new Date(), getLegacyAccess = async () => false, getCost,
   testBypassEnabled = false,
   maxReservationQuantity = { messages: 1, pages: 2147483647 } } = {}) {
   // ponytail: test grants belong to this process; reenable after restart, shared storage only if testing multiple replicas.
@@ -82,8 +82,11 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
     if (row) {
       testOwners.delete(ids.join(':'));
       const used = await usage(db, ids, row.id), limits = LIMITS[row.plan_id];
+      const spend=getCost?await getCost(db,auth,row):null;
+      const budget=CHAT_PLANS.find(plan=>plan.id===row.plan_id).price.cents/2;
+      const cost=spend?{...spend,limitCents:Math.floor(budget),remainingCents:Math.max(0,Math.floor(budget-spend.usedCents))}:null;
       return { allowed: true, active: true, source: 'entitlement', ...entitlement(row), limits, used,
-        remaining: { messages: limits.messages - used.messages, pages: null } };
+        remaining: { messages: limits.messages - used.messages, pages: null },...(cost?{cost}:{}) };
     }
     if (includeTestAccess && testBypassEnabled === true && testOwners.has(ids.join(':'))) {
       return { allowed: true, active: true, source: 'test', planId: null, limits: null, used: null, remaining: null };
@@ -156,6 +159,8 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
       }
       const allowed = await access(db, ids, auth);
       check(allowed.allowed, 'chat_access_required', 403);
+      check(!allowed.cost||allowed.cost.unpriced===0,'chat_cost_unavailable',503);
+      check(!allowed.cost||allowed.cost.remainingCents>0,'chat_cost_budget_exceeded',429);
       check(kind==='pages' || !allowed.remaining || quantity <= allowed.remaining[kind], 'chat_quota_exceeded', 429);
       const row = (await db.query(`INSERT INTO audita_chat_reservations
         (tenant_id,user_id,request_id,entitlement_id,kind,quantity) VALUES($1,$2,$3,$4,$5,$6) RETURNING *`,
@@ -194,7 +199,13 @@ export function createChatAccessService({ getDb, now = () => new Date(), getLega
       return { revoked: result.rows.length };
     });
   }
-  return { grantPaidAccess, getAccess, enableTestAccess, reserve,
+  async function assertCanSpend(auth) {
+    const allowed=await getAccess(auth);
+    check(allowed.allowed,'chat_access_required',403);
+    check(!allowed.cost||!allowed.cost.unpriced,'chat_cost_unavailable',503);
+    check(!allowed.cost||allowed.cost.remainingCents>0,'chat_cost_budget_exceeded',429);
+  }
+  return { grantPaidAccess, getAccess, enableTestAccess, reserve, assertCanSpend,
     complete: (auth, input) => finish(auth, input, 'completed'),
     release: (auth, input) => finish(auth, input, 'released'),
     revokeSubscription: input => revoke(input, 'subscription'), revokePayment: input => revoke(input, 'payment') };

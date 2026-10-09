@@ -9,7 +9,7 @@ const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
 test('completed seller reports show numeric score, all three bands and the private PDF link; unfinished reviews do not show a score', () => {
   const code=appJs.slice(appJs.indexOf('function renderSellerReview('),appJs.indexOf('function validateCnibDocument('));
-  const context=vm.createContext({escapeHtml:value=>String(value)});
+  const context=vm.createContext({escapeHtml:value=>String(value),isCertificateOnly:()=>false});
   vm.runInContext(code,context);
   for(const [value,band] of [[100,'green'],[70,'yellow'],[40,'red'],[null,'yellow']]) {
     const target={innerHTML:'',querySelector:()=>null};
@@ -152,7 +152,7 @@ test("seller results preserve every source, private PDF indices and pending quer
   assert.match(result.innerHTML, /3\/4 resultados · 2 PDFs/);
   context.isCertificateOnly=()=>true;
   context.renderSellerAnalysisResult(audit);
-  assert.doesNotMatch(result.innerHTML,/sellerReviewPanel/);
+  assert.match(result.innerHTML,/sellerReviewPanel/,'certificate results provide the optional analysis panel without starting AI');
   assert.match(result.innerHTML,/documents\/tjdft\/0/);
   assert.match(result.innerHTML,/documents\/seller_sources\/2/);
 });

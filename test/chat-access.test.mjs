@@ -36,6 +36,23 @@ async function fixture(t, options = {}) {
     setTime: value => { clock = value; } };
 }
 
+test('50 percent processing guard blocks new work, not replay; renewals use their own spend and test grants stay scoped',async t=>{
+  let usedCents=0,unpriced=0;
+  const {service}=await fixture(t,{getCost:async()=>({usedCents,unpriced})});
+  await service.grantPaidAccess(invoice());
+  const held=await service.reserve(auth,{requestId:'first-cost-check',kind:'messages'});
+  assert.equal(held.duplicate,false);
+  assert.equal((await service.getAccess(auth)).cost.limitCents,2495);
+  usedCents=2495;
+  assert.equal((await service.reserve(auth,{requestId:'first-cost-check',kind:'messages'})).duplicate,true);
+  await assert.rejects(service.reserve(auth,{requestId:'over-budget',kind:'messages'}),{code:'chat_cost_budget_exceeded'});
+  await assert.rejects(service.assertCanSpend(auth),{code:'chat_cost_budget_exceeded'});
+  usedCents=0;unpriced=1;
+  await assert.rejects(service.reserve(auth,{requestId:'unpriced',kind:'pages'}),{code:'chat_cost_unavailable'});
+  unpriced=0;
+  await service.assertCanSpend(auth);
+});
+
 test('permanent complimentary access survives restart, overrides exhausted quotas and remains user scoped', async t => {
   const previous = process.env.AUDITA_UNLIMITED_ACCESS_EMAILS;
   process.env.AUDITA_UNLIMITED_ACCESS_EMAILS = 'approved@example.test';

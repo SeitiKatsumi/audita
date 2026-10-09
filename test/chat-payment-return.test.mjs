@@ -4,6 +4,15 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
 const js = await readFile(new URL('../chat-subscription.js', import.meta.url), 'utf8');
+test('typing during access loading never opens a false paywall; loaded denial still gates', () => {
+  let opened=0,prevented=0;
+  const input={closest:()=>null},context={input,form:{},loaded:false,loading:Promise.resolve(),allowed:()=>true,open:()=>opened++};
+  runInNewContext(js.slice(js.indexOf('  function gate(event)'),js.indexOf('  function listen('))+'; this.gate=gate;',context);
+  const event={target:input,type:'beforeinput',preventDefault:()=>prevented++,stopImmediatePropagation(){}};
+  context.gate(event);assert.equal(opened,0);assert.equal(prevented,0);
+  context.loaded=true;context.loading=null;context.gate(event);assert.equal(opened,0);
+  context.allowed=()=>false;context.gate(event);assert.equal(opened,1);assert.equal(prevented,1);
+});
 function fixture() {
   let next = { active: true, test: true }, fail = false, queued = null, reads = 0;
   const context = {
@@ -69,7 +78,7 @@ test('cancelled, unrelated, logged-out and destroyed returns do not poll', async
 test('only the chat-specific return parameter opens confirmation; cleanup cancels timers', () => {
   assert.match(js, /get\("chat_checkout"\)/);
   assert.doesNotMatch(js, /get\("checkout"\)/);
-  assert.match(js, /if \(checkoutReturn\) open\(\)/);
+  assert.match(js, /if \(checkoutReturn\) void refresh\(\)\.then/);
   assert.match(js, /destroy\(\) \{ destroyed = true; clearTimeout\(confirmationTimer\)/);
   assert.match(js, /if \(previous\) checkoutReturn = null/);
 });

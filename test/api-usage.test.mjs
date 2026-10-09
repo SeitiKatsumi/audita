@@ -3,10 +3,29 @@ import test from "node:test";
 
 import {
   DEFAULT_API_PRICING,
+  defaultChatPricing,
   createApiUsageService,
   estimateApiUsageCost,
   extractOpenAIUsage,
 } from "../services/api-usage.service.mjs";
+
+test('paid chat cost uses default model prices, long-context rates and owner/period-scoped usage; unknown prices stay visible', async () => {
+  const pricing=defaultChatPricing('gpt-6-luna');
+  assert.equal(estimateApiUsageCost({inputUnits:100000,outputUnits:1000},pricing),.0105);
+  assert.equal(estimateApiUsageCost({inputUnits:300000,outputUnits:1000},pricing),.06075);
+  let params;
+  const db={query:async(sql,values)=>{assert.match(sql,/tenant_id=\$1 AND user_id=\$2/);assert.match(sql,/created_at >= \$3 AND created_at < \$4/);params=values;return {rows:[
+    {model:'gpt-6-luna',service:'responses',input_units:100000,output_units:1000,currency:'USD'},
+    {actual_cost:2,currency:'BRL'},
+    {model:'unknown',service:'responses',currency:'USD'},
+    {model:'gpt-6-luna',service:'transcriptions',currency:'USD'},
+  ]};}};
+  const service=createApiUsageService(),period={period_start:'2026-10-01',period_end:'2026-11-01'};
+  const result=await service.getChatBudget(db,{tenantId:1,user:{id:2}},period);
+  assert.deepEqual(params,[1,2,period.period_start,period.period_end]);
+  assert.equal(result.unpriced,2);
+  assert.equal(result.usedCents,Math.ceil((2+.0105*result.usdBrl)*100));
+});
 
 test("extracts aggregated OpenAI agent usage including cached input", () => {
   const usage = extractOpenAIUsage({

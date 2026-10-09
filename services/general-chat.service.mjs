@@ -85,6 +85,11 @@ export function createGeneralChatService({storage,documents,recordUsage=async()=
        if(['response.failed','response.incomplete','error'].includes(event.type))throw Object.assign(new Error('chat_incomplete'),{code:'chat_incomplete',statusCode:502});
      }
      chatCheck(response?.status==='completed','chat_incomplete',502);
+     const toolCalls=(response.output||[]).filter(i=>i.type.endsWith('_call'));
+     // ponytail: sessions and images without usage use conservative allowances, not invoiced cost.
+     const toolCostUsd=toolCalls.reduce((cost,item)=>cost+(item.type==='web_search_call'?.01:item.type==='code_interpreter_call'?.03:item.type==='image_generation_call'?(item.usage?.output_tokens?item.usage.output_tokens*.00003+Number(item.usage.input_tokens||0)*.000008:1):0),0);
+     const usage={...extractOpenAIUsage(response),metadata:{tools:toolCalls.map(i=>i.type),toolCostUsd}};
+     await recordUsage(usage,auth,model);
      const artifacts=[],sources=[];
      const addSource=s=>{if(safeUrl(s.url)&&!sources.some(x=>x.url===s.url))sources.push({name:String(s.title||s.name||s.url).slice(0,180),url:s.url});};
      for(const item of response.output||[]) {
@@ -108,13 +113,12 @@ export function createGeneralChatService({storage,documents,recordUsage=async()=
      answer=answer.replace(/【[^】]+】|cite[^]+/g,'').replace(/\[([^\]]+)\]\(sandbox:[^)]+\)/g,'$1');
      const now=new Date().toISOString();
      signal.throwIfAborted();
-     const result={answer,model,sources,artifacts,actions:[],threadId:id,usage:{...extractOpenAIUsage(response),metadata:{tools:(response.output||[]).filter(i=>i.type.endsWith('_call')).map(i=>i.type)}}};
+     const result={answer,model,sources,artifacts,actions:[],threadId:id,usage};
      thread.messages.push({id:body.requestId,role:'user',content:latest,documentIds:ids,createdAt:now},
        {id:`${body.requestId}-reply`,role:'assistant',content:answer,artifacts,sources,model,createdAt:now});
      thread.messages=thread.messages.slice(-100);thread.updatedAt=now;delete thread.processing;
      if(thread.title==='Nova conversa')thread.title=latest.slice(0,65);
      await storage.saveThread(auth,thread);finished=true;
-     await recordUsage(result.usage,auth,model).catch(()=>{});
      return result;
    } finally {
      if(thread&&!finished){thread.processing={requestId:body.requestId,status:signal?.aborted?'cancelled':'failed'};await storage.saveThread(auth,thread).catch(()=>{});}

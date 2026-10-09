@@ -953,7 +953,7 @@ export function createStripeBillingService({
           ? `${config.appUrl}/?lawyer_kit_checkout=cancelled#analise-cobrancas`
           : `${config.appUrl}/planos?checkout=cancelled`,
       locale: "pt-BR",
-      billing_address_collection: "required",
+      billing_address_collection: isChat ? "auto" : "required",
       integration_identifier: config.integrationIdentifier,
       line_items: [{ price: selection.priceId, quantity: 1 }],
       metadata: commonMetadata,

@@ -7161,6 +7161,8 @@ dialog.login-screen[open]::backdrop { animation: login-backdrop-enter 220ms ease
 }
 
 .chat-attach-icon {
+  width: 20px;
+  height: 20px;
   font-size: 1.15rem;
   font-weight: 500;
   line-height: 1;

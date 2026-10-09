@@ -135,7 +135,7 @@ test("seller POST validates selection and consent, persists the selected source 
     const history=await auditService.listAuditHistory({auth:owner});
     assert.equal(history.audits.find(a=>a.consultaId===issuance.body.consultaId).sellerFlow,'certificates');
     const review=createSellerReviewService({getDb:()=>({pool:pg,dbReady:true}),auditService,ai:{ready:()=>{throw Error('AI must not run');}}});
-    await assert.rejects(()=>review.start(issuance.body.consultaId,owner,{auth:owner},true),/certificate_collection_only/);
+    await assert.rejects(()=>review.start(issuance.body.consultaId,owner,{auth:owner},true),/certificate_analysis_subscription_required/);
     await confirm(dataOrder.body);
     const dataAudit=await waitForAudit(dataOrder.body.orderId);
     assert.equal(dataAudit.status,'success');
@@ -144,7 +144,7 @@ test("seller POST validates selection and consent, persists the selected source 
     assert.equal(dataRow.id,'protestos');assert.equal(dataRow.kind,'data');assert.equal(dataRow.pdfPath,undefined);
     const dataSaved=(await pg.query('SELECT request_payload FROM audita_audits WHERE public_id=$1',[dataOrder.body.orderId])).rows[0].request_payload;
     assert.equal(dataSaved.sellerAiConsent,false);assert.notEqual(dataSaved.extraFieldsProvided.discoverCompanies,true);
-    await assert.rejects(()=>review.start(dataOrder.body.orderId,owner,{auth:owner},true),/certificate_collection_only/);
+    await assert.rejects(()=>review.start(dataOrder.body.orderId,owner,{auth:owner},true),/certificate_analysis_subscription_required/);
     const beforeAutomatic=providerCalls.length;
     for(const override of [{state:'XX'},{state:'SP',aiConsent:false},{state:'SP',municipality:'Cidade inválida'},{state:'SP',paidQueryConfirmed:false}]) {
       assert.equal((await post({...body,automatic:true,aiConsent:true,...override})).status,400);

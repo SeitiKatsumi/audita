@@ -21,7 +21,7 @@ must remain disabled for paid operation. AI provider costs still apply.
 An active paid chat entitlement takes precedence over free test access and
 clears that process-local test grant. Existing free reservations are preserved;
 new work uses paid quotas. Expiry/revocation does not restore that old grant.
-The chat checkout return uses `chat_checkout`; it opens the status dialog and
+The chat checkout return uses `chat_checkout`; it checks access before opening the status dialog and
 checks server access every five seconds for up to two minutes. A URL never
 grants access. Delayed confirmation displays guidance not to buy again;
 manual refresh and returning to the tab still query the server. Active paid
@@ -88,3 +88,7 @@ Billing fees. Confirm invoicing/tax obligations separately; no Stripe Tax enable
 Local development intentionally leaves checkout unavailable without configured
 test prices/database. No production prices, real payment, migration or deployment
 is authorized by this implementation.
+
+## Atualização de 09/10
+
+Checkout do chat usa billing_address_collection=auto. A interface aguarda o acesso antes de abrir compra; plano confirmado não reabre o dialog. Anexos são lidos ao enviar, sem modal individual. Plano individual vigente tem orçamento estimado de IA de 50% do preço por período, com câmbio operacional AUDITA_CHAT_USD_BRL (padrão 6). Cotas de mensagens preservadas; sem cotas de páginas/arquivos. Consulte [meeting-20261008.md](meeting-20261008.md) para alcance e limitações de custo.

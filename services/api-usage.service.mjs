@@ -18,6 +18,13 @@ export const DEFAULT_API_PRICING = Object.freeze({
   source: "OpenAI pricing",
 });
 
+// Official Standard rates checked 2026-10-09; tenant-specific prices take precedence.
+const CHAT_PRICING = {'gpt-6.1-sol':[2,.1,10],'gpt-6-sol':[2,.2,10],'gpt-6-luna':[.1,.01,.5],'gpt-5-mini':[.25,.025,2]};
+export function defaultChatPricing(model) {
+  const prices=CHAT_PRICING[model];
+  return prices?{...DEFAULT_API_PRICING,model,active:true,inputCostPerMillion:prices[0],cachedInputCostPerMillion:prices[1],outputCostPerMillion:prices[2],longContextThreshold:model.startsWith('gpt-6')?272000:null,source:'https://developers.openai.com/api/docs/models/'+model}:null;
+}
+
 function numberValue(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
@@ -139,10 +146,11 @@ export function estimateApiUsageCost(event, pricing) {
   const outputUnits = integerValue(event.outputUnits);
   const requestCount = integerValue(event.requestCount, 1);
   const quantity = numberValue(event.quantity, 1);
+  const longContext = pricing.longContextThreshold && inputUnits > pricing.longContextThreshold;
   const estimated =
-    (uncachedInputUnits / 1_000_000) * numberValue(pricing.inputCostPerMillion) +
-    (cachedInputUnits / 1_000_000) * numberValue(pricing.cachedInputCostPerMillion) +
-    (outputUnits / 1_000_000) * numberValue(pricing.outputCostPerMillion) +
+    (uncachedInputUnits / 1_000_000) * numberValue(pricing.inputCostPerMillion) * (longContext ? 2 : 1) +
+    (cachedInputUnits / 1_000_000) * numberValue(pricing.cachedInputCostPerMillion) * (longContext ? 2 : 1) +
+    (outputUnits / 1_000_000) * numberValue(pricing.outputCostPerMillion) * (longContext ? 1.5 : 1) +
     requestCount * numberValue(pricing.requestCost) +
     quantity * numberValue(pricing.unitCost);
   return Number(estimated.toFixed(10));
@@ -360,8 +368,9 @@ export function createApiUsageService({ getDb } = {}) {
     const event = normalizeUsageInput(rawEvent);
     if (!event) return { invalid: true };
     const pricingRows = await listPricing(authContext);
-    const pricing = choosePricing(pricingRows, event);
-    const estimatedCost = pricing ? estimateApiUsageCost(event, pricing) : null;
+    const pricing = choosePricing(pricingRows, event) || (event.provider==='openai'&&event.service==='responses'?defaultChatPricing(event.model):null);
+    const toolExchange = pricing?.currency === 'BRL' ? numberValue(process.env.AUDITA_CHAT_USD_BRL,6) : 1;
+    const estimatedCost = pricing ? estimateApiUsageCost(event, pricing)+numberValue(event.metadata.toolCostUsd)*toolExchange : null;
     const currency = event.currency || pricing?.currency || "USD";
     const priced = Boolean(pricing) || event.actualCost !== null;
     const tenantId = authContext?.tenantId;
@@ -515,5 +524,21 @@ export function createApiUsageService({ getDb } = {}) {
     return buildDashboard(result.rows.map(publicUsage), pricing, boundedDays);
   }
 
-  return { record, getDashboard, listPricing, savePricing };
+  async function getChatBudget(db,auth,entitlement) {
+    const usdBrl=Number(process.env.AUDITA_CHAT_USD_BRL||6);
+    if(!Number.isFinite(usdBrl)||usdBrl<=0) throw Object.assign(new Error('chat_cost_configuration'),{statusCode:503,code:'chat_cost_configuration'});
+    const rows=(await db.query(`SELECT * FROM audita_api_usage WHERE tenant_id=$1 AND user_id=$2 AND provider='openai'
+      AND operation IN ('general_chat','chat_document','certificate_document_analysis')
+      AND created_at >= $3 AND created_at < $4`,[auth.tenantId,auth.user.id,entitlement.period_start,entitlement.period_end])).rows;
+    let used=0,unpriced=0;
+    for(const row of rows) {
+      const fallback=defaultChatPricing(row.model);
+      const tools=row.metadata?.toolCostUsd??(Array.isArray(row.metadata?.tools)?row.metadata.tools.reduce((sum,type)=>sum+(type==='web_search_call'?.01:type==='code_interpreter_call'?.03:type==='image_generation_call'?1:0),0):0);
+      const cost=row.actual_cost??row.estimated_cost??(row.service==='responses'&&fallback?estimateApiUsageCost({inputUnits:row.input_units,cachedInputUnits:row.cached_input_units,outputUnits:row.output_units},fallback)+numberValue(tools):null);
+      if(cost===null||!['BRL','USD'].includes(row.currency)) {unpriced++;continue;}
+      used+=Number(cost)*(row.currency==='USD'?usdBrl:1)*100;
+    }
+    return {usedCents:Math.ceil(used),unpriced,usdBrl};
+  }
+  return { record, getDashboard, listPricing, savePricing, getChatBudget };
 }

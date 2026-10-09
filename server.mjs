@@ -1749,7 +1749,9 @@ const auditService = createAuditService({
 });
 const sellerReviewService = createSellerReviewService({
   getDb: () => ({ pool, dbReady }), auditService,
-  ai: createSellerReviewAI({ recordUsage: (usage, auth) => apiUsageService.record(auth, { provider: 'openai', service: 'responses', model: process.env.AUDITA_SELLER_AI_MODEL || process.env.AUDITA_CHAT_MODEL || 'gpt-5-mini', operation: 'seller_document_analysis', ...usage }) }),
+  getAnalysisAccess: async auth => { const benefit=await certificateBenefits(auth);return benefit.subscriber||benefit.complimentary; },
+  checkAnalysisCost:auth=>chatAccessService.assertCanSpend(auth),
+  ai: createSellerReviewAI({ recordUsage: (usage, auth, operation='seller_document_analysis') => apiUsageService.record(auth, { provider: 'openai', service: 'responses', model: process.env.AUDITA_SELLER_AI_MODEL || process.env.AUDITA_CHAT_MODEL || 'gpt-5-mini', operation, ...usage }) }),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
 const billingAccessService = createBillingAccessService({
@@ -1761,6 +1763,7 @@ const billingAccessService = createBillingAccessService({
 const chatTestBypassEnabled = process.env.AUDITA_CHAT_TEST_BYPASS_ENABLED === 'true';
 const chatAccessService = createChatAccessService({
   getDb: () => ({ pool, dbReady }),
+  getCost:(db,auth,entitlement)=>apiUsageService.getChatBudget(db,auth,entitlement),
   testBypassEnabled: chatTestBypassEnabled,
   getLegacyAccess: async (auth, connection) => {
     const result = await connection.query(`SELECT 1 FROM audita_subscriptions
@@ -3244,7 +3247,7 @@ async function handleApi(request, response, pathname) {
         return true;
       }
       if (pathname === "/api/chat/documents/prepare" && request.method === "POST") {
-        const raw = await readBufferBody(request, 17 * 1024 * 1024);
+        const raw = await readBufferBody(request, 68 * 1024 * 1024);
         const body = JSON.parse(raw.toString("utf8"));
         if (typeof body.contentBase64 !== "string" || body.contentBase64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.contentBase64)) {
           sendJson(response, 400, { error: "invalid_file" });
@@ -4168,7 +4171,7 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 403, { error: 'same_origin_required' }); return true;
         }
         const body = await readJsonBody(request);
-        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent));
+        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose));
       } else if (sellerReviewMatch[2] === 'report.pdf') {
         const buffer = await sellerReviewService.pdf(id, auth);
         response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="relatorio-audita.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });

@@ -116,6 +116,7 @@ test("members buy chat subscriptions without discounts or Standard redirects", a
   assert.equal(params.get("success_url"), "https://audita.example/chat?chat_checkout=success");
   assert.equal(params.get("cancel_url"), "https://audita.example/chat?chat_checkout=cancelled");
   assert.equal(params.has("allow_promotion_codes"), false);
+  assert.equal(params.get("billing_address_collection"), "auto", "chat checkout does not force billing address");
   assert.equal(params.has("subscription_data[trial_period_days]"), false);
   assert.equal(f.grants.length, 0);
 });

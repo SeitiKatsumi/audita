@@ -49,6 +49,30 @@ async function fixture() {
   return {db,audit,review,ai,rows,calls,request,options,start};
 }
 
+test('certificate collection has no automatic AI; paid subscriber may request a grounded custom PDF without new collection',async()=>{
+  const f=await fixture();
+  try {
+    f.request.body.extraFields.sellerFlow='certificates';
+    const {consultaId:id}=await f.audit.startAudit(f.request);
+    for(let i=0;i<200;i++){const a=await f.audit.findAudit(id,f.request);if(a.resultados?.length&&a.resultados.every(r=>!['pending','running','queued'].includes(r.status)))break;await new Promise(r=>setTimeout(r,10));}
+    assert.equal(f.calls.length,0);
+    await assert.rejects(f.review.start(id,owner,f.request,true,'Confira as pendências fiscais.'),{code:'certificate_analysis_subscription_required'});
+    let subscribed=true;
+    const review=createSellerReviewService({...f.options,getAnalysisAccess:async()=>subscribed});
+    await assert.rejects(review.start(id,owner,f.request,true,'x'),{code:'invalid_analysis_purpose'});
+    await review.start(id,owner,f.request,true,'Confira as pendências fiscais.');
+    await review.wait(id);
+    const state=await review.get(id,owner);
+    assert.equal(state.status,'completed');assert.equal(state.purpose,'Confira as pendências fiscais.');
+    assert.equal(state.report.title,'Análise das certidões');assert.ok(!state.report.safetyScore);
+    assert.ok(f.calls.every(call=>call.purpose===state.purpose));
+    assert.equal((await PDFDocument.load(await review.pdf(id,owner))).getTitle(),'Análise das certidões');
+    const count=f.calls.length;await review.start(id,owner,f.request,true,state.purpose);assert.equal(f.calls.length,count);
+    subscribed=false;await assert.rejects(review.start(id,owner,f.request,true,state.purpose),{code:'certificate_analysis_subscription_required'});
+    await assert.rejects(review.get(id,{tenantId:2,user:{id:812}}),{code:'seller_analysis_not_found'});
+  } finally {await f.db.close();}
+});
+
 test('seller collection -> AI -> persisted report -> private PDF; source failures remain gaps and no new collection on retry',async()=>{
   const f=await fixture();
   try {

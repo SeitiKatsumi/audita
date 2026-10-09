@@ -3,15 +3,22 @@ import {PDFDocument} from 'pdf-lib';
 import {IrError, requireIr as check, irKey, sealIr, openIr} from './ir-exemption-domain.mjs';
 import {extractOpenAIUsage} from './api-usage.service.mjs';
 
-const MAX_BYTES = 12 * 1024 * 1024;
+const MAX_BYTES = 50 * 1024 * 1024;
 const MAX_CONTEXT = 24000;
 const PNG = Buffer.from([137,80,78,71,13,10,26,10]);
 const validId = value => typeof value === 'string' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value);
-const invalidFile = () => new IrError('invalid_file', 'Envie PDF, PNG ou JPEG valido, de ate 12 MB.');
+const invalidFile = () => new IrError('invalid_file', 'Envie PDF, PNG ou JPEG valido, de ate 50 MB.');
 const dimensions = (width, height) => check(Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= 10000 && height <= 10000 && width * height <= 25000000, 'invalid_file', 'Imagem excede o limite de 25 megapixels ou 10000 pixels por lado.');
 
 async function inspect(buffer, mimeType, fileName) {
-  check(Buffer.isBuffer(buffer) && buffer.length > 0 && buffer.length <= MAX_BYTES, 'invalid_file', 'Envie um arquivo de ate 12 MB.');
+  check(Buffer.isBuffer(buffer) && buffer.length > 0 && buffer.length <= MAX_BYTES, 'invalid_file', 'Envie um arquivo de ate 50 MB.');
+  const audioMime = {wav:'audio/wav',mp3:'audio/mpeg',webm:'audio/webm',m4a:'audio/mp4',mp4:'audio/mp4'}[String(fileName).split('.').at(-1).toLowerCase()];
+  if(audioMime) {
+    const magic=buffer.subarray(0,16);
+    const valid=audioMime==='audio/wav'?magic.toString('ascii',0,4)==='RIFF'&&magic.toString('ascii',8,12)==='WAVE':audioMime==='audio/webm'?magic.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])):audioMime==='audio/mp4'?magic.toString('ascii',4,8)==='ftyp':magic.toString('ascii',0,3)==='ID3'||magic[0]===255&&(magic[1]&0xe0)===0xe0;
+    check(valid&&buffer.length<=25*1024*1024,'invalid_file','Envie áudio WAV, MP3, WEBM ou M4A válido, de até25 MB.');
+    return {mime:audioMime,pages:1};
+  }
   const extension=String(fileName).split('.').at(-1).toLowerCase();
   const textTypes={txt:'text/plain',md:'text/markdown',csv:'text/csv',json:'application/json',html:'text/html'};
   if(textTypes[extension]) {
@@ -109,7 +116,7 @@ export function createChatDocumentsService({getDb, env = process.env, accessServ
     check(typeof fileName === 'string' && fileName.trim() && fileName.length <= 180 && !/[\\/\x00-\x1f\x7f]/.test(fileName), 'invalid_file', 'Nome de arquivo invalido.');
     const {mime,pages} = await inspect(buffer,mimeType,fileName);
     const id = randomUUID();
-    // ponytail: encrypted DB blobs capped at 12 MB/file; private object storage if volume grows.
+    // ponytail: encrypted DB blobs capped at 50 MB/file; private object storage if volume grows.
     await pool.query('INSERT INTO audita_chat_documents(id,tenant_id,user_id,pages,encrypted_payload,encrypted_file) VALUES($1,$2,$3,$4,$5,$6)',
       [id,auth.tenantId,auth.user.id,pages,seal(auth,id,'payload',{fileName,mime,result:null,processing:false}),seal(auth,id,'file',buffer)]);
     return {id,pages,pagesAvailable:null,status:'prepared'};
@@ -117,6 +124,15 @@ export function createChatDocumentsService({getDb, env = process.env, accessServ
   async function extract(auth,row,payload,part) {
     const sdk = client || new (await import('openai')).default({apiKey:apiKey(), timeout:120000, maxRetries:0});
     const buffer = part || open(auth,row.id,'file',row.encrypted_file);
+    if(payload.mime.startsWith('audio/')) {
+      await accessService.assertCanSpend?.(auth);
+      const response=await sdk.audio.transcriptions.create({file:new File([buffer],payload.fileName,{type:payload.mime}),model:env.AUDITA_CHAT_AUDIO_MODEL||'gpt-transcribe',response_format:'json'});
+      const text=String(response.text||'').trim();
+      check(text.length>0&&text.length<=80000,'ai_incomplete','Não foi possível transcrever o áudio. Confira o arquivo.',503);
+      const seconds = Number(response.usage?.seconds ?? response.duration);
+      await recordUsage({model:env.AUDITA_CHAT_AUDIO_MODEL||'gpt-transcribe',service:'transcriptions',currency:'USD',quantity:Number.isFinite(seconds)?seconds:0,unitName:'second',actualCost:Number.isFinite(seconds)&&seconds>0?seconds*.0045/60:null,...extractOpenAIUsage(response)},auth);
+      return {summary:'Transcrição do áudio [p. 1]: '+text.slice(0,3900),pages:[{page:1,text,uncertain:false}]};
+    }
     // ponytail: sequential 20-page batches bound provider output; no total page cap.
     if(payload.mime==='application/pdf' && row.pages>20) {
       const original=await PDFDocument.load(buffer),result={summary:'',pages:[]};
@@ -137,6 +153,7 @@ export function createChatDocumentsService({getDb, env = process.env, accessServ
     const attachment = !payload.mime.startsWith('image/')
       ? {type:'input_file',filename:payload.fileName,file_data:data}
       : {type:'input_image',image_url:data,detail:'high'};
+    await accessService.assertCanSpend?.(auth);
     const response = await sdk.responses.create({
       model:env.AUDITA_CHAT_DOCUMENT_MODEL || env.AUDITA_CHAT_QUICK_MODEL || 'gpt-6-luna', store:false, max_output_tokens:12000,
       text:{format:{type:'json_object'}},
@@ -215,7 +232,8 @@ export function createChatDocumentsService({getDb, env = process.env, accessServ
   async function getInput(auth,id) {
     const {row,payload}=await owned(db(),auth,id);
     check(payload.result,'analysis_required','Conclua a leitura do documento.',409);
-    return {id,fileName:payload.fileName,mime:payload.mime,pages:row.pages,summary:payload.result.summary,buffer:open(auth,id,'file',row.encrypted_file)};
+    const audio=payload.mime.startsWith('audio/');
+    return {id,fileName:audio?payload.fileName+'.txt':payload.fileName,mime:audio?'text/plain':payload.mime,pages:row.pages,summary:payload.result.summary,buffer:audio?Buffer.from(payload.result.pages[0].text,'utf8'):open(auth,id,'file',row.encrypted_file)};
   }
   return {prepare,analyze,getContext,getInput};
 }

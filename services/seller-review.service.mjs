@@ -89,7 +89,7 @@ export function validateSellerReading(value, source, text, scanned = false) {
   return reading;
 }
 
-export function createSellerReviewService({ getDb, auditService, ai, readPdf, extractText = extractSellerText, now = () => new Date() }) {
+export function createSellerReviewService({ getDb, auditService, ai, readPdf, getAnalysisAccess = async () => false, checkAnalysisCost = async () => {}, extractText = extractSellerText, now = () => new Date() }) {
   const active = new Map();
   function pool() { const db = getDb(); if (!db?.dbReady || !db.pool) fail('seller_storage_unavailable', 503); return db.pool; }
   async function access(id, auth) {
@@ -108,7 +108,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
   function view(stored) {
     if (!stored) return { status: 'not_started', progress: 0, aiReady: ai.ready() };
     const { token, fingerprint, checkpoints, ...publicState } = stored;
-    if (publicState.report) publicState.report = { ...publicState.report, safetyScore: calculateSellerSafetyScore(publicState.report) };
+    if (publicState.report && !publicState.purpose) publicState.report = { ...publicState.report, safetyScore: calculateSellerSafetyScore(publicState.report) };
     if (stored.status === 'running' && now() - new Date(stored.updatedAt) > 180000) return { ...publicState, status: 'interrupted', message: 'A análise foi interrompida. Retome sem refazer as consultas.', aiReady: ai.ready() };
     return { ...publicState, aiReady: ai.ready() };
   }
@@ -118,9 +118,15 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
     const result = await pool().query("UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{sellerReview}',$3::jsonb) WHERE public_id=$1 AND request_payload->'sellerReview'->>'token'=$2 RETURNING id", [id, token, JSON.stringify(state)]);
     if (!result.rows.length) fail('seller_review_replaced', 409);
   }
-  async function start(id, auth, request, consent) {
+  async function start(id, auth, request, consent, purpose) {
     const row = await access(id, auth);
-    if (row.request_payload.sellerFlow === 'certificates') fail('certificate_collection_only', 409);
+    const certificates = row.request_payload.sellerFlow === 'certificates';
+    if (certificates) {
+      if (!await getAnalysisAccess(auth)) fail('certificate_analysis_subscription_required', 402);
+      if (typeof purpose !== 'string' || purpose.trim().length < 10 || purpose.length > 2000 || /[\u0000-\u0008]/.test(purpose)) fail('invalid_analysis_purpose');
+      purpose = purpose.trim();
+      await checkAnalysisCost(auth);
+    }
     if (consent !== true && row.request_payload.sellerAiConsent !== true) fail('seller_ai_consent_required');
     const audit = await auditService.findAudit(id, request);
     if (!audit || audit.unauthorized) fail('seller_analysis_not_found', 404);
@@ -129,13 +135,13 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
     const sources = sellerSources(audit);
     const segment = getAnalysisSegment(row.request_payload.sellerSegment || 'analise-vendedor');
     if (!segment) fail('invalid_analysis_segment', 422);
-    const fingerprint = segment.id === 'analise-vendedor' ? digest(sources) : digest({ segment: segment.id, sources });
+    const fingerprint = certificates ? digest({ sources, purpose }) : segment.id === 'analise-vendedor' ? digest(sources) : digest({ segment: segment.id, sources });
     const previous = row.request_payload.sellerReview;
     if (previous?.status === 'completed' && previous.fingerprint === fingerprint && !previous.report.sources.some(s => s.status === 'unread')) return view(previous);
     if (active.has(id)) return get(id, auth);
     if (!ai.ready()) fail('seller_ai_unavailable', 503);
     if (sources.length > 300) fail('seller_too_many_sources', 422);
-    const state = { token: randomUUID(), fingerprint, segment: segment.id, selectedStates:row.request_payload.sellerStates||[], status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
+    const state = { token: randomUUID(), fingerprint, segment: segment.id, ...(certificates ? { purpose } : {}), selectedStates:row.request_payload.sellerStates||[], status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
     const claimed = await pool().query(`UPDATE audita_audits SET request_payload=jsonb_set(jsonb_set(request_payload,'{sellerAiConsent}','true'::jsonb),'{sellerReview}',$4::jsonb)
       WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3
       AND (request_payload->'sellerReview'->>'status' IS DISTINCT FROM 'running' OR (request_payload->'sellerReview'->>'updatedAt')::timestamptz < $5::timestamptz)
@@ -173,8 +179,9 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
               }
               const scanned = Boolean(buffer && (needsVision || plain(text).length < 80));
               if (!buffer && !plain(text) && !Object.keys(details).length) fail('empty_evidence', 422);
+              if(state.purpose) await checkAnalysisCost(auth);
               if (plain(text).length + JSON.stringify(details).length > 180000) fail('source_too_large', 422);
-              const reading = validateSellerReading(await ai.read({ segment: state.segment, id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), source, text, scanned);
+              const reading = validateSellerReading(await ai.read({ segment: state.segment, purpose: state.purpose, id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), source, text, scanned);
               results[index] = { ...meta, status: 'analyzed', method: scanned ? 'Leitura visual por IA; confira a transcrição no original' : 'Texto e dados da fonte', ...reading };
             } catch {
               results[index] = { ...meta, status: 'unread', message: 'Não foi possível concluir a leitura desta fonte. Confira o original ou tente novamente.', outcome: 'inconclusive' };
@@ -192,11 +199,12 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ex
       const analyzed = results.filter(r => r.status === 'analyzed').length;
       const gaps = results.filter(r => r.status !== 'analyzed' || r.outcome === 'inconclusive');
       const segment = getAnalysisSegment(state.segment);
-      const report = { id, segment: segment.id, title: segment.title, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
+      const report = { id, segment: segment.id, title: state.purpose ? 'Análise das certidões' : segment.title, purpose: state.purpose, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: state.purpose ? 'Análise limitada às certidões selecionadas, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
         conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
       };
       report.executiveSummary=[report.conclusion,...findings.filter(f=>f.priority!=='information').map(f=>`${f.title}: ${f.description}`),...findings.filter(f=>f.category==='company'&&f.priority==='information').map(f=>f.description)].join('\n\n');
       if(analyzed&&typeof ai.summarize==='function') {
+        if(state.purpose) await checkAnalysisCost(auth);
         state.current='Preparando o resumo e o relatório em PDF';state.progress=97;await persist();
         try {report.summaryParagraphs=await ai.summarize(report,auth);report.executiveSummary=report.summaryParagraphs.map(p=>p.text).join('\n\n');report.summaryStatus='completed';}
         catch {report.summaryStatus='source_readings';}
