@@ -1,5 +1,15 @@
 # Deploy
 
+## Reunião de 08/10 — publicada em 09/10/2026
+
+PR19, código/runtime `8fffb98`, CapRover `audita:152`; imagem anterior `151`. 575 testes Node/PGlite aprovados, CI da branch/main verde, Chrome com provedores fictícios até relatório/PDF e mobile sem overflow. Smoke, banco pronto, nove assets iguais ao Git e endpoints privados401 sem sessão. Main local/localhost3000 consolidada. Website68 preservado.
+
+Sem dependências ou migração. Backup PostgreSQL/config validado antes do deploy em diretório privado do servidor, manifest `meeting-20261009-manifest.json`; comparação posterior confirmou env/volumes preservados. Padrões opcionais: `AUDITA_CHAT_AUDIO_MODEL=gpt-transcribe`, `AUDITA_CHAT_USD_BRL=6`; configuração existente não substituída. Nginx suporta corpo de 68 MB. Retorno: selecionar imagem151, preservando banco/chaves/volume.
+
+O primeiro task do Swarm repetiu `No such container`, enquanto o substituto152 já estava healthy. Retomada nativa com `docker service update srv-captain--audita`, sem force, terminou em completed; 502 transitório resolvido e smoke aprovado. Causa recorrente da falha de task ainda merece investigação na infraestrutura; não foi feita alteração global de Docker, rede ou outros apps.
+
+Decisões, orçamento estimado e dependências administrativas/VPS/documento real para custo em [meeting-20261008.md](meeting-20261008.md). Evidência de interface, apenas dados fictícios: [mobile](qa/meeting-certificates-mobile.png).
+
 ## Publicacao da reuniao de07/10 -08/10/2026
 
 Publicacao autorizada de app/site: conciliar main6847c3 e trabalho local preservado. Regras30x/10x porfonte, zero10/gratis assinante, desconto30%, dois protestos/dossie, analisesmultiUF com checkout e retorno ao segmento. Reusa JSON criptografado, assinatura/acesso e checkout; sem migracao, novas dependencias, chaves ou volumes. Pedidos antigos mantem preco salvo. Antes/depois: backup PostgreSQL/config, env/volumes, CI, testes/PGlite, Chrome ficticio ate PDF, SHA/assets/health/autenticacao. Sem cobranca/emissao real como teste. Fonte gratuita somente para beneficio vigente validado no servidor, bypass nao qualifica; acesso individual existente preservado. Custos de empresas vinculadas inclusos no pacote, nao adicionar cobranca silenciosa. Sponsor/chaves Audita e franquia cincoCPF dependem de especificacao.
