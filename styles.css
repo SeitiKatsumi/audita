@@ -12409,4 +12409,6 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 
 .service-card-explained .service-info-link { color: var(--lime); font-size: .875rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .service-info-link span { font-size: .75rem; font-weight: 400; }
+.service-card-explained .service-action-link { width: 100%; border: 0; background: transparent; box-shadow: none; padding: 8px 0 0; text-align: left; text-decoration: underline; font-family: inherit; cursor: pointer; }
+.service-action-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
 .service-info-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }

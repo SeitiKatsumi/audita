@@ -736,3 +736,6 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 # 2026-10-12 - Acesso ao site na Central de Servicos
 - Codex, codex/catalog-site-button, integrado na main local: botao Conheca todos os servicos em nosso site abaixo da introducao e acima dos filtros, nova aba com noopener/noreferrer e rotulo acessivel. Layout permite quebra em telas estreitas. Botao confirmado no HTML servido pela3000; diff check aprovado. Sem commit/push/deploy.
 - Correcao solicitada: acesso movido do topo do catalogo para item Conheca nosso site no menu lateral, imediatamente abaixo de Central de Servicos; abre URL fornecida em nova aba. Botao da home preservado. Ordem e remocao do botao anterior confirmadas no HTML servido na3000. Sem commit/push/deploy.
+
+# 2026-10-12 - Estilo da consulta de jurisprudencias
+- Codex, codex/jurisprudence-link-style, integrado na main local: Consultar jurisprudencias agora usa texto verde sublinhado e seta, fundo transparente, sem botao azul. Mantidos botao semantico, foco por teclado e abertura do dialogo existente. Onze testes de catalogo aprovados, diff check e HTML na3000 conferidos. Commit/push solicitados; sem deploy.
