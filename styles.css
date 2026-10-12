@@ -12406,3 +12406,7 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 #certificateAudienceDialog[open] { display: flex; flex-direction: column; max-height: calc(100dvh - 32px); overflow: hidden; }
 #certificateAudienceDialog .charge-faq-header { flex-shrink: 0; }
 #certificateAudienceDialog .ir-diseases-content { overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+
+.service-card-explained .service-info-link { color: var(--lime); font-size: .875rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.service-info-link span { font-size: .75rem; font-weight: 400; }
+.service-info-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }

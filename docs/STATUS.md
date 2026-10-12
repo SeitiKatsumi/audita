@@ -723,3 +723,7 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 # 2026-10-08 - Link de publico-alvo das certidoes
 - Codex, codex/certificate-audience, integrado na main local: link Para quem e este servico abaixo de Pacote Brasil inteiro abre modal nativo com seis publicos e exemplos de uso. Estilo de link, rolagem interna e retorno de foco ao fechar. Teste de abertura/fechamento passou; node --check e git diff --check aprovados. Verificacao visual bloqueada por permissao do navegador recusada. Sem push/deploy.
 - Commit e push solicitados pelo usuario; main remota conferida sem divergencia, teste do modal e sintaxe aprovados novamente. Envio ao GitHub nesta entrega; deploy nao solicitado.
+
+# 2026-10-12 - Links informativos na Central de Servicos
+- Codex, codex/service-info-links, integrado na main local: 18 links fornecidos pelo usuario em Mais informacoes (10 cards estaticos e oito segmentos), nova aba com noopener/noreferrer. Auxilio-acidente e Audita Kids ausentes da central; certidoes e glosas sem URL fornecida. Doze testes pertinentes, sintaxe e diff check aprovados; HTML/catalogo atualizados confirmados por HTTP200 na3000. Sem verificacao visual ou dos sites externos, sem commit/push/deploy. Fetch identificou novos commits remotos; atualizacao da main remota nao incorporada nesta alteracao local.
+- Complemento: URLs fornecidas para glosas e certidoes adicionadas; certidoes aponta para analise-de-vendedor conforme segundo endereco enviado. Total de20 cards com links, sem criar novos servicos.

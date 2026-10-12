@@ -124,7 +124,7 @@ test('all catalog cards have details and preserve destinations and searchable au
   assert.ok(card.includes('Para quem é'));
   assert.ok(card.includes('service-note'));
   const pending=card.includes('data-categories="laudos"');
-  assert.equal(card.includes('<a '),!pending);
+  assert.equal(card.includes('href="#'),!pending);
   if(pending) assert.ok(card.includes('Em desenvolvimento'));
  }
  for(const [route,title,action,query,category] of [
