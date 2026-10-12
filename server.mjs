@@ -1786,7 +1786,13 @@ const certificateOrderService=createCertificateOrderService({getDb:()=>({pool,db
   startAudit:(request,options)=>auditService.startAudit(request,options)});
 async function certificateBenefits(auth) {
   if(auth.unauthorized||!auth.user)return {subscriber:false,complimentary:false};
-  const access=await chatAccessService.getAccess(auth,{includeTestAccess:false});
+  let access;
+  try {
+    access=await chatAccessService.getAccess(auth,{includeTestAccess:false});
+  } catch (error) {
+    if (error.code === 'chat_unauthorized') return {subscriber:false,complimentary:false};
+    throw error;
+  }
   return {subscriber:access.source==='entitlement'&&access.active===true||access.source==='legacy'&&access.allowed===true,complimentary:access.source==='complimentary'};
 }
 const chatDocumentsService = createChatDocumentsService({
