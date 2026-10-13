@@ -1,5 +1,9 @@
 # Deploy
 
+## Resultados em texto das consultas — 13/10/2026
+
+Continuacao autorizada da emissao publicada: botao Ver resultado em consultas concluidas sem PDF, com dados salvos, abertura no proprio item e status explicito. Mudanca apenas de interface/documentacao/teste, sem migracao, dependencia, chaves ou volumes novos.23 testes pertinentes e Chrome ficticio aprovados. Conferir backup/config atual, CI, imagem concluida, health/banco/auth e assets antes de declarar implantacao; rollback por imagem157, sem restauracao de banco necessaria para esta mudanca. Publicacao em andamento.
+
 ## Publicacao consolidada de certidoes — 13/10/2026
 
 Publicacao autorizada de todas as mudancas locais/main: enriquecimento CPF/CNPJ, formulario sem checkboxes duplicados e opcao Continuar sem pagar — teste, incluindo as atualizacoes de links/menu e anexos do chat ja enviadas. Suite Node/PGlite579/579 e Chrome com fornecedores ficticios aprovados. Sem migracoes ou dependencias novas. Backup PostgreSQL/config obrigatorio antes da alteracao; preservar chaves/volumes e adicionar somente AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED=true ao ambiente do app, conforme pedido de testes. Manter imagem/versao anterior para rollback; desligar o flag revoga novas liberacoes. Verificacao final deve confirmar CI, imagem concluida, saude/banco/auth, assets e disponibilidade do bypass sem realizar consulta ou cobranca real.

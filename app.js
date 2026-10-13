@@ -6881,7 +6881,7 @@ function getSellerCertificateStatus(certificate = {}, auditStatus = "pending", i
     return { label: "PDF disponível", className: "success" };
   }
   if (certificate.status === "success") {
-    return { label: certificate.kind === "data" ? "Consulta disponível" : "Resultado disponível", className: "success" };
+    return { label: certificate.kind === "data" ? "Consulta concluída" : "Resultado disponível", className: "success" };
   }
   if (certificate.status === "failed" || certificate.resultado === "erro") {
     return { label: certificate.kind === "data" ? "Consulta indisponível" : "Falha na emissão", className: "failed" };
@@ -6897,6 +6897,14 @@ function getSellerCertificateStatus(certificate = {}, auditStatus = "pending", i
     return { label: "Não extraída", className: "failed" };
   }
   return { label: "Na fila", className: "processing" };
+}
+
+function toggleSellerQueryResult(button) {
+  const panel = document.getElementById(button.dataset.sellerResultToggle);
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+  button.setAttribute('aria-expanded', String(!panel.hidden));
+  button.textContent = panel.hidden ? 'Ver resultado' : 'Ocultar resultado';
 }
 
 function formatSellerAnalysisElapsed(milliseconds) {
@@ -6972,6 +6980,8 @@ function getSellerAnalysisStartError(data = {}, responseStatus = 0) {
 
 function renderSellerAnalysisResult(audit) {
   if (!sellerAnalysisResult) return;
+  const openResults = new Set([...(sellerAnalysisResult.querySelectorAll?.('[data-seller-query-result]:not([hidden])') || [])].map(panel => panel.id));
+  const focusedResult = document.activeElement?.dataset?.sellerResultToggle;
   const executions = audit?.resultados || [];
   const execution = executions.find((item) => ["pending", "running"].includes(item.status) && item.dados?.progress?.stage !== "completed") || executions[0];
   const certificates = executions.flatMap((item) => {
@@ -7028,20 +7038,28 @@ function renderSellerAnalysisResult(audit) {
       : certificate.kind !== "data" && certificate.resultado === "nada_consta"
         ? "Nada consta"
         : "";
-    const details = certificate.details && typeof certificate.details === "object"
-      ? Object.entries(certificate.details).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value)).slice(0, 30)
-        .map(([label, value]) => `<small><b>${escapeHtml(label)}</b>: ${escapeHtml(String(value))}</small>`).join("") : "";
+    const detailEntries = certificate.details && typeof certificate.details === "object"
+      ? Object.entries(certificate.details).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value)).slice(0, 30) : [];
+    const details = detailEntries.map(([label, value]) => `<small><b>${escapeHtml(label)}</b>: ${escapeHtml(String(value))}</small>`).join("");
+    const textResult = certificate.status === 'success' && !pdfUrl;
+    const resultId = `seller-query-${encodeURIComponent(audit?.consultaId || 'current')}-${encodeURIComponent(certificate.fonte || String(index))}-${certificate.documentIndex}`;
+    const resultOpen = openResults.has(resultId);
+    const resultContent = detailEntries.length
+      ? `<p>Consulta concluída. Dados retornados pela fonte:</p><dl>${detailEntries.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('')}</dl>`
+      : `<p>${escapeHtml(certificate.summary || resultLabel || 'A fonte concluiu a consulta, mas não enviou dados adicionais no retorno.')}</p>`;
     return `
       <article class="seller-certificate-item">
         <div>
-          <strong>${escapeHtml(certificate.tipo || expectedType)}</strong>
+          <strong id="${escapeHtml(resultId)}-source">${escapeHtml(certificate.tipo || expectedType)}</strong>
           <small>${escapeHtml(certificate.summary || resultLabel || (certificate.errorMessage ? "Consulta indisponível nesta tentativa" : certificate.kind === "data" ? "Consulta de dados complementares" : "Certidão da fonte consultada"))}</small>
           ${certificate.scope ? `<small>Abrangência: ${escapeHtml(certificate.scope)}</small>` : ""}
           ${certificate.checkedAt ? `<small>Consulta: ${escapeHtml(certificate.checkedAt)}</small>` : ""}
-          ${details ? `<details><summary>Ver dados da consulta</summary>${details}</details>` : ""}
+          ${details && !textResult ? `<details><summary>Ver dados da consulta</summary>${details}</details>` : ""}
         </div>
         <span class="property-status ${escapeHtml(status.className)}">${escapeHtml(status.label)}</span>
         ${pdfUrl ? `<a class="secondary-action" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noreferrer">Abrir PDF</a>` : ""}
+        ${textResult ? `<button type="button" class="secondary-action seller-query-result-toggle" id="${escapeHtml(resultId)}-toggle" data-seller-result-toggle="${escapeHtml(resultId)}" aria-controls="${escapeHtml(resultId)}" aria-expanded="${resultOpen}" aria-describedby="${escapeHtml(resultId)}-source">${resultOpen ? 'Ocultar resultado' : 'Ver resultado'}</button>
+        <div class="seller-query-result" data-seller-query-result id="${escapeHtml(resultId)}" role="region" aria-labelledby="${escapeHtml(resultId)}-source" ${resultOpen ? '' : 'hidden'}><h4>Resultado da consulta</h4>${resultContent}</div>` : ''}
       </article>
     `;
   }).join("");
@@ -7071,6 +7089,7 @@ function renderSellerAnalysisResult(audit) {
     <div id="sellerReviewPanel" aria-live="polite"></div>
     <details id="sellerCollectionDetails" class="seller-source-details" ${documentsOpen?'open':''}><summary>Ver documentos extraídos e status (${available}/${total})</summary><div class="seller-certificate-list">${certificateRows}</div></details>
   `;
+  if (focusedResult) document.getElementById(`${focusedResult}-toggle`)?.focus({ preventScroll: true });
 }
 
 let sellerCollectionRun = 0;
@@ -7119,6 +7138,11 @@ async function loadSellerAnalysisResult(consultaId, attempts = 1200) {
 }
 
 let sellerReviewRun = 0;
+sellerAnalysisResult?.addEventListener('click', event => {
+  const button = event.target.closest('[data-seller-result-toggle]');
+  if (button) toggleSellerQueryResult(button);
+});
+
 async function loadSellerReviewHistory() {
   const target = document.querySelector('#sellerReviewHistoryList');
   if (!target) return;
