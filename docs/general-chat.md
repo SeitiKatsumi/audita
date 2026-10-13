@@ -39,3 +39,7 @@ Chamadas reais de teste, com dados fictícios e sem banco de produção: modelos
 ## Entrega da reunião de 08/10
 
 Consulte [meeting-20261008.md](meeting-20261008.md) para decisões, testes, limite estimado de processamento e dependências externas. Transcrição usa AUDITA_CHAT_AUDIO_MODEL (padrão gpt-transcribe), com registro de duração e custo. Sem voz em tempo real.
+
+## Anexos por arrastar e soltar
+- Arquivos podem ser soltos na area da conversa; destaque visual indica o destino. Ficam na lista de anexos para revisao antes de enviar, pelo mesmo fluxo do seletor. Durante processamento, novos anexos ficam bloqueados. Arrastar texto nao e interceptado.
+- Cada arquivo pendente tem botao Remover individual; ao excluir, o foco vai ao proximo anexo ou ao seletor. Remocao bloqueada durante processamento.

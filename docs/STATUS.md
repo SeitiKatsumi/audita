@@ -743,3 +743,7 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 # 2026-10-13 - Rotulo Nova consulta
 - Codex, codex/new-query-label, integrado na main local: sellerChangeData exibe apenas Nova consulta. Alteracao textual sem mudar acao. Rotulo confirmado por HTTP200 na3000; diff check aprovado. Sem commit/push/deploy.
 - Download na analise opcional de certidoes renomeado para Obter certidoes; demais analises mantem rotulo original. Acao de download preservada. Sintaxe/diff check aprovados e JS atualizado confirmado por HTTP200 na3000. Sem commit/push/deploy.
+
+# 2026-10-13 - Arrastar arquivos na conversa
+- Codex, codex/chat-file-drop, integrado na main local: area da conversa aceita arquivos por drag/drop com destaque visual e mesma fila/limite de50MB do seletor. Arquivos aguardam envio explicito; bloqueio durante processamento, texto arrastado preservado. Testes de drag/drop e chat geral aprovados, sintaxe e diff check aprovados; JS na3000 conferido por HTTP200. Sem verificacao visual pelo navegador, chamada IA real, commit/push/deploy.
+- Complemento: cada anexo agora tem botao Remover visivel em item separado, quebra de linha responsiva e retorno de foco apos remocao. Remocao bloqueada durante processamento. Seis testes aprovados novamente e JS confirmado na3000. Usuario autorizou commit/push; sem deploy.

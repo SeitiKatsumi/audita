@@ -19,6 +19,22 @@ export function formatGeneralChat(text) {
   }).join('');
 }
 
+export function bindChatFileDrop(area, {addFiles, isBusy}) {
+ let depth=0;
+ const isFileDrag=e=>Array.from(e.dataTransfer?.types||[]).includes('Files');
+ const reset=()=>{depth=0;area.classList.remove('chat-file-dragging');};
+ area.addEventListener('dragenter',e=>{if(!isFileDrag(e))return;e.preventDefault();depth++;if(!isBusy())area.classList.add('chat-file-dragging');});
+ area.addEventListener('dragover',e=>{if(!isFileDrag(e))return;e.preventDefault();e.dataTransfer.dropEffect=isBusy()?'none':'copy';});
+ area.addEventListener('dragleave',e=>{if(!isFileDrag(e)&&!depth)return;e.preventDefault();if(--depth<=0)reset();});
+ area.addEventListener('drop',e=>{
+   if(!isFileDrag(e)&&!e.dataTransfer?.files?.length)return;
+   e.preventDefault();e.stopPropagation();reset();
+   if(!isBusy())addFiles(Array.from(e.dataTransfer?.files||[]));
+ });
+ area.addEventListener('dragend',reset);
+ area.addEventListener('keydown',e=>{if(e.key==='Escape')reset();});
+}
+
 export function initGeneralChat({getAuthState,subscription,requestLogin,getLegacyThreads=()=>[]}) {
  const form=document.querySelector('#chatForm'),input=document.querySelector('#chatInput'),messages=document.querySelector('#chatMessages');
  const list=document.querySelector('#chatThreadList'),empty=document.querySelector('#chatEmptyState'),error=document.querySelector('#chatError');
@@ -60,7 +76,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    if(thread.processing&&!active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status" ${busy?'class="general-chat-thinking"':''}>${escape(thread.processing.message|| (thread.processing.status==='running'?'Continuando a tarefa...':'A tarefa foi interrompida. Tente novamente.'))}</small></div></article>`);
    if(active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status" class="general-chat-thinking">${escape(active.status)}</small><div class="chat-message-body" data-stream>${formatGeneralChat(active.text)}</div></div></article>`);
    list.innerHTML=threads.map(t=>`<div class="chat-thread-item ${t.id===thread.id?'active':''}"><button type="button" data-general-thread="${escape(t.id)}">${escape(t.title)}</button><button type="button" data-general-delete="${escape(t.id)}" aria-label="Excluir conversa">×</button></div>`).join('');
-   pending.classList.toggle('hidden',!files.length);pending.innerHTML=files.map((f,i)=>`<span><strong>${escape(f.name)}</strong><button type="button" data-remove-file="${i}" aria-label="Remover ${escape(f.name)}">×</button></span>`).join('');
+   pending.classList.toggle('hidden',!files.length);pending.innerHTML=files.map((f,i)=>`<span class="general-chat-pending-file"><strong title="${escape(f.name)}">${escape(f.name)}</strong><button class="general-chat-remove-file" type="button" data-remove-file="${i}" aria-label="Remover ${escape(f.name)}" ${busy?'disabled':''}>Remover <span aria-hidden="true">×</span></button></span>`).join('');
    send.disabled=busy;send.hidden=busy;attach.disabled=busy;fileInput.disabled=busy;stop.hidden=!busy;
    if(composerFocused)(busy?stop:input).focus();
    requestAnimationFrame(()=>{messages.scrollTop=messages.scrollHeight;});
@@ -141,10 +157,14 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    try{await request('/api/chat/cancel',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({threadId:task.threadId,requestId:task.requestId})});if(task.controller)task.controller.abort();else watch();}
    catch(e){showError(e.message);}
  });
- fileInput.addEventListener('change',e=>{e.stopImmediatePropagation();const next=[...fileInput.files];
+ function addFiles(next){
+   if(active||thread.processing?.status==='running'||!next.length)return;
    if(next.some(f=>f.size>50*1024*1024)){showError('Cada arquivo pode ter até 50 MB.');return;}
-   files.push(...next);showError();render();},true);
- pending.addEventListener('click',e=>{const b=e.target.closest('[data-remove-file]');if(b){e.stopImmediatePropagation();files.splice(Number(b.dataset.removeFile),1);render();}},true);
+   files.push(...next);showError();render();
+ }
+ fileInput.addEventListener('change',e=>{e.stopImmediatePropagation();addFiles([...fileInput.files]);fileInput.value='';},true);
+ bindChatFileDrop(form.closest('.chat-main'),{addFiles,isBusy:()=>Boolean(active)||thread.processing?.status==='running'});
+ pending.addEventListener('click',e=>{const b=e.target.closest('[data-remove-file]');if(b){e.stopImmediatePropagation();if(active||thread.processing?.status==='running')return;const index=Number(b.dataset.removeFile);files.splice(index,1);render();(pending.querySelector(`[data-remove-file="${Math.min(index,files.length-1)}"]`)||attach).focus();}},true);
  for(const id of ['chatNewButton','chatMobileNewButton'])document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();newThread();},true);
  list.addEventListener('click',async e=>{const button=e.target.closest('[data-general-thread],[data-general-delete]');if(!button)return;e.stopImmediatePropagation();if(active)return;
    try{if(button.dataset.generalDelete){await request('/api/chat/threads/'+button.dataset.generalDelete,{method:'DELETE'});threads=threads.filter(t=>t.id!==button.dataset.generalDelete);if(thread.id===button.dataset.generalDelete)newThread();render();}
