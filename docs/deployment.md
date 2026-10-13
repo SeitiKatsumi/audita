@@ -1,5 +1,9 @@
 # Deploy
 
+## Publicacao consolidada de certidoes — 13/10/2026
+
+Publicacao autorizada de todas as mudancas locais/main: enriquecimento CPF/CNPJ, formulario sem checkboxes duplicados e opcao Continuar sem pagar — teste, incluindo as atualizacoes de links/menu e anexos do chat ja enviadas. Suite Node/PGlite579/579 e Chrome com fornecedores ficticios aprovados. Sem migracoes ou dependencias novas. Fazer backup PostgreSQL/config antes da alteracao; preservar chaves/volumes e adicionar somente AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED=true ao ambiente do app, conforme pedido de testes. Manter imagem/versao anterior para rollback; desligar o flag revoga novas liberacoes. Confirmar CI, imagem concluida, saude/banco/auth, assets e disponibilidade do bypass sem realizar consulta ou cobranca real. Publicacao em andamento; registrar versao e verificacoes finais abaixo.
+
 ## Reunião de 08/10 — publicada em 09/10/2026
 
 PR19, código/runtime `8fffb98`, CapRover `audita:152`; imagem anterior `151`. 575 testes Node/PGlite aprovados, CI da branch/main verde, Chrome com provedores fictícios até relatório/PDF e mobile sem overflow. Smoke, banco pronto, nove assets iguais ao Git e endpoints privados401 sem sessão. Main local/localhost3000 consolidada. Website68 preservado.

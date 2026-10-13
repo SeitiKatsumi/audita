@@ -6598,7 +6598,7 @@ function configureSellerFlow(page) {
     : `${segment.description} Do CPF ou CNPJ ao relatório: escolha um ou vários estados, ou todo o Brasil.`;
   document.querySelector('#sellerFlowSteps').textContent = certificates ? 'Dados do titular → Seleção e emissão → Documentos disponíveis' : 'Dados do titular → Levantamento das fontes → Análise por IA e relatório PDF';
   document.querySelector('.seller-analysis-form-heading strong').textContent=certificates?'Dados do titular':segment.question;
-  document.querySelector('.seller-analysis-form-heading small').textContent=certificates?'Informe o titular e selecione as certidões, comprovantes e consultas.':`Informe o CPF ou CNPJ e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente. ${segment.scope}`;
+  document.querySelector('.seller-analysis-form-heading small').textContent=certificates?'Informe o CPF ou CNPJ e selecione as certidões, comprovantes e consultas. Os dados disponíveis serão preenchidos automaticamente.':`Informe o CPF ou CNPJ e o estado. Os documentos e as empresas vinculadas serão consultados automaticamente. ${segment.scope}`;
   document.querySelector('#sellerAiConsentLabel').hidden = true;
   const consent = document.querySelector('#sellerAnalysisAiConsent');
   consent.disabled = certificates;
@@ -6607,14 +6607,16 @@ function configureSellerFlow(page) {
   sellerAnalysisForm.hidden = false;
   sellerAnalysisSubmit.disabled = false;
   sellerAnalysisSubmit.textContent = certificates ? 'Obter documentos e consultas' : 'Avançar e iniciar extração →';
-  for(const selector of ['#sellerManualSelection','#sellerPaidConsentLabel']) document.querySelector(selector).hidden=!certificates;
+  document.querySelector('#sellerManualSelection').hidden=!certificates;
+  document.querySelector('#sellerAuthorizationLabel').hidden=certificates;
+  sellerAnalysisAuthorization.disabled=certificates;
+  sellerAnalysisAuthorization.required=!certificates;
   document.querySelector('#sellerStatesChoice').open=certificates;
   document.querySelector('#sellerStatesChoice summary').textContent=certificates?'Estados da consulta':'Outros estados ou Brasil inteiro — opcional';
   document.querySelector('#sellerManualCompanies').hidden=true;
   document.querySelector('#sellerStateField').hidden=certificates;
   document.querySelector('#sellerAnalysisState').required=!certificates;
   document.querySelector('#sellerStateField').firstChild.textContent = segment.id === 'analise-vendedor' ? 'Estado do vendedor' : 'Estado do titular';
-  document.querySelector('#sellerAnalysisPaid').required=certificates;
   document.querySelector('#sellerAuthorizationText').textContent=certificates?'Tenho autorização ou base legal para consultar este titular.':'Tenho autorização ou base legal para consultar este titular e autorizo o levantamento e a análise dos documentos pela IA da Audita (OpenAI).';
   document.querySelector('#sellerStepNav li:last-child').hidden=certificates;
   setSellerStep(1);
@@ -6652,7 +6654,7 @@ function updateSellerDocumentType() {
   document.querySelector('#sellerFullNameLabel').textContent=company?'Razão social':'Nome completo';
   sellerAnalysisCpf.maxLength=company?18:14;
   sellerAnalysisCpf.placeholder=company?'00.000.000/0000-00':'000.000.000-00';
-  document.querySelector('#sellerIdentityHint').hidden=isCertificateOnly();
+  document.querySelector('#sellerIdentityHint').hidden=false;
   if(isCertificateOnly()&&sellerCoverage) renderCertificateChoices();
   updateSellerMunicipalities();
   updateSellerEstimate();
@@ -6704,25 +6706,26 @@ function updateSellerEstimate() {
   if(sellerCoverage?.certificateComplimentary)quote.amountCents=0;
   const target = document.querySelector("#sellerAnalysisCost");
   const state=selectedSellerState();
-  const identityCost=!isCertificateOnly()&&sellerDocumentType()==='cpf'&&(!sellerAnalysisFullName.value.trim()||((selected.length||queries.some(item=>item.endpoint==='CertidaoConjuntaDebitosPessoaFisica'))&&!document.querySelector('#sellerAnalysisBirthDate').value)) ? Number(sellerCoverage?.identityQueryCostBrl ?? .36) : 0;
+  const courtFields=new Set(selected.flatMap(c=>c.requiredIdentityFields||[]));
+  const identityFields={fullName:sellerAnalysisFullName.value.trim(),motherName:sellerAnalysisMotherName?.value.trim(),birthDate:document.querySelector('#sellerAnalysisBirthDate')?.value,gender:document.querySelector('#sellerAnalysisGender')?.value};
+  const requiredIdentity=['fullName',...courtFields,...(queries.some(item=>item.endpoint==='CertidaoConjuntaDebitosPessoaFisica')?['birthDate']:[])];
+  const identityCost=sellerDocumentType()==='cpf'&&requiredIdentity.some(field=>field!=='rg'&&!identityFields[field]) ? Number(sellerCoverage?.identityQueryCostBrl ?? .36) : 0;
   const brl=value=>`R$ ${value.toFixed(2).replace('.',',')}`;
   if(typeof sellerAnalysisSubmit!=='undefined'&&sellerAnalysisSubmit&&!sellerAnalysisSubmit.disabled)sellerAnalysisSubmit.textContent=quote.amountCents>0?'Continuar para pagamento':isCertificateOnly()?'Obter documentos e consultas':'Avançar e iniciar extração →';
-  if(target)target.innerHTML=!isCertificateOnly()&&!state?'Selecione o estado para calcular a estimativa.':`<small>${selected.length+queries.length} fontes selecionadas · ${selectedSellerUfs().length} estados · pagamento único</small>${quote.discountCents?`<small><s>${brl(quote.baseCents/100)}</s> · 30% de desconto de assinante</small>`:''}<strong>${brl(quote.amountCents/100)}</strong><small>${sellerCoverage?.certificateComplimentary?'Acesso individual liberado. ':''}${sellerCoverage?.certificateSubscriber?'Fontes gratuitas do provedor sem cobrança para assinantes. ':''}A coleta depende de cada fonte. ${isCertificateOnly()?'Consultas de dados não são certidões oficiais. Análise opcional incluída para assinantes IA.':'Inclui levantamento e relatório de IA; até cinco empresas vinculadas ao CPF.'}${quote.amountCents>0&&sellerCoverage?.certificateCheckoutReady===false?' Pagamento indisponível neste ambiente; nenhuma coleta será iniciada.':''}</small>${identityCost?`<small>Se necessário, o preenchimento cadastral automático usa a consulta ao CPF (${brl(identityCost)} de custo do provedor), pela carteira existente.</small>`:''}`;
-  const courtFields=new Set(selected.flatMap(c=>c.requiredIdentityFields||[]));
+  if(target)target.innerHTML=!isCertificateOnly()&&!state?'Selecione o estado para calcular a estimativa.':`<small>${selected.length+queries.length} fontes selecionadas · ${selectedSellerUfs().length} estados · pagamento único</small>${quote.discountCents?`<small><s>${brl(quote.baseCents/100)}</s> · 30% de desconto de assinante</small>`:''}<strong>${brl(quote.amountCents/100)}</strong><small>${sellerCoverage?.certificateComplimentary?'Acesso individual liberado. ':''}${sellerCoverage?.certificateSubscriber?'Fontes gratuitas do provedor sem cobrança para assinantes. ':''}A coleta depende de cada fonte. ${isCertificateOnly()?'Consultas de dados não são certidões oficiais. Análise opcional incluída para assinantes IA.':'Inclui levantamento e relatório de IA; até cinco empresas vinculadas ao CPF.'}${quote.amountCents>0&&sellerCoverage?.certificateCheckoutReady===false?(isCertificateOnly()&&sellerCoverage?.certificateTestBypassEnabled?' Pagamento indisponível; você pode usar o bypass de teste na próxima etapa.':' Pagamento indisponível neste ambiente; nenhuma coleta será iniciada.'):''}</small>${identityCost?`<small>Se necessário, o preenchimento cadastral automático usa a consulta ao CPF (${brl(identityCost)} de custo do provedor), pela carteira existente.</small>`:''}`;
   for (const selector of ["#sellerAnalysisRg", "#sellerAnalysisGender"]) {
     const field = document.querySelector(selector);
-    if (field) field.required = isCertificateOnly() ? courtFields.has(selector==='#sellerAnalysisRg'?'rg':'gender') : sellerMissingIdentityFields.has(selector==='#sellerAnalysisRg'?'rg':'gender');
+    if (field) field.required = sellerMissingIdentityFields.has(selector==='#sellerAnalysisRg'?'rg':'gender');
   }
   const birthDate = document.querySelector("#sellerAnalysisBirthDate");
-  if (birthDate) birthDate.required = isCertificateOnly() ? courtFields.has('birthDate') || queries.some((item) => item.endpoint === "CertidaoConjuntaDebitosPessoaFisica") : sellerMissingIdentityFields.has('birthDate');
+  if (birthDate) birthDate.required = sellerMissingIdentityFields.has('birthDate');
   const name=sellerAnalysisFullName;
-  if(name) name.required=isCertificateOnly()||sellerMissingIdentityFields.has('fullName');
-  if(sellerAnalysisMotherName) sellerAnalysisMotherName.required=sellerMissingIdentityFields.has('motherName')||(isCertificateOnly()&&courtFields.has('motherName'));
+  if(name) name.required=sellerMissingIdentityFields.has('fullName');
+  if(sellerAnalysisMotherName) sellerAnalysisMotherName.required=sellerMissingIdentityFields.has('motherName');
   for(const [wrapper,field] of [['#sellerBirthDateField',birthDate],['#sellerRgField',document.querySelector('#sellerAnalysisRg')],['#sellerGenderField',document.querySelector('#sellerAnalysisGender')],['#sellerFullNameField',name],['#sellerAnalysisMotherField',sellerAnalysisMotherName]]) {
     const element=document.querySelector(wrapper); if(element) element.hidden=!field?.required;
     if(field) field.disabled=!field.required;
   }
-  if (!selected.length && sellerAnalysisMotherName) sellerAnalysisMotherName.required = false;
 }
 async function loadSellerCoverage() {
   const target = document.querySelector("#sellerAnalysisCoverage");
@@ -6783,11 +6786,24 @@ async function followCertificatePayment(id){
         sessionStorage.removeItem(key);sessionStorage.setItem(sellerHistoryKey(),order.consultaId);clearCertificateReturn();
         await loadSellerAnalysisResult(order.consultaId);return;
       }
-      const review=order.status==='review_required',closed=['failed','expired'].includes(order.status),waiting=['paid','starting'].includes(order.status);
-      if(lastStatus!==order.status){
-        lastStatus=order.status;
-        sellerAnalysisResult.innerHTML=`<article class="certificate-payment"><h3>${review?'Pagamento recebido — confira com a equipe':closed?'Pagamento não concluído':waiting?'Pagamento confirmado — preparando coleta':order.flow==='seller'?'Pagamento da análise':'Pagamento da emissão'}</h3><p>${order.documentCount} fontes selecionadas</p>${order.discountCents?'<p>30% de desconto de assinante aplicado.</p>':''}<strong class="certificate-price">R$ ${(order.amountCents/100).toFixed(2).replace('.',',')}</strong><p>${review?'O início da coleta precisa ser conferido pela equipe. Não pague nem envie este pedido novamente.':closed?'O pagamento falhou ou o checkout expirou. Volte à seleção para abrir um novo pedido.':waiting?'Aguarde o início da coleta. Seu pagamento já foi confirmado; não pague novamente.':'A coleta começa após a confirmação do pagamento. Os métodos disponíveis aparecem no checkout.'}</p><div class="certificate-payment-actions">${!review&&!closed&&!waiting&&order.checkoutUrl?'<button type="button" class="primary-action" data-certificate-pay>Ir para pagamento</button>':''}<button type="button" class="secondary-action" data-certificate-refresh>Verificar pagamento</button>${!waiting&&!review?'<button type="button" class="secondary-action" data-certificate-back>Voltar à seleção</button>':''}</div><small role="status" data-certificate-status></small></article>`;
+      const review=order.status==='review_required',closed=['failed','expired'].includes(order.status),waiting=['paid','starting'].includes(order.status),bypass=order.testBypassAvailable===true;
+      const statusKey=order.status+':'+bypass;
+      if(lastStatus!==statusKey){
+        lastStatus=statusKey;
+        sellerAnalysisResult.innerHTML=`<article class="certificate-payment"><h3>${review?(order.testBypassed?'Teste liberado — confira com a equipe':'Pagamento recebido — confira com a equipe'):closed?'Pagamento não concluído':waiting?(order.testBypassed?'Teste liberado — preparando coleta':'Pagamento confirmado — preparando coleta'):order.flow==='seller'?'Pagamento da análise':'Pagamento da emissão'}</h3><p>${order.documentCount} fontes selecionadas</p>${order.discountCents?'<p>30% de desconto de assinante aplicado.</p>':''}<strong class="certificate-price">R$ ${(order.amountCents/100).toFixed(2).replace('.',',')}</strong><p>${review?'O início da coleta precisa ser conferido pela equipe. Não pague nem envie este pedido novamente.':closed?'O pagamento falhou ou o checkout expirou. Volte à seleção para abrir um novo pedido.':waiting?(order.testBypassed?'Aguarde o início da coleta em modo de teste. Nenhum pagamento foi registrado.':'Aguarde o início da coleta. Seu pagamento já foi confirmado; não pague novamente.'):bypass?'Continue para o pagamento ou use a opção de teste abaixo.':'A coleta começa após a confirmação do pagamento. Os métodos disponíveis aparecem no checkout.'}</p><div class="certificate-payment-actions">${!review&&!closed&&!waiting&&order.checkoutUrl?'<button type="button" class="primary-action" data-certificate-pay>Ir para pagamento</button>':''}${bypass?'<button type="button" class="secondary-action" data-certificate-test>Continuar sem pagar — teste</button>':''}<button type="button" class="secondary-action" data-certificate-refresh>Verificar pagamento</button>${!waiting&&!review?'<button type="button" class="secondary-action" data-certificate-back>Voltar à seleção</button>':''}</div>${bypass?'<p>O bypass ignora a cobrança da Audita. As fontes externas podem gerar custos de consulta.</p>':''}<small role="status" data-certificate-status></small></article>`;
         sellerAnalysisResult.querySelector('[data-certificate-pay]')?.addEventListener('click',()=>{const url=new URL(order.checkoutUrl);if(url.protocol==='https:'&&url.hostname==='checkout.stripe.com')location.assign(url.href);});
+        sellerAnalysisResult.querySelector('[data-certificate-test]')?.addEventListener('click',async event=>{
+          const button=event.currentTarget,status=sellerAnalysisResult.querySelector('[data-certificate-status]');
+          button.disabled=true;status.textContent='Iniciando em modo de teste…';
+          try{
+            const response=await fetch(`/api/certificate-orders/${encodeURIComponent(id)}/test-bypass`,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
+            const data=await response.json();
+            if(run!==certificatePaymentRun||getActivePage()!==page)return;
+            if(!response.ok){status.textContent=data.error==='certificate_test_bypass_disabled'?'O bypass de teste foi desativado neste ambiente.':'Não foi possível iniciar em modo de teste. Verifique o pedido antes de tentar novamente.';return;}
+            await refresh();
+          }catch{if(run===certificatePaymentRun)status.textContent='Não foi possível confirmar o início. Use Verificar pagamento antes de tentar novamente.';}
+          finally{button.disabled=false;}
+        });
         sellerAnalysisResult.querySelector('[data-certificate-refresh]')?.addEventListener('click',refresh);
         sellerAnalysisResult.querySelector('[data-certificate-back]')?.addEventListener('click',()=>{certificatePaymentRun++;clearTimeout(timer);sessionStorage.removeItem(key);clearCertificateReturn();setSellerStep(1);});
       }
@@ -6832,7 +6848,7 @@ document.querySelector('#sellerAnalysisState')?.addEventListener('change',()=>{u
 document.querySelector('#sellerAnalysisMunicipality')?.addEventListener('change',updateSellerEstimate);
 document.querySelector('#sellerAnalysisDocumentType')?.addEventListener('change',()=>{sellerAnalysisCpf.value='';resetSellerIdentity();updateSellerDocumentType();sellerAnalysisError.textContent='';sellerAnalysisCpf.focus();});
 sellerAnalysisAuthorization?.addEventListener('change',()=>{
-  if(!isCertificateOnly()) for(const selector of ['#sellerAnalysisPaid','#sellerAnalysisAiConsent']) document.querySelector(selector).checked=sellerAnalysisAuthorization.checked;
+  if(!isCertificateOnly()) document.querySelector('#sellerAnalysisAiConsent').checked=sellerAnalysisAuthorization.checked;
 });
 
 function isValidSellerAnalysisCpf(value) {
@@ -9200,21 +9216,17 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
     document.querySelector("#sellerAnalysisCompanyCnpjs")?.focus();
     return;
   }
-  if (!automatic&&!document.querySelector("#sellerAnalysisPaid")?.checked) {
-    sellerAnalysisError.textContent = "Confirme o custo das consultas selecionadas.";
-    return;
-  }
   if (!(documentType==='cnpj'?isValidSellerAnalysisCnpj(cpf):isValidSellerAnalysisCpf(cpf))) {
     if (sellerAnalysisError) sellerAnalysisError.textContent = documentType==='cnpj'?'Informe um CNPJ válido.':"Informe um CPF válido.";
     sellerAnalysisCpf?.focus();
     return;
   }
-  if (!fullName && (!automatic||sellerMissingIdentityFields.has('fullName'))) {
+  if (!fullName && sellerMissingIdentityFields.has('fullName')) {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Informe o nome completo do titular.";
     sellerAnalysisFullName?.focus();
     return;
   }
-  if (!sellerAnalysisAuthorization?.checked) {
+  if (automatic && !sellerAnalysisAuthorization?.checked) {
     if (sellerAnalysisError) sellerAnalysisError.textContent = "Confirme a autorização ou base legal para realizar a consulta.";
     sellerAnalysisAuthorization?.focus();
     return;

@@ -11,14 +11,16 @@ export const certificatePriceCents=cost=>{
 };
 
 // Orders reuse audit JSON; keep the encrypted request for manual recovery after provider interruption.
-export function createCertificateOrderService({getDb,checkout,startAudit,env=process.env,now=()=>Date.now()}){
+export function createCertificateOrderService({getDb,checkout,checkoutReady=()=>true,startAudit,env=process.env,now=()=>Date.now()}){
   const key=()=>irKey(env.AUDITA_PROFILE_ENCRYPTION_KEY);
+  const testBypassEnabled=()=>env.AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED==='true';
+  const canTestBypass=o=>testBypassEnabled()&&(o.flow||'certificates')==='certificates';
   function db(){const d=getDb();check(d?.dbReady&&d.pool&&key(),'certificate_storage_unavailable','O armazenamento seguro está indisponível.',503);return d.pool;}
   const signed=a=>check(a?.tenantId&&a?.user?.id&&!a.unauthorized,'authentication_required','Entre para continuar.',401);
   const seal=(id,value)=>sealIr(value,key(),'certificate-order:'+id);
   const open=(id,value)=>openIr(value,key(),'certificate-order:'+id);
   async function owned(a,id){signed(a);check(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id)),'certificate_order_not_found','Pedido não encontrado.',404);const row=(await db().query('SELECT public_id,request_payload FROM audita_audits WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3',[id,a.tenantId,a.user.id])).rows[0];check(row?.request_payload?.certificateOrder,'certificate_order_not_found','Pedido não encontrado.',404);return row.request_payload.certificateOrder;}
-  const publicOrder=(id,o)=>({orderId:id,status:o.status,amountCents:o.amountCents,baseCents:o.baseCents,discountCents:o.discountCents,subscriber:o.subscriber,flow:o.flow||'certificates',segment:o.segment||'analise-vendedor',documentCount:o.documentCount,consultaId:o.status==='started'?id:null,...(o.status==='pending'&&o.checkout?{checkoutUrl:o.checkout.url}:{})});
+  const publicOrder=(id,o)=>({orderId:id,status:o.status,amountCents:o.amountCents,baseCents:o.baseCents,discountCents:o.discountCents,subscriber:o.subscriber,flow:o.flow||'certificates',segment:o.segment||'analise-vendedor',documentCount:o.documentCount,consultaId:o.status==='started'?id:null,testBypassAvailable:canTestBypass(o)&&o.status==='pending',testBypassed:o.testBypassed===true,...(o.status==='pending'&&o.checkout?{checkoutUrl:o.checkout.url}:{})});
   async function update(a,id,o){await db().query("UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{certificateOrder}',$4::jsonb),updated_at=NOW() WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3",[id,a.tenantId,a.user.id,JSON.stringify(o)]);}
   async function create(a,body,{providerCostBrl,costs=[providerCostBrl],subscriber=false,complimentary=false,documentCount}){
     signed(a);check(Array.isArray(costs)&&costs.length>0&&costs.length<=300,'invalid_certificate_price','Seleção inválida.',400);
@@ -29,11 +31,25 @@ export function createCertificateOrderService({getDb,checkout,startAudit,env=pro
     await db().query(`INSERT INTO audita_audits(public_id,tenant_id,requested_by_user_id,document_type,tipo_documento,document_hash,documento_hash,document_masked,subject_name,status,authorization_confirmed,request_payload)
       VALUES($1,$2,$3,$4,$4,$5,$5,$6,$7,'pending',true,$8)`,[id,a.tenantId,a.user.id,body.tipoDocumento,hashDocument(a.tenantId,body.documento),maskDocument(body.tipoDocumento,body.documento),body.extraFields.stateCourtFields.fullName,JSON.stringify({sellerFlow:order.flow,sellerSegment:order.segment,fontes:body.fontes,certificateOrder:order})]);
     if(!order.amountCents)return collect(a,id,{});
+    if(canTestBypass(order)&&!checkoutReady())return publicOrder(id,order);
     order.checkout=await checkout(a,{id,amountCents:order.amountCents,flow:order.flow,segment:order.segment});
     check(order.checkout?.id&&/^https:\/\/checkout\.stripe\.com\//.test(order.checkout.url),'certificate_checkout_invalid','Não foi possível abrir o pagamento.',502);
     await update(a,id,order);return publicOrder(id,order);
   }
   async function get(a,id){const o=await owned(a,id);return publicOrder(id,o);}
+  async function testBypass(a,id,request={}){
+    signed(a);check(testBypassEnabled(),'certificate_test_bypass_disabled','O bypass de teste não está habilitado neste ambiente.',403);
+    const order=await owned(a,id);
+    check((order.flow||'certificates')==='certificates','certificate_test_bypass_unavailable','O bypass de teste está disponível somente para emissão de certidões.',409);
+    if(['started','starting'].includes(order.status))return publicOrder(id,order);
+    if(order.status==='paid')return collect(a,id,request);
+    check(order.status==='pending','certificate_test_bypass_unavailable','Este pedido precisa de conferência antes de continuar.',409);
+    const marked=await db().query(`UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{certificateOrder}',
+      (request_payload->'certificateOrder') || $4::jsonb),updated_at=NOW()
+      WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3 AND request_payload->'certificateOrder'->>'status'='pending' RETURNING public_id`,
+      [id,a.tenantId,a.user.id,JSON.stringify({status:'paid',testBypassed:true,testBypassedAt:now(),testBypassedBy:a.user.id})]);
+    return marked.rows.length?collect(a,id,request):get(a,id);
+  }
   async function collect(a,id,request){
     const order=await owned(a,id);if(order.status==='started')return publicOrder(id,order);
     check(order.status==='paid','certificate_payment_pending','Aguardando confirmação do pagamento.',409);
@@ -64,5 +80,5 @@ export function createCertificateOrderService({getDb,checkout,startAudit,env=pro
     const marked=await db().query("UPDATE audita_audits SET request_payload=jsonb_set(jsonb_set(request_payload,'{certificateOrder,status}','\"paid\"'),'{certificateOrder,paidAt}',$4::jsonb),updated_at=NOW() WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3 AND request_payload->'certificateOrder'->>'status' IN ('pending','expired','failed') RETURNING public_id",[id,a.tenantId,a.user.id,JSON.stringify(now())]);
     if(marked.rows.length)await collect(a,id,{});return {tenantId:a.tenantId};
   }
-  return {create,get,collect,paymentEvent,ready:()=>Boolean(getDb()?.dbReady&&key())};
+  return {create,get,collect,paymentEvent,testBypass,testBypassEnabled,ready:()=>Boolean(getDb()?.dbReady&&key())};
 }
