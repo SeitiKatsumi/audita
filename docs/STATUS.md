@@ -739,3 +739,7 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 # 2026-10-12 - Estilo da consulta de jurisprudencias
 - Codex, codex/jurisprudence-link-style, integrado na main local: Consultar jurisprudencias agora usa texto verde sublinhado e seta, fundo transparente, sem botao azul. Mantidos botao semantico, foco por teclado e abertura do dialogo existente. Onze testes de catalogo aprovados, diff check e HTML na3000 conferidos. Commit/push solicitados; sem deploy.
+
+# 2026-10-13 - Rotulo Nova consulta
+- Codex, codex/new-query-label, integrado na main local: sellerChangeData exibe apenas Nova consulta. Alteracao textual sem mudar acao. Rotulo confirmado por HTTP200 na3000; diff check aprovado. Sem commit/push/deploy.
+- Download na analise opcional de certidoes renomeado para Obter certidoes; demais analises mantem rotulo original. Acao de download preservada. Sintaxe/diff check aprovados e JS atualizado confirmado por HTTP200 na3000. Sem commit/push/deploy.
