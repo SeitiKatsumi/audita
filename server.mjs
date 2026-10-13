@@ -1783,6 +1783,7 @@ const stripeBillingService = createStripeBillingService({
 });
 const certificateOrderService=createCertificateOrderService({getDb:()=>({pool,dbReady}),
   checkout:(auth,order)=>stripeBillingService.createCertificateCheckoutSession(auth,order),
+  checkoutReady:()=>billingConfiguration().checkoutReady&&billingConfiguration().webhookReady,
   startAudit:(request,options)=>auditService.startAudit(request,options)});
 async function certificateBenefits(auth) {
   if(auth.unauthorized||!auth.user)return {subscriber:false,complimentary:false};
@@ -3953,7 +3954,7 @@ async function handleApi(request, response, pathname) {
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
     };
     sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage), companyStates: sellerStatePlans(coverage,'cnpj'), identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl,
-      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateSubscriber:benefits.subscriber,certificateComplimentary:benefits.complimentary,certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
+      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateSubscriber:benefits.subscriber,certificateComplimentary:benefits.complimentary,certificateTestBypassEnabled:certificateOrderService.ready()&&certificateOrderService.testBypassEnabled(),certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
     return true;
   }
 
@@ -4034,10 +4035,6 @@ async function handleApi(request, response, pathname) {
       const requiredIdentity = [...new Set(['fullName', ...(needsBirthDate ? ['birthDate'] : []), ...(autonomousPlan?.requiredIdentityFields || []), ...(pathname === '/api/seller-analysis/df' ? ['motherName'] : [])])];
       const identity = () => ({ fullName: resolvedFullName, motherName: resolvedMotherName, birthDate: body.birthDate, rg: String(body.rg || '').trim().slice(0,30), gender: ['Masculino','Feminino'].includes(body.gender) ? body.gender : '' });
       const missingIdentity = () => requiredIdentity.filter(field => !identity()[field]);
-
-      if(body.flow==='certificates'&&missingIdentity().length) {
-        sendJson(response,422,{error:'seller_identity_fields_required',missingFields:missingIdentity(),identity:identity(),motherNameRequired:missingIdentity().includes('motherName')});return true;
-      }
 
       if (isCompany && !resolvedFullName) {
         const company = await collectSellerCompany({documento:document,tipoDocumento:'cnpj',extraFields:{},retries:0,timeoutMs:15000});
@@ -4131,7 +4128,7 @@ async function handleApi(request, response, pathname) {
         request.body.extraFields.paidQueryConfirmed = body.paidQueryConfirmed === true;
         Object.assign(request.body.extraFields.stateCourtFields, {
           birthDate: body.birthDate.split("-").reverse().join("/"),
-          rg: String(body.rg).trim().slice(0, 30),
+          rg: String(body.rg || '').trim().slice(0, 30),
           email: String(body.email || "").trim().slice(0, 180),
           gender: body.gender === "Feminino" ? "Feminino" : "Masculino",
         });
@@ -4143,7 +4140,8 @@ async function handleApi(request, response, pathname) {
         if(!costs.length)costs.push(0);
         const quote=certificateQuote(costs,benefits.subscriber);
         const catalog=billingConfiguration();
-        if(!certificateOrderService.ready()||quote.amountCents>0&&!benefits.complimentary&&(!catalog.checkoutReady||!catalog.webhookReady)) {
+        const testBypassAvailable=body.flow==='certificates'&&certificateOrderService.testBypassEnabled?.()===true;
+        if(!certificateOrderService.ready()||quote.amountCents>0&&!benefits.complimentary&&!testBypassAvailable&&(!catalog.checkoutReady||!catalog.webhookReady)) {
           sendJson(response,503,{error:'billing_not_configured',message:'O pagamento está temporariamente indisponível. Nenhuma emissão foi iniciada.'});return true;
         }
         const order=await certificateOrderService.create(authContext,request.body,{providerCostBrl,costs,...benefits,documentCount:(autonomousPlan?.certificates.length||0)+(sellerDocumentPlan?.queries.length||0)||1});
@@ -4155,6 +4153,16 @@ async function handleApi(request, response, pathname) {
         message: 'Não foi possível preparar a consulta. Tente novamente ou contate a equipe.',
       });
     }
+    return true;
+  }
+
+  const certificateTestBypassMatch=pathname.match(/^\/api\/certificate-orders\/([0-9a-fA-F-]{36})\/test-bypass$/);
+  if(certificateTestBypassMatch&&request.method==='POST') {
+    try {
+      if(!String(request.headers['content-type']).startsWith('application/json')||request.headers['sec-fetch-site']==='cross-site'||(request.headers.origin&&new URL(request.headers.origin).host!==request.headers.host)){sendJson(response,403,{error:'same_origin_required'});return true;}
+      const order=await certificateOrderService.testBypass(await getTenantIdForRequest(request),certificateTestBypassMatch[1],request);
+      sendJson(response,202,order);
+    }catch(error){sendJson(response,error.statusCode||error.status||500,{error:error.code||'certificate_test_bypass_failed',message:error.code==='certificate_test_bypass_disabled'?'O bypass de teste não está habilitado neste ambiente.':'Não foi possível iniciar este pedido em modo de teste.'});}
     return true;
   }
 

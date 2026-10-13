@@ -12,7 +12,71 @@ import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER,certificateQu
 import { sellerStatePlans,sellerQueriesForState } from '../services/seller-state-plan.mjs';
 import { createDirectDataSellerService } from "../services/direct-data-seller.service.mjs";
 import { createSellerReviewService } from '../services/seller-review.service.mjs';
-import { personNamesMatch, normalizePersonBirthDate } from "../services/direct-data-person.service.mjs";
+import { personNamesMatch, normalizePersonBirthDate, createDirectDataPersonService } from "../services/direct-data-person.service.mjs";
+
+test('certificate issuance enriches CPF before asking for missing data, reuses scoped cache and keeps checkout before collection', async () => {
+  const owner={tenantId:1,user:{id:811}},orders=[],charges=[];
+  let providerCalls=0;
+  const person=createDirectDataPersonService({
+    env:{DIRECT_DATA_PERSON_ENABLED:'true',DIRECT_DATA_TOKEN:'fixture-token'},
+    fetchImpl:async()=>{providerCalls++;return new Response(JSON.stringify({metaDados:{consultaUid:'fixture-identity'},retorno:{cpf:'52998224725',nome:'Titular Ficticio',nomeMae:'Mae Ficticia',dataNascimento:'15/02/1980',sexo:'F'}}));},
+    creditsService:{getWallet:async()=>({enabled:true,balance:10}),consume:async(actor)=>{charges.push(actor);return {ok:true};}},
+  });
+  const source=await readFile(new URL('../server.mjs',import.meta.url),'utf8');
+  const context=vm.createContext({crypto,normalizeDfSellerInput,normalizeSellerInput,normalizePersonBirthDate,buildDfSellerAuditRequest,planSellerDocuments,planAutonomousCertificates,validateCnpj,personNamesMatch,
+    certificateQuote,CERTIFICATE_PRICE_MULTIPLIER,billingConfiguration:()=>({checkoutReady:true,webhookReady:true}),
+    chatAccessService:{getAccess:async()=>({active:false})},sellerReviewService:{ready:()=>{throw Error('issuance must not call AI');}},
+    certificateOrderService:{ready:()=>true,create:async(actor,body,quote)=>{orders.push({actor,body,quote});return {orderId:crypto.randomUUID(),status:'pending'};}},
+    collectSellerCompany:async(input)=>({status:'success',dados:{cnpj:input.documento,razaoSocial:'Empresa Ficticia Ltda'}}),
+    directDataPersonService:person,directDataCertificatesService:{getStatus:()=>({configured:true,allowedUfs:['AP']})},directDataSellerService:{getStatus:()=>({configured:true})},
+    getTenantIdForRequest:async(request)=>request.auth||{unauthorized:true},readJsonBody:async(request)=>request.body,sendJson:(response,status,body)=>Object.assign(response,{status,body}),
+  });
+  vm.runInContext(`${source.slice(source.indexOf('async function certificateBenefits('),source.indexOf('const chatDocumentsService ='))} async function handle(pathname,request,response){${source.slice(source.indexOf('  if (["/api/seller-analysis/df"'),source.indexOf('  const certificateOrderMatch='))}}`,context);
+  const post=async(body,auth=owner)=>{const response={};await context.handle('/api/seller-analysis',{method:'POST',auth,body:structuredClone(body)},response);return response;};
+  const cpf={documentType:'cpf',document:'52998224725',flow:'certificates',ufs:['DF'],courtCertificates:['DF:Cível'],sellerQueries:[],authorizationConfirmed:true,paidQueryConfirmed:true,aiConsent:true};
+  for(const [body,actor,status] of [[cpf,null,401],[{...cpf,authorizationConfirmed:false},owner,400],[{...cpf,paidQueryConfirmed:false},owner,400],[{...cpf,document:'11111111111'},owner,400],[{...cpf,courtCertificates:['DF:unknown']},owner,400]])assert.equal((await post(body,actor)).status,status);
+  assert.equal(providerCalls,0);assert.equal(orders.length,0);
+  const enriched=await post(cpf);
+  assert.equal(enriched.status,202);assert.equal(enriched.body.identityEnriched,true);assert.equal(enriched.body.checkoutRequired,true);
+  assert.equal(providerCalls,1);assert.equal(charges.length,1);
+  assert.equal(orders[0].body.extraFields.stateCourtFields.fullName,'Titular Ficticio');
+  assert.equal(orders[0].body.extraFields.stateCourtFields.motherName,'Mae Ficticia');
+  assert.equal(orders[0].body.extraFields.sellerFlow,'certificates');assert.equal(orders[0].body.extraFields.sellerAiConsent,false);
+  assert.equal(orders[0].body.extraFields.discoverCompanies,undefined);
+  assert.equal((await post(cpf)).status,202);assert.equal(providerCalls,1);assert.equal(charges.length,1,'same account reuses cached identity');
+  const partial={...cpf,ufs:['AP'],courtCertificates:['AP:Cível']};
+  const missing=await post(partial);
+  assert.equal(missing.status,422);assert.deepEqual(Array.from(missing.body.missingFields),['rg']);assert.equal(missing.body.motherNameRequired,false);
+  assert.equal(missing.body.identity.birthDate,'1980-02-15');assert.equal(missing.body.identity.gender,'Feminino');
+  assert.equal(orders.length,2,'no checkout until required identity is complete');
+  assert.equal((await post({...partial,...missing.body.identity,rg:'12345678'})).status,202);
+  assert.equal(providerCalls,1);assert.equal(charges.length,1,'manual complement does not query again');
+  assert.equal(orders.at(-1).body.extraFields.stateCourtFields.birthDate,'15/02/1980');
+  assert.equal(orders.at(-1).body.extraFields.stateCourtFields.rg,'12345678');
+  assert.equal((await post(cpf,{tenantId:1,user:{id:812}})).status,202);
+  assert.equal((await post(cpf,{tenantId:2,user:{id:811}})).status,202);
+  assert.equal(providerCalls,3);assert.equal(charges.length,3,'identity cache is isolated by tenant and user');
+  context.directDataPersonService={lookup:async()=>({unavailable:true,reason:'provider_disabled'})};
+  const fallback=await post(cpf);
+  assert.equal(fallback.status,503);assert.deepEqual(Array.from(fallback.body.missingFields),['fullName','motherName']);assert.equal(fallback.body.motherNameRequired,true);
+  assert.equal((await post({...cpf,fullName:'Titular Ficticio',motherName:'Mae Ficticia'})).status,202,'manual fields allow fallback without retrying unavailable provider');
+  context.directDataPersonService={lookup:async()=>({insufficientCredits:true,creditCost:1,wallet:{balance:0}})};
+  assert.equal((await post(cpf)).status,402);
+  context.directDataPersonService={lookup:async()=>({result:{document:'11144477735',fullName:'Outra Pessoa',motherName:'Outra Mae'}})};
+  assert.equal((await post(cpf)).status,409,'mismatched identity never reaches checkout');
+  context.directDataPersonService={lookup:async()=>({result:{document:cpf.document,fullName:'Titular Ficticio'}})};
+  const absentMother=await post(cpf);assert.equal(absentMother.status,422);assert.deepEqual(Array.from(absentMother.body.missingFields),['motherName']);assert.equal(absentMother.body.identity.fullName,'Titular Ficticio');
+  const simple=await post({...cpf,ufs:[],courtCertificates:[],sellerQueries:['cndt']});
+  assert.equal(simple.status,202,'sources without mother or birth date requirements ask for neither');
+  assert.equal((await post({...cpf,documentType:'cnpj',document:'04252011000110',ufs:[],courtCertificates:[],sellerQueries:['cndt-company'],companyCnpjs:['04252011000110']})).status,202);
+  assert.equal(orders.at(-1).body.extraFields.stateCourtFields.fullName,'Empresa Ficticia Ltda');
+  context.billingConfiguration=()=>({checkoutReady:false,webhookReady:false});
+  const manual={...cpf,fullName:'Titular Ficticio',motherName:'Mae Ficticia'};
+  assert.equal((await post({...manual,testBypass:true})).status,503,'browser flags cannot skip an unconfigured checkout');
+  context.certificateOrderService.testBypassEnabled=()=>true;
+  assert.equal((await post(manual)).status,202,'server opt-in allows a certificate order without Stripe');
+  assert.equal((await post({...manual,flow:'seller',aiConsent:false})).status,503,'test bypass does not change commercial analysis checkout');
+});
 
 test("seller POST validates selection and consent, persists the selected source and needs no unrelated identity fields", async () => {
   const pg = new PGlite();

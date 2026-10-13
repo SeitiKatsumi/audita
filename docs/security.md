@@ -30,6 +30,8 @@ persistente entre reinicios; configurar apenas apos autorizacao do responsavel.
 
 ## Principios
 
+O bypass temporário da emissão de certidões exige `AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED=true` no servidor; o padrão é desativado. O POST privado de `/api/certificate-orders/:id/test-bypass` exige mesma origem, sessão e propriedade por tenant/usuário. Atua somente sobre emissão pendente, com claim atômico e registro explícito de teste, preservando preço e sem criar pagamento recebido. Não libera análises comerciais nem pedidos em conferência. Desativar a configuração bloqueia novas liberações; consultas já iniciadas permanecem no histórico. O bypass da Audita não torna gratuitos os fornecedores externos.
+
 - Menor privilegio.
 - Segregacao de ambientes.
 - Secrets fora do codigo.

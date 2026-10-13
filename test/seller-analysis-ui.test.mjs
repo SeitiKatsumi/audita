@@ -50,7 +50,7 @@ test("seller analysis selects validated states with cost and legal consent", () 
   assert.match(indexHtml, /id="sellerAnalysisUfs"/);
   assert.match(indexHtml, /id="sellerAnalysisQueries"/);
   assert.match(indexHtml, /id="sellerAnalysisCompanyCnpjs"/);
-  assert.match(indexHtml, /id="sellerAnalysisPaid"/);
+  assert.doesNotMatch(indexHtml, /id="sellerAnalysisPaid"/);
   assert.match(indexHtml, /id="sellerAnalysisAiConsent"/);
   assert.match(appJs, /\/api\/seller-analysis\/coverage/);
   assert.match(appJs, /motherNameRequired/);
@@ -61,12 +61,12 @@ test("seller analysis selects validated states with cost and legal consent", () 
 });
 
 test("certificate groups show applicable sources, 30x prices and only required identity", async () => {
-  const elements=new Map(["#sellerAnalysisCoverage","#sellerAnalysisUfs","#sellerAnalysisQueries","#sellerAnalysisCost","#sellerAnalysisBirthDate","#sellerAnalysisRg","#sellerAnalysisGender","#sellerAnalysisDocumentType"].map(s=>[s,{innerHTML:'',value:'',required:false}]));
+  const elements=new Map(["#sellerAnalysisCoverage","#sellerAnalysisUfs","#sellerAnalysisQueries","#sellerAnalysisCost","#sellerAnalysisBirthDate","#sellerAnalysisRg","#sellerAnalysisGender","#sellerAnalysisDocumentType","#sellerBirthDateField","#sellerRgField","#sellerGenderField","#sellerFullNameField","#sellerAnalysisMotherField"].map(s=>[s,{innerHTML:'',value:'',required:false}]));
   elements.get('#sellerAnalysisDocumentType').value='cpf';
   const selected={ufs:[],queries:[],courts:[]};
   const context=vm.createContext({certificateSelection,certificateQuote,isCertificateOnly:()=>true,updateSellerMunicipalities:()=>{},
     document:{querySelector:s=>elements.get(s),querySelectorAll:s=>(s.includes('sellerAnalysisUfs')?selected.ufs:s.includes('data-certificate-court')?selected.courts:selected.queries).map(value=>({value}))},
-    sellerAnalysisMotherName:{required:false},sellerAnalysisFullName:{required:false,value:''},sellerAnalysisCpf:{value:'04252011000110'},sellerAnalysisError:null,
+    sellerAnalysisMotherName:{required:false,value:''},sellerAnalysisFullName:{required:false,value:''},sellerAnalysisCpf:{value:'04252011000110'},sellerAnalysisError:null,
     location:{search:''},sessionStorage:{getItem:()=>null},escapeHtml:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),
     fetch:async()=>({ok:true,json:async()=>({certificatePriceMultiplier:30,states:[{uf:'AP',name:'Amapá',queryIds:['fiscal','ccd','protestos','cadin']}],companyStates:[{uf:'AP',name:'Amapá',queryIds:['fgts']}],certificates:[{uf:'AP',type:'Cível',provider:'direct_data',requiredIdentityFields:['birthDate','rg']},{uf:'AP',type:'Criminal',provider:'direct_data',requiredIdentityFields:['gender']}],sellerSources:{configured:true,queries:[
       {id:'protestos',kind:'data',category:'Protestos',label:'Protestos',costBrl:3.5,documentTypes:['cpf'],scope:'Brasil',params:{}},
@@ -80,7 +80,14 @@ test("certificate groups show applicable sources, 30x prices and only required i
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Escolha os estados/);
   selected.ufs=['AP'];selected.courts=['AP:Cível'];selected.queries=['fiscal','ccd'];context.renderCertificateChoices();context.updateSellerEstimate();
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/<details open>/);assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Não inclui &lt;dívida ativa&gt;/);
-  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 48,60/);assert.equal(elements.get('#sellerAnalysisBirthDate').required,true);assert.equal(elements.get('#sellerAnalysisRg').required,true);
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 48,60/);
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/preenchimento cadastral automático/);
+  for(const selector of ['#sellerAnalysisBirthDate','#sellerAnalysisRg','#sellerAnalysisGender'])assert.equal(elements.get(selector).required,false,'identity is enriched before requesting manual input');
+  for(const selector of ['#sellerBirthDateField','#sellerRgField','#sellerGenderField','#sellerFullNameField','#sellerAnalysisMotherField'])assert.equal(elements.get(selector).hidden,true);
+  vm.runInContext("sellerMissingIdentityFields=new Set(['rg'])",context);context.updateSellerEstimate();
+  assert.equal(elements.get('#sellerAnalysisRg').required,true);assert.equal(elements.get('#sellerRgField').hidden,false);
+  assert.equal(elements.get('#sellerBirthDateField').hidden,true);assert.equal(elements.get('#sellerAnalysisMotherField').hidden,true);
+  vm.runInContext('sellerMissingIdentityFields.clear()',context);
   assert.equal(elements.get('#sellerAnalysisGender').required,false);
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Consulta de dados — sem PDF oficial/);
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Comprovante de consulta em PDF/);
