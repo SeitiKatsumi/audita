@@ -16,6 +16,8 @@ Consultas concluídas sem PDF exibem o botão **Ver resultado**, que abre no pr�
 
 ### Regras acordadas em 07/10/2026, 16h18
 
+A somatória da seleção permanece visível para todas as contas, inclusive administradores e contas com liberação individual. A liberação dispensa o pagamento no servidor, sem zerar o valor exibido; a interface informa a dispensa e oferece **Continuar sem pagar**. Descontos de assinante e fontes gratuitas mantêm as regras existentes. O bypass de teste também preserva o preço exibido e o valor salvo do pedido. A estimativa não registra pagamento ou receita.
+
 Emissao e nove analises compartilham a escolha de uma ou varias UFs/Brasil. Nacionais e tribunais regionais nao se repetem. O estado principal conserva o municipio opcional. A selecao automatica exclui fontes `manualOnly`; IEPTB basica e dossie QUOD completo sao opcoes separadas na emissao.
 
 Preco calculado por fonte, em centavos: custo-base ate R$2 ×30; acima de R$2 ×10. Fontes de custo zero custam R$10 para nao assinantes, e zero para assinantes. Assinatura IA vigente conferida no servidor concede30% sobre o total pago; Experimente pago e legado Stripe ativo tambem participam. Bypass de teste nao concede desconto; acesso individual gratuito autorizado continua preservado. Exemplos:0,54→16,20;2→60;2,95→29,50;3,50→35;6,99→69,90. Assinante paga11,34 por fonte0,54 e24,50 pela consulta3,50. O valor Brasil depende das fontes selecionadas, nunca e uma constante.

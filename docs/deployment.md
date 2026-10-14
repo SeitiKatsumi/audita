@@ -1,5 +1,9 @@
 # Deploy
 
+## Publicação final consolidada — 13/10/2026
+
+Usuário autorizou publicar tudo que falta. A versão inclui a soma visível nas contas com liberação individual, preservando descontos e preço de referência, com **Continuar sem pagar** quando a dispensa é válida no servidor. Reúne CPF/CNPJ automático, resultados em texto, bypass de teste e etapa3 de Análise IA já publicados. Sem migração, dependência ou mudança de ambiente/volumes; backup PostgreSQL/config obrigatório e rollback pela imagem159. Verificar CI, serviço saudável/concluído, versão/ativos, banco/autenticação e interface antes da entrega. Em publicação.
+
 ## Etapa3 — Análise IA das certidões — 13/10/2026
 
 Continuação autorizada do módulo publicado: etapa própria, análise geral ou de uma fonte concluída (PDF/texto), orientação opcional e relatórios salvos por escopo. Servidor resolve fontes da consulta privada; assinatura, consentimento, orçamento e claim continuam obrigatórios. Sem migração, dependência ou alteração de env/volumes.582 testes Node/PGlite aprovados; Chrome com provedores/IA fictícios confirmou geral, documento PDF, resultado em texto, histórico após recarga e celular390px sem overflow. Verificar backup/config atual, CI, imagem concluída, health/banco/auth e assets antes de concluir. Rollback por imagem158; preservar JSON/banco/documentos. Em publicação.
