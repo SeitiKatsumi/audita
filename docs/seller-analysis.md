@@ -12,6 +12,8 @@ Testes: `node --test test/analysis-segments.test.mjs test/seller-review.test.mjs
 
 ## Fluxo
 
+Consultas concluídas sem PDF exibem o botão **Ver resultado**, que abre no próprio item o resumo e os dados textuais salvos. Valores zero e falsos são preservados; falta de detalhes não é apresentada como ausência de ocorrências. A abertura não repete consultas nem chama IA. O painel e o foco do botão são preservados durante o acompanhamento de outras fontes. PDFs continuam com **Abrir PDF**; falhas e fontes pendentes não recebem o botão de resultado concluído.
+
 ### Regras acordadas em 07/10/2026, 16h18
 
 Emissao e nove analises compartilham a escolha de uma ou varias UFs/Brasil. Nacionais e tribunais regionais nao se repetem. O estado principal conserva o municipio opcional. A selecao automatica exclui fontes `manualOnly`; IEPTB basica e dossie QUOD completo sao opcoes separadas na emissao.

@@ -143,7 +143,7 @@ test("seller results preserve every source, private PDF indices and pending quer
   context.renderSellerAnalysisResult(audit);
   assert.equal(context.sellerAnalysisFinished(audit), false, "one completed source must not stop polling");
   assert.match(result.innerHTML, /Consultando/);
-  assert.match(result.innerHTML, /Consulta disponível/);
+  assert.match(result.innerHTML, /Consulta concluída/);
   assert.match(result.innerHTML, /Na fila/);
   assert.doesNotMatch(result.innerHTML, /Não extraída/);
   assert.match(result.innerHTML, /2\/4 resultados · 1 PDFs/);
@@ -162,4 +162,44 @@ test("seller results preserve every source, private PDF indices and pending quer
   assert.match(result.innerHTML,/sellerReviewPanel/,'certificate results provide the optional analysis panel without starting AI');
   assert.match(result.innerHTML,/documents\/tjdft\/0/);
   assert.match(result.innerHTML,/documents\/seller_sources\/2/);
+});
+
+test('text results preserve zero, false, safe text and an open panel during collection without new requests', () => {
+  const id='seller-query-audit-test-seller_documents-0';
+  const panel={id,hidden:true};
+  let focusCalls=0,fetchCalls=0;
+  const button={dataset:{sellerResultToggle:id},textContent:'Ver resultado',attributes:{},setAttribute(name,value){this.attributes[name]=value;},focus(){focusCalls++;}};
+  const result={innerHTML:'',querySelectorAll:()=>panel.hidden?[]:[panel]};
+  const context=vm.createContext({
+    sellerAnalysisResult:result,Date,Number,encodeURIComponent,isCertificateOnly:()=>true,
+    document:{activeElement:button,querySelector:()=>null,getElementById:key=>key===id?panel:key===id+'-toggle'?button:null},
+    escapeHtml:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'),
+    selectedSellerCertificates:()=>[],selectedSellerQueries:()=>[],sellerCompanyCnpjs:()=>[],fetch:()=>{fetchCalls++;throw new Error('Must use saved results');},
+  });
+  const start=appJs.indexOf('function getSellerCertificateStatus('),end=appJs.indexOf('async function loadSellerAnalysisResult(',start);
+  vm.runInContext(appJs.slice(start,end),context);
+  const audit={consultaId:'audit-test',status:'running',resultados:[{fonte:'seller_documents',status:'running',dados:{certidoes:[
+    {tipo:'Processos',kind:'data',status:'success',details:{'Total de processos':0,'Possui apontamentos':false,Observação:'<script>unsafe</script>'}},
+    {tipo:'Resumo sem detalhes',kind:'data',status:'success',summary:'Retorno textual <obtido>.'},
+    {tipo:'Sem detalhes',kind:'data',status:'success'},
+    {tipo:'Falhou',kind:'data',status:'failed'},
+    {tipo:'Pendente',kind:'data',status:'pending'},
+  ]}}]};
+  context.renderSellerAnalysisResult(audit);
+  assert.equal((result.innerHTML.match(/data-seller-result-toggle=/g)||[]).length,3);
+  assert.match(result.innerHTML,/<dt>Total de processos<\/dt><dd>0<\/dd>/);
+  assert.match(result.innerHTML,/<dd>false<\/dd>/);
+  assert.match(result.innerHTML,/&lt;script&gt;unsafe&lt;\/script&gt;/);
+  assert.match(result.innerHTML,/Retorno textual &lt;obtido&gt;/);
+  assert.match(result.innerHTML,/não enviou dados adicionais/);
+  assert.doesNotMatch(result.innerHTML,/<script>|Nenhum processo|Nada consta/);
+  context.toggleSellerQueryResult(button);
+  assert.equal(panel.hidden,false);assert.equal(button.attributes['aria-expanded'],'true');assert.equal(button.textContent,'Ocultar resultado');
+  context.renderSellerAnalysisResult(audit);
+  assert.match(result.innerHTML,/aria-expanded="true"[^>]*>Ocultar resultado/);
+  assert.match(result.innerHTML,new RegExp('id="'+id+'" role="region"[^>]* ><h4>'));
+  assert.equal(focusCalls,2);
+  context.toggleSellerQueryResult(button);
+  assert.equal(panel.hidden,true);assert.equal(button.attributes['aria-expanded'],'false');assert.equal(button.textContent,'Ver resultado');
+  assert.equal(fetchCalls,0);
 });

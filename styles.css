@@ -4703,6 +4703,26 @@ h2 {
   text-decoration: none;
 }
 
+.seller-query-result-toggle { min-width: 120px; }
+.seller-certificate-item > .seller-query-result {
+  grid-column: 1 / -1;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.seller-certificate-item > .seller-query-result[hidden] { display: none; }
+.seller-query-result h4, .seller-query-result p, .seller-query-result dl { margin: 0; }
+.seller-query-result p { max-width: 72ch; color: var(--muted); }
+.seller-query-result dl > div {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.3fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 0;
+}
+.seller-query-result dt { font-weight: 700; color: var(--muted); }
+.seller-query-result dd { margin: 0; line-height: 1.6; white-space: pre-wrap; }
+
 @media (max-width: 980px) {
   .seller-analysis-scope,
   .seller-analysis-workspace {
@@ -4711,6 +4731,7 @@ h2 {
 }
 
 @media (max-width: 620px) {
+  .seller-query-result dl > div { grid-template-columns: 1fr; gap: 4px; }
   .seller-analysis-header,
   .seller-analysis-result-head {
     align-items: flex-start;
