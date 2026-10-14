@@ -92,7 +92,7 @@ test("certificate groups show applicable sources, 30x prices and only required i
   const selected={ufs:[],queries:[],courts:[]};
   const context=vm.createContext({certificateSelection,certificateQuote,isCertificateOnly:()=>true,updateSellerMunicipalities:()=>{},
     document:{querySelector:s=>elements.get(s),querySelectorAll:s=>(s.includes('sellerAnalysisUfs')?selected.ufs:s.includes('data-certificate-court')?selected.courts:selected.queries).map(value=>({value}))},
-    sellerAnalysisMotherName:{required:false,value:''},sellerAnalysisFullName:{required:false,value:''},sellerAnalysisCpf:{value:'04252011000110'},sellerAnalysisError:null,
+    sellerAnalysisMotherName:{required:false,value:''},sellerAnalysisFullName:{required:false,value:''},sellerAnalysisCpf:{value:'04252011000110'},sellerAnalysisError:null,sellerAnalysisSubmit:{disabled:false,textContent:''},
     location:{search:''},sessionStorage:{getItem:()=>null},escapeHtml:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),
     fetch:async()=>({ok:true,json:async()=>({certificatePriceMultiplier:30,states:[{uf:'AP',name:'Amapá',queryIds:['fiscal','ccd','protestos','cadin']}],companyStates:[{uf:'AP',name:'Amapá',queryIds:['fgts']}],certificates:[{uf:'AP',type:'Cível',provider:'direct_data',requiredIdentityFields:['birthDate','rg']},{uf:'AP',type:'Criminal',provider:'direct_data',requiredIdentityFields:['gender']}],sellerSources:{configured:true,queries:[
       {id:'protestos',kind:'data',category:'Protestos',label:'Protestos',costBrl:3.5,documentTypes:['cpf'],scope:'Brasil',params:{}},
@@ -122,6 +122,21 @@ test("certificate groups show applicable sources, 30x prices and only required i
   assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 51,20/);
   vm.runInContext('sellerCoverage.certificateSubscriber=true',context);context.updateSellerEstimate();
   assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 35,84/);assert.match(elements.get('#sellerAnalysisCost').innerHTML,/30% de desconto/);
+  vm.runInContext('sellerCoverage.certificateComplimentary=true;sellerCoverage.certificateCheckoutReady=false',context);context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/<strong>R\$ 35,84<\/strong>/,'individual release must preserve the subscriber quote');
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/pagamento dispensado/);
+  assert.equal(context.sellerAnalysisSubmit.textContent,'Continuar sem pagar');
+  assert.doesNotMatch(elements.get('#sellerAnalysisCost').innerHTML,/Pagamento indisponível/,'individual release does not require checkout');
+  vm.runInContext('sellerCoverage.certificateSubscriber=false',context);context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/<strong>R\$ 51,20<\/strong>/,'individual release must preserve the regular quote');
+  selected.queries=['cadin'];context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/<strong>R\$ 16,20<\/strong>/,'changing the selection must update the released quote');
+  selected.queries=['protestos','cadin'];
+  vm.runInContext('sellerCoverage.certificateComplimentary=false;sellerCoverage.certificateTestBypassEnabled=true',context);context.updateSellerEstimate();
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/<strong>R\$ 51,20<\/strong>/,'test bypass must preserve the regular quote');
+  assert.equal(context.sellerAnalysisSubmit.textContent,'Continuar para pagamento');
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/bypass de teste na próxima etapa/);
+  vm.runInContext('sellerCoverage.certificateCheckoutReady=true;sellerCoverage.certificateTestBypassEnabled=false',context);
   vm.runInContext('sellerCoverage.certificateSubscriber=false',context);
   assert.equal(elements.get('#sellerAnalysisBirthDate').required,false);
   selected.courts=['AP:Cível'];
