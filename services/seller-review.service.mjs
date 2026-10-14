@@ -112,19 +112,44 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
     if (stored.status === 'running' && now() - new Date(stored.updatedAt) > 180000) return { ...publicState, status: 'interrupted', message: 'A análise foi interrompida. Retome sem refazer as consultas.', aiReady: ai.ready() };
     return { ...publicState, aiReady: ai.ready() };
   }
-  async function get(id, auth) { return view((await access(id, auth)).request_payload.sellerReview); }
+  function certificateReviews(payload) {
+    const reviews = { ...(payload.certificateReviews || {}) };
+    const latest = payload.sellerReview;
+    if (latest && !reviews[latest.analysisKey || 'all']) reviews[latest.analysisKey || 'all'] = latest;
+    return reviews;
+  }
+  async function get(id, auth, request, analysisKey) {
+    const payload = (await access(id, auth)).request_payload;
+    if (payload.sellerFlow !== 'certificates') return view(payload.sellerReview);
+    const audit = await auditService.findAudit(id, request);
+    if (!audit || audit.unauthorized) fail('seller_analysis_not_found', 404);
+    const documents = sellerSources(audit).map(source => ({ id: source.id, title: source.title, kind: source.kind, scope: source.scope, status: source.status, hasPdf: Boolean(source.pdfPath), checkedAt: source.checkedAt }));
+    if (analysisKey !== undefined && analysisKey !== null && analysisKey !== 'all' && !documents.some(source => source.id === analysisKey)) fail('invalid_analysis_selection', 400);
+    const reviews = certificateReviews(payload);
+    const key = analysisKey || payload.sellerReview?.analysisKey || 'all';
+    const stored = analysisKey ? reviews[key] : payload.sellerReview;
+    const latest = view(payload.sellerReview);
+    return { ...view(stored), consentGranted: payload.sellerAiConsent === true, analysisKey: key, analysisMode: key === 'all' ? 'general' : 'document', sourceId: key === 'all' ? null : key,
+      documents, canAnalyze: await getAnalysisAccess(auth),
+      savedAnalyses: Object.entries(reviews).filter(([, state]) => state.status === 'completed').map(([key, state]) => ({ key, title: key === 'all' ? 'Análise geral' : documents.find(source => source.id === key)?.title || 'Documento', generatedAt: state.report?.generatedAt, analyzed: state.report?.analyzed || 0 })),
+      activeAnalysis: latest.status === 'running' ? { analysisKey: payload.sellerReview.analysisKey || 'all', progress: latest.progress, current: latest.current } : null };
+  }
   async function save(id, token, state) {
     state.updatedAt = now().toISOString();
-    const result = await pool().query("UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{sellerReview}',$3::jsonb) WHERE public_id=$1 AND request_payload->'sellerReview'->>'token'=$2 RETURNING id", [id, token, JSON.stringify(state)]);
+    const serialized = JSON.stringify(state);
+    const result = state.analysisKey
+      ? await pool().query("UPDATE audita_audits SET request_payload=jsonb_set(jsonb_set(request_payload,'{sellerReview}',$3::jsonb),'{certificateReviews}',COALESCE(request_payload->'certificateReviews','{}'::jsonb)||$4::jsonb) WHERE public_id=$1 AND request_payload->'sellerReview'->>'token'=$2 RETURNING id", [id, token, serialized, JSON.stringify({ [state.analysisKey]: state })])
+      : await pool().query("UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{sellerReview}',$3::jsonb) WHERE public_id=$1 AND request_payload->'sellerReview'->>'token'=$2 RETURNING id", [id, token, serialized]);
     if (!result.rows.length) fail('seller_review_replaced', 409);
   }
-  async function start(id, auth, request, consent, purpose) {
+  async function start(id, auth, request, consent, purpose, selection = {}) {
     const row = await access(id, auth);
     const certificates = row.request_payload.sellerFlow === 'certificates';
+    const customPurpose = typeof purpose === 'string' && purpose.trim().length > 0;
     if (certificates) {
       if (!await getAnalysisAccess(auth)) fail('certificate_analysis_subscription_required', 402);
-      if (typeof purpose !== 'string' || purpose.trim().length < 10 || purpose.length > 2000 || /[\u0000-\u0008]/.test(purpose)) fail('invalid_analysis_purpose');
-      purpose = purpose.trim();
+      if (purpose !== undefined && (typeof purpose !== 'string' || purpose.trim().length > 0 && purpose.trim().length < 10 || purpose.length > 2000 || /[\u0000-\u0008]/.test(purpose))) fail('invalid_analysis_purpose');
+      purpose = purpose?.trim() || 'Analise os documentos e dados obtidos, resuma os pontos de atenção e indique o que precisa de conferência.';
       await checkAnalysisCost(auth);
     }
     if (consent !== true && row.request_payload.sellerAiConsent !== true) fail('seller_ai_consent_required');
@@ -132,21 +157,36 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
     if (!audit || audit.unauthorized) fail('seller_analysis_not_found', 404);
     if (!audit.resultados?.length || audit.resultados.some(r => ['pending', 'running', 'queued'].includes(r.status))) fail('seller_collection_pending', 409);
     if (audit.resultados.some(r => !['tjdft', 'seller_documents'].includes(r.fonte))) fail('not_seller_analysis', 422);
-    const sources = sellerSources(audit);
+    let sources = sellerSources(audit);
+    let analysisKey;
+    const mode = selection?.mode || 'general';
+    if (certificates) {
+      if (!selection || typeof selection !== 'object' || Array.isArray(selection) || !['general', 'document'].includes(mode) || mode === 'general' && selection.sourceId) fail('invalid_analysis_selection');
+      if (mode === 'document') {
+        const selected = sources.find(source => source.id === selection.sourceId && source.status === 'success');
+        if (!selected) fail('invalid_analysis_selection');
+        sources = [selected];
+        if (!customPurpose) purpose = 'Analise somente o documento ou consulta selecionado, explique o resultado e indique os pontos que precisam de conferência.';
+        analysisKey = selected.id;
+      } else analysisKey = 'all';
+      if (!sources.some(source => source.status === 'success')) fail('certificate_no_available_sources', 422);
+    } else if (selection?.mode || selection?.sourceId) fail('invalid_analysis_selection');
     const segment = getAnalysisSegment(row.request_payload.sellerSegment || 'analise-vendedor');
     if (!segment) fail('invalid_analysis_segment', 422);
     const fingerprint = certificates ? digest({ sources, purpose }) : segment.id === 'analise-vendedor' ? digest(sources) : digest({ segment: segment.id, sources });
-    const previous = row.request_payload.sellerReview;
+    const previous = certificates ? certificateReviews(row.request_payload)[analysisKey] : row.request_payload.sellerReview;
     if (previous?.status === 'completed' && previous.fingerprint === fingerprint && !previous.report.sources.some(s => s.status === 'unread')) return view(previous);
-    if (active.has(id)) return get(id, auth);
+    if (active.has(id)) return get(id, auth, request);
     if (!ai.ready()) fail('seller_ai_unavailable', 503);
     if (sources.length > 300) fail('seller_too_many_sources', 422);
-    const state = { token: randomUUID(), fingerprint, segment: segment.id, ...(certificates ? { purpose } : {}), selectedStates:row.request_payload.sellerStates||[], status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
-    const claimed = await pool().query(`UPDATE audita_audits SET request_payload=jsonb_set(jsonb_set(request_payload,'{sellerAiConsent}','true'::jsonb),'{sellerReview}',$4::jsonb)
+    const state = { token: randomUUID(), fingerprint, segment: segment.id, ...(certificates ? { purpose, customPurpose, analysisKey, analysisMode: mode, sourceId: mode === 'document' ? analysisKey : null } : {}), selectedStates:row.request_payload.sellerStates||[], status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
+    const reviewUpdate = "jsonb_set(jsonb_set(request_payload,'{sellerAiConsent}','true'::jsonb),'{sellerReview}',$4::jsonb)";
+    const saved = certificates ? { ...(row.request_payload.sellerReview && !row.request_payload.sellerReview.analysisKey ? { all: row.request_payload.sellerReview } : {}), [analysisKey]: state } : null;
+    const claimed = await pool().query(`UPDATE audita_audits SET request_payload=${certificates ? `jsonb_set(${reviewUpdate},'{certificateReviews}',COALESCE(request_payload->'certificateReviews','{}'::jsonb)||$6::jsonb)` : reviewUpdate}
       WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3
       AND (request_payload->'sellerReview'->>'status' IS DISTINCT FROM 'running' OR (request_payload->'sellerReview'->>'updatedAt')::timestamptz < $5::timestamptz)
-      RETURNING id`, [id, auth.tenantId, auth.user.id, JSON.stringify(state), new Date(now() - 180000).toISOString()]);
-    if (!claimed.rows.length) return get(id, auth);
+      RETURNING id`, [id, auth.tenantId, auth.user.id, JSON.stringify(state), new Date(now() - 180000).toISOString(), ...(certificates ? [JSON.stringify(saved)] : [])]);
+    if (!claimed.rows.length) return get(id, auth, request);
     // ponytail: two readers per report; database lease prevents duplicate work for the same audit across processes.
     const job = run(id, auth, audit, sources, state).finally(() => active.delete(id));
     active.set(id, job);
@@ -199,8 +239,8 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       const analyzed = results.filter(r => r.status === 'analyzed').length;
       const gaps = results.filter(r => r.status !== 'analyzed' || r.outcome === 'inconclusive');
       const segment = getAnalysisSegment(state.segment);
-      const report = { id, segment: segment.id, title: state.purpose ? 'Análise das certidões' : segment.title, purpose: state.purpose, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: state.purpose ? 'Análise limitada às certidões selecionadas, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
-        conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
+      const report = { id, segment: segment.id, title: state.analysisMode === 'document' ? 'Análise de documento' : state.purpose ? 'Análise das certidões' : segment.title, purpose: state.purpose, analysisMode: state.analysisMode, sourceId: state.sourceId, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: state.analysisMode === 'document' ? 'Análise limitada ao documento selecionado, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : state.purpose ? 'Análise limitada às certidões selecionadas, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
+        conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? state.purpose ? 'Foram identificados pontos que precisam de conferência no material analisado.' : 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
       };
       report.executiveSummary=[report.conclusion,...findings.filter(f=>f.priority!=='information').map(f=>`${f.title}: ${f.description}`),...findings.filter(f=>f.category==='company'&&f.priority==='information').map(f=>f.description)].join('\n\n');
       if(analyzed&&typeof ai.summarize==='function') {
@@ -223,9 +263,10 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       await save(id, state.token, state).catch(() => {});
     } finally { stopped = true; clearInterval(heartbeat); }
   }
-  async function pdf(id, auth) {
+  async function pdf(id, auth, analysisKey) {
     const row = await access(id, auth);
-    const state = row.request_payload.sellerReview;
+    if (analysisKey && row.request_payload.sellerFlow !== 'certificates') fail('invalid_analysis_selection');
+    const state = analysisKey ? certificateReviews(row.request_payload)[analysisKey] : row.request_payload.sellerReview;
     if (state?.status !== 'completed' || !state.report) fail('seller_report_not_ready', 409);
     return sellerReportPdf(state.report);
   }
