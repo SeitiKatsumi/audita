@@ -7181,6 +7181,54 @@ dialog.login-screen[open]::backdrop { animation: login-backdrop-enter 220ms ease
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.25);
 }
 
+.chat-attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-attachment-actions .chat-attach-button {
+  min-width: 0;
+  height: 40px;
+  align-self: center;
+  white-space: normal;
+}
+
+.chat-file-drop-field {
+  display: flex;
+  width: 150px;
+  height: 40px;
+  box-sizing: border-box;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 2px dashed #42c982;
+  border-radius: 8px;
+  background: rgba(66, 201, 130, 0.05);
+  color: #62ffa5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.chat-file-drop-field svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+
+.chat-attachment-actions:has(.chat-attach-button:disabled) .chat-file-drop-field {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .chat-file-drop-field { display: none; }
+}
+
 .chat-attach-button {
   display: inline-flex;
   min-width: 124px;

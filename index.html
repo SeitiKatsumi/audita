@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261013-certificate-ai" />
+    <link rel="stylesheet" href="styles.css?v=20261014-chat-drop-field" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -219,17 +219,23 @@
             <div class="chat-error hidden" id="chatError" role="alert"></div>
             <form class="chat-composer" id="chatForm">
               <div class="chat-attachment-preview hidden" id="chatAttachmentPreview"></div>
-              <button
-                class="chat-attach-button"
-                id="chatAttachmentButton"
-                type="button"
-                aria-controls="chatAttachment"
-                aria-label="Anexar arquivos"
-                title="Anexar arquivos"
-              >
-                <svg class="chat-attach-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m8 13 7-7a3 3 0 0 1 4 4l-9 9a5 5 0 0 1-7-7l9-9"/><path d="m8 13 5-5a1 1 0 0 1 2 2l-5 5"/></svg>
-                <span>Anexar arquivos</span>
-              </button>
+              <div class="chat-attachment-actions">
+                <button
+                  class="chat-attach-button"
+                  id="chatAttachmentButton"
+                  type="button"
+                  aria-controls="chatAttachment"
+                  aria-label="Anexar arquivos"
+                  title="Anexar arquivos"
+                >
+                  <svg class="chat-attach-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="m8 13 7-7a3 3 0 0 1 4 4l-9 9a5 5 0 0 1-7-7l9-9"/><path d="m8 13 5-5a1 1 0 0 1 2 2l-5 5"/></svg>
+                  <span>Anexar arquivos</span>
+                </button>
+                <div class="chat-file-drop-field">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17H6a4 4 0 0 1-.8-7.9A7 7 0 0 1 18.7 8 4.5 4.5 0 0 1 0 9H17M12 12v9m-3-6 3-3 3 3"/></svg>
+                  <span>Arraste seus arquivos aqui</span>
+                </div>
+              </div>
               <input
                 class="hidden"
                 id="chatAttachment"
