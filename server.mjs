@@ -4185,14 +4185,14 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 403, { error: 'same_origin_required' }); return true;
         }
         const body = await readJsonBody(request);
-        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose));
+        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose, { mode: body.analysisMode, sourceId: body.sourceId }));
       } else if (sellerReviewMatch[2] === 'report.pdf') {
-        const buffer = await sellerReviewService.pdf(id, auth);
+        const buffer = await sellerReviewService.pdf(id, auth, new URL(request.url || '/', 'http://localhost').searchParams.get('analysis'));
         response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="relatorio-audita.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });
         response.end(buffer);
       } else {
         response.setHeader('cache-control', 'private, no-store');
-        sendJson(response, 200, await sellerReviewService.get(id, auth));
+        sendJson(response, 200, await sellerReviewService.get(id, auth, request, new URL(request.url || '/', 'http://localhost').searchParams.get('analysis')));
       }
     } catch (error) { sendJson(response, error.status || 503, { error: error.code || 'seller_review_unavailable' }); }
     return true;

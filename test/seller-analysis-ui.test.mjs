@@ -7,6 +7,32 @@ import vm from "node:vm";
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const appJs = readFileSync(new URL("../app.js", import.meta.url), "utf8");
 
+test('certificate stage offers general or individual analysis, sends the selected scope and opens saved reports without AI', async () => {
+  const sent=[],opened=[],stored=new Map();
+  const submit={disabled:false},error={textContent:''},back={};
+  const form={elements:{purpose:{value:''},consent:{checked:true}},reportValidity:()=>true,querySelector:selector=>selector==='[type="submit"]'?submit:error};
+  const mode={value:'document'},source={value:'seller_documents:1'},saved={dataset:{certificateSaved:'all'}};
+  const target={innerHTML:'',querySelector:selector=>selector==='[data-certificate-back]'?back:selector==='[data-certificate-analysis-form]'?form:null,querySelectorAll:selector=>selector.includes('analysis-mode')?[mode]:selector.includes('analysis-source')?[source]:selector==='[data-certificate-saved]'?[saved]:[]};
+  const context=vm.createContext({escapeHtml:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'),isCertificateOnly:()=>true,
+    sessionStorage:{setItem:(key,value)=>stored.set(key,value),removeItem:key=>stored.delete(key)},loadSellerReview:async(id,key)=>opened.push([id,key]),fetch:async(url,options)=>{sent.push(JSON.parse(options.body));return {ok:true,json:async()=>({})};},sellerReviewRun:0,setSellerStep:step=>opened.push(step)});
+  vm.runInContext(appJs.slice(appJs.indexOf('function renderSellerReview('),appJs.indexOf('function validateCnibDocument(')),context);
+  const state={analysisKey:'seller_documents:0',status:'completed',aiReady:true,canAnalyze:true,customPurpose:false,documents:[{id:'seller_documents:0',status:'success',title:'Certidão <fictícia>',hasPdf:true,scope:'Brasil'},{id:'seller_documents:1',status:'success',title:'Consulta fictícia',hasPdf:false,scope:'Brasil'},{id:'seller_documents:2',status:'failed',title:'Falha',scope:'DF'}],savedAnalyses:[{key:'all',title:'Análise geral'}],report:{analyzed:1,total:1,executiveSummary:'Resumo <seguro>\n\nSegundo parágrafo.',findings:[],sources:[]}};
+  context.renderSellerReview(target,'test-id',state);
+  assert.match(target.innerHTML,/Análise IA/);assert.match(target.innerHTML,/Resultado em texto/);assert.match(target.innerHTML,/Indisponível para análise/);
+  assert.match(target.innerHTML,/Opcional/);assert.match(target.innerHTML,/id="certificateAnalysisPurpose"/);
+  assert.match(target.innerHTML,/report\.pdf\?analysis=seller_documents%3A0/);
+  assert.match(target.innerHTML,/<p>Resumo &lt;seguro&gt;<\/p><p>Segundo parágrafo\.<\/p>/);
+  saved.onclick();source.onchange();
+  assert.equal(sent.length,0,'changing scope or opening saved results only fetches the saved review');
+  assert.deepEqual(opened.slice(0,2),[['test-id','all'],['test-id','seller_documents:1']]);
+  await form.onsubmit({preventDefault(){}});
+  assert.deepEqual(sent[0],{consent:true,purpose:'',analysisMode:'document',sourceId:'seller_documents:0'});
+  context.renderSellerReview(target,'test-id',{...state,analysisKey:'all',report:null});
+  await form.onsubmit({preventDefault(){}});
+  assert.deepEqual(sent[1],{consent:true,purpose:'',analysisMode:'general'});
+  back.onclick();assert.equal(opened.at(-1),2);assert.equal(stored.size,0);
+});
+
 test('completed seller reports show numeric score, all three bands and the private PDF link; unfinished reviews do not show a score', () => {
   const code=appJs.slice(appJs.indexOf('function renderSellerReview('),appJs.indexOf('function validateCnibDocument('));
   const context=vm.createContext({escapeHtml:value=>String(value),isCertificateOnly:()=>false});

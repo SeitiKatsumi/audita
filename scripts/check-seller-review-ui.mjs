@@ -85,7 +85,7 @@ try {
    }
    if(path.startsWith('/api/seller-analysis')||path.startsWith('/api/certificate-orders')){
      const res={setHeader(){},writeHead(status,headers){Object.assign(this,{status,headers});},end(buffer){this.buffer=buffer;}};
-     await sandbox.handle(path,{method:req.method(),body:req.method()==='POST'?req.postDataJSON():{},headers:{'content-type':'application/json',host:new URL(base).host,origin:base}},res);
+     await sandbox.handle(path,{url:req.url(),method:req.method(),body:req.method()==='POST'?req.postDataJSON():{},headers:{'content-type':'application/json',host:new URL(base).host,origin:base}},res);
      if(res.body?.consultaId||res.body?.orderId)lastId=res.body.consultaId||res.body.orderId;
      if(res.buffer)return route.fulfill({status:res.status,headers:Object.fromEntries(Object.entries(res.headers).map(([k,v])=>[k,String(v)])),body:res.buffer});
      return route.fulfill({status:res.status||500,json:res.body||{}});
