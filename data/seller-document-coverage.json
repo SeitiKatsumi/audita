@@ -36,19 +36,6 @@
       "limitation": "Consulta estruturada do provedor. Não é uma certidão cartorária em PDF."
     },
     {
-      "id": "protestos-basica",
-      "label": "Protestos nacionais — IEPTB Básica",
-      "category": "Protestos",
-      "scope": "Brasil",
-      "endpoint": "ProtestosBasica",
-      "params": {},
-      "costBrl": 2.95,
-      "kind": "data",
-      "documentTypes": ["cpf", "cnpj"],
-      "manualOnly": true,
-      "limitation": "Consulta básica de dados, sem certidão ou comprovante em PDF. O resultado se limita à base consultada pelo provedor."
-    },
-    {
       "id": "dossie-credito-completo",
       "label": "Dossiê de crédito completo — QUOD",
       "category": "Crédito",

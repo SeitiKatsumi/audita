@@ -807,3 +807,9 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Codex, codex/select-all-cadin, base origin/main75d24bf. Confirmado via HTTP que producao ainda exclui consultas de dados ao selecionar todas. Correcao anterior permanecia local. Escopo: handler de selecao em app.js e teste de regressao.
 - Validacao: teste reproduziu exatamente GO/RS/SP CADIN desmarcados antes da correcao e passou apos corrigir; sintaxe/diff check aprovados. Correcao ja presente na main local e confirmada por HTTP200 na3000. Sem commit/push/deploy nesta etapa.
 - Usuario autorizou commit e push da correcao e teste; validacao repetida com sucesso antes de enviar. Deploy de producao nao executado nesta tarefa.
+
+# 2026-10-15 - Remocao da consulta IEPTB Basica
+- Codex, codex/remove-basic-protests. Escopo: catalogo de consultas e testes; retirar Basica de novas selecoes, manter Online e historico existente.
+
+- 2026-10-15: removida IEPTB Basica do catalogo; Online mantida e tentativa de nova selecao da Basica rejeitada. Quinze testes de documentos aprovados, diff check aprovado. Integrado localmente; sem commit/push/deploy.
+- Commit e push autorizados pelo usuario para esta remocao. Validacao:15 testes de documentos aprovados no checkout local com catalogo atualizado; diff check aprovado. Sem deploy executado.
