@@ -6843,7 +6843,7 @@ for (const [id, checked] of [["sellerAnalysisSelectAll", true], ["sellerAnalysis
     document.querySelectorAll("#sellerAnalysisUfs input").forEach((input) => { input.checked = checked; });
     if(!isCertificateOnly()){document.querySelector('#sellerAnalysisState').value=checked?selectedSellerState()?.uf||selectedSellerUfs()[0]||'':'';updateSellerMunicipalities();}
     if(isCertificateOnly())renderCertificateChoices();
-    if(!isCertificateOnly()||!checked)document.querySelectorAll("#sellerAnalysisQueries input").forEach((input) => { input.checked = checked; });
+    document.querySelectorAll("#sellerAnalysisQueries input").forEach((input) => { input.checked = checked; });
     updateSellerEstimate();
   });
 }

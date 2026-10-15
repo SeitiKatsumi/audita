@@ -802,3 +802,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 # 2026-10-14 - Campo visivel para arrastar arquivos
 - Codex, codex/chat-drop-field, base main54b915f (develop indisponivel). Escopo: index.html e styles.css; campo tracejado ao lado do seletor reutilizando drag/drop existente. Integracao local preservara outras tarefas.
 - Concluido: campo compacto ao lado do seletor e mensagem, oculto no mobile/touch. Integrado na3000, dois testes de drag/drop e diff check aprovados. Usuario autorizou commit/push; publicar somente esta mudanca, preservando outras tarefas locais. Sem deploy.
+
+# 2026-10-15 - Selecao completa incluindo CADIN
+- Codex, codex/select-all-cadin, base origin/main75d24bf. Confirmado via HTTP que producao ainda exclui consultas de dados ao selecionar todas. Correcao anterior permanecia local. Escopo: handler de selecao em app.js e teste de regressao.
+- Validacao: teste reproduziu exatamente GO/RS/SP CADIN desmarcados antes da correcao e passou apos corrigir; sintaxe/diff check aprovados. Correcao ja presente na main local e confirmada por HTTP200 na3000. Sem commit/push/deploy nesta etapa.
+- Usuario autorizou commit e push da correcao e teste; validacao repetida com sucesso antes de enviar. Deploy de producao nao executado nesta tarefa.
