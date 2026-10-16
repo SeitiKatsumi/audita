@@ -167,3 +167,5 @@ Aplicacao proposta: identificar os processos relevantes, deixar o cliente escolh
 - Termo CNJ V1.2 obtidoHTTP200 e lido em memoria; tres paginas.
 -36testes existentes de coletor autonomo, conector Direct Data, API e documentos do vendedor passaram com provedores simulados/PGlite. Eles conferem contratos e isolamento; nao substituem homologacao real de emissao.
 - Auditoria documental, sem mudanca de comportamento ou publicacao.
+
+Verificação final: as três certidões nativas ES/CPF também retornaram PDFs oficiais com identidade e título/UF conferidos. O dado materno inicialmente extraído de um documento histórico era um placeholder; foi resolvido a partir da certidão AP do mesmo titular. O adaptador agora informa campos rejeitados pelo tribunal imediatamente, sem alterar nomes nem aguardar o prazo de resultado. Evidências nativas preservadas no armazenamento privado principal.
