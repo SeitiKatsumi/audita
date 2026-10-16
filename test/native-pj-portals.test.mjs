@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { collect, fillTjdftFirstStep, fillTjdftSecondStep, fillEsTjesPageFields, getMissingStateCourtFields, hasEsTjesPrintableCertificateSignal, saveNativeCertificatePdf } from "../collectors/tjdft.collector.mjs";
+import { collect, fillTjdftFirstStep, fillTjdftSecondStep, fillEsTjesPageFields, getMissingStateCourtFields, hasEsTjesPrintableCertificateSignal, saveNativeCertificatePdf, waitForEsTjesResultOrValidation } from "../collectors/tjdft.collector.mjs";
 
 const company = { tipoDocumento: "cnpj", documento: "11222333000181", extraFields: { stateCourtFields: { fullName: "EMPRESA FICTICIA TESTE LTDA", motherName: "Nao preencher", birthDate: "1980-01-01", rg: "Nao preencher" } } };
 function pageStub() {
@@ -59,6 +59,16 @@ test("native DF/ES company requirements never inherit personal identity fields; 
 test("TJES request form is never printed as an issued certificate merely because its header says Nada Consta", () => {
   assert.equal(hasEsTjesPrintableCertificateSignal("Tribunal de Justiça do Estado do Espírito Santo Emissão de Certidão Negativa de Nada Consta Tipo de Pessoa CPF CNPJ Primeiro Nome Natureza da Certidão Emitir Certidão"), false);
   assert.equal(hasEsTjesPrintableCertificateSignal("Tribunal de Justiça do Estado do Espírito Santo Certidão Negativa Dados da certidão Nada consta"), true);
+});
+
+test("TJES sees invalid inputs even when the portal omits their error-message container", async () => {
+  for (const invalid of [true, false]) {
+    const previous = globalThis.document;
+    try {
+      globalThis.document = { querySelector: (selector) => selector === "#v2Form" || invalid && selector.includes("input.erro") ? {} : null, querySelectorAll: () => [] };
+      await waitForEsTjesResultOrValidation({ async waitForFunction(check) { assert.equal(check(), invalid); } });
+    } finally { if (previous === undefined) delete globalThis.document; else globalThis.document = previous; }
+  }
 });
 
 test("native company PDF is saved only after matching the company identity", async () => {

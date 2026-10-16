@@ -4868,6 +4868,11 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
       };
     }
 
+    const invalidFields = await page.locator("#v2Form input.erro, #v2Form select.erro").evaluateAll((fields) => fields.map((field) => field.labels?.[0]?.innerText?.replace(/\s*\*\s*$/, "").trim() || field.id));
+    if (invalidFields.length) {
+      return { tipo: certificateType.label, status: "failed", resultado: SOURCE_RESULT.ERRO, invalidFields, errorMessage: `TJES exige correção dos campos: ${invalidFields.join(", ")}. Confira os dados cadastrais.` };
+    }
+
     if (download) {
       const downloadPath = await download.path();
       const buffer = Buffer.from(await readFile(downloadPath));
@@ -4976,13 +4981,13 @@ async function clickEsTjesSolicitar(page) {
     .catch(() => false);
 }
 
-async function waitForEsTjesResultOrValidation(page) {
+export async function waitForEsTjesResultOrValidation(page) {
   const timeout = envNumber("STATE_COURT_TJES_RESULT_TIMEOUT_MS", envNumber("STATE_COURT_STEP_TIMEOUT_MS", 45000));
   await page
     .waitForFunction(
       () => {
         if (document.querySelector("#v2Form")) {
-          return [...document.querySelectorAll("#v2AvisoErro, .v2-msg-erro")].some((element) => Boolean(element.innerText?.trim()) && element.getClientRects().length > 0);
+          return Boolean(document.querySelector("#v2Form input.erro, #v2Form select.erro")) || [...document.querySelectorAll("#v2AvisoErro, .v2-msg-erro")].some((element) => Boolean(element.innerText?.trim()) && element.getClientRects().length > 0);
         }
         const text = String(document.body?.innerText || "")
           .normalize("NFD")
