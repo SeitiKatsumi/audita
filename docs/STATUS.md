@@ -831,3 +831,6 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 - 2026-10-16: Codex, codex/recovery-file-label: oculta apresentacao nativa No file chosen nos tres campos e usa Selecionar arquivo com nomes apos selecao/arraste. Input nativo preservado para teclado, required e seletor. Integrado localmente, sem commit/push/deploy.
 - Publicacao solicitada:44 testes aprovados no checkout isolado; diff check aprovado. Escopo somente rotulo dos seletores de arquivos; sem deploy.
+
+- 2026-10-16: Codex, codex/recovery-drop-color: orientacao de arraste em verde #5dffa8, com especificidade corrigida sobre regra generica de small. Cache CSS atualizado e integrado localmente; sem commit/push/deploy.
+- Publicacao solicitada: diff check aprovado e CSS atualizado confirmado por HTTP na3000. Sem deploy.
