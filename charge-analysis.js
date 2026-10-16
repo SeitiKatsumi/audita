@@ -746,9 +746,13 @@ if (stage) {
   function scrollLatestMessage(container) {
     window.requestAnimationFrame(() => {
       if (document.body.dataset.activePage !== "analise-cobrancas") return;
-      container?.lastElementChild?.scrollIntoView?.({
+      const target = state.screen === "analyzing"
+        ? stage.querySelector(".charge-analysis-processing")
+        : container?.lastElementChild;
+      if (!target?.isConnected) return;
+      target.scrollIntoView?.({
         behavior: prefersReducedMotion ? "auto" : "smooth",
-        block: "end",
+        block: state.screen === "analyzing" ? "center" : "end",
       });
     });
   }

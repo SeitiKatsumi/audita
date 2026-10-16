@@ -714,7 +714,7 @@ test("app hides the one-page shell until the initial route is ready", () => {
       appJs.lastIndexOf("const authState = await loadAuthState();"),
   );
   assert.match(indexHtml, /styles\.css\?v=[\w-]+/);
-  assert.match(indexHtml, /charge-analysis\.js\?v=20260922-service-intros/);
+  assert.match(indexHtml, /charge-analysis\.js\?v=20261016-analysis-scroll/);
   assert.match(indexHtml, /app\.js\?v=[^"\s]+/);
 });
 

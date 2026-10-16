@@ -813,3 +813,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 - 2026-10-15: removida IEPTB Basica do catalogo; Online mantida e tentativa de nova selecao da Basica rejeitada. Quinze testes de documentos aprovados, diff check aprovado. Integrado localmente; sem commit/push/deploy.
 - Commit e push autorizados pelo usuario para esta remocao. Validacao:15 testes de documentos aprovados no checkout local com catalogo atualizado; diff check aprovado. Sem deploy executado.
+
+# 2026-10-16 - Rolagem para analise em andamento
+- Codex, codex/itau-analysis-scroll: rolagem prioriza painel de processamento durante analise, em vez da ultima mensagem do historico. Respeita movimento reduzido e pagina ativa. Integracao pontual preserva CEP e demais alteracoes locais.
+- Validado na main consolidada:48 testes de rolagem/UI/CEP aprovados, sintaxe/diff check e JS HTTP200 na3000. Sem commit/push/deploy.
+- Commit/push autorizados para rolagem:44 testes do checkout isolado aprovados; alteracoes de CEP e honorarios continuam separadas. Sem deploy.
