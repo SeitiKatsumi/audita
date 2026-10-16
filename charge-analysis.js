@@ -39,7 +39,11 @@ export function bindRecoveryFileDrop(stage) {
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   stage.addEventListener("change", event => {
-    if (zoneFor(event)) event.target.setCustomValidity?.("");
+    const zone = zoneFor(event);
+    if (!zone) return;
+    event.target.setCustomValidity?.("");
+    const names = zone.querySelector("[data-recovery-file-names]");
+    if (names) names.textContent = Array.from(event.target.files || []).map(file => file.name).join(", ");
   });
 }
 
@@ -1862,9 +1866,9 @@ if (stage) {
           <p>A data, a hora e o mesmo identificador serão registrados nos dois PDFs. Não é necessário desenhar a assinatura.</p>
         </div>
         <div class="charge-recovery-form-grid">
-          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "Qualquer formato")}</small></span><input type="file" name="identityDocument" ${attachments.identityDocument ? "" : "required"} /><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
-          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "Qualquer formato")}</small></span><input type="file" name="proofOfResidence" ${attachments.proofOfResidence ? "" : "required"} /><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
-          <label class="wide charge-recovery-file-drop" data-recovery-file-drop><span>Extratos e faturas da análise (se precisar anexar novamente)</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "Qualquer formato")}</small></span><input type="file" name="identityDocument" ${attachments.identityDocument ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "Qualquer formato")}</small></span><input type="file" name="proofOfResidence" ${attachments.proofOfResidence ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="wide charge-recovery-file-drop" data-recovery-file-drop><span>Extratos e faturas da análise (se precisar anexar novamente)</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
           <label class="wide"><span>Digite seu nome completo para assinar os dois documentos</span><input name="powerOfAttorneySignerName" required maxlength="160" autocomplete="off" value="${escapeChargeHtml(powerOfAttorneyAcceptance.signerName || "")}" /></label>
         </div>
         <p class="charge-recovery-form-intro">Envie identidade e comprovante de residência em qualquer formato, com até 12 MB por arquivo. PDF, JPG e PNG aparecem nas páginas do relatório; outros formatos ficam incorporados como anexos originais no PDF. O relatório, a procuração, o contrato e os anexos serão encaminhados ao advogado.</p>

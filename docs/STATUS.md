@@ -828,3 +828,6 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Validacao:58 testes aprovados (PDF/anexos/UI/integracao), sintaxe e diff check. Servidor3000 permanece PID125216: backend novo depende de reinicio anteriormente rejeitado pela revisao automatica; nao contornado. Sem commit/push/deploy.
 - Complemento: areas de arrastar nos tres campos de anexos do formulario, mantendo seletor nativo. Identidade/residencia recebem um arquivo; extratos aceitam multiplos. Validacao de12MB, feedback de arraste e dica oculta mobile.57 testes aprovados; JS servido na3000 confirmado, sem teste visual. Backend de formatos ainda requer reinicio bloqueado anteriormente.
 - Publicacao solicitada:59 testes aprovados no checkout isolado baseado em origin/main744524d; commit/push apenas de formatos de anexos e drag/drop, preservando demais tarefas locais. Deploy e reinicio local nao realizados.
+
+- 2026-10-16: Codex, codex/recovery-file-label: oculta apresentacao nativa No file chosen nos tres campos e usa Selecionar arquivo com nomes apos selecao/arraste. Input nativo preservado para teclado, required e seletor. Integrado localmente, sem commit/push/deploy.
+- Publicacao solicitada:44 testes aprovados no checkout isolado; diff check aprovado. Escopo somente rotulo dos seletores de arquivos; sem deploy.
