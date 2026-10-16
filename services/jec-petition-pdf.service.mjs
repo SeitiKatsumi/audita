@@ -847,6 +847,28 @@ export async function appendJecPetitionAttachments(basePdf, attachments = []) {
 
   for (const attachment of attachments) {
     const label = String(attachment?.label || "").trim();
+    const bytes = Buffer.from(attachment?.bytes || []);
+    // Legacy callers without a filename still require a valid PDF.
+    if (attachment?.name && !bytes.subarray(0, 1024).includes(Buffer.from("%PDF-"))) {
+      if (!bytes.length) throw invalidPdf("jec_petition_attachment_invalid", label);
+      const png = bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+      const jpg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+      if (png || jpg) {
+        try {
+          const image = png ? await output.embedPng(bytes) : await output.embedJpg(bytes);
+          const page = output.addPage([595.28, 841.89]);
+          const size = image.scale(Math.min(515 / image.width, 740 / image.height, 1));
+          page.drawImage(image, { x: (595.28-size.width)/2, y: (841.89-size.height)/2, ...size });
+        } catch { throw invalidPdf("jec_petition_attachment_invalid", label); }
+      } else {
+        const page = output.addPage([595.28, 841.89]);
+        page.drawText("Documento incorporado como anexo original", { x: 40, y: 780, size: 16 });
+        page.drawText(String(attachment.name).replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 70), { x: 40, y: 750, size: 10 });
+        page.drawText("Abra o painel de anexos de um leitor de PDF para acessar o arquivo.", { x: 40, y: 725, size: 11 });
+      }
+      await output.attach(bytes, attachment.name, { mimeType: "application/octet-stream", description: label });
+      continue;
+    }
     const source = await loadPdf(
       attachment?.bytes,
       "jec_petition_attachment_invalid",

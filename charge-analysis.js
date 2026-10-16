@@ -1,6 +1,48 @@
 import { ITAU_FAQ_ITEMS, ITAU_FAQ_LEGAL_NOTICE } from "./itau-faq.js";
 import { buildChargeCalculationSnapshot } from "./charge-calculation.js";
 
+export function bindRecoveryFileDrop(stage) {
+  const zoneFor = event => event.target?.closest?.("[data-recovery-file-drop]");
+  stage.addEventListener("dragover", event => {
+    const zone = zoneFor(event);
+    if (!zone || !Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    zone.classList.add("dragover");
+  });
+  stage.addEventListener("dragleave", event => {
+    const zone = zoneFor(event);
+    if (zone && !zone.contains(event.relatedTarget)) zone.classList.remove("dragover");
+  });
+  stage.addEventListener("drop", event => {
+    const zone = zoneFor(event);
+    if (!zone) return;
+    event.preventDefault();
+    zone.classList.remove("dragover");
+    const input = zone.querySelector('input[type="file"]');
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (!input || input.disabled || !files.length) return;
+    input.setCustomValidity("");
+    if (!input.multiple && files.length > 1) {
+      input.setCustomValidity("Arraste apenas um arquivo para este campo.");
+      input.reportValidity();
+      return;
+    }
+    if (files.some(file => file.size > 12 * 1024 * 1024)) {
+      input.setCustomValidity("Cada arquivo deve ter no máximo 12 MB.");
+      input.reportValidity();
+      return;
+    }
+    const transfer = new DataTransfer();
+    for (const file of files) transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  stage.addEventListener("change", event => {
+    if (zoneFor(event)) event.target.setCustomValidity?.("");
+  });
+}
+
 export { buildChargeCalculationSnapshot } from "./charge-calculation.js";
 
 export const CHARGE_ANALYSIS_BRAND_GROUPS = Object.freeze([
@@ -1820,12 +1862,12 @@ if (stage) {
           <p>A data, a hora e o mesmo identificador serão registrados nos dois PDFs. Não é necessário desenhar a assinatura.</p>
         </div>
         <div class="charge-recovery-form-grid">
-          <label><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "PDF")}</small></span><input type="file" name="identityDocument" accept=".pdf,application/pdf" ${attachments.identityDocument ? "" : "required"} /></label>
-          <label><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "PDF")}</small></span><input type="file" name="proofOfResidence" accept=".pdf,application/pdf" ${attachments.proofOfResidence ? "" : "required"} /></label>
-          <label class="wide"><span>Extratos e faturas da análise (se precisar anexar novamente)</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "Qualquer formato")}</small></span><input type="file" name="identityDocument" ${attachments.identityDocument ? "" : "required"} /><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "Qualquer formato")}</small></span><input type="file" name="proofOfResidence" ${attachments.proofOfResidence ? "" : "required"} /><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="wide charge-recovery-file-drop" data-recovery-file-drop><span>Extratos e faturas da análise (se precisar anexar novamente)</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
           <label class="wide"><span>Digite seu nome completo para assinar os dois documentos</span><input name="powerOfAttorneySignerName" required maxlength="160" autocomplete="off" value="${escapeChargeHtml(powerOfAttorneyAcceptance.signerName || "")}" /></label>
         </div>
-        <p class="charge-recovery-form-intro">Envie identidade e comprovante de residência em PDF, com até 12 MB por arquivo. O relatório, a procuração, o contrato e os anexos serão encaminhados ao advogado.</p>
+        <p class="charge-recovery-form-intro">Envie identidade e comprovante de residência em qualquer formato, com até 12 MB por arquivo. PDF, JPG e PNG aparecem nas páginas do relatório; outros formatos ficam incorporados como anexos originais no PDF. O relatório, a procuração, o contrato e os anexos serão encaminhados ao advogado.</p>
 
         <input type="hidden" name="historicalDocumentsAvailable" value="${escapeChargeHtml(historicalDocumentsAvailable)}" />
         <input type="hidden" name="doubleRefundAmount" value="${escapeChargeHtml(calculatedValues.doubleRefundAmount ?? claimant.doubleRefundAmount ?? "")}" />
@@ -1847,7 +1889,7 @@ if (stage) {
       <div class="charge-analysis-conversation charge-recovery-conversation compact">
         ${assistantMessage(`
           <p><strong>Agora vou montar o seu Relatório Técnico de Auditoria.</strong></p>
-          <p>Confira seus dados, envie identidade e comprovante de residência em PDF e assine a procuração e o contrato com um único aceite e seu nome completo. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
+          <p>Confira seus dados, envie identidade e comprovante de residência em qualquer formato e assine a procuração e o contrato com um único aceite e seu nome completo. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
         `, "IA AUDITA · Relatório")}
       </div>
       ${recoveryReportFormMarkup()}
@@ -1923,10 +1965,8 @@ if (stage) {
       const selected = data.get(field);
       const file = selected?.size ? selected : previous[field];
       if (!file?.size || typeof file.arrayBuffer !== "function") {
-        throw new Error(`Envie ${label} em PDF para continuar.`);
+        throw new Error(`Envie ${label} para continuar.`);
       }
-      const isPdf = file.type === "application/pdf" || String(file.name || "").toLowerCase().endsWith(".pdf");
-      if (!isPdf) throw new Error(`${label} deve ser enviado em PDF.`);
       if (file.size > 12 * 1024 * 1024) throw new Error(`${label} deve ter no máximo 12 MB.`);
       return file;
     };
@@ -2175,6 +2215,8 @@ if (stage) {
       render();
     }
   }
+
+  bindRecoveryFileDrop(stage);
 
   stage.addEventListener("click", (event) => {
     const button = event.target.closest("[data-charge-action]");

@@ -714,7 +714,7 @@ test("app hides the one-page shell until the initial route is ready", () => {
       appJs.lastIndexOf("const authState = await loadAuthState();"),
   );
   assert.match(indexHtml, /styles\.css\?v=[\w-]+/);
-  assert.match(indexHtml, /charge-analysis\.js\?v=20261016-follow-latest/);
+  assert.match(indexHtml, /charge-analysis\.js\?v=20261016-recovery-drop/);
   assert.match(indexHtml, /app\.js\?v=[^"\s]+/);
 });
 
@@ -723,8 +723,8 @@ test("recovery uses one electronic acceptance for the contract and power of atto
   assert.ok(powerOfAttorneyTemplate.length > 1000);
   assert.doesNotMatch(chargeAnalysisJs, /Relatório pronto para revisão|Revisar conteúdo do PDF|Avisos importantes|Continuar para o depoimento/);
   assert.doesNotMatch(chargeAnalysisJs, /RECOVERY_TESTIMONY_TOPICS|chargeRecoveryTestimonyForm|testimonyAnswer|refinedTestimony|testimonyReviewed|consumerTestimony/);
-  assert.match(chargeAnalysisJs, /name="identityDocument" accept="\.pdf,application\/pdf"/);
-  assert.match(chargeAnalysisJs, /name="proofOfResidence" accept="\.pdf,application\/pdf"/);
+  assert.doesNotMatch(chargeAnalysisJs, /name="identityDocument" accept=/);
+  assert.doesNotMatch(chargeAnalysisJs, /name="proofOfResidence" accept=/);
   assert.match(chargeAnalysisJs, /name="powerOfAttorneyAccepted"/);
   assert.match(chargeAnalysisJs, /name="powerOfAttorneySignerName"/);
   assert.equal((chargeAnalysisJs.match(/name="powerOfAttorneyAccepted"/g) || []).length, 1);

@@ -1369,31 +1369,14 @@ async function readJecPetitionPdfRequest(request) {
   const readPdf = async (field, label) => {
     const file = form.get(field);
     if (!file || typeof file.arrayBuffer !== "function" || !file.size) {
-      const error = new Error(`Envie ${label} em PDF.`);
-      error.code = "JEC_PDF_ATTACHMENT_REQUIRED";
-      throw error;
+      throw Object.assign(new Error(`Envie ${label}.`), { code: "JEC_PDF_ATTACHMENT_REQUIRED" });
     }
     if (file.size > 12 * 1024 * 1024) {
-      const error = new Error(`${label} deve ter no máximo 12 MB.`);
-      error.code = "JEC_PDF_ATTACHMENT_TOO_LARGE";
-      throw error;
+      throw Object.assign(new Error(`${label} deve ter no máximo 12 MB.`), { code: "JEC_PDF_ATTACHMENT_TOO_LARGE" });
     }
     const bytes = Buffer.from(await file.arrayBuffer());
-    const hasPdfHeader = bytes.subarray(0, 1024).includes(Buffer.from("%PDF-"));
-    if ((file.type && file.type !== "application/pdf") || !hasPdfHeader) {
-      const error = new Error(`${label} deve ser um arquivo PDF válido.`);
-      error.code = "JEC_PDF_ATTACHMENT_INVALID_TYPE";
-      throw error;
-    }
-    try {
-      const pdf = await PDFDocument.load(bytes);
-      if (pdf.getPageCount() === 0) throw new Error("pdf_without_pages");
-    } catch {
-      const error = new Error(`${label} deve ser um arquivo PDF válido.`);
-      error.code = "JEC_PDF_ATTACHMENT_INVALID_TYPE";
-      throw error;
-    }
-    return { label, bytes };
+    const name = String(file.name || field).split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 120);
+    return { label, bytes, name: `${field}-${name}`, type: "application/octet-stream" };
   };
 
   const sources = [];
@@ -4958,7 +4941,7 @@ async function handleApi(request, response, pathname) {
           : error.status || statusByCode[error?.code] || 500;
       const safeAttachmentMessage =
         error?.code === "jec_petition_attachment_invalid"
-          ? "O documento de identidade ou o comprovante de residência não pôde ser lido como PDF. Envie outro arquivo."
+          ? "O documento de identidade ou o comprovante de residência está corrompido ou não pôde ser lido. Envie outro arquivo."
           : "";
       const bodyTooLargeMessage =
         error?.code === "BODY_TOO_LARGE"

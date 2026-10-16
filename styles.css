@@ -12594,3 +12594,8 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 .service-card-explained .service-action-link { width: 100%; border: 0; background: transparent; box-shadow: none; padding: 8px 0 0; text-align: left; text-decoration: underline; font-family: inherit; cursor: pointer; }
 .service-action-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
 .service-info-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
+
+.charge-recovery-file-drop { border: 1px dashed #2a8a82; border-radius: 10px; padding: 12px; transition: background .15s; }
+.charge-recovery-file-drop.dragover { background: rgba(71,255,166,.12); border-color: #5dffa8; }
+.charge-recovery-drop-hint { color: #5dffa8; }
+@media (hover: none), (max-width: 760px) { .charge-recovery-drop-hint { display: none; } }
