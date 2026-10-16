@@ -1,5 +1,9 @@
 # Deploy
 
+## Ampliação estadual CPF/CNPJ — 16/10/2026
+
+Publicação autorizada pelo usuário, PR29. Cobertura homologada de35 opções CPF/12UFs e14 CNPJ/6UFs;27 portais oficiais complementares, sem promessa de emissão automática nacional.612 testes Node/PGlite aprovados, Chrome desktop/mobile com provedores fictícios e revisão independente concluída. Sem migração, dependência ou mudança de env/volumes. ProcessOnline permanece desativado. Backup atual, imagem de rollback, CI e verificação de saúde/banco/auth/cobertura/ativos pendentes de registro antes da entrega.
+
 ## Publicação final consolidada — 13/10/2026
 
 Usuário autorizou publicar tudo que falta. A versão inclui a soma visível nas contas com liberação individual, preservando descontos e preço de referência, com **Continuar sem pagar** quando a dispensa é válida no servidor. Reúne CPF/CNPJ automático, resultados em texto, bypass de teste e etapa3 de Análise IA já publicados. Sem migração, dependência ou mudança de ambiente/volumes; backup PostgreSQL/config obrigatório e rollback pela imagem159. Verificar CI, serviço saudável/concluído, versão/ativos, banco/autenticação e interface antes da entrega. Em publicação.

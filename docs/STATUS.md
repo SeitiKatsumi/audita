@@ -1,3 +1,6 @@
+# 2026-10-16 - Publicação autorizada da ampliação de certidões
+- Codex; usuário autorizou publicar. Branch codex/auditoria-certidoes-20261016 enviada e PR29 aberto contra main5067c8b. Revisão independente sem bloqueadores: catálogo homologado, CPF/CNPJ, seleção/preço/plano/worker e arquivos Docker conferidos. CI e backup atual em andamento; conferir versão, saúde/banco, autenticação e cobertura servida antes de marcar produção. ProcessOnline permanece desativado; sem migração, dependência ou alteração de env/volumes.
+
 # 2026-10-16 - Ampliação de certidões concluída localmente
 - Codex; tarefa em codex/auditoria-certidoes-20261016, consolidada na main local sem trocar a branch compartilhada. CPF e CNPJ autorizados pelo usuário para homologação; identidades e PDFs permanecem no armazenamento privado ignorado pelo Git.
 - Cobertura automática: 35 opções TJ para CPF em 12 UFs e 14 para CNPJ em AP, BA, DF, ES, PE e RS. PDFs reais conferidos por documento, nome/razão social, título e UF. Candidatos não entram na seleção, preço ou coleta pública. Portais oficiais das 27 UFs acessíveis como complemento, sem cobrança ou promessa de emissão.
