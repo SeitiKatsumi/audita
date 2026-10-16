@@ -65,7 +65,7 @@ test('UF/Brasil scope, national deduplication and prices use the validated cover
   assert(df.queries.filter(q=>q.endpoint==='TribunalRegionalTrabalho').every(q=>q.params.REGIAO===10||q.params.REGIAO==='10'));
   assert(df.queries.find(q=>q.endpoint==='TribunalRegionalTrabalho').region.includes('Distrito Federal'));
   assert(certificateSelection(c,['SP'],'cnpj').queries.every(q=>q.documentTypes.includes('cnpj')));
-  assert(df.queries.some(q=>q.id==='protestos'));assert(all.queries.filter(q=>q.kind==='data').length===12);assert(all.queries.filter(q=>q.kind==='data'&&q.includePdf).length===3);assert.equal(certificatePriceCents(.54),1620);
+  assert(df.queries.some(q=>q.id==='protestos'));assert(all.queries.filter(q=>q.kind==='data').length===11);assert(!all.queries.some(q=>q.id==='protestos-basica'));assert(all.queries.filter(q=>q.kind==='data'&&q.includePdf).length===3);assert.equal(certificatePriceCents(.54),1620);
   assert.throws(()=>certificatePriceCents(-1));assert.throws(()=>certificatePriceCents(NaN));
 });
 

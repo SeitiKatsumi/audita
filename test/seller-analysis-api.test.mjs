@@ -70,6 +70,16 @@ test('certificate issuance enriches CPF before asking for missing data, reuses s
   assert.equal(simple.status,202,'sources without mother or birth date requirements ask for neither');
   assert.equal((await post({...cpf,documentType:'cnpj',document:'04252011000110',ufs:[],courtCertificates:[],sellerQueries:['cndt-company'],companyCnpjs:['04252011000110']})).status,202);
   assert.equal(orders.at(-1).body.extraFields.stateCourtFields.fullName,'Empresa Ficticia Ltda');
+  const companyCourt={...cpf,documentType:'cnpj',document:'04252011000110',fullName:'Empresa Ficticia Ltda',motherName:'',companyCnpjs:[],ufs:['AP'],courtCertificates:['AP:Fiscal'],includeCandidates:true};
+  const beforeCompany=orders.length;
+  assert.equal((await post(companyCourt)).status,400,'public flags cannot enable an unhomologated company certificate');
+  assert.equal(orders.length,beforeCompany);
+  context.planAutonomousCertificates=(ufs,configuration,ids,documentType)=>planAutonomousCertificates(ufs,configuration,ids,documentType,{includeCandidates:true});
+  assert.equal((await post(companyCourt)).status,202,'server propagates company type into the validated planner');
+  assert.equal(orders.at(-1).body.tipoDocumento,'cnpj');
+  assert.equal(orders.at(-1).body.extraFields.stateCourtFields.fullName,'Empresa Ficticia Ltda');
+  assert.equal(orders.at(-1).body.extraFields.stateCourtFields.gender,undefined,'company payload does not fabricate personal identity');
+  context.planAutonomousCertificates=planAutonomousCertificates;
   context.billingConfiguration=()=>({checkoutReady:false,webhookReady:false});
   const manual={...cpf,fullName:'Titular Ficticio',motherName:'Mae Ficticia'};
   assert.equal((await post({...manual,testBypass:true})).status,503,'browser flags cannot skip an unconfigured checkout');
@@ -278,7 +288,8 @@ test('CPF enrichment asks only missing RG; CNPJ starts company sources and persi
     assert.equal((await post({...company},null)).status,401);assert.equal(calls.length,before);
     const start=await post({...company});assert.equal(start.status,202);
     const result=await wait(start.body.consultaId);assert.equal(result.subjectName,'Empresa Ficticia Ltda');assert.equal(result.tipoDocumento,'cnpj');
-    assert.equal(courtInputs.length,1,'company uses company coverage, never PF court collectors');assert.equal(lookups,1);
+    assert.equal(courtInputs.length,2,'company uses its newly homologated court coverage');assert.equal(lookups,1);
+    assert.equal(courtInputs.at(-1).tipoDocumento,'cnpj');assert.equal(courtInputs.at(-1).extraFields.stateCourtFields.gender,undefined);
     assert.ok(calls.slice(before).length>0);assert.ok(calls.slice(before).every(call=>call.parameters.CNPJ==='04252011000110'&&!call.parameters.CPF&&!call.parameters.DATANASCIMENTO));
     await review.start(start.body.consultaId,owner,{auth:owner},true);await review.wait(start.body.consultaId);
     const report=await review.get(start.body.consultaId,owner);assert.equal(report.status,'completed');assert.equal(report.report.subject.name,'Empresa Ficticia Ltda');
@@ -288,9 +299,9 @@ test('CPF enrichment asks only missing RG; CNPJ starts company sources and persi
     await assert.rejects(()=>restored.get(start.body.consultaId,{tenantId:1,user:{id:813}}),/seller_analysis_not_found/);
     sandbox.directDataPersonService.lookup=async()=>{lookups++;return {unavailable:true,reason:'provider_temporarily_unavailable'};};
     const fallback=await post({...cpf,state:'ES'});
-    assert.equal(fallback.status,503);assert.equal(fallback.body.motherNameRequired,false);
-    assert.deepEqual(Array.from(fallback.body.missingFields),['fullName']);
-    const manual=await post({...cpf,state:'ES',fullName:'Pessoa Ficticia'});
+    assert.equal(fallback.status,503);assert.equal(fallback.body.motherNameRequired,true);
+    assert.deepEqual(Array.from(fallback.body.missingFields),['fullName','motherName']);
+    const manual=await post({...cpf,state:'ES',fullName:'Pessoa Ficticia',motherName:'Mae Ficticia'});
     assert.equal(manual.status,202);assert.equal(lookups,2,'manual fallback avoids another lookup');await wait(manual.body.consultaId);
   } finally {await pg.close();}
 });

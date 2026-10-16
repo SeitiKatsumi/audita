@@ -28,17 +28,19 @@ const records = Object.entries(states).map(([uf, name]) => {
   const selected = catalog.queries.filter(item => serves(item, uf));
   const pf = selected.filter(item => item.documentTypes.includes("cpf"));
   const pj = selected.filter(item => item.documentTypes.includes("cnpj"));
-  const tj = courts.certificates.filter(item => item.uf === uf).map((item, index) => ({ id: `tj-${uf}-${index}`, category: "TJ", label: item.type, kind: "certificate" }));
-  const company = [...pj, { id: "public-company-qsa", category: "Cadastro", label: "CNPJ e QSA (consulta gratuita)", kind: "data" }];
-  const seller = [...tj, ...pf];
+  const tj = documentType => courts.certificates.filter(item => item.uf === uf && (item.documentTypes || ['cpf']).includes(documentType) && (item.validatedDocumentTypes || ['cpf']).includes(documentType)).map((item, index) => ({ id: `tj-${uf}-${index}`, category: "TJ", label: item.type, kind: "certificate" }));
+  const pfCourts = tj('cpf'), pjCourts = tj('cnpj');
+  const company = [...pjCourts, ...pj, { id: "public-company-qsa", category: "Cadastro", label: "CNPJ e QSA (consulta gratuita)", kind: "data" }];
+  const seller = [...pfCourts, ...pf];
   assert.equal(new Set(seller.map(x => x.id)).size, seller.length);
   assert.equal(new Set(company.map(x => x.id)).size, company.length);
   assert.equal(pf.filter(x => x.endpoint === "TribunalRegionalFederal").length, 2);
   assert.equal(pj.filter(x => x.endpoint === "TribunalRegionalFederal").length, 2);
   const limits = [];
-  if (!tj.length) limits.push("TJ estadual ainda sem emissão validada.");
+  if (!pfCourts.length) limits.push("TJ estadual CPF ainda sem emissão validada.");
+  if (!pjCourts.length) limits.push("TJ estadual CNPJ ainda sem emissão validada.");
   if (uf === "RR") limits.push("TJ sem cível comum; há criminal, militar e falências.");
-  if (uf === "RS") limits.push("TJ limitado ao alvará de folha corrida.");
+  if (uf === "RS") limits.push("TJ: certidão cível e alvará de folha corrida; o alvará não substitui distribuição criminal integral.");
   if (!pf.some(x => x.endpoint === "CertidaoNegativaDebitos" || x.provider === "portal")) limits.push("Certidão fiscal estadual CPF pendente.");
   if (!pf.some(x => x.endpoint === "TribunalRegionalTrabalho")) limits.push("Certidão TRT pendente.");
   const towns = selected.filter(x => x.endpoint === "CertidaoNegativaDebitosMunicipal").map(x => `${x.scope} (${x.documentTypes.join("/").toUpperCase()})`);
@@ -54,13 +56,13 @@ const records = Object.entries(states).map(([uf, name]) => {
 }).sort((a, b) => b.seller.length - a.seller.length || a.uf.localeCompare(b.uf));
 
 assert.equal(records.length, 27);
-const rows = records.map((r, index) => [r.uf, r.name, `=SUM(D${index + 2}:F${index + 2})`, r.official, r.receipt, r.data, r.company.length, list(r.seller), list(r.company), r.limits, catalog.validatedAt, "Integrado localmente; produção pendente", "https://docs.google.com/spreadsheets/d/1myQG7FETZWMqPXPcaDNkYYPEWU3KJRRkX0QketehcnY/edit?gid=1989173279#gid=1989173279"]);
+const rows = records.map((r, index) => [r.uf, r.name, `=SUM(D${index + 2}:F${index + 2})`, r.official, r.receipt, r.data, r.company.length, list(r.seller), list(r.company), r.limits, `Outras consultas: ${catalog.validatedAt}; TJs: ${courts.validatedAt}`, "Integrado localmente; produção pendente", "https://docs.google.com/spreadsheets/d/1myQG7FETZWMqPXPcaDNkYYPEWU3KJRRkX0QketehcnY/edit?gid=1989173279#gid=1989173279"]);
 const notes = [
   ["Critério", "Uma opção validada conta uma vez por UF e por perfil. Nacionais aparecem em todas as 27 UFs. CPF e CNPJ são consultados separadamente."],
   ["Regionais", "TRFs contam somente nas UFs de sua região; TRT2 e TRT15 contam em SP. TRT22 físico/eletrônico conta uma única vez."],
   ["Municipais", "Total inclui produtos dos municípios nomeados na linha. Para um vendedor específico, selecionar apenas municípios e jurisdições aplicáveis."],
   ["Tipos", "Certidões e comprovantes têm PDF. Dados sem PDF são consultas estruturadas. Processos agrupados/completos são dois produtos e podem trazer dados sobrepostos."],
-  ["CNPJ", "Total por empresa inclui CNDT, FGTS, dois documentos do TRF, cadastro/QSA gratuito e opções fiscais/municipais validadas na UF."],
+  ["CNPJ", "Total por empresa inclui certidões TJ homologadas para CNPJ, CNDT, FGTS, dois documentos do TRF, cadastro/QSA gratuito e opções fiscais/municipais validadas na UF."],
   ["Totais", "Não somar as UFs para obter produtos únicos nacionais: a repetição por cobertura é intencional. As quantidades não indicam completude da análise jurídica."],
   ["Jurisdição", "https://www.cnj.jus.br/wp-content/uploads/2025/11/justica-em-numeros-2025.pdf"],
   ["Trabalhista", "https://www.cnj.jus.br/tribunais/"]

@@ -44,7 +44,10 @@
       "params": {},
       "costBrl": 6.99,
       "kind": "data",
-      "documentTypes": ["cpf", "cnpj"],
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
       "manualOnly": true,
       "limitation": "Dossiê QUOD com dados e score do provedor; não é Serasa, certidão oficial ou aprovação de negócio. Sem PDF oficial; protestos conforme a base QUOD, sem substituir IEPTB."
     },
@@ -746,9 +749,11 @@
       "costBrl": 1.1,
       "kind": "data",
       "documentTypes": [
-        "cpf"
+        "cpf",
+        "cnpj"
       ],
-      "limitation": "Levantamento do provedor; não é certidão nem garante cobertura integral dos tribunais. Exige análise do papel do vendedor em cada processo."
+      "limitation": "Levantamento do provedor; não é certidão nem garante cobertura integral dos tribunais. Exige análise do papel do vendedor em cada processo.",
+      "validatedAt": "2026-10-16"
     },
     {
       "id": "cadin-go",
@@ -1353,9 +1358,11 @@
       "costBrl": 3.3,
       "kind": "data",
       "documentTypes": [
-        "cpf"
+        "cpf",
+        "cnpj"
       ],
-      "limitation": "Base do provedor; não é certidão nem garante cobertura integral. A tela apresenta até 20 detalhes, omite informações em segredo de justiça e exige análise do papel do vendedor."
+      "limitation": "Base do provedor; não é certidão nem garante cobertura integral. A tela apresenta até 20 detalhes, omite informações em segredo de justiça e exige análise do papel do vendedor.",
+      "validatedAt": "2026-10-16"
     },
     {
       "id": "cadin-mg",

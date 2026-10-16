@@ -1,202 +1,1077 @@
 {
-  "validatedAt": "2026-09-28",
-  "documentType": "cpf",
+  "validatedAt": "2026-10-16",
   "certificates": [
     {
       "uf": "AP",
       "type": "Cível",
       "provider": "direct_data",
-      "expectedText": "CERTIDÃO CÍVEL"
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16"
     },
     {
       "uf": "AP",
       "type": "Criminal",
       "provider": "direct_data",
-      "expectedText": "CERTIDÃO CRIMINAL"
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16"
     },
     {
       "uf": "DF",
       "type": "Criminal",
       "provider": "portal",
       "portalType": "criminal",
-      "expectedText": "(AÇÕES CRIMINAIS)"
+      "expectedText": "(AÇÕES CRIMINAIS)",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16",
+      "validatedBy": "official_portal_pdf"
     },
     {
       "uf": "DF",
       "type": "Cível",
       "provider": "portal",
       "portalType": "civil",
-      "expectedText": "(AÇÕES CÍVEIS)"
+      "expectedText": "(AÇÕES CÍVEIS)",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16",
+      "validatedBy": "official_portal_pdf"
     },
     {
       "uf": "DF",
       "type": "Falência e Recuperação Judicial",
       "provider": "portal",
       "portalType": "falencia",
-      "expectedText": "(AÇÕES DE FALÊNCIAS E RECUPERAÇÕES JUDICIAIS)"
+      "expectedText": "(AÇÕES DE FALÊNCIAS E RECUPERAÇÕES JUDICIAIS)",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16",
+      "validatedBy": "official_portal_pdf"
     },
     {
       "uf": "DF",
       "type": "Especial (Cível e Criminal)",
       "provider": "portal",
       "portalType": "especial",
-      "expectedText": "(ESPECIAL - AÇÕES CÍVEIS E CRIMINAIS)"
+      "expectedText": "(ESPECIAL - AÇÕES CÍVEIS E CRIMINAIS)",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16",
+      "validatedBy": "official_portal_pdf"
     },
     {
       "uf": "ES",
       "type": "Cível",
       "provider": "portal",
       "portalType": "civil",
-      "expectedText": "NATUREZA CÍVEL"
+      "expectedText": "CERTIDÃO NEGATIVA DE PRIMEIRA INSTÂNCIA CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16",
+      "validatedBy": "official_portal_pdf"
     },
     {
       "uf": "ES",
       "type": "Criminal",
       "provider": "portal",
       "portalType": "criminal",
-      "expectedText": "NATUREZA CRIMINAL"
+      "expectedText": "CERTIDÃO NEGATIVA DE PRIMEIRA INSTÂNCIA CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16",
+      "validatedBy": "official_portal_pdf"
     },
     {
       "uf": "ES",
       "type": "Família",
       "provider": "direct_data",
-      "expectedText": "NATUREZA FAMÍLIA"
+      "expectedText": "NATUREZA FAMÍLIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "ES",
       "type": "Fiscal",
       "provider": "direct_data",
-      "expectedText": "NATUREZA DE EXECUÇÕES FISCAIS"
+      "expectedText": "NATUREZA DE EXECUÇÕES FISCAIS",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "ES",
       "type": "Militar",
       "provider": "direct_data",
-      "expectedText": "NATUREZA AUDITORIA MILITAR"
+      "expectedText": "NATUREZA AUDITORIA MILITAR",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "ES",
       "type": "Falência e recuperação judicial",
       "provider": "portal",
       "portalType": "falencia",
-      "expectedText": "NATUREZA DE RECUPERAÇÃO JUDICIAL E EXTRAJUDICIAL"
+      "expectedText": "CERTIDÃO NEGATIVA DE PRIMEIRA INSTÂNCIA RECUPERAÇÃO JUDICIAL E EXTRAJUDICIAL (FALÊNCIA E CONCORDATA)",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16",
+      "validatedBy": "official_portal_pdf"
     },
     {
       "uf": "GO",
       "type": "Cível",
       "provider": "direct_data",
-      "expectedText": "AÇÕES CIVEIS TODAS AS COMARCAS"
+      "expectedText": "AÇÕES CIVEIS TODAS AS COMARCAS",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "GO",
       "type": "Criminal",
       "provider": "direct_data",
-      "expectedText": "AÇÕES CRIMINAIS TODAS AS COMARCAS"
+      "expectedText": "AÇÕES CRIMINAIS TODAS AS COMARCAS",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "PA",
       "type": "Cível",
       "provider": "direct_data",
-      "expectedText": "DISTRIBUIÇÃO DE FEITOS CÍVEIS"
+      "expectedText": "DISTRIBUIÇÃO DE FEITOS CÍVEIS",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "PA",
       "type": "Criminal",
       "provider": "direct_data",
-      "expectedText": "CERTIDÃO JUDICIAL CRIMINAL"
+      "expectedText": "CERTIDÃO JUDICIAL CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "PE",
       "type": "Cível",
       "provider": "direct_data",
-      "expectedText": "CERTIDÃO CÍVEL"
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16"
     },
     {
       "uf": "PE",
       "type": "Criminal",
       "provider": "direct_data",
-      "expectedText": "CERTIDÃO CRIMINAL"
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16"
     },
     {
       "uf": "PE",
       "type": "Judicial para fins eleitorais",
       "provider": "direct_data",
       "expectedText": "CERTIDÃO JUDICIAL PARA FINS ELEITORAIS",
-      "providerType": "FinsEleitorais"
+      "providerType": "FinsEleitorais",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "PI",
       "type": "Cível",
       "provider": "direct_data",
-      "expectedText": "CÍVEL E EXECUÇÃO CÍVEL - UNIFICADA"
+      "expectedText": "CÍVEL E EXECUÇÃO CÍVEL - UNIFICADA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "PI",
       "type": "Criminal",
       "provider": "direct_data",
-      "expectedText": "CRIMINAL E AUDITORIA MILITAR - UNIFICADA"
+      "expectedText": "CRIMINAL E AUDITORIA MILITAR - UNIFICADA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "PI",
       "type": "Judicial para fins eleitorais",
       "provider": "direct_data",
       "expectedText": "CÍVEL, EXECUÇÃO CÍVEL, CRIMINAL E AUDITORIA MILITAR - UNIFICADA",
-      "providerType": "FinsEleitorais"
+      "providerType": "FinsEleitorais",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "RR",
       "type": "Criminal",
       "provider": "direct_data",
       "providerType": "Cível",
-      "expectedText": "Certidão de Distribuição de Ação Criminal"
+      "expectedText": "Certidão de Distribuição de Ação Criminal",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "RR",
       "type": "Militar",
       "provider": "direct_data",
       "providerType": "Criminal",
-      "expectedText": "Certidão de Distribuição de Ação Militar"
+      "expectedText": "Certidão de Distribuição de Ação Militar",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "RR",
       "type": "Concordata e Falências",
       "provider": "direct_data",
       "providerType": "Militar",
-      "expectedText": "Certidão de Distribuição de Ação Concordata e Falências"
+      "expectedText": "Certidão de Distribuição de Ação Concordata e Falências",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "RS",
       "type": "Alvará de folha corrida",
       "provider": "direct_data",
       "providerType": "Criminal",
-      "expectedText": "ALVARÁ DE FOLHA CORRIDA"
+      "expectedText": "ALVARÁ DE FOLHA CORRIDA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "TO",
       "type": "Cível",
       "provider": "portal",
       "portalType": "civil",
-      "expectedText": "AÇÕES E EXECUÇÕES CÍVEIS"
+      "expectedText": "AÇÕES E EXECUÇÕES CÍVEIS",
+      "documentTypes": [
+        "cpf"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "TO",
       "type": "Criminal",
       "provider": "portal",
       "portalType": "criminal",
-      "expectedText": "AÇÕES E EXECUÇÕES CRIMINAIS"
+      "expectedText": "AÇÕES E EXECUÇÕES CRIMINAIS",
+      "documentTypes": [
+        "cpf"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "TO",
       "type": "Falência e recuperação judicial",
       "provider": "direct_data",
       "expectedText": "DISTRIBUIÇÃO FALÊNCIA, RECUPERAÇÃO JUDICIAL",
-      "providerType": "FalênciaRecuperação"
+      "providerType": "FalênciaRecuperação",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
     },
     {
       "uf": "TO",
       "type": "Fiscal",
       "provider": "direct_data",
-      "expectedText": "AÇÕES DE EXECUÇÕES FISCAIS"
+      "expectedText": "AÇÕES DE EXECUÇÕES FISCAIS",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-09-28"
+    },
+    {
+      "uf": "AC",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AC",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AC",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AC",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AP",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AP",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AM",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AM",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AM",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "AM",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "BA",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO ESTADUAL AÇÕES CÍVEIS",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16"
+    },
+    {
+      "uf": "BA",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": [
+        "CERTIDÃO ESTADUAL CRIMINAL",
+        "CERTIDÃO ESTADUAL CRIMINAIS"
+      ],
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16"
+    },
+    {
+      "uf": "BA",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "BA",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "CE",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "CE",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "CE",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "CE",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "DF",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "DF",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "ES",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "GO",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "GO",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "MT",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "MT",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "MT",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "MT",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PA",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PA",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PB",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PB",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PB",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PB",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PE",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PE",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PI",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "PI",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RN",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RN",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RN",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RN",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RR",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RR",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RS",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO JUDICIAL CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedAt": "2026-10-16"
+    },
+    {
+      "uf": "RS",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "RS",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "SE",
+      "type": "Cível",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO JUDICIAL NATUREZA: CÍVEL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-10-16"
+    },
+    {
+      "uf": "SE",
+      "type": "Criminal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO JUDICIAL NATUREZA: CRIMINAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
+      "validatedAt": "2026-10-16"
+    },
+    {
+      "uf": "SE",
+      "type": "Fiscal",
+      "provider": "direct_data",
+      "expectedText": "CERTIDÃO FISCAL",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
+    },
+    {
+      "uf": "SE",
+      "type": "FalênciaRecuperação",
+      "provider": "direct_data",
+      "expectedText": "FALÊNCIA",
+      "documentTypes": [
+        "cpf",
+        "cnpj"
+      ],
+      "validatedDocumentTypes": [],
+      "availability": "requires_validation"
     }
+  ],
+  "documentTypes": [
+    "cpf",
+    "cnpj"
   ]
 }
