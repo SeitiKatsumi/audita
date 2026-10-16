@@ -7,19 +7,27 @@ import { findStateCourtProfile } from "./state-courts.service.mjs";
 const coverage = JSON.parse(readFileSync(new URL("../data/state-court-autonomous.json", import.meta.url), "utf8"));
 const compact = (value) => String(value || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
-export function getAutonomousCertificateCoverage(configuration = {}) {
+export function getAutonomousCertificateCoverage(configuration = {}, { includeCandidates = false } = {}) {
   const certificates = coverage.certificates.filter((item) => item.provider === "portal" || (configuration.configured && configuration.allowedUfs?.includes(item.uf)))
-    .map(item=>({...item,id:`${item.uf}:${item.type}`,requiredIdentityFields:(findStateCourtProfile(item.uf)?.requiredFields||[]).filter(field=>['birthDate','motherName','rg','gender'].includes(field))}));
+    .map(item=>{
+      const supported = item.documentTypes || ['cpf'];
+      // Legacy evidence was PF only; adding CNPJ support must not silently homologate it.
+      const validatedDocumentTypes = (item.validatedDocumentTypes || ['cpf']).filter(type=>supported.includes(type));
+      const documentTypes = supported.filter(type=>['cpf','cnpj'].includes(type) && (includeCandidates === true || validatedDocumentTypes.includes(type)));
+      return {...item,documentTypes,validatedDocumentTypes,id:`${item.uf}:${item.type}`,requiredIdentityFields:(findStateCourtProfile(item.uf)?.requiredFields||[]).filter(field=>['birthDate','motherName','rg','gender'].includes(field))};
+    }).filter(item=>item.documentTypes.length);
   return { ...coverage, certificates, ufs: [...new Set(certificates.map((item) => item.uf))], pdfQueryCostBrl: configuration.pdfTotalCostBrl || 0.54 };
 }
 
-export function planAutonomousCertificates(ufs, configuration = {}, ids) {
-  const catalog = getAutonomousCertificateCoverage(configuration);
-  if (!Array.isArray(ufs) || !ufs.length || ufs.some((uf) => !catalog.ufs.includes(uf))) throw new Error("unsupported_autonomous_uf");
-  const available = catalog.certificates.filter((item) => ufs.includes(item.uf));
+export function planAutonomousCertificates(ufs, configuration = {}, ids, documentType = 'cpf', { includeCandidates = false } = {}) {
+  if (!['cpf','cnpj'].includes(documentType)) throw new Error('invalid_autonomous_subject');
+  if (!Array.isArray(ufs) || !ufs.length) throw new Error("unsupported_autonomous_uf");
+  const catalog = getAutonomousCertificateCoverage(configuration, { includeCandidates });
+  const available = catalog.certificates.filter((item) => ufs.includes(item.uf) && item.documentTypes.includes(documentType));
+  if (ufs.some((uf) => !available.some(item=>item.uf===uf))) throw new Error("unsupported_autonomous_uf");
   if(ids!==undefined && (!Array.isArray(ids)||!ids.length||ids.some(id=>!available.some(c=>c.id===id))))throw new Error('invalid_autonomous_certificate_selection');
   const certificates=ids===undefined?available:available.filter(c=>ids.includes(c.id));
-  const requiredIdentityFields=[...new Set(certificates.flatMap(item=>findStateCourtProfile(item.uf)?.requiredFields||[]))].filter(field=>['birthDate','motherName','rg','gender'].includes(field));
+  const requiredIdentityFields=documentType==='cpf'?[...new Set(certificates.flatMap(item=>findStateCourtProfile(item.uf)?.requiredFields||[]))].filter(field=>['birthDate','motherName','rg','gender'].includes(field)):[];
   return { certificates, requiredIdentityFields, maxProviderCostBrl: Number((certificates.filter((item) => item.provider === "direct_data").length * catalog.pdfQueryCostBrl).toFixed(2)) };
 }
 
@@ -50,11 +58,11 @@ export async function downloadCertificateEvidence(url, fetchImpl = fetch) {
   return Buffer.concat(chunks);
 }
 
-export async function collectAutonomousCertificates(input, { collectPortal, closeAssisted, queryCertificate, configuration, download = downloadCertificateEvidence, savePdf = saveAndExtractPdfBuffer, readPdf = extractPdfText } = {}) {
+export async function collectAutonomousCertificates(input, { collectPortal, closeAssisted, queryCertificate, configuration, includeCandidates = false, download = downloadCertificateEvidence, savePdf = saveAndExtractPdfBuffer, readPdf = extractPdfText } = {}) {
   const extra = input.extraFields || {};
   if (extra.authorizationConfirmed !== true) throw new Error("authorization_required");
-  const plan = planAutonomousCertificates(extra.autonomousUfs, configuration, extra.autonomousCertificates);
-  if (input.tipoDocumento !== "cpf" || !extra.stateCourtFields?.fullName) throw new Error("invalid_autonomous_subject");
+  if (!['cpf','cnpj'].includes(input.tipoDocumento) || !extra.stateCourtFields?.fullName) throw new Error("invalid_autonomous_subject");
+  const plan = planAutonomousCertificates(extra.autonomousUfs, configuration, extra.autonomousCertificates, input.tipoDocumento, { includeCandidates });
   if (plan.certificates.some((item) => item.provider === "direct_data") && extra.paidQueryConfirmed !== true) throw new Error("paid_query_confirmation_required");
   const rows = plan.certificates.map((item) => ({ uf: item.uf, tipo: `${item.uf} · ${item.type}`, status: "pending", resultado: "indisponivel", provider: item.provider }));
   for (let i = 0; i < plan.certificates.length; i++) {
@@ -73,7 +81,7 @@ export async function collectAutonomousCertificates(input, { collectPortal, clos
         if (!certificateScopeMatches(text, item.expectedText, item.uf)) throw new Error("evidence_scope_mismatch");
         rows[i] = { ...rows[i], ...certificate, uf: item.uf, tipo: rows[i].tipo, status: "success" };
       } else {
-        const response = await queryCertificate({ ...extra.stateCourtFields, document: input.documento, documentType: "cpf", uf: item.uf, certificateType: item.providerType || item.type, generatePdf: true, authorizationConfirmed: true, paidQueryConfirmed: true, requestId: `${input.consultaId}:${item.uf}:${item.type}` }, input.usageContext);
+        const response = await queryCertificate({ ...extra.stateCourtFields, document: input.documento, documentType: input.tipoDocumento, uf: item.uf, certificateType: item.providerType || item.type, generatePdf: true, authorizationConfirmed: true, paidQueryConfirmed: true, requestId: `${input.consultaId}:${item.uf}:${item.type}` }, input.usageContext);
         if (!response.result?.certificate?.evidenceUrl) throw new Error(response.reason || "official_pdf_unavailable");
         const buffer = await download(response.result.certificate.evidenceUrl);
         const text = await readPdf(buffer);
