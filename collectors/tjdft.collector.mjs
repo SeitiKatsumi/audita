@@ -7,8 +7,9 @@ import {
   SOURCE_RESULT,
 } from "./base.collector.mjs";
 import { readFile } from "node:fs/promises";
-import { collectAutonomousCertificates } from "../services/state-court-autonomous.service.mjs";
+import { certificatePdfMatches, collectAutonomousCertificates } from "../services/state-court-autonomous.service.mjs";
 import { extractPdfText, saveAndExtractPdfBuffer } from "../services/pdf.service.mjs";
+import { savePdfBuffer } from "../services/storage.service.mjs";
 import {
   findStateCourtProfile,
   getStateCourtCertificateLabel,
@@ -399,6 +400,13 @@ async function collectStateCourtPortal({ input, profile, stateCourtName, stateCo
   }
 
   if (profile?.uf === "TO") {
+    if (input.tipoDocumento === "cnpj") {
+      return manualRequiredResult(fonte, "TJTO informa custas para pessoa jurídica; a emissão deve seguir o canal oficial.", {
+        ...baseData,
+        officialUrl: "https://www.tjto.jus.br/servicos/certidoes",
+        proximoPasso: "Verifique as custas e solicite a certidão no portal do TJTO. Casos com processos ou homonímia exigem o sistema com GOV.BR.",
+      });
+    }
     return collectToTjtoStateCourt({ input, profile, stateCourtName, stateCourtUrl, requestedCertificates, baseData });
   }
 
@@ -465,7 +473,9 @@ async function collectStateCourtPortal({ input, profile, stateCourtName, stateCo
 }
 
 function getMissingStateCourtFields(input, profile) {
-  const fields = profile?.requiredFields || [];
+  const fields = profile?.uf === "ES" && input.tipoDocumento === "cpf"
+    ? [...(profile.requiredFields || []), "motherName"]
+    : profile?.requiredFields || [];
   const provided = input.extraFields?.stateCourtFields || {};
   return fields.filter((field) => {
     if (field === "document") {
@@ -4833,40 +4843,12 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
   const page = await context.newPage();
   try {
     page.setDefaultTimeout(envNumber("STATE_COURT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
-    const fields = input.extraFields?.stateCourtFields || {};
-    const documentValue = String(
-      input.tipoDocumento === "cnpj" ? input.extraFields?.cnpjDocument || input.documento : input.extraFields?.cpfDocument || input.documento,
-    ).replace(/\D/g, "");
-    await page.goto("https://sistemas.tjes.jus.br/certidaonegativa/sistemas/certidao/CERTIDAOPESQUISA.cfm", {
+    await page.goto("https://sistemas.tjes.jus.br/certidao-negativa/emitir", {
       waitUntil: "domcontentloaded",
       timeout: envNumber("STATE_COURT_NAV_TIMEOUT_MS", 30000),
     });
 
-    await page.locator("#cbInstancia").selectOption(esInstanceValue(fields.instance));
-    await page.waitForTimeout(500);
-    await page.locator("#cbNatureza").selectOption(esNatureValue(certificateType.id)).catch(() => {});
-    await page.locator(input.tipoDocumento === "cnpj" ? "#rbPessoaJ" : "#rbPessoaF").check({ force: true }).catch(() => {});
-    await safeFill(page, input.tipoDocumento === "cnpj" ? "#edCnpj" : "#edCpf", formatDocument(documentValue));
-    await safeFill(page, "#edRg", fields.rg);
-    await safeFill(page, "#edTitEleitor", fields.voterTitle);
-    await safeFill(page, "#edCtpsNumero", fields.ctpsNumber);
-    await safeFill(page, "#edCtpsSerie", fields.ctpsSeries);
-    await safeFill(page, "#edNome", fields.fullName);
-    await safeFill(page, "#edMae", fields.motherName);
-    await safeFill(page, "#edPai", fields.fatherName);
-    await safeFill(page, "#edNascimento", formatBrazilianDate(fields.birthDate));
-    await selectByTextOrValue(page, "#cbNacionalidade", fields.nationality || "BRASILEIRO");
-    await selectByTextOrValue(page, "#cbEstadoCivil", fields.civilStatus);
-    await safeFill(page, "input[name='edProfissao']", fields.profession);
-    await selectByTextOrValue(page, "#cbMunicipioInfo", fields.city);
-    await safeFill(page, "#edBairro", fields.neighborhood);
-    await safeFill(page, "#edRua", fields.address);
-    await safeFill(page, "#edNumero", fields.addressNumber);
-    await safeFill(page, "#edComplemento", fields.addressComplement);
-    await safeFill(page, "#edCep", fields.cep);
-    await safeFill(page, "#edEmail", fields.email);
-    await safeFill(page, "#edTelFixo", fields.phone);
-    await safeFill(page, "#edTelCelular", fields.mobile);
+    await fillEsTjesPageFields(page, input, certificateType);
 
     const downloadPromise = page.waitForEvent("download", { timeout: envNumber("STATE_COURT_DOWNLOAD_TIMEOUT_MS", 25000) }).catch(() => null);
     await clickEsTjesSolicitar(page);
@@ -4888,12 +4870,7 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
     if (download) {
       const downloadPath = await download.path();
       const buffer = Buffer.from(await readFile(downloadPath));
-      const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
-        consultaId: input.consultaId,
-        fonte,
-        fileName: `tjes-${certificateType.id}.pdf`,
-        buffer,
-      });
+      const { pdfPath, rawText } = await saveNativeCertificatePdf(input, `tjes-${certificateType.id}.pdf`, buffer);
       return {
         tipo: certificateType.label,
         status: "success",
@@ -4910,12 +4887,7 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
       const pdfResponse = await fetch(pdfLink);
       if (pdfResponse.ok) {
         const buffer = Buffer.from(await pdfResponse.arrayBuffer());
-        const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
-          consultaId: input.consultaId,
-          fonte,
-          fileName: `tjes-${certificateType.id}.pdf`,
-          buffer,
-        });
+        const { pdfPath, rawText } = await saveNativeCertificatePdf(input, `tjes-${certificateType.id}.pdf`, buffer);
         return {
           tipo: certificateType.label,
           status: "success",
@@ -4961,9 +4933,27 @@ async function collectEsTjesCertificate({ context, input, certificateType }) {
   }
 }
 
+export async function fillEsTjesPageFields(page, input, certificateType) {
+  const fields = input.extraFields?.stateCourtFields || {};
+  const isCompany = input.tipoDocumento === "cnpj";
+  const documentValue = String(isCompany ? input.extraFields?.cnpjDocument || input.documento : input.extraFields?.cpfDocument || input.documento).replace(/\D/g, "");
+  const instance = esInstanceValue(fields.instance);
+  await page.locator(isCompany ? "#rbPessoaJ" : "#rbPessoaF").check();
+  await page.locator(isCompany ? "#edCnpj" : "#edCpf").fill(formatDocument(documentValue));
+  await page.locator("#cbInstancia").selectOption(instance);
+  await page.locator(`#cbNatureza${instance}`).selectOption(esNatureValue(certificateType.id));
+  if (isCompany) {
+    await page.locator("#edRazaoSocial").fill(fields.companyName || fields.fullName || input.extraFields?.tjdftCompanyName || "");
+  } else {
+    await page.locator("#edPrimeiroNome").fill(fields.firstName || String(fields.fullName || "").trim().split(/\s+/)[0]);
+    await page.locator("#edMae").fill(fields.motherName || input.extraFields?.motherName || "");
+    await safeFill(page, "#edPai", fields.fatherName);
+  }
+}
+
 async function clickEsTjesSolicitar(page) {
   const timeout = envNumber("STATE_COURT_FIELD_TIMEOUT_MS", 8000);
-  const button = page.locator("#btnSolicitar").first();
+  const button = page.locator("#btnAvancar, #btnSolicitar").first();
   await button.waitFor({ state: "attached", timeout });
   await button.scrollIntoViewIfNeeded({ timeout }).catch(() => {});
   const clicked = await button.click({ timeout, noWaitAfter: true }).then(() => true).catch(() => false);
@@ -4972,7 +4962,7 @@ async function clickEsTjesSolicitar(page) {
   }
   return page
     .evaluate(() => {
-      const button = document.querySelector("#btnSolicitar");
+      const button = document.querySelector("#btnAvancar, #btnSolicitar");
       if (!button) return false;
       button.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
       button.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true }));
@@ -4990,6 +4980,9 @@ async function waitForEsTjesResultOrValidation(page) {
   await page
     .waitForFunction(
       () => {
+        if (document.querySelector("#v2Form")) {
+          return [...document.querySelectorAll("#v2AvisoErro, .v2-msg-erro")].some((element) => Boolean(element.innerText?.trim()) && element.getClientRects().length > 0);
+        }
         const text = String(document.body?.innerText || "")
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "")
@@ -5026,12 +5019,7 @@ async function saveEsTjesPrintedCertificate({ page, input, certificateType }) {
     preferCSSPageSize: true,
     margin: { top: "8mm", right: "8mm", bottom: "8mm", left: "8mm" },
   });
-  return saveAndExtractPdfBuffer({
-    consultaId: input.consultaId,
-    fonte,
-    fileName: `tjes-${certificateType.id}.pdf`,
-    buffer,
-  });
+  return saveNativeCertificatePdf(input, `tjes-${certificateType.id}.pdf`, buffer);
 }
 
 function isEsajAssistedSession(session) {
@@ -6864,13 +6852,24 @@ export function getTjdftPfMissingFields({ firstName, motherName, certificateType
   return missingFields;
 }
 
+export async function saveNativeCertificatePdf(input, fileName, buffer) {
+  const rawText = await extractPdfText(buffer);
+  if (input.tipoDocumento === "cnpj") {
+    const fields = input.extraFields?.stateCourtFields || {};
+    const companyName = fields.companyName || fields.fullName || input.extraFields?.tjdftCompanyName || "";
+    if (!certificatePdfMatches(buffer, rawText, input.documento, companyName)) throw new Error("evidence_identity_unverified");
+  }
+  const pdfPath = await savePdfBuffer({ consultaId: input.consultaId, fonte, fileName, buffer });
+  return { pdfPath, rawText };
+}
+
 async function collectCertificate({ context, input, firstName, motherName, fatherName, certificateType }) {
   const page = await context.newPage();
   try {
     page.setDefaultTimeout(envNumber("TJDFT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
     await page.goto(OFFICIAL_URL, { waitUntil: "domcontentloaded" });
-    await fillFirstStep(page, input.documento, firstName, certificateType);
-    await fillSecondStep(page, motherName, fatherName);
+    await fillTjdftFirstStep(page, input.documento, firstName, certificateType);
+    if (input.tipoDocumento !== "cnpj") await fillTjdftSecondStep(page, motherName, fatherName);
     const { downloadUrl, pageText } = await readResult(page);
 
     if (!downloadUrl) {
@@ -6896,12 +6895,7 @@ async function collectCertificate({ context, input, firstName, motherName, fathe
     }
 
     const buffer = Buffer.from(await pdfResponse.arrayBuffer());
-    const { pdfPath, rawText } = await saveAndExtractPdfBuffer({
-      consultaId: input.consultaId,
-      fonte,
-      fileName: `tjdft-${certificateType.id}.pdf`,
-      buffer,
-    });
+    const { pdfPath, rawText } = await saveNativeCertificatePdf(input, `tjdft-${certificateType.id}.pdf`, buffer);
 
     const textForAnalysis = rawText || "";
     return {
@@ -6926,11 +6920,12 @@ async function collectCertificate({ context, input, firstName, motherName, fathe
   }
 }
 
-async function fillFirstStep(page, documento, firstName, certificateType) {
+export async function fillTjdftFirstStep(page, documento, firstName, certificateType) {
   const stepTimeoutMs = envNumber("TJDFT_STEP_TIMEOUT_MS", 30000);
   const textInputs = page.locator("input[type='text']");
   await textInputs.nth(0).fill(formatDocument(documento));
-  if (firstName) {
+  // The official wizard removes the first-name input and skips affiliation for CNPJ.
+  if (String(documento).replace(/\D/g, "").length === 11 && firstName) {
     await textInputs.nth(1).fill(firstName);
   }
   await chooseCertificateType(page, certificateType);
@@ -6952,12 +6947,8 @@ async function fillFirstStep(page, documento, firstName, certificateType) {
   }
 }
 
-async function fillSecondStep(page, motherName, fatherName) {
+export async function fillTjdftSecondStep(page, motherName, fatherName) {
   const stepTimeoutMs = envNumber("TJDFT_STEP_TIMEOUT_MS", 45000);
-  if (!motherName && !fatherName) {
-    return;
-  }
-
   const textInputs = page.locator("input[type='text']");
   if (motherName) {
     await textInputs.nth(2).fill(motherName);
@@ -7083,7 +7074,8 @@ function hasCertificateResultSignal(text) {
   );
 }
 
-function hasEsTjesPrintableCertificateSignal(text) {
+export function hasEsTjesPrintableCertificateSignal(text) {
+  if (hasEsTjesRequestFormSignal(text)) return false;
   const normalized = normalize(text);
   return (
     normalized.includes("tribunal de justica do estado do espirito santo") &&
@@ -7096,6 +7088,7 @@ function hasEsTjesRequestFormSignal(text) {
   const normalized = normalize(text);
   return (
     normalized.includes("solicitacao de certidao negativa") ||
+    (normalized.includes("tipo de pessoa") && normalized.includes("natureza da certidao")) ||
     normalized.includes("preencha o cpf") ||
     normalized.includes("preencha o cnpj") ||
     normalized.includes("informe o nome conforme o cpf")
