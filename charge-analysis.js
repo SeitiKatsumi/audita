@@ -746,9 +746,12 @@ if (stage) {
   function scrollLatestMessage(container) {
     window.requestAnimationFrame(() => {
       if (document.body.dataset.activePage !== "analise-cobrancas") return;
+      const latestPanel = [...stage.querySelectorAll(":scope > :not(.charge-analysis-floating-avatar)")].at(-1);
       const target = state.screen === "analyzing"
         ? stage.querySelector(".charge-analysis-processing")
-        : container?.lastElementChild;
+        : latestPanel?.matches(".charge-analysis-conversation")
+          ? latestPanel.lastElementChild
+          : latestPanel || container?.lastElementChild;
       if (!target?.isConnected) return;
       target.scrollIntoView?.({
         behavior: prefersReducedMotion ? "auto" : "smooth",
@@ -2096,7 +2099,10 @@ if (stage) {
       render();
       return;
     }
-    if (triageStarted || state.screen !== "triage") return;
+    if (triageStarted || state.screen !== "triage") {
+      scrollLatestMessage(stage.querySelector(".charge-analysis-conversation"));
+      return;
+    }
     triageStarted = true;
     render();
   }

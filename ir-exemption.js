@@ -1,4 +1,4 @@
-import {createAuditaChatMotion} from './audita-chat-motion.js';
+import {createAuditaChatMotion} from './audita-chat-motion.js?v=20261016-follow-latest';
 const irRoot = document.querySelector('#isencao-ir');
 const $ = (selector, root=irRoot) => root.querySelector(selector);
 const $$ = (selector, root=irRoot) => [...root.querySelectorAll(selector)];
@@ -20,7 +20,7 @@ async function api(path='',options={}) {
 }
 const post=(path,body)=>api(path,{method:'POST',body:JSON.stringify(body||{})});
 async function guarded(fn){if(state.busy)return;state.busy=true;notice();$$('button[type=submit]').forEach(b=>b.disabled=true);try{await fn();}catch(e){notice(e.message);if(e.code==='case_conflict'&&state.case){await loadCase(state.case.id).catch(()=>{});}}finally{state.busy=false;$$('button[type=submit]').forEach(b=>b.disabled=false);}}
-async function loadCase(id){state.tab='chat';state.case=(await api(`/cases/${encodeURIComponent(id)}`)).case;state.editing=null;const url=new URL(location.href);url.searchParams.set('case',id);history.replaceState(null,'',url);await render();await completeSummary();if(state.case.question)scrollLatestAssistant();else $('#questionTitle')?.scrollIntoView({block:'start',behavior:'auto'});}
+async function loadCase(id){state.tab='chat';state.case=(await api(`/cases/${encodeURIComponent(id)}`)).case;state.editing=null;const url=new URL(location.href);url.searchParams.set('case',id);history.replaceState(null,'',url);await render();await completeSummary();scrollLatestAssistant();}
 async function updateCase(result,animate=false){state.case=result.case;state.editing=null;state.summaryError=false;await render(animate);await completeSummary();}
 async function completeSummary(){
   const c=state.case;
@@ -29,7 +29,7 @@ async function completeSummary(){
   try{
     const result=await post(`/cases/${c.id}/actions`,{action:'analyze',revision:c.revision});
     if(state.case!==c)return;
-    state.case=result.case;await render();$('#questionTitle')?.scrollIntoView({block:'start',behavior:'auto'});
+    state.case=result.case;await render();scrollLatestAssistant();
   }catch(error){
     if(state.case!==c)return;
     state.summaryError=true;await render();

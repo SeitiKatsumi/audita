@@ -818,3 +818,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Codex, codex/itau-analysis-scroll: rolagem prioriza painel de processamento durante analise, em vez da ultima mensagem do historico. Respeita movimento reduzido e pagina ativa. Integracao pontual preserva CEP e demais alteracoes locais.
 - Validado na main consolidada:48 testes de rolagem/UI/CEP aprovados, sintaxe/diff check e JS HTTP200 na3000. Sem commit/push/deploy.
 - Commit/push autorizados para rolagem:44 testes do checkout isolado aprovados; alteracoes de CEP e honorarios continuam separadas. Sem deploy.
+
+# 2026-10-16 - Ultima mensagem em todos os chats
+- Codex, codex/all-chat-autoscroll: helper compartilhado de IR/PIS/Energia/Glosas/Importacao acompanha novos conteudos, ignora modulos ocultos e polling sem mudanca. Importacao deixa de voltar ao topo. Dividas bancarias acompanha etapa mais recente. Itau e chat geral ja acompanham analise e streaming. Cache atualizado; preservar alteracoes pendentes.
+- Incluido Itau: rolar ao painel de anexos/acoes abaixo da conversa e retomar ponto recente ao reabrir. Integrado localmente preservando pendencias;65 testes pertinentes aprovados, diff check e oito scripts HTTP200 conferidos. Sem verificacao visual, commit/push/deploy.
+- Commit/push autorizados para esta tarefa.51 testes do checkout isolado reaprovados; demais alteracoes locais permanecem separadas. Sem deploy executado.

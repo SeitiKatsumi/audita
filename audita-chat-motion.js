@@ -1,8 +1,13 @@
 // Shared Itaú-style timing and avatar movement for assisted Audita conversations.
 export function createAuditaChatMotion({getStage,getConversation,isActive}) {
 let floatingAssistantAvatar=null;
+let latestContent=null;
 function moveAssistantAvatar(conversation,{immediate=false}={}){
   const stage=getStage();
+  const latest=conversation?.lastElementChild;
+  const content=latest?.textContent;
+  if(!isActive())latestContent=null;
+  else if(latest && content!==latestContent){latestContent=content;scrollLatestAssistant();}
   if(!floatingAssistantAvatar){
     floatingAssistantAvatar=document.createElement('span');
     floatingAssistantAvatar.className='charge-analysis-avatar charge-analysis-floating-avatar';
@@ -25,10 +30,12 @@ function moveAssistantAvatar(conversation,{immediate=false}={}){
     avatar.classList.add('is-positioning');positionAvatar();avatar.getBoundingClientRect();avatar.classList.remove('is-positioning');
   }else window.requestAnimationFrame(positionAvatar);
 }
+window.addEventListener('hashchange',()=>{if(isActive())scrollLatestAssistant();});
 let cancelTyping=()=>{};
-function scrollLatestAssistant(message=getConversation()?.lastElementChild){
+function scrollLatestAssistant(message){
   window.requestAnimationFrame(()=>{
-    if(message?.isConnected&&isActive())message.scrollIntoView({behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches?'auto':'smooth',block:'end'});
+    const target=message?.isConnected?message:getConversation()?.lastElementChild;
+    if(target?.isConnected&&isActive())target.scrollIntoView({behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches?'auto':'smooth',block:'end'});
   });
 }
 function animateAssistant(){

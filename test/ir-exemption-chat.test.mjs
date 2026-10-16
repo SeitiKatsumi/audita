@@ -204,7 +204,7 @@ test('Itaú follows new messages on desktop and mobile only while active', async
   const start=source.indexOf('  function scrollLatestMessage(container) {');
   const end=source.indexOf('  async function revealTriageMessages',start);
   let options;
-  const context=vm.createContext({window:{requestAnimationFrame:fn=>fn()},document:{body:{dataset:{activePage:'analise-cobrancas'}}},prefersReducedMotion:false,container:{lastElementChild:{scrollIntoView:value=>{options=value;}}}});
+  const context=vm.createContext({state:{screen:'upload'},stage:{querySelectorAll:()=>[]},window:{requestAnimationFrame:fn=>fn()},document:{body:{dataset:{activePage:'analise-cobrancas'}}},prefersReducedMotion:false,container:{lastElementChild:{isConnected:true,scrollIntoView:value=>{options=value;}}}});
   vm.runInContext(source.slice(start,end)+'\nscrollLatestMessage(container);',context);
   assert.equal(options.block,'end');
   assert.equal(options.behavior,'smooth');
