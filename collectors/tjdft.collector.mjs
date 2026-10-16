@@ -472,12 +472,13 @@ async function collectStateCourtPortal({ input, profile, stateCourtName, stateCo
   );
 }
 
-function getMissingStateCourtFields(input, profile) {
-  const fields = profile?.uf === "ES" && input.tipoDocumento === "cpf"
-    ? [...(profile.requiredFields || []), "motherName"]
-    : profile?.requiredFields || [];
+export function getMissingStateCourtFields(input, profile) {
+  const fields = [...new Set([...(profile?.requiredFields || []), ...(profile?.uf === "ES" && input.tipoDocumento === "cpf" ? ["motherName"] : [])])];
   const provided = input.extraFields?.stateCourtFields || {};
+  const nativeCompany = input.tipoDocumento === "cnpj" && ["DF", "ES"].includes(profile?.uf);
   return fields.filter((field) => {
+    if (nativeCompany && ["motherName", "fatherName", "birthDate", "firstName", "gender", "rg"].includes(field)) return false;
+    if (nativeCompany && ["fullName", "companyName"].includes(field)) return !String(provided.companyName || provided.fullName || input.extraFields?.tjdftCompanyName || "").trim();
     if (field === "document") {
       const documentValue = input.tipoDocumento === "cnpj" ? input.extraFields?.cnpjDocument || input.documento : input.extraFields?.cpfDocument || input.documento;
       return !String(documentValue || "").replace(/\D/g, "");

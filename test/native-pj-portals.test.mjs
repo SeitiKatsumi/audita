@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { collect, fillTjdftFirstStep, fillTjdftSecondStep, fillEsTjesPageFields, hasEsTjesPrintableCertificateSignal, saveNativeCertificatePdf } from "../collectors/tjdft.collector.mjs";
+import { collect, fillTjdftFirstStep, fillTjdftSecondStep, fillEsTjesPageFields, getMissingStateCourtFields, hasEsTjesPrintableCertificateSignal, saveNativeCertificatePdf } from "../collectors/tjdft.collector.mjs";
 
 const company = { tipoDocumento: "cnpj", documento: "11222333000181", extraFields: { stateCourtFields: { fullName: "EMPRESA FICTICIA TESTE LTDA", motherName: "Nao preencher", birthDate: "1980-01-01", rg: "Nao preencher" } } };
 function pageStub() {
@@ -43,6 +43,17 @@ test("TJDFT PF civel still confirms the second step when affiliation is optional
   const page = pageStub();
   await fillTjdftSecondStep(page, "", "");
   assert.deepEqual(page.calls, [["click", "button"]]);
+});
+
+test("native DF/ES company requirements never inherit personal identity fields; ES PF still requires mother once", () => {
+  const requiredFields = ["document", "fullName", "motherName", "fatherName", "birthDate", "firstName", "gender", "rg"];
+  const input = { ...company, extraFields: { stateCourtFields: { companyName: "EMPRESA FICTICIA TESTE LTDA" } } };
+  for (const uf of ["DF", "ES"]) {
+    assert.deepEqual(getMissingStateCourtFields(input, { uf, requiredFields }), []);
+    assert.deepEqual(getMissingStateCourtFields({ ...input, extraFields: {} }, { uf, requiredFields }), ["fullName"]);
+  }
+  assert.deepEqual(getMissingStateCourtFields({ tipoDocumento: "cpf", documento: "52998224725", extraFields: { stateCourtFields: { fullName: "Pessoa Ficticia" } } }, { uf: "ES", requiredFields: ["document", "fullName", "motherName"] }), ["motherName"]);
+  for (const uf of ["MA", "GO", "TO"]) assert.ok(getMissingStateCourtFields(input, { uf, requiredFields }).includes("motherName"));
 });
 
 test("TJES request form is never printed as an issued certificate merely because its header says Nada Consta", () => {
