@@ -229,7 +229,7 @@
       "uf": "ES",
       "court": "TJES",
       "stateName": "Espirito Santo",
-      "url": "https://sistemas.tjes.jus.br/certidaonegativa/sistemas/certidao/CERTIDAOPESQUISA.cfm",
+      "url": "https://sistemas.tjes.jus.br/certidao-negativa/emitir",
       "platform": "custom",
       "automationStatus": "active",
       "captchaMode": "assisted",
@@ -242,7 +242,8 @@
         "document",
         "instance",
         "nature",
-        "fullName"
+        "fullName",
+        "motherName"
       ],
       "optionalFields": [
         "rg",

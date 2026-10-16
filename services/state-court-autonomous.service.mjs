@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { saveAndExtractPdfBuffer, extractPdfText } from "./pdf.service.mjs";
 import { successResult, failedResult } from "../collectors/base.collector.mjs";
-import { findStateCourtProfile } from "./state-courts.service.mjs";
+import { findStateCourtProfile, listStateCourtProfiles } from "./state-courts.service.mjs";
 
 const coverage = JSON.parse(readFileSync(new URL("../data/state-court-autonomous.json", import.meta.url), "utf8"));
 const compact = (value) => String(value || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -16,7 +16,8 @@ export function getAutonomousCertificateCoverage(configuration = {}, { includeCa
       const documentTypes = supported.filter(type=>['cpf','cnpj'].includes(type) && (includeCandidates === true || validatedDocumentTypes.includes(type)));
       return {...item,documentTypes,validatedDocumentTypes,id:`${item.uf}:${item.type}`,requiredIdentityFields:(findStateCourtProfile(item.uf)?.requiredFields||[]).filter(field=>['birthDate','motherName','rg','gender'].includes(field))};
     }).filter(item=>item.documentTypes.length);
-  return { ...coverage, certificates, ufs: [...new Set(certificates.map((item) => item.uf))], pdfQueryCostBrl: configuration.pdfTotalCostBrl || 0.54 };
+  const officialPortals = listStateCourtProfiles().filter(item=>/^https:\/\//.test(item.url)).map(({uf,stateName,court,url})=>({uf,stateName,court,url}));
+  return { ...coverage, certificates, officialPortals, ufs: [...new Set(certificates.map((item) => item.uf))], pdfQueryCostBrl: configuration.pdfTotalCostBrl || 0.54 };
 }
 
 export function planAutonomousCertificates(ufs, configuration = {}, ids, documentType = 'cpf', { includeCandidates = false } = {}) {
@@ -32,14 +33,18 @@ export function planAutonomousCertificates(ufs, configuration = {}, ids, documen
 }
 
 export function certificatePdfMatches(buffer, text, document, fullName) {
+  const digits=String(document||'').replace(/\D/g,'');
+  if(!compact(fullName) || ![11,14].includes(digits.length)) return false;
+  const identifier=new RegExp(`(?<!\\d)${digits.split('').join('[.\\s/\\-]*')}(?!\\d)`);
   return buffer.subarray(0, 5).toString() === "%PDF-" &&
-    compact(text).includes(compact(fullName)) && text.replace(/\D/g, "").includes(String(document).replace(/\D/g, "")) &&
+    compact(text).includes(compact(fullName)) && identifier.test(text) &&
     /certid[ãa]o|certifica(?:mos|do)/i.test(text);
 }
 
 export function certificateScopeMatches(text, expectedText, uf) {
   const stateName = uf ? findStateCourtProfile(uf)?.stateName : "";
-  return Boolean(expectedText && compact(text).includes(compact(expectedText)) && (!uf || (stateName && compact(text).includes(compact(stateName)))));
+  const titles=Array.isArray(expectedText)?expectedText:[expectedText];
+  return Boolean(titles.some(title=>title && compact(text).includes(compact(title))) && (!uf || (stateName && compact(text).includes(compact(stateName)))));
 }
 
 export async function downloadCertificateEvidence(url, fetchImpl = fetch) {

@@ -3990,8 +3990,7 @@ async function handleApi(request, response, pathname) {
         try {
           if (!Array.isArray(body.ufs)) throw new Error("invalid_ufs");
           if (body.ufs.length) {
-            if (isCompany) throw new Error('unsupported_company_court_selection');
-            autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus(), body.flow==='certificates'?body.courtCertificates:undefined);
+            autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus(), body.flow==='certificates'?body.courtCertificates:undefined, documentType);
           }
           if (!Array.isArray(companyCnpjs) || companyCnpjs.length > 5 || companyCnpjs.some((value) => !validateCnpj(value))) throw new Error("invalid_company_cnpjs");
           sellerDocumentPlan = planSellerDocuments(body.sellerQueries || [], directDataSellerService.getStatus(), companyCnpjs);
@@ -4003,7 +4002,7 @@ async function handleApi(request, response, pathname) {
           return true;
         }
         const maxProviderCostBrl = (autonomousPlan?.maxProviderCostBrl || 0) + sellerDocumentPlan.maxProviderCostBrl;
-        if ((maxProviderCostBrl > 0 || (autonomousPlan && !sellerInput.motherName)) && body.paidQueryConfirmed !== true) {
+        if ((maxProviderCostBrl > 0 || (!isCompany && autonomousPlan && !sellerInput.motherName)) && body.paidQueryConfirmed !== true) {
           sendJson(response, 400, { error: "paid_query_confirmation_required", maxProviderCostBrl });
           return true;
         }
@@ -4110,10 +4109,12 @@ async function handleApi(request, response, pathname) {
         if(body.flow==='certificates'&&body.courtCertificates!==undefined)request.body.extraFields.autonomousCertificates=body.courtCertificates;
         request.body.extraFields.paidQueryConfirmed = body.paidQueryConfirmed === true;
         Object.assign(request.body.extraFields.stateCourtFields, {
-          birthDate: body.birthDate.split("-").reverse().join("/"),
-          rg: String(body.rg || '').trim().slice(0, 30),
           email: String(body.email || "").trim().slice(0, 180),
-          gender: body.gender === "Feminino" ? "Feminino" : "Masculino",
+          ...(!isCompany ? {
+            birthDate: body.birthDate.split("-").reverse().join("/"),
+            rg: String(body.rg || '').trim().slice(0, 30),
+            gender: body.gender === "Feminino" ? "Feminino" : "Masculino",
+          } : {}),
         });
       }
       const providerCostBrl=(autonomousPlan?.maxProviderCostBrl||0)+(sellerDocumentPlan?.maxProviderCostBrl||0);

@@ -40,7 +40,7 @@ const records = Object.entries(states).map(([uf, name]) => {
   if (!pfCourts.length) limits.push("TJ estadual CPF ainda sem emissão validada.");
   if (!pjCourts.length) limits.push("TJ estadual CNPJ ainda sem emissão validada.");
   if (uf === "RR") limits.push("TJ sem cível comum; há criminal, militar e falências.");
-  if (uf === "RS") limits.push("TJ limitado ao alvará de folha corrida.");
+  if (uf === "RS") limits.push("TJ: certidão cível e alvará de folha corrida; o alvará não substitui distribuição criminal integral.");
   if (!pf.some(x => x.endpoint === "CertidaoNegativaDebitos" || x.provider === "portal")) limits.push("Certidão fiscal estadual CPF pendente.");
   if (!pf.some(x => x.endpoint === "TribunalRegionalTrabalho")) limits.push("Certidão TRT pendente.");
   const towns = selected.filter(x => x.endpoint === "CertidaoNegativaDebitosMunicipal").map(x => `${x.scope} (${x.documentTypes.join("/").toUpperCase()})`);
@@ -56,7 +56,7 @@ const records = Object.entries(states).map(([uf, name]) => {
 }).sort((a, b) => b.seller.length - a.seller.length || a.uf.localeCompare(b.uf));
 
 assert.equal(records.length, 27);
-const rows = records.map((r, index) => [r.uf, r.name, `=SUM(D${index + 2}:F${index + 2})`, r.official, r.receipt, r.data, r.company.length, list(r.seller), list(r.company), r.limits, catalog.validatedAt, "Integrado localmente; produção pendente", "https://docs.google.com/spreadsheets/d/1myQG7FETZWMqPXPcaDNkYYPEWU3KJRRkX0QketehcnY/edit?gid=1989173279#gid=1989173279"]);
+const rows = records.map((r, index) => [r.uf, r.name, `=SUM(D${index + 2}:F${index + 2})`, r.official, r.receipt, r.data, r.company.length, list(r.seller), list(r.company), r.limits, `Outras consultas: ${catalog.validatedAt}; TJs: ${courts.validatedAt}`, "Integrado localmente; produção pendente", "https://docs.google.com/spreadsheets/d/1myQG7FETZWMqPXPcaDNkYYPEWU3KJRRkX0QketehcnY/edit?gid=1989173279#gid=1989173279"]);
 const notes = [
   ["Critério", "Uma opção validada conta uma vez por UF e por perfil. Nacionais aparecem em todas as 27 UFs. CPF e CNPJ são consultados separadamente."],
   ["Regionais", "TRFs contam somente nas UFs de sua região; TRT2 e TRT15 contam em SP. TRT22 físico/eletrônico conta uma única vez."],

@@ -35,8 +35,13 @@ test("autonomous batch keeps a failed certificate pending in the outcome and pre
   assert.equal(result.dados.progress.stage, "completed");
   assert.deepEqual(progress, [0, 1]);
   assert.equal(certificatePdfMatches(buffer, "CERTIDAO Pessoa Teste 11111111111", input.documento, "Pessoa Teste"), false);
+  assert.equal(certificatePdfMatches(buffer, "CERTIDAO Pessoa Teste 529982247250", input.documento, "Pessoa Teste"), false);
+  assert.equal(certificatePdfMatches(buffer, "CERTIDAO Pessoa Teste 529.982.247-25", input.documento, "  "), false);
+  assert.equal(certificatePdfMatches(buffer, "CERTIDAO Pessoa Teste 529.982.247-25", input.documento, "Pessoa Teste"), true);
   assert.equal(certificateScopeMatches("Certidão de Distribuição de Ação Militar", "Certidão de Distribuição de Ação Criminal"), false);
   assert.equal(certificateScopeMatches("Tribunal do Pará CERTIDÃO CÍVEL", "CERTIDÃO CÍVEL", "AP"), false);
+  assert.equal(certificateScopeMatches("Espírito Santo CERTIDÃO NEGATIVA DE PRIMEIRA INSTÂNCIA CÍVEL. Observações: ações de natureza criminal.", "CERTIDÃO NEGATIVA DE PRIMEIRA INSTÂNCIA CRIMINAL", "ES"), false);
+  assert.equal(certificateScopeMatches("Bahia CERTIDÃO ESTADUAL CRIMINAIS", ["CERTIDÃO ESTADUAL CRIMINAL","CERTIDÃO ESTADUAL CRIMINAIS"], "BA"), true);
   await assert.rejects(() => downloadCertificateEvidence("https://127.0.0.1/document.pdf"), /invalid_evidence_host/);
 });
 

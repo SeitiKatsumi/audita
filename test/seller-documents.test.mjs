@@ -38,6 +38,19 @@ const PDF = Buffer.from("%PDF-test");
 const PDF_TEXT = "CERTIDÃO DE DÉBITOS TRABALHISTAS BANCO NACIONAL DE DEVEDORES TRABALHISTAS 529.982.247-25";
 const dependencies = (overrides = {}) => ({ configuration, query: async () => result({ documentoConsultado: CPF, possuiProcesso: false }), download: async () => PDF, readPdf: async () => PDF_TEXT, savePdf: async () => ({ pdfPath: "private-test.pdf", rawText: "never-copy-this" }), ...overrides });
 
+test('company judicial data queries use only the CNPJ, retain zero totals and never claim an official PDF',async()=>{
+  const ids=['processos-agrupados','processos-completos'],calls=[];
+  assert.equal(planSellerDocuments(ids,configuration).maxProviderCostBrl,4.4);
+  const batch={...input({sellerQueries:ids,stateCourtFields:{fullName:'Empresa Ficticia'}}),documento:CNPJ,tipoDocumento:'cnpj'};
+  const output=await collectSellerDocuments(batch,dependencies({query:async request=>{
+    calls.push(request);
+    return result({documentoConsultado:CNPJ,totalProcessos:0,processos:[],segmentos:[],tribunais:[],distribuicaoPorAno:[],areasDireito:[]});
+  },download:async()=>{throw Error('judicial data is not a certificate');}}));
+  assert.equal(calls.length,2);
+  assert(calls.every(c=>c.parameters.CNPJ===CNPJ&&!c.parameters.CPF&&!c.parameters.DATANASCIMENTO&&!c.parameters.GERARCOMPROVANTE));
+  assert(output.dados.certidoes.every(c=>c.status==='success'&&c.kind==='data'&&!c.pdfPath&&c.subjectDocument===CNPJ));
+});
+
 test('CPF discovery deduplicates and caps companies, then uses each company UF without attributing failures as clearance',async()=>{
   const companies=Array.from({length:6},(_,index)=>{
     let value=String(index+1).padStart(12,'0');

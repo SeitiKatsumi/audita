@@ -2,6 +2,40 @@
 
 # Análise documental do vendedor
 
+## Atualização local de 16/10/2026 — certidões CPF/CNPJ
+
+A homologação real autorizada nesta rodada ampliou os TJs para **35 opções CPF em 12 UFs** e **14 opções CNPJ em seis UFs**. Quantidade de documentos não significa cobertura jurídica integral de uma UF. São resultados do checkout local; **push e publicação em produção permanecem pendentes**. A fotografia inicial de produção (`5067c8b`) tinha 30 opções CPF/10UFs e zero TJ para CNPJ; detalhes e histórico em [Auditoria de16/10](certificate-audit-20261016.md).
+
+| UF | CPF homologadas | CNPJ homologadas |
+| --- | ---: | ---: |
+| AP | 2 | 2 |
+| BA | 2 | 2 |
+| DF | 4 | 4 |
+| ES | 6 | 3 |
+| GO | 2 | 0 |
+| PA | 2 | 0 |
+| PE | 3 | 2 |
+| PI | 3 | 0 |
+| RR | 3 | 0 |
+| RS | 2 | 1 |
+| SE | 2 | 0 |
+| TO | 4 | 0 |
+| Total | 35 | 14 |
+
+As cinco novas opções CPF são cível/criminal de BA e SE e cível do RS; o alvará do RS permanece uma entrega distinta. Para CNPJ, os portais oficiais emitiram quatro tipos no DF e cível/criminal/falência no ES. A Direct Data emitiu cível/criminal de AP, BA e PE, mais cível do RS. PDF, identidade, título e UF foram conferidos em cada combinação liberada; outras naturezas, instâncias, resultados positivos e comarcas não são presumidos a partir dessa amostra.
+
+`documentTypes` informa os perfis suportados pelo item; `validatedDocumentTypes` define os perfis homologados. Seleção, plano, custo e worker filtram esses perfis antes de coletar/cobrar. Candidatos ficam fora da oferta e somente a homologação interna pode habilitá-los; flags públicas não liberam candidatos. CNPJ não pede nascimento, RG, gênero ou filiação de pessoa física. A cobertura informa links dos 27 portais oficiais para os caminhos ainda não automatizados.
+
+O portal ES usa a URL atualizada e exige conferir o cabeçalho específico da natureza: menção a outra natureza nas observações não basta. A resposta PDF da Direct Data contendo `Found The document has moved` foi rejeitada. As consultas `ProcessosJudiciaisAgrupada` e `ProcessosJudiciaisCompleta` foram homologadas também por CNPJ, com HTTP200 e identidade no campo `documentoConsultado`; custo-base R$1,10/R$3,30. Entregam dados processuais, sem se tornarem certidão ou cópia integral dos autos.
+
+Validação: **611/611 testes Node/PGlite aprovados**. Chrome com CNPJ/fornecedores fictícios confirmou preço R$16,20, checkout antes da coleta, webhook assinado simulado, um PDF privado (200 para proprietário, 401 sem sessão e 404 para outro tenant), zero IA e zero lookup CPF. Reload não repetiu coleta; mobile390px sem overflow; 27 links oficiais conferidos. A jornada simulada não é teste de cobrança real Stripe; a emissão real dos documentos foi homologada separadamente.
+
+Tentativas não liberadas em16/10: cível CPF AC/AM/CE/PB/RN503 e MTtimeout; cível CNPJ AC/AM/CE/PB/RN503, GO/MT/RR400, PA/PI/SEtimeout e TO500; falência CPF BA400 e criminal CNPJ RS400. Os demais estados conservam os resultados históricos, sem disponibilidade atual inferida. Algumas respostas/links CPF se perderam por falha de gravação em disco e não foram reconsultados para evitar custos duplicados.
+
+Estimativa conservadora da rodada: **R$24,02**, calculada por35tentativas de certidões xR$0,54 + duas consultas cadastrais/societárias xR$0,36 +R$4,40 de processos. Não é fatura conciliada nem comprova cobrança das falhas. ProcessOnline fica desativado sem aprovação B2B/chave/contrato; DataJud não entrou no produto comercial em razão dos termos; Jusbrasil/Judit dependem de contrato. Não houve contato, compra ou substituição de credenciais de fornecedores.
+
+A tarefa principal conduz a consolidação na3000. O túnel de banco15432 continua indisponível, condição preexistente; `.env` e configuração privada preservados. Os registros datados abaixo conservam o histórico de decisões/validações anteriores; não substituem este estado local nem comprovam deploy.
+
 ## Aplicações comerciais compartilhadas
 
 `analysis-segments.js` é o catálogo único de rotas, textos, categorias e foco confiável da IA. As nove aplicações usam o mesmo formulário CPF/CNPJ, coletores por UF, enriquecimento, progresso, score, persistência e PDF. A Central organiza futuros sócios, fornecedores, parceiros, aquisição e reavaliação em **Empresas e parcerias**; diagnóstico em **Diagnóstico documental**; vendedor e locação em **Imóveis**; documentos para concorrências em **Licitações**. Os demais serviços permanecem disponíveis.

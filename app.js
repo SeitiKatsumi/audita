@@ -2,7 +2,7 @@ import { initGeneralChat } from './general-chat.js?v=20261009-meeting';
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js?v=20261009-meeting";
 import { analysisSegments, getAnalysisSegment } from './analysis-segments.js';
-import {certificateSelection,certificateQuote} from './certificate-selection.js?v=20261008-meeting';
+import {certificateSelection,certificateQuote} from './certificate-selection.js?v=20261016-courts-pj';
 for (const element of document.querySelectorAll('[data-page], [data-nav-pages]')) {
   for (const key of ['page', 'navPages']) {
     const pages = (element.dataset[key] || '').split(/\s+/);
@@ -6689,10 +6689,9 @@ function setSellerStep(step) {
   if(changed) { const target=step===1?sellerAnalysisCpf:sellerAnalysisResult; if(step!==1) target?.setAttribute('tabindex','-1');target?.focus({preventScroll:true});shell.scrollIntoView({block:'start',behavior:'instant'}); }
 }
 function selectedSellerCertificates() {
-  if(sellerDocumentType()==='cnpj') return [];
   const ufs = selectedSellerUfs();
   const ids = isCertificateOnly() ? new Set([...document.querySelectorAll('#sellerAnalysisQueries input[data-certificate-court]:checked')].map(input=>input.value)) : null;
-  return (sellerCoverage?.certificates || []).filter((item) => ufs.includes(item.uf) && (!ids || ids.has(item.id || item.uf+':'+item.type)));
+  return (sellerCoverage?.certificates || []).filter((item) => ufs.includes(item.uf) && (item.documentTypes||['cpf']).includes(sellerDocumentType()) && (!ids || ids.has(item.id || item.uf+':'+item.type)));
 }
 function selectedSellerUfs() {
   const checked=[...document.querySelectorAll('#sellerAnalysisUfs input:checked')].map(input=>input.value);
@@ -6719,13 +6718,14 @@ function updateSellerEstimate() {
   const paymentRequired=quote.amountCents>0&&sellerCoverage?.certificateComplimentary!==true;
   const target = document.querySelector("#sellerAnalysisCost");
   const state=selectedSellerState();
-  const courtFields=new Set(selected.flatMap(c=>c.requiredIdentityFields||[]));
+  const courtFields=new Set(sellerDocumentType()==='cnpj'?[]:selected.flatMap(c=>c.requiredIdentityFields||[]));
   const identityFields={fullName:sellerAnalysisFullName.value.trim(),motherName:sellerAnalysisMotherName?.value.trim(),birthDate:document.querySelector('#sellerAnalysisBirthDate')?.value,gender:document.querySelector('#sellerAnalysisGender')?.value};
   const requiredIdentity=['fullName',...courtFields,...(queries.some(item=>item.endpoint==='CertidaoConjuntaDebitosPessoaFisica')?['birthDate']:[])];
   const identityCost=sellerDocumentType()==='cpf'&&requiredIdentity.some(field=>field!=='rg'&&!identityFields[field]) ? Number(sellerCoverage?.identityQueryCostBrl ?? .36) : 0;
   const brl=value=>`R$ ${value.toFixed(2).replace('.',',')}`;
   if(typeof sellerAnalysisSubmit!=='undefined'&&sellerAnalysisSubmit&&!sellerAnalysisSubmit.disabled)sellerAnalysisSubmit.textContent=paymentRequired?'Continuar para pagamento':sellerCoverage?.certificateComplimentary&&quote.amountCents>0?'Continuar sem pagar':isCertificateOnly()?'Obter documentos e consultas':'Avançar e iniciar extração →';
   if(target)target.innerHTML=!isCertificateOnly()&&!state?'Selecione o estado para calcular a estimativa.':`<small>${selected.length+queries.length} fontes selecionadas · ${selectedSellerUfs().length} estados · ${sellerCoverage?.certificateComplimentary?'pagamento dispensado':'pagamento único'}</small>${quote.discountCents?`<small><s>${brl(quote.baseCents/100)}</s> · 30% de desconto de assinante</small>`:''}<strong>${brl(quote.amountCents/100)}</strong><small>${sellerCoverage?.certificateComplimentary?'Acesso individual liberado: você pode continuar sem pagar. ':''}${sellerCoverage?.certificateSubscriber?'Fontes gratuitas do provedor sem cobrança para assinantes. ':''}A coleta depende de cada fonte. ${isCertificateOnly()?'Consultas de dados não são certidões oficiais. Análise opcional incluída para assinantes IA.':'Inclui levantamento e relatório de IA; até cinco empresas vinculadas ao CPF.'}${paymentRequired&&sellerCoverage?.certificateCheckoutReady===false?(isCertificateOnly()&&sellerCoverage?.certificateTestBypassEnabled?' Pagamento indisponível; você pode usar o bypass de teste na próxima etapa.':' Pagamento indisponível neste ambiente; nenhuma coleta será iniciada.'):''}</small>${identityCost?`<small>Se necessário, o preenchimento cadastral automático usa a consulta ao CPF (${brl(identityCost)} de custo do provedor), pela carteira existente.</small>`:''}`;
+  if(target && !isCertificateOnly()) target.innerHTML+=sellerCourtPortalsHtml(selectedSellerUfs());
   for (const selector of ["#sellerAnalysisRg", "#sellerAnalysisGender"]) {
     const field = document.querySelector(selector);
     if (field) field.required = sellerMissingIdentityFields.has(selector==='#sellerAnalysisRg'?'rg':'gender');
@@ -6769,12 +6769,16 @@ async function loadSellerCoverage() {
     restoreCertificatePayment();
   } catch { target.textContent = "Não foi possível carregar a cobertura. Recarregue antes de consultar.";if(sellerAnalysisError) sellerAnalysisError.textContent=target.textContent; }
 }
+function sellerCourtPortalsHtml(ufs) {
+  const portals=(sellerCoverage?.officialPortals||[]).filter(portal=>ufs.includes(portal.uf));
+  return portals.length?`<details class="seller-source-details"><summary>Complementar certidões nos portais oficiais</summary><p>Para tipos ou estados sem emissão automática validada, consulte o tribunal. O portal pode exigir login, pagamento de custas ou atendimento presencial. Esses links não entram no preço da seleção.</p><ul>${portals.map(portal=>`<li><a href="${escapeHtml(portal.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(portal.stateName)} (${escapeHtml(portal.uf)}) — portal oficial</a></li>`).join('')}</ul></details>`:'';
+}
 function renderCertificateChoices(){
   const ufs=[...document.querySelectorAll('#sellerAnalysisUfs input:checked')].map(input=>input.value);
   const selection=certificateSelection(sellerCoverage,ufs,sellerDocumentType());
   const groups=[...new Set(selection.queries.map(q=>q.category||'Outras'))];
   const courtHtml=selection.courts.length?`<details open><summary>Tribunais estaduais — ${selection.courts.length} certidões</summary><fieldset><legend class="sr-only">Tribunais estaduais</legend>${selection.courts.map(c=>`<label class="seller-analysis-consent"><input type="checkbox" data-certificate-court value="${escapeHtml(c.id||c.uf+':'+c.type)}" checked/><span><strong>${escapeHtml(c.uf)} · ${escapeHtml(c.type)}</strong><br/>R$ ${(certificateQuote([c.provider==='direct_data'?sellerCoverage.pdfQueryCostBrl||.54:0],sellerCoverage.certificateSubscriber===true).amountCents/100).toFixed(2).replace('.',',')}</span></label>`).join('')}</fieldset></details>`:'';
-  document.querySelector('#sellerAnalysisQueries').innerHTML=courtHtml+groups.map(category=>`<details open><summary>${escapeHtml(category)} — ${selection.queries.filter(q=>q.category===category).length} fontes</summary><fieldset><legend class="sr-only">${escapeHtml(category)}</legend>${selection.queries.filter(q=>(q.category||'Outras')===category).map(q=>`<label class="seller-analysis-consent"><input type="checkbox" value="${escapeHtml(q.id)}" ${q.kind==='certificate'?'checked':""} /><span><strong>${escapeHtml(q.label)}</strong><br/>${q.kind==='certificate'?'Certidão':q.includePdf?'Comprovante de consulta em PDF':'Consulta de dados — sem PDF oficial'} · ${escapeHtml(q.region)} · R$ ${(q.priceCents/100).toFixed(2).replace('.',',')}${q.limitation?`<br/><small>${escapeHtml(q.limitation)}</small>`:''}</span></label>`).join('')}</fieldset></details>`).join('')+(ufs.length?'':'<p>Escolha os estados acima. As certidões nacionais entram uma única vez, mesmo no pacote Brasil inteiro.</p>');
+  document.querySelector('#sellerAnalysisQueries').innerHTML=courtHtml+groups.map(category=>`<details open><summary>${escapeHtml(category)} — ${selection.queries.filter(q=>q.category===category).length} fontes</summary><fieldset><legend class="sr-only">${escapeHtml(category)}</legend>${selection.queries.filter(q=>(q.category||'Outras')===category).map(q=>`<label class="seller-analysis-consent"><input type="checkbox" value="${escapeHtml(q.id)}" ${q.kind==='certificate'?'checked':""} /><span><strong>${escapeHtml(q.label)}</strong><br/>${q.kind==='certificate'?'Certidão':q.includePdf?'Comprovante de consulta em PDF':'Consulta de dados — sem PDF oficial'} · ${escapeHtml(q.region)} · R$ ${(q.priceCents/100).toFixed(2).replace('.',',')}${q.limitation?`<br/><small>${escapeHtml(q.limitation)}</small>`:''}</span></label>`).join('')}</fieldset></details>`).join('')+sellerCourtPortalsHtml(ufs)+(ufs.length?'':'<p>Escolha os estados acima. As certidões nacionais entram uma única vez, mesmo no pacote Brasil inteiro.</p>');
 }
 function sellerPaymentKey(){return isCertificateOnly()?'auditaCertificateOrder':`auditaAnalysisOrder:${activeAnalysisSegment().id}`;}
 function restoreCertificatePayment(){
@@ -9328,7 +9332,7 @@ sellerAnalysisForm?.addEventListener("submit", async (event) => {
   const motherName = sellerAnalysisMotherName?.value.trim() || "";
   const automatic=flow==='seller',state=selectedSellerState();
   const documentType=sellerDocumentType();
-  const ufs = documentType==='cnpj'?[]:[...new Set(selectedSellerCertificates().map(c=>c.uf))];
+  const ufs = [...new Set(selectedSellerCertificates().map(c=>c.uf))];
   const sellerQueries = selectedSellerQueries().map((item) => item.id);
   const companyCnpjs = sellerCompanyCnpjs();
   if(automatic&&!state) {sellerAnalysisError.textContent='Selecione o estado do titular.';document.querySelector('#sellerAnalysisState').focus();return;}
