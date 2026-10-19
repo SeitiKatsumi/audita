@@ -860,3 +860,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Codex, codex/publish-pending. Usuario solicitou commit e push de tudo, incluindo filtro Glosas Indevidas Plano Saude. Integracao de CEP automatico, clausula de honorarios30%, feedback de envio do chat e espacamento inferior, preservando todas as alteracoes remotas de certidoes e testes reforcados.
 - Arquivos temporarios, logs e documentos locais de teste nao sao parte da publicacao. Sem deploy executado; validacao em andamento.
 - Validacao concluida:620 testes,619 aprovados,0 falhas,1 ignorado; diff check aprovado. Integracao preserva origin/main0a3b676. Commit/push autorizados pelo usuario; deploy nao executado.
+
+- 2026-10-19: Codex, codex/chat-composer-layout. Campo de mensagem e enviar acima, anexar/arrastar abaixo com divisoria, conforme imagem. Drag oculto mobile preservado. CSS integrado na3000; sem commit/push/deploy.
+
+- Ajuste solicitado: compositor mais baixo, mensagem minima44px, enviar40px e espacamentos reduzidos; duas faixas preservadas.
+- Commit/push solicitados para layout compacto do chat:4 testes de envio aprovados, diff check aprovado e CSS servido na3000. Sem deploy.
