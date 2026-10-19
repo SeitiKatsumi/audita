@@ -747,3 +747,44 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 # 2026-10-13 - Arrastar arquivos na conversa
 - Codex, codex/chat-file-drop, integrado na main local: area da conversa aceita arquivos por drag/drop com destaque visual e mesma fila/limite de50MB do seletor. Arquivos aguardam envio explicito; bloqueio durante processamento, texto arrastado preservado. Testes de drag/drop e chat geral aprovados, sintaxe e diff check aprovados; JS na3000 conferido por HTTP200. Sem verificacao visual pelo navegador, chamada IA real, commit/push/deploy.
 - Complemento: cada anexo agora tem botao Remover visivel em item separado, quebra de linha responsiva e retorno de foco apos remocao. Remocao bloqueada durante processamento. Seis testes aprovados novamente e JS confirmado na3000. Usuario autorizou commit/push; sem deploy.
+
+# 2026-10-13 - Envio imediato e erros de anexos no chat
+- Codex, codex/chat-send-feedback, checkout separado baseado na main54b915f (develop nao disponivel). Escopo: general-chat.js, chat-subscription.js, testes de envio e cache em app.js. Mensagem imediata durante leitura de anexos e diagnostico seguro de falhas. Em andamento; integrar localmente na3000, sem publicacao.
+- Implementado e validado: mensagem otimista antes dos anexos, campo limpo, nomes visiveis, recuperacao de pendentes sem perder novo rascunho e erros documentais com motivo/codigo seguro. Onze testes de envio/acesso/drag-drop aprovados. Falha especifica do PDF relatada em producao ainda nao reproduzida: arquivo e resposta da requisicao nao fornecidos; health de producao retornou banco pronto. Sem IA real, alteracao de banco, push ou deploy.
+- Integrado na main local sem trocar branch ou descartar alteracoes; os tres scripts servidos em http://localhost:3000 conferem byte a byte. Mais19 testes de chat/documentos aprovados (30 no total), sintaxe/diff check aprovados. Configuracao, autenticacao e processo existente preservados; assets lidos dinamicamente dispensaram reinicio. Sem publicacao; diagnostico do PDF de producao depende do arquivo ou codigo da falha.
+
+# 2026-10-14 - Selecionar todas as fontes
+- Codex, codex/select-all-certificates, integrado na main local preservando mudancas de chat: botao Brasil inteiro marca todas as fontes renderizadas, incluindo CADIN e demais consultas de dados. Desmarcar todas e recalculo preservados; nenhuma coleta/pagamento automatico. Cinco testes de selecao/pedido aprovados, sintaxe/diff check e JS na3000 conferidos. Sem commit/push/deploy; correcao ainda nao publicada no site de producao da imagem.
+
+# 2026-10-14 - Campo visivel para arrastar arquivos
+- Codex, codex/chat-drop-field, integrado na main local: campo verde tracejado ao lado de Anexar arquivos, com mensagem em linha separada e layout responsivo. Reutiliza drag/drop e bloqueio de anexos existentes. Alteracoes anteriores preservadas; origin/main segue a frente, sem integrar commits remotos alheios. Sem commit/push/deploy.
+- Validacao: dois testes de drag/drop aprovados, diff check aprovado e campo confirmado no HTML servido na3000 (HTTP200). Sem verificacao visual pelo navegador.
+- Ajuste solicitado: seletor, campo tracejado compacto e mensagem na mesma linha; area de arrastar oculta ate768px e em dispositivos de ponteiro touch. Mantido fluxo de anexos. Diff check e verificacao dos assets locais aprovados; sem publicacao.
+- 2026-10-15: producao e origin/main conferidos, correcao CADIN nao publicada. Regressao reproduzida no checkout atualizado select-all-cadin e aprovada apos corrigir; sintaxe/diff check aprovados. Servidor3000 reiniciado e handler corrigido confirmado por HTTP200. Publicacao ainda pendente.
+
+# 2026-10-15 - Nome da categoria Glosas
+- Codex, codex/glosas-category-label. Escopo: rotulo do filtro na Central em index.html. Renomeado para Glosas Indevidas Plano Saude; identificador saude e funcionamento preservados. Integrado localmente; sem commit/push/deploy.
+
+- 2026-10-15: removida IEPTB Basica do catalogo; Online mantida e tentativa de nova selecao da Basica rejeitada. Quinze testes de documentos aprovados, diff check aprovado. Integrado localmente; sem commit/push/deploy.
+
+- 2026-10-16: Codex, codex/itau-cep-autofill, integrado na main local preservando demais tarefas. Busca de CEP ViaCEP preenche rua/bairro/cidade/UF; numero/complemento manuais, fallback manual, timeout e protecao contra respostas antigas.47 testes de UI/CEP aprovados; sem commit/push/deploy.
+- 2026-10-16: codex/itau-success-fees integrado nos arquivos locais. Clausula Terceira com texto exato solicitado,30% em exito/acordo; versao do aceite atualizada.11 testes aprovados. Reinicio da3000 bloqueado pela politica automatica; previa do processo existente ainda pode exibir texto antigo. Sem commit/push/deploy.
+
+# 2026-10-16 - Rolagem para analise em andamento
+- Codex, codex/itau-analysis-scroll: rolagem prioriza painel de processamento durante analise, em vez da ultima mensagem do historico. Respeita movimento reduzido e pagina ativa. Integracao pontual preserva CEP e demais alteracoes locais.
+- Validacao:48 testes de rolagem/UI/CEP aprovados, sintaxe e diff check aprovados. JS atualizado confirmado por HTTP200 na3000; sem consulta paga, commit/push/deploy.
+
+# 2026-10-16 - Rolagem de todos os chats
+- Codex, codex/all-chat-autoscroll. Helper compartilhado acompanha ultima mensagem de IR/PIS/Glosas/Energia/Importacao; Importacao nao volta ao topo. Dividas acompanha etapa recente. Itau inclui painel de anexos/acoes apos o historico, alem do processamento. Chat geral ja acompanha streaming. Preservados CEP, honorarios e demais pendencias.
+- Validacao:65 testes de rolagem, Itau/CEP, IR/PIS, Importacao e Dividas aprovados; diff check aprovado e oito scripts servidos identicos aos arquivos na3000. Sem teste visual no navegador, consulta paga, commit/push/deploy.
+
+# 2026-10-16 - Espaco abaixo dos controles do chat
+- Codex, codex/chat-bottom-spacing. Padding real no fim do stage e margem de rolagem nos paineis de acao,48px no desktop e espaco adicional para navegacao inferior/mobile. Corrige formulario de anexos encostado na borda. Cache CSS atualizado; demais mudancas locais preservadas.
+
+- 2026-10-16: Codex, codex/itau-attachment-formats: identidade/residencia aceitam qualquer formato ate12MB. PDF mesclado, JPG/PNG renderizados, demais formatos incorporados como anexos originais com pagina indicativa. Escopo: charge-analysis.js, server.mjs, services/jec-petition-pdf.service.mjs e index.html. Integracao local preserva demais pendencias; sem publicacao.
+- Validacao:58 testes aprovados (PDF/anexos/UI/integracao), sintaxe e diff check. Servidor3000 permanece PID125216: backend novo depende de reinicio anteriormente rejeitado pela revisao automatica; nao contornado. Sem commit/push/deploy.
+- Complemento: areas de arrastar nos tres campos de anexos do formulario, mantendo seletor nativo. Identidade/residencia recebem um arquivo; extratos aceitam multiplos. Validacao de12MB, feedback de arraste e dica oculta mobile.57 testes aprovados; JS servido na3000 confirmado, sem teste visual. Backend de formatos ainda requer reinicio bloqueado anteriormente.
+
+- 2026-10-16: Codex, codex/recovery-file-label: oculta apresentacao nativa No file chosen nos tres campos e usa Selecionar arquivo com nomes apos selecao/arraste. Input nativo preservado para teclado, required e seletor. Integrado localmente, sem commit/push/deploy.
+
+- 2026-10-16: Codex, codex/recovery-drop-color: orientacao de arraste em verde #5dffa8, com especificidade corrigida sobre regra generica de small. Cache CSS atualizado e integrado localmente; sem commit/push/deploy.

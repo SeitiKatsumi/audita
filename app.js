@@ -1,6 +1,6 @@
-import { initGeneralChat } from './general-chat.js?v=20261009-meeting';
+import { initGeneralChat } from './general-chat.js?v=20261013-send-feedback';
 import { initServicesCatalog } from "./services-catalog.js";
-import { initChatSubscription } from "./chat-subscription.js?v=20261009-meeting";
+import { initChatSubscription } from "./chat-subscription.js?v=20261013-send-feedback";
 import { analysisSegments, getAnalysisSegment } from './analysis-segments.js';
 import {certificateSelection,certificateQuote} from './certificate-selection.js?v=20261008-meeting';
 for (const element of document.querySelectorAll('[data-page], [data-nav-pages]')) {
@@ -6814,7 +6814,7 @@ for (const [id, checked] of [["sellerAnalysisSelectAll", true], ["sellerAnalysis
     document.querySelectorAll("#sellerAnalysisUfs input").forEach((input) => { input.checked = checked; });
     if(!isCertificateOnly()){document.querySelector('#sellerAnalysisState').value=checked?selectedSellerState()?.uf||selectedSellerUfs()[0]||'':'';updateSellerMunicipalities();}
     if(isCertificateOnly())renderCertificateChoices();
-    if(!isCertificateOnly()||!checked)document.querySelectorAll("#sellerAnalysisQueries input").forEach((input) => { input.checked = checked; });
+    document.querySelectorAll("#sellerAnalysisQueries input").forEach((input) => { input.checked = checked; });
     updateSellerEstimate();
   });
 }

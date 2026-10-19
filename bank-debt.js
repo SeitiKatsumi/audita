@@ -77,6 +77,7 @@ function documentIntake(){
 function summary(){const d=current.details;return d?`<dl class="debt-summary"><div><dt>Banco / cobrador</dt><dd>${esc(d.creditor)}</dd></div><div><dt>Dívida original informada</dt><dd>${money(d.originalCents)}</dd></div><div><dt>Cobrança atual</dt><dd>${money(d.chargedCents)}</dd></div></dl>`:'';}
 function reviewer(){if(current.operator&&!current.details)return '<details><summary>Equipe Audita · conferir dados extraídos</summary>'+detailsForm()+'</details>';if(!current.operator||!['calculation_pending','offer','paid'].includes(current.status))return '';const r=current.review||{};return `<details class="debt-review"><summary>Equipe Audita · publicar análise validada</summary><p>A estimativa BACEN é preliminar. Confira contrato, histórico, encargos e fundamentação antes de publicar a análise validada que libera a contratação.</p>${form('review',field('reviewed','Saldo recalculado (R$)',r.reviewedCents!=null?r.reviewedCents/100:'','number','min="0" step="0.01" max="100000000"')+field('price','Preço do serviço (R$)',r.priceCents?r.priceCents/100:'','number','min="1" step="0.01" max="100000000"')+area('methodology','Memória de cálculo: períodos, taxas, valores e fontes',r.methodology||current.estimateText||'','required minlength="30" maxlength="12000"')+area('legalBasis','Fundamentação jurídica específica revisada',r.legalBasis||'','required minlength="30" maxlength="12000"')+field('creditorLegalName','Razão social do credor',r.creditorLegalName||'')+field('creditorDocument','CNPJ do credor (14 dígitos)',r.creditorDocument||'','text','pattern="[0-9]{14}"')+field('creditorAddress','Endereço do credor',r.creditorAddress||'')+field('lawyerName','Nome do advogado outorgado',r.lawyerName||'')+field('lawyerOab','OAB e UF do advogado',r.lawyerOab||'')+'<label class="debt-check"><input name="confirmed" type="checkbox" required> Confirmei documentos, cálculo, fundamentação e condições do serviço.</label>','Publicar análise e contratação')}</details>`;}
 function claimantForm(){const c=current.claimant||{};return form('claimant',field('fullName','Nome completo',c.fullName||'')+field('document','CPF',c.document||'')+field('email','E-mail',c.email||'','email')+field('phone','Telefone',c.phone||'','tel')+field('nationality','Nacionalidade',c.nationality||'Brasileiro(a)')+field('maritalStatus','Estado civil',c.maritalStatus||'')+field('profession','Profissão',c.profession||'')+field('postalCode','CEP',c.postalCode||'','text','pattern="[0-9]{5}-?[0-9]{3}"')+field('street','Rua / avenida',c.street||'')+field('number','Número',c.number||'')+`<label>Complemento (opcional)<input name="complement" value="${esc(c.complement)}" maxlength="200"></label>`+field('neighborhood','Bairro',c.neighborhood||'')+field('city','Cidade',c.city||'')+select('uf','Estado',ufs.map(v=>[v,v]),c.uf||'SP')+'<label class="debt-check"><input type="checkbox" name="conciliation" required> Tenho interesse na tentativa de conciliação com o credor.</label>','Conferir procuração e contrato');}
+let latestChatContent=null;
 function render(){
   if(current?.owner&&current.status==='calculation_pending'&&!current.analysisPending&&(current.analysis||current.analysisError||current.manualReview)){
     viewDocuments=true;edit=false;
@@ -105,6 +106,15 @@ function render(){
   $('#debtStage').innerHTML=html;
   const reviewForm=$('#debtStage form[data-form=review]');if(reviewForm)reviewForm.insertAdjacentHTML('afterbegin',select('lawyerUserId','Advogado responsável cadastrado',(config?.lawyers||[]).map(u=>[String(u.id),esc(u.name)]),String(current.review?.lawyerUserId||'')));
   if(current&&!current.owner)$('#debtStage').querySelectorAll('form:not([data-form="review"]):not([data-form="details"]),[data-debt="submit"],[data-answer]').forEach(e=>e.hidden=true);
+  const latest=$('#debtStage').lastElementChild;
+  const content=latest?.textContent;
+  if(document.body.dataset.activePage!=='dividas-bancarias')latestChatContent=null;
+  else if(latest && content!==latestChatContent){
+    latestChatContent=content;
+    requestAnimationFrame(()=>{
+      if(document.body.dataset.activePage==='dividas-bancarias')$('#debtStage').lastElementChild?.scrollIntoView({block:'end',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+    });
+  }
   schedulePaymentCheck();
 }
 function schedulePaymentCheck(){clearTimeout(poll);if((current?.status!=='payment_pending'&&!current?.analysisPending)||document.body.dataset.activePage!=='dividas-bancarias')return;poll=setTimeout(async()=>{try{if(!busy){const id=current.id,fresh=(await api('/cases/'+id)).case;if(current?.id!==id)return;if(fresh.revision!==current.revision||(fresh.analysisPending&&(analysisStalled(fresh)!==!!$('#debtStage [data-debt=refresh]')))){current=fresh;render();await refreshList();}else if(JSON.stringify(fresh.analysisProgress)!==JSON.stringify(current.analysisProgress)){current=fresh;const progress=$('.debt-analysis-progress');if(progress)progress.outerHTML=analysisProgress();}}}catch{}finally{schedulePaymentCheck();}},current?.analysisPending?3000:10000);}
@@ -118,7 +128,7 @@ root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)retur
   if(b.dataset.case){run(()=>load(b.dataset.case));return;}
   if(b.dataset.answer){run(()=>command('answer',{key:b.dataset.answer,value:b.dataset.value==='true'}));return;}
   const action=b.dataset.debt;
-  if(action==='back-documents'){viewDocuments=true;edit=false;render();$('#debtStage').scrollIntoView?.({block:'start'});return;}
+  if(action==='back-documents'){viewDocuments=true;edit=false;render();$('#debtStage').lastElementChild?.scrollIntoView?.({block:'end'});return;}
   if(action==='return-stage'){viewDocuments=false;render();$('#debtStage').scrollIntoView?.({block:'start'});return;}
   if(action==='add-payment'){const list=$('[data-payments]');if(list.children.length<120)list.insertAdjacentHTML('beforeend',paymentRow());return;}
   if(action==='remove-payment'){b.closest('[data-payment]').remove();return;}

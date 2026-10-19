@@ -1,4 +1,4 @@
-import {createAuditaChatMotion} from './audita-chat-motion.js';
+import {createAuditaChatMotion} from './audita-chat-motion.js?v=20261016-follow-latest';
 import {pisEscape as e,pisApi,pisPost,pisCommand,pisDocuments,pisPanel,pisAnswerLabel,submitPisPanel} from './pis-pasep-panel.js';
 const root=document.querySelector('#pis-pasep'),$=selector=>root.querySelector(selector);
 let sessionEpoch=0,operationEpoch=0;

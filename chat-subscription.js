@@ -69,10 +69,22 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
         chat_checkout_pending: "Existe um checkout pendente. Retome o plano escolhido ou tente novamente após a expiração.",
       }[data.error] : null;
       const costMessage = {chat_cost_budget_exceeded:'Limite de processamento do período atingido. Aguarde a renovação ou contate o suporte.',chat_cost_unavailable:'Não foi possível conferir o consumo. Atualize o acesso ou contate o suporte.'}[data.error];
-      const error = new Error(checkoutMessage || costMessage || (response.status === 401 ? "Entre novamente para continuar." : response.status === 413
+      const documentMessage = url.startsWith('/api/chat/documents/') ? {
+        invalid_file: 'O arquivo não pôde ser lido. Confira se abre normalmente e envie uma cópia PDF sem senha.',
+        unavailable: 'O armazenamento seguro de documentos está indisponível. Tente mais tarde ou contate o suporte.',
+        ai_unavailable: 'A leitura por IA está temporariamente indisponível. Contate o suporte.',
+        ai_incomplete: 'A leitura do documento ficou incompleta. Tente novamente; se persistir, envie o PDF em partes.',
+        document_analysis_failed: 'Não foi possível analisar o documento. Tente novamente; se persistir, contate o suporte.',
+        document_busy: 'Este documento ainda está sendo processado. Aguarde antes de tentar novamente.',
+        quota_recovery_required: 'A leitura precisa de recuperação. Contate o suporte antes de repetir o envio.',
+        not_found: 'O documento não está mais disponível. Anexe o arquivo novamente.',
+      }[data.error] || ([502,504].includes(response.status) ? 'O serviço de leitura não respondeu a tempo. Tente novamente mais tarde.' : null) : null;
+      const error = new Error(checkoutMessage || costMessage || documentMessage || (response.status === 401 ? "Entre novamente para continuar." : response.status === 413
         ? "O arquivo excede o limite de 50 MB." : [402, 429].includes(response.status)
           ? "Saldo insuficiente. Confira seu plano e o consumo." : "N\u00e3o foi poss\u00edvel concluir. Tente novamente."));
       error.status = response.status;
+      error.code = data.error;
+      if(url.startsWith('/api/chat/documents/'))error.message += ' (Código: ' + (/^[a-z_]{1,64}$/.test(data.error || '') ? data.error : 'HTTP ' + response.status) + ')';
       throw error;
     }
     return data;

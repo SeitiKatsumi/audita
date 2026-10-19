@@ -1,4 +1,4 @@
-import {createAuditaChatMotion} from './audita-chat-motion.js';
+import {createAuditaChatMotion} from './audita-chat-motion.js?v=20261016-follow-latest';
 const root=document.querySelector('#importApp');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v/100);
@@ -109,7 +109,7 @@ function render(scroll=false){
  if(!config.storageReady)root.querySelector('[data-import-form=create] button')?.setAttribute('disabled','');
  if(!config.aiReady)root.querySelectorAll('[data-import=extract],[data-import=suggest]').forEach(el=>el.disabled=true);
  motion.moveAssistantAvatar(root.querySelector('.charge-analysis-conversation'),{immediate:true});
- if(scroll){const target=log.lastElementChild;target?.querySelector('.import-question')?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});target?.classList.add('import-new-message');}
+ if(scroll){const target=log.lastElementChild;target?.querySelector('.import-question')?.focus({preventScroll:true});motion.scrollLatestAssistant();target?.classList.add('import-new-message');}
  if(current?.busy&&document.body.dataset.activePage==='auditoria-importacao')timer=setTimeout(()=>run(async()=>{current=(await api('/cases/'+current.id)).case;},false),5000);
 }
 async function run(fn,scroll=true){if(busy)return;busy=true;error='';const turn=epoch;root?.setAttribute('aria-busy','true');root?.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){if(turn===epoch)error=e.message;}finally{if(turn===epoch){busy=false;processing='';render(scroll);}}}

@@ -54,7 +54,7 @@ function escapeHtml(value) {
 
 export const POWER_OF_ATTORNEY_ACCEPTANCE_TEXT =
   "Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Jurídicos e Honorários Advocatícios, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.";
-export const POWER_OF_ATTORNEY_ACCEPTANCE_VERSION = "2026-08-28-contract-1";
+export const POWER_OF_ATTORNEY_ACCEPTANCE_VERSION = "2026-10-16-contract-2";
 
 function normalizedSignerName(value) {
   return String(value || "")
@@ -295,9 +295,7 @@ export function buildLegalServicesAgreementHtml({
 
     <section class="clause">
       <h2>CLÁUSULA TERCEIRA - DOS HONORÁRIOS ADVOCATÍCIOS CONTRATUAIS (ÊXITO)</h2>
-      <p>As partes pactuam a remuneração dos serviços advocatícios nas seguintes condições:</p>
-      <p><strong>Procedência em 1ª Instância (Sem Recurso do Banco):</strong> Caso a ação seja julgada procedente em 1ª Instância e a instituição financeira não interponha recurso, o(a) CONTRATANTE ficará ISENTO(A) do pagamento de qualquer percentual a título de honorários de êxito, recebendo a integralidade do valor apurado na condenação.</p>
-      <p><strong>Vitória em 2ª Instância (Fase Recursal):</strong> Caso o réu (Itaú) recorra da decisão e o CONTRATADO elabore a defesa em grau recursal (Contrarrazões ao Recurso Inominado) obtendo a manutenção da vitória ou êxito perante a Turma Recursal / Câmara Recursal, o(a) CONTRATANTE pagará ao CONTRATADO o percentual de 10% (dez por cento) sobre o valor líquido final obtido na condenação ou no acordo.</p>
+      <p>Em caso de êxito na ação, seja em 1ª Instância ou após a atuação em fase recursal (apresentação de Contrarrazões), bem como em caso de acordo, o(a) CONTRATANTE pagará ao CONTRATADO o percentual de 30% (trinta por cento) sobre o valor líquido final obtido.</p>
     </section>
 
     <section class="clause">
@@ -847,6 +845,28 @@ export async function appendJecPetitionAttachments(basePdf, attachments = []) {
 
   for (const attachment of attachments) {
     const label = String(attachment?.label || "").trim();
+    const bytes = Buffer.from(attachment?.bytes || []);
+    // Legacy callers without a filename still require a valid PDF.
+    if (attachment?.name && !bytes.subarray(0, 1024).includes(Buffer.from("%PDF-"))) {
+      if (!bytes.length) throw invalidPdf("jec_petition_attachment_invalid", label);
+      const png = bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]));
+      const jpg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+      if (png || jpg) {
+        try {
+          const image = png ? await output.embedPng(bytes) : await output.embedJpg(bytes);
+          const page = output.addPage([595.28, 841.89]);
+          const size = image.scale(Math.min(515 / image.width, 740 / image.height, 1));
+          page.drawImage(image, { x: (595.28-size.width)/2, y: (841.89-size.height)/2, ...size });
+        } catch { throw invalidPdf("jec_petition_attachment_invalid", label); }
+      } else {
+        const page = output.addPage([595.28, 841.89]);
+        page.drawText("Documento incorporado como anexo original", { x: 40, y: 780, size: 16 });
+        page.drawText(String(attachment.name).replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 70), { x: 40, y: 750, size: 10 });
+        page.drawText("Abra o painel de anexos de um leitor de PDF para acessar o arquivo.", { x: 40, y: 725, size: 11 });
+      }
+      await output.attach(bytes, attachment.name, { mimeType: "application/octet-stream", description: label });
+      continue;
+    }
     const source = await loadPdf(
       attachment?.bytes,
       "jec_petition_attachment_invalid",

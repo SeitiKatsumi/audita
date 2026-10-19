@@ -1,4 +1,4 @@
-import {createAuditaChatMotion} from './audita-chat-motion.js';
+import {createAuditaChatMotion} from './audita-chat-motion.js?v=20261016-follow-latest';
 const root=document.querySelector('#glosasApp');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>(v/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});

@@ -43,3 +43,8 @@ Consulte [meeting-20261008.md](meeting-20261008.md) para decisões, testes, limi
 ## Anexos por arrastar e soltar
 - Arquivos podem ser soltos na area da conversa; destaque visual indica o destino. Ficam na lista de anexos para revisao antes de enviar, pelo mesmo fluxo do seletor. Durante processamento, novos anexos ficam bloqueados. Arrastar texto nao e interceptado.
 - Cada arquivo pendente tem botao Remover individual; ao excluir, o foco vai ao proximo anexo ou ao seletor. Remocao bloqueada durante processamento.
+
+## Retorno imediato no envio
+- A mensagem e os nomes dos anexos aparecem na conversa assim que o acesso e confirmado, antes da leitura; o campo e limpo e a rolagem existente acompanha a atividade.
+- Falhas na leitura recuperam o texto se o campo estiver vazio e devolvem somente os arquivos ainda nao processados; documentos ja lidos permanecem vinculados. Novo rascunho digitado durante a operacao e preservado.
+- Erros documentais exibem uma orientacao por codigo conhecido e o codigo seguro de diagnostico, sem revelar mensagens internas do servidor.

@@ -1,7 +1,108 @@
 import { ITAU_FAQ_ITEMS, ITAU_FAQ_LEGAL_NOTICE } from "./itau-faq.js";
 import { buildChargeCalculationSnapshot } from "./charge-calculation.js";
 
+export function bindRecoveryFileDrop(stage) {
+  const zoneFor = event => event.target?.closest?.("[data-recovery-file-drop]");
+  stage.addEventListener("dragover", event => {
+    const zone = zoneFor(event);
+    if (!zone || !Array.from(event.dataTransfer?.types || []).includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    zone.classList.add("dragover");
+  });
+  stage.addEventListener("dragleave", event => {
+    const zone = zoneFor(event);
+    if (zone && !zone.contains(event.relatedTarget)) zone.classList.remove("dragover");
+  });
+  stage.addEventListener("drop", event => {
+    const zone = zoneFor(event);
+    if (!zone) return;
+    event.preventDefault();
+    zone.classList.remove("dragover");
+    const input = zone.querySelector('input[type="file"]');
+    const files = Array.from(event.dataTransfer?.files || []);
+    if (!input || input.disabled || !files.length) return;
+    input.setCustomValidity("");
+    if (!input.multiple && files.length > 1) {
+      input.setCustomValidity("Arraste apenas um arquivo para este campo.");
+      input.reportValidity();
+      return;
+    }
+    if (files.some(file => file.size > 12 * 1024 * 1024)) {
+      input.setCustomValidity("Cada arquivo deve ter no máximo 12 MB.");
+      input.reportValidity();
+      return;
+    }
+    const transfer = new DataTransfer();
+    for (const file of files) transfer.items.add(file);
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  stage.addEventListener("change", event => {
+    const zone = zoneFor(event);
+    if (!zone) return;
+    event.target.setCustomValidity?.("");
+    const names = zone.querySelector("[data-recovery-file-names]");
+    if (names) names.textContent = Array.from(event.target.files || []).map(file => file.name).join(", ");
+  });
+}
+
 export { buildChargeCalculationSnapshot } from "./charge-calculation.js";
+
+export function bindRecoveryPostalCode(stage, fetchAddress = fetch) {
+  const forms = new WeakMap();
+  const fields = { street: "logradouro", district: "bairro", city: "localidade", uf: "uf" };
+  const lookup = async (event) => {
+    const input = event.target;
+    if (input.name !== "postalCode" || input.form?.id !== "chargeRecoveryForm") return;
+    const form = input.form;
+    const cep = input.value.replace(/\D/g, "");
+    const previous = forms.get(form);
+    if (previous?.cep === cep) return;
+    previous?.controller.abort();
+    const status = form.querySelector("[data-postal-status]");
+    const controller = new AbortController();
+    const request = { cep, controller, filled: previous?.filled || {} };
+    forms.set(form, request);
+    for (const [name, value] of Object.entries(request.filled)) {
+      if (form.elements[name].value === value) form.elements[name].value = "";
+    }
+    request.filled = {};
+    if (cep.length !== 8) {
+      status.textContent = "Digite os 8 dígitos do CEP para buscar o endereço.";
+      return;
+    }
+    const initial = Object.fromEntries(Object.keys(fields).map(name => [name, form.elements[name].value]));
+    status.textContent = "Buscando endereço…";
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const current = () => forms.get(form) === request && form.isConnected && input.value.replace(/\D/g, "") === cep;
+    try {
+      const response = await fetchAddress(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal, credentials: "omit" });
+      if (!response.ok) throw new Error("lookup_failed");
+      const address = await response.json();
+      if (!current()) return;
+      if (address.erro || !address.localidade || !/^[A-Z]{2}$/.test(address.uf || "")) throw new Error("not_found");
+      for (const [name, key] of Object.entries(fields)) {
+        const field = form.elements[name];
+        if (!field.disabled && field.value === initial[name] && typeof address[key] === "string") {
+          field.value = address[key].slice(0, field.maxLength > 0 ? field.maxLength : 160);
+          request.filled[name] = field.value;
+        }
+      }
+      status.textContent = "Endereço consultado. Confira os dados e complete número e campos que faltarem.";
+    } catch (error) {
+      if (!current()) return;
+      forms.delete(form);
+      status.textContent = error.message === "not_found"
+        ? "CEP não encontrado. Confira o CEP ou preencha o endereço manualmente."
+        : "Não foi possível consultar o CEP. Preencha o endereço manualmente ou tente novamente ao sair do campo.";
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+  stage.addEventListener("input", lookup);
+  stage.addEventListener("change", lookup);
+}
 
 export const CHARGE_ANALYSIS_BRAND_GROUPS = Object.freeze([
   {
@@ -746,9 +847,16 @@ if (stage) {
   function scrollLatestMessage(container) {
     window.requestAnimationFrame(() => {
       if (document.body.dataset.activePage !== "analise-cobrancas") return;
-      container?.lastElementChild?.scrollIntoView?.({
+      const latestPanel = [...stage.querySelectorAll(":scope > :not(.charge-analysis-floating-avatar)")].at(-1);
+      const target = state.screen === "analyzing"
+        ? stage.querySelector(".charge-analysis-processing")
+        : latestPanel?.matches(".charge-analysis-conversation")
+          ? latestPanel.lastElementChild
+          : latestPanel || container?.lastElementChild;
+      if (!target?.isConnected) return;
+      target.scrollIntoView?.({
         behavior: prefersReducedMotion ? "auto" : "smooth",
-        block: "end",
+        block: state.screen === "analyzing" ? "center" : "end",
       });
     });
   }
@@ -1793,7 +1901,7 @@ if (stage) {
 
         <div class="charge-recovery-section-title"><strong>Endereço</strong><span>Usado para identificar o consumidor e a competência territorial.</span></div>
         <div class="charge-recovery-form-grid">
-          <label><span>CEP</span><input name="postalCode" required inputmode="numeric" maxlength="9" autocomplete="postal-code" data-recovery-mask="postalCode" placeholder="00000-000" value="${escapeChargeHtml(formatRecoveryPostalCode(claimant.postalCode || ""))}" /></label>
+          <label><span>CEP</span><input name="postalCode" required inputmode="numeric" maxlength="9" autocomplete="postal-code" data-recovery-mask="postalCode" aria-describedby="chargePostalStatus" placeholder="00000-000" value="${escapeChargeHtml(formatRecoveryPostalCode(claimant.postalCode || ""))}" /><small id="chargePostalStatus" data-postal-status role="status" aria-live="polite">Digite os 8 dígitos do CEP para buscar o endereço.</small></label>
           <label><span>Bairro</span><input name="district" required maxlength="80" autocomplete="address-level3" value="${escapeChargeHtml(claimant.district || "")}" /></label>
           <label class="wide"><span>Logradouro</span><input name="street" required maxlength="160" autocomplete="address-line1" value="${escapeChargeHtml(claimant.street || "")}" /></label>
           <label><span>Número</span><input name="addressNumber" required maxlength="20" autocomplete="address-line2" value="${escapeChargeHtml(claimant.addressNumber || "")}" /></label>
@@ -1813,12 +1921,12 @@ if (stage) {
           <p>A data, a hora e o mesmo identificador serão registrados nos dois PDFs. Não é necessário desenhar a assinatura.</p>
         </div>
         <div class="charge-recovery-form-grid">
-          <label><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "PDF")}</small></span><input type="file" name="identityDocument" accept=".pdf,application/pdf" ${attachments.identityDocument ? "" : "required"} /></label>
-          <label><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "PDF")}</small></span><input type="file" name="proofOfResidence" accept=".pdf,application/pdf" ${attachments.proofOfResidence ? "" : "required"} /></label>
-          <label class="wide"><span>Extratos e faturas da análise (se precisar anexar novamente)</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "Qualquer formato")}</small></span><input type="file" name="identityDocument" ${attachments.identityDocument ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "Qualquer formato")}</small></span><input type="file" name="proofOfResidence" ${attachments.proofOfResidence ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="wide charge-recovery-file-drop" data-recovery-file-drop><span>Extratos e faturas da análise (se precisar anexar novamente)</span><input name="sourceDocuments" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.txt,.csv" /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
           <label class="wide"><span>Digite seu nome completo para assinar os dois documentos</span><input name="powerOfAttorneySignerName" required maxlength="160" autocomplete="off" value="${escapeChargeHtml(powerOfAttorneyAcceptance.signerName || "")}" /></label>
         </div>
-        <p class="charge-recovery-form-intro">Envie identidade e comprovante de residência em PDF, com até 12 MB por arquivo. O relatório, a procuração, o contrato e os anexos serão encaminhados ao advogado.</p>
+        <p class="charge-recovery-form-intro">Envie identidade e comprovante de residência em qualquer formato, com até 12 MB por arquivo. PDF, JPG e PNG aparecem nas páginas do relatório; outros formatos ficam incorporados como anexos originais no PDF. O relatório, a procuração, o contrato e os anexos serão encaminhados ao advogado.</p>
 
         <input type="hidden" name="historicalDocumentsAvailable" value="${escapeChargeHtml(historicalDocumentsAvailable)}" />
         <input type="hidden" name="doubleRefundAmount" value="${escapeChargeHtml(calculatedValues.doubleRefundAmount ?? claimant.doubleRefundAmount ?? "")}" />
@@ -1840,7 +1948,7 @@ if (stage) {
       <div class="charge-analysis-conversation charge-recovery-conversation compact">
         ${assistantMessage(`
           <p><strong>Agora vou montar o seu Relatório Técnico de Auditoria.</strong></p>
-          <p>Confira seus dados, envie identidade e comprovante de residência em PDF e assine a procuração e o contrato com um único aceite e seu nome completo. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
+          <p>Confira seus dados, envie identidade e comprovante de residência em qualquer formato e assine a procuração e o contrato com um único aceite e seu nome completo. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
         `, "IA AUDITA · Relatório")}
       </div>
       ${recoveryReportFormMarkup()}
@@ -1916,10 +2024,8 @@ if (stage) {
       const selected = data.get(field);
       const file = selected?.size ? selected : previous[field];
       if (!file?.size || typeof file.arrayBuffer !== "function") {
-        throw new Error(`Envie ${label} em PDF para continuar.`);
+        throw new Error(`Envie ${label} para continuar.`);
       }
-      const isPdf = file.type === "application/pdf" || String(file.name || "").toLowerCase().endsWith(".pdf");
-      if (!isPdf) throw new Error(`${label} deve ser enviado em PDF.`);
       if (file.size > 12 * 1024 * 1024) throw new Error(`${label} deve ter no máximo 12 MB.`);
       return file;
     };
@@ -2092,7 +2198,10 @@ if (stage) {
       render();
       return;
     }
-    if (triageStarted || state.screen !== "triage") return;
+    if (triageStarted || state.screen !== "triage") {
+      scrollLatestMessage(stage.querySelector(".charge-analysis-conversation"));
+      return;
+    }
     triageStarted = true;
     render();
   }
@@ -2165,6 +2274,8 @@ if (stage) {
       render();
     }
   }
+
+  bindRecoveryFileDrop(stage);
 
   stage.addEventListener("click", (event) => {
     const button = event.target.closest("[data-charge-action]");
@@ -2323,6 +2434,8 @@ if (stage) {
       if (formatter) event.target.value = formatter(event.target.value);
     }
   });
+
+  bindRecoveryPostalCode(stage);
 
   stage.addEventListener("change", (event) => {
     if (event.target.id === "lawyerKitUf") {

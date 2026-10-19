@@ -241,7 +241,7 @@ test("electronic acceptance requires the typed claimant name", () => {
       accepted: true,
       signerName: "joao DA SILVA",
       statement: "Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Jurídicos e Honorários Advocatícios, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.",
-      version: "2026-08-28-contract-1",
+      version: "2026-10-16-contract-2",
     },
   );
   assert.throws(
@@ -336,7 +336,7 @@ test("legal-services contract preserves the supplied terms and uses the same com
   };
   const html = buildLegalServicesAgreementHtml(document);
   assert.match(html, /CONTRATO DE PRESTAÇÃO DE SERVIÇOS JURÍDICOS E HONORÁRIOS ADVOCATÍCIOS/);
-  assert.match(html, /10% \(dez por cento\)/);
+  assert.match(html, /30% \(trinta por cento\)/);
   assert.match(html, /fica totalmente isento\(a\) do pagamento de taxas judiciárias/);
   assert.match(html, /CONTRATADO NÃO interporá recurso/);
   assert.match(html, /risco financeiro direto[\s\S]*?ZERO/);
@@ -358,9 +358,47 @@ test("legal-services contract preserves the supplied terms and uses the same com
     }),
   }));
   assert.match(renderedHtml, /shared-a/);
+  assert.match(renderedHtml, /30% \(trinta por cento\)/);
+  assert.doesNotMatch(renderedHtml, /10%|Sem Recurso do Banco|ficará ISENTO/);
   assert.equal(browserClosed, true);
   const output = await PDFDocument.load(bytes);
   assert.equal(output.getPageCount(), 2);
   assert.match(output.getSubject(), /shared-acceptance-id/);
   assert.match(output.getSubject(), /shared-fingerprint/);
+});
+
+
+test("identity and residence preserve arbitrary original attachments and render PNG photos", async () => {
+  const bytes = await appendJecPetitionAttachments(await pdfWithPageSizes([[310,410]]), [
+    { label: "identity", name: "identity-photo.png", bytes: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=", "base64") },
+    { label: "residence", name: "residence-document.docx", bytes: Buffer.from("original document fixture") },
+  ]);
+  const result = await PDFDocument.load(bytes);
+  assert.equal(result.getPageCount(), 3);
+  const { PDFName } = await import("pdf-lib");
+  const names = result.catalog.lookup(PDFName.of("Names")).lookup(PDFName.of("EmbeddedFiles")).lookup(PDFName.of("Names"));
+  assert.equal(names.size(), 4);
+  assert.equal(names.get(0).decodeText(), "identity-photo.png");
+  assert.equal(names.get(2).decodeText(), "residence-document.docx");
+});
+
+test("multipart identity/residence accepts arbitrary types and keeps size and required checks", async () => {
+  const source = readFileSync(new URL("../server.mjs", import.meta.url), "utf8");
+  const start = source.indexOf("async function readJecPetitionPdfRequest");
+  const end = source.indexOf("function buildPowerOfAttorneyAcceptanceRecord", start);
+  let form;
+  const read = new Function("readBufferBody", "Request", "PDFDocument", source.slice(start,end) + ";return readJecPetitionPdfRequest;")(
+    async () => Buffer.alloc(0), class { async formData() { return form; } }, PDFDocument,
+  );
+  const request = { headers: { "content-type": "multipart/form-data; boundary=test" }, url: "/submit" };
+  form = new FormData();
+  form.append("identityDocument", new Blob(["photo"], {type:"image/heic"}), "photo.heic");
+  form.append("proofOfResidence", new Blob(["document"], {type:"application/msword"}), "document.doc");
+  const result = await read(request);
+  assert.equal(result.attachments.length, 2);
+  assert.equal(result.attachments[0].bytes.toString(), "photo");
+  form.delete("identityDocument");
+  await assert.rejects(read(request), e => e.code === "JEC_PDF_ATTACHMENT_REQUIRED");
+  form.append("identityDocument", new Blob([new Uint8Array(12*1024*1024+1)]), "large.bin");
+  await assert.rejects(read(request), e => e.code === "JEC_PDF_ATTACHMENT_TOO_LARGE");
 });

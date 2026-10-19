@@ -1,3 +1,5 @@
+> Atualizacao 2026-10-15: IEPTB Basica removida do catalogo de novas consultas a pedido do usuario. Mantida IEPTB Online. Referencias abaixo a Basica registram a integracao anterior.
+
 # Análise documental do vendedor
 
 ## Aplicações comerciais compartilhadas

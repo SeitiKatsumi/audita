@@ -68,7 +68,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    messages.querySelectorAll('.chat-message-row').forEach(n=>n.remove());
    messages.insertAdjacentHTML('beforeend',thread.messages.map((m,index)=>`<article class="chat-message-row ${m.role==='user'?'user':'assistant'}">${m.role==='assistant'?assistantAvatar:''}<div class="chat-message-content">
      ${m.role==='assistant'?'<strong>IA AUDITA</strong>':''}<div class="chat-message-body">${formatGeneralChat(m.content)}</div>
-     ${m.documentIds?.length?'<small>Documentos vinculados a esta conversa</small>':''}
+     ${m.fileNames?.length?`<small>${m.fileNames.map(escape).join(' · ')}</small>`:m.documentIds?.length?'<small>Documentos vinculados a esta conversa</small>':''}
      ${(m.artifacts||[]).map(artifactHtml).join('')}
      ${m.sources?.length?`<details class="general-chat-sources"><summary>Fontes consultadas</summary>${m.sources.map(s=>safeLink(s.url)?`<a href="${escape(s.url)}" target="_blank" rel="noopener noreferrer">${escape(s.name)}</a>`:'').join('')}</details>`:''}
      ${m.role==='assistant'?`<div class="general-chat-message-actions"><button type="button" data-copy="${index}" aria-label="Copiar resposta" title="Copiar resposta">${copyIcon}</button><button type="button" data-retry="${index}" aria-label="Tentar novamente" title="Tentar novamente" ${busy?'disabled':''}>${retryIcon}</button></div>`:''}
@@ -107,17 +107,23 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    if(!await subscription.ensureAccess('messages')||active||thread.processing?.status==='running'||startingAccount!==account()||startingVersion!==version)return;
    const accountId=account(),run=version,localThread=thread,controller=new AbortController();
    const userMessage={id:uuid(),role:'user',content:text||'Analise os arquivos anexados.',createdAt:new Date().toISOString()};
+   const submittedFiles=[...files];let remainingFiles=[...submittedFiles],submitted=false;
+   userMessage.fileNames=submittedFiles.map(file=>file.name);
+   localThread.messages.push(userMessage);files=[];fileInput.value='';input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));
    active={controller,status:'Preparando conversa',text:'',threadId:thread.id,requestId:userMessage.id};showError();render();
    try {
      const docIds=[...(localThread.documentIds||[])];
-     for(const file of [...files]){active.status=`Lendo ${file.name}`;render();const doc=await subscription.analyzeDocument(file);if(!doc)throw Object.assign(new Error('Leitura cancelada.'),{cancelled:true});if(!docIds.includes(doc.id))docIds.push(doc.id);localThread.documentIds=[...docIds];files=files.filter(f=>f!==file);}
+     for(const file of submittedFiles){active.status=`Lendo ${file.name}`;render();const doc=await subscription.analyzeDocument(file);if(!doc)throw Object.assign(new Error('Leitura cancelada.'),{cancelled:true});if(!docIds.includes(doc.id))docIds.push(doc.id);localThread.documentIds=[...docIds];remainingFiles=remainingFiles.filter(f=>f!==file);}
      if(run!==version||accountId!==account())return;
      localThread.documentIds=docIds;userMessage.documentIds=docIds;
      const fingerprint=JSON.stringify([userMessage.content,docIds,'auto']);
-     if(localThread.pendingRequest?.fingerprint===fingerprint)userMessage.id=localThread.pendingRequest.id;
+     if(localThread.pendingRequest?.fingerprint===fingerprint){
+       localThread.messages=localThread.messages.filter(m=>m===userMessage||m.id!==localThread.pendingRequest.id);
+       userMessage.id=localThread.pendingRequest.id;
+     }
      localThread.pendingRequest={fingerprint,id:userMessage.id};
      active.requestId=userMessage.id;remember('audita:general-chat:'+accountId,localThread.id);
-     if(!localThread.messages.some(m=>m.id===userMessage.id))localThread.messages.push(userMessage);files=[];fileInput.value='';input.value='';
+     submitted=true;
      active.status='Preparando resposta';render();
      const r=await fetch('/api/chat/stream',{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'content-type':'application/json'},
        body:JSON.stringify({requestId:userMessage.id,threadId:localThread.id,mode:'auto',documentIds:docIds,messages:[{role:'user',content:userMessage.content}]})});
@@ -144,10 +150,11 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
      threads=[{id:localThread.id,title:localThread.title,updatedAt:localThread.updatedAt},...threads.filter(t=>t.id!==localThread.id)];
      remember('audita:general-chat:'+accountId,localThread.id);
    }catch(e){if(run!==version||accountId!==account())return;
+     if(!submitted){localThread.messages=localThread.messages.filter(m=>m!==userMessage);files=[...remainingFiles,...files];}
      if(e.quotaReleased||e.code==='chat_reservation_finalized'){delete localThread.pendingRequest;localThread.messages=localThread.messages.filter(m=>m.id!==userMessage.id);}
      if(e.name==='AbortError')showError('Geração interrompida. Você pode tentar novamente.');
      else if(!e.cancelled&&!subscription.handleAccessError(e.status))showError(e.message);
-     input.value=text;
+     if(!input.value){input.value=text;input.dispatchEvent(new Event('input',{bubbles:true}));}
    }finally{if(run===version&&accountId===account()){active=null;render();void subscription.refresh();}}
  }
  form.addEventListener('submit',e=>{e.preventDefault();e.stopImmediatePropagation();void sendMessage();},true);
