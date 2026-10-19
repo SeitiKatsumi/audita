@@ -1766,6 +1766,7 @@ const stripeBillingService = createStripeBillingService({
 });
 const certificateOrderService=createCertificateOrderService({getDb:()=>({pool,dbReady}),
   checkout:(auth,order)=>stripeBillingService.createCertificateCheckoutSession(auth,order),
+  checkoutReady:()=>billingConfiguration().checkoutReady&&billingConfiguration().webhookReady,
   startAudit:(request,options)=>auditService.startAudit(request,options)});
 async function certificateBenefits(auth) {
   if(auth.unauthorized||!auth.user)return {subscriber:false,complimentary:false};
@@ -3936,7 +3937,7 @@ async function handleApi(request, response, pathname) {
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
     };
     sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage), companyStates: sellerStatePlans(coverage,'cnpj'), identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl,
-      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateSubscriber:benefits.subscriber,certificateComplimentary:benefits.complimentary,certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
+      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateSubscriber:benefits.subscriber,certificateComplimentary:benefits.complimentary,certificateTestBypassEnabled:certificateOrderService.ready()&&certificateOrderService.testBypassEnabled(),certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
     return true;
   }
 
@@ -3989,8 +3990,7 @@ async function handleApi(request, response, pathname) {
         try {
           if (!Array.isArray(body.ufs)) throw new Error("invalid_ufs");
           if (body.ufs.length) {
-            if (isCompany) throw new Error('unsupported_company_court_selection');
-            autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus(), body.flow==='certificates'?body.courtCertificates:undefined);
+            autonomousPlan = planAutonomousCertificates(body.ufs, directDataCertificatesService.getStatus(), body.flow==='certificates'?body.courtCertificates:undefined, documentType);
           }
           if (!Array.isArray(companyCnpjs) || companyCnpjs.length > 5 || companyCnpjs.some((value) => !validateCnpj(value))) throw new Error("invalid_company_cnpjs");
           sellerDocumentPlan = planSellerDocuments(body.sellerQueries || [], directDataSellerService.getStatus(), companyCnpjs);
@@ -4002,7 +4002,7 @@ async function handleApi(request, response, pathname) {
           return true;
         }
         const maxProviderCostBrl = (autonomousPlan?.maxProviderCostBrl || 0) + sellerDocumentPlan.maxProviderCostBrl;
-        if ((maxProviderCostBrl > 0 || (autonomousPlan && !sellerInput.motherName)) && body.paidQueryConfirmed !== true) {
+        if ((maxProviderCostBrl > 0 || (!isCompany && autonomousPlan && !sellerInput.motherName)) && body.paidQueryConfirmed !== true) {
           sendJson(response, 400, { error: "paid_query_confirmation_required", maxProviderCostBrl });
           return true;
         }
@@ -4017,10 +4017,6 @@ async function handleApi(request, response, pathname) {
       const requiredIdentity = [...new Set(['fullName', ...(needsBirthDate ? ['birthDate'] : []), ...(autonomousPlan?.requiredIdentityFields || []), ...(pathname === '/api/seller-analysis/df' ? ['motherName'] : [])])];
       const identity = () => ({ fullName: resolvedFullName, motherName: resolvedMotherName, birthDate: body.birthDate, rg: String(body.rg || '').trim().slice(0,30), gender: ['Masculino','Feminino'].includes(body.gender) ? body.gender : '' });
       const missingIdentity = () => requiredIdentity.filter(field => !identity()[field]);
-
-      if(body.flow==='certificates'&&missingIdentity().length) {
-        sendJson(response,422,{error:'seller_identity_fields_required',missingFields:missingIdentity(),identity:identity(),motherNameRequired:missingIdentity().includes('motherName')});return true;
-      }
 
       if (isCompany && !resolvedFullName) {
         const company = await collectSellerCompany({documento:document,tipoDocumento:'cnpj',extraFields:{},retries:0,timeoutMs:15000});
@@ -4113,10 +4109,12 @@ async function handleApi(request, response, pathname) {
         if(body.flow==='certificates'&&body.courtCertificates!==undefined)request.body.extraFields.autonomousCertificates=body.courtCertificates;
         request.body.extraFields.paidQueryConfirmed = body.paidQueryConfirmed === true;
         Object.assign(request.body.extraFields.stateCourtFields, {
-          birthDate: body.birthDate.split("-").reverse().join("/"),
-          rg: String(body.rg).trim().slice(0, 30),
           email: String(body.email || "").trim().slice(0, 180),
-          gender: body.gender === "Feminino" ? "Feminino" : "Masculino",
+          ...(!isCompany ? {
+            birthDate: body.birthDate.split("-").reverse().join("/"),
+            rg: String(body.rg || '').trim().slice(0, 30),
+            gender: body.gender === "Feminino" ? "Feminino" : "Masculino",
+          } : {}),
         });
       }
       const providerCostBrl=(autonomousPlan?.maxProviderCostBrl||0)+(sellerDocumentPlan?.maxProviderCostBrl||0);
@@ -4126,7 +4124,8 @@ async function handleApi(request, response, pathname) {
         if(!costs.length)costs.push(0);
         const quote=certificateQuote(costs,benefits.subscriber);
         const catalog=billingConfiguration();
-        if(!certificateOrderService.ready()||quote.amountCents>0&&!benefits.complimentary&&(!catalog.checkoutReady||!catalog.webhookReady)) {
+        const testBypassAvailable=body.flow==='certificates'&&certificateOrderService.testBypassEnabled?.()===true;
+        if(!certificateOrderService.ready()||quote.amountCents>0&&!benefits.complimentary&&!testBypassAvailable&&(!catalog.checkoutReady||!catalog.webhookReady)) {
           sendJson(response,503,{error:'billing_not_configured',message:'O pagamento está temporariamente indisponível. Nenhuma emissão foi iniciada.'});return true;
         }
         const order=await certificateOrderService.create(authContext,request.body,{providerCostBrl,costs,...benefits,documentCount:(autonomousPlan?.certificates.length||0)+(sellerDocumentPlan?.queries.length||0)||1});
@@ -4138,6 +4137,16 @@ async function handleApi(request, response, pathname) {
         message: 'Não foi possível preparar a consulta. Tente novamente ou contate a equipe.',
       });
     }
+    return true;
+  }
+
+  const certificateTestBypassMatch=pathname.match(/^\/api\/certificate-orders\/([0-9a-fA-F-]{36})\/test-bypass$/);
+  if(certificateTestBypassMatch&&request.method==='POST') {
+    try {
+      if(!String(request.headers['content-type']).startsWith('application/json')||request.headers['sec-fetch-site']==='cross-site'||(request.headers.origin&&new URL(request.headers.origin).host!==request.headers.host)){sendJson(response,403,{error:'same_origin_required'});return true;}
+      const order=await certificateOrderService.testBypass(await getTenantIdForRequest(request),certificateTestBypassMatch[1],request);
+      sendJson(response,202,order);
+    }catch(error){sendJson(response,error.statusCode||error.status||500,{error:error.code||'certificate_test_bypass_failed',message:error.code==='certificate_test_bypass_disabled'?'O bypass de teste não está habilitado neste ambiente.':'Não foi possível iniciar este pedido em modo de teste.'});}
     return true;
   }
 
@@ -4160,14 +4169,14 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 403, { error: 'same_origin_required' }); return true;
         }
         const body = await readJsonBody(request);
-        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose));
+        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose, { mode: body.analysisMode, sourceId: body.sourceId }));
       } else if (sellerReviewMatch[2] === 'report.pdf') {
-        const buffer = await sellerReviewService.pdf(id, auth);
+        const buffer = await sellerReviewService.pdf(id, auth, new URL(request.url || '/', 'http://localhost').searchParams.get('analysis'));
         response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="relatorio-audita.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });
         response.end(buffer);
       } else {
         response.setHeader('cache-control', 'private, no-store');
-        sendJson(response, 200, await sellerReviewService.get(id, auth));
+        sendJson(response, 200, await sellerReviewService.get(id, auth, request, new URL(request.url || '/', 'http://localhost').searchParams.get('analysis')));
       }
     } catch (error) { sendJson(response, error.status || 503, { error: error.code || 'seller_review_unavailable' }); }
     return true;

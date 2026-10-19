@@ -9,6 +9,53 @@ import {createAuditService} from '../services/audit.service.mjs';
 import {certificateSelection} from '../certificate-selection.js';
 import {getSellerDocumentCoverage} from '../services/seller-documents.service.mjs';
 import {sellerStatePlans} from '../services/seller-state-plan.mjs';
+import vm from 'node:vm';
+
+test('test bypass requires server opt-in, same-origin owner access and collects once without recording a payment',async()=>{
+  const pg=new PGlite(),collected=[];let checkouts=0,checkoutConfigured=true;
+  try{
+    await pg.exec((await readFile(new URL('../db/schema.sql',import.meta.url),'utf8')).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;',''));
+    await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,password_hash) VALUES(811,1,'fixture@example.test','Pessoa Ficticia','disabled')");
+    const a={tenantId:1,user:{id:811}},env={AUDITA_PROFILE_ENCRYPTION_KEY:'fixture-key-that-is-at-least-thirty-two-characters'};
+    const make=()=>createCertificateOrderService({getDb:()=>({pool:pg,dbReady:true}),env,checkoutReady:()=>checkoutConfigured,
+      checkout:async()=>{checkouts++;return {id:'cs_fixture_'+checkouts,url:'https://checkout.stripe.com/c/pay/fixture'};},
+      startAudit:async(request,options)=>{collected.push(request.body);await new Promise(resolve=>setTimeout(resolve,10));return {consultaId:options.consultaId};},
+    });
+    const orders=make(),body={tipoDocumento:'cpf',documento:'52998224725',fontes:['tjdft'],extraFields:{sellerFlow:'certificates',sellerAiConsent:false,stateCourtFields:{fullName:'Pessoa Ficticia'},authorizationConfirmed:true}};
+    const pending=await orders.create(a,body,{costs:[.54],documentCount:1});
+    assert.equal(pending.testBypassAvailable,false);assert.equal(pending.amountCents,1620);assert.equal(collected.length,0);
+    const source=await readFile(new URL('../server.mjs',import.meta.url),'utf8');
+    const context=vm.createContext({URL,certificateOrderService:orders,getTenantIdForRequest:async request=>request.auth||{unauthorized:true},sendJson:(response,status,body)=>Object.assign(response,{status,body})});
+    vm.runInContext(`async function handle(pathname,request,response){${source.slice(source.indexOf('  const certificateTestBypassMatch='),source.indexOf('  const sellerReviewMatch ='))}}`,context);
+    const headers={'content-type':'application/json',host:'fixture.test',origin:'https://fixture.test'};
+    const post=async(id=pending.orderId,auth=a,extraHeaders={})=>{const response={};await context.handle('/api/certificate-orders/'+id+'/test-bypass',{method:'POST',auth,headers:{...headers,...extraHeaders}},response);return response;};
+    assert.equal((await post(pending.orderId,null)).status,401);
+    assert.equal((await post()).status,403);assert.equal(collected.length,0);
+    env.AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED='true';
+    assert.equal((await orders.get(a,pending.orderId)).testBypassAvailable,true,'existing pending orders receive the option when enabled');
+    for(const extra of [{'sec-fetch-site':'cross-site'},{origin:'https://another.test'},{'content-type':'text/plain'}])assert.equal((await post(pending.orderId,a,extra)).status,403);
+    for(const foreign of [{tenantId:2,user:{id:811}},{tenantId:1,user:{id:812}}])assert.equal((await post(pending.orderId,foreign)).status,404);
+    const analysis=await orders.create(a,{...body,extraFields:{...body.extraFields,sellerFlow:'seller'}},{costs:[.54],documentCount:1});
+    assert.equal(analysis.testBypassAvailable,false);assert.equal((await post(analysis.orderId)).status,409);assert.equal(collected.length,0);
+    const responses=await Promise.all([post(),post()]);assert(responses.every(r=>r.status===202));
+    assert.equal(collected.length,1);assert.deepEqual(collected[0],body);
+    const completed=await make().get(a,pending.orderId);assert.equal(completed.status,'started');assert.equal(completed.testBypassed,true);assert.equal(completed.amountCents,1620);assert.equal(completed.testBypassAvailable,false);
+    assert.equal((await post()).status,202);assert.equal(collected.length,1,'repeated requests and restart do not recollect');
+    const saved=(await pg.query('SELECT request_payload FROM audita_audits WHERE public_id=$1',[pending.orderId])).rows[0].request_payload.certificateOrder;
+    assert.equal(saved.testBypassed,true);assert.equal(saved.testBypassedBy,811);assert.equal(typeof saved.testBypassedAt,'number');assert.equal(saved.paidAt,undefined);assert.equal(saved.amountCents,1620);
+    assert.equal(JSON.stringify(completed).includes(body.documento),false);assert.equal(completed.encryptedBody,undefined);
+    checkoutConfigured=false;
+    const before=checkouts,noStripe=await orders.create(a,body,{costs:[.54],documentCount:1});
+    assert.equal(noStripe.status,'pending');assert.equal(noStripe.checkoutUrl,undefined);assert.equal(noStripe.testBypassAvailable,true);assert.equal(checkouts,before);
+    assert.equal((await post(noStripe.orderId)).status,202);assert.equal(collected.length,2);
+    for(const status of ['expired','review_required']){
+      const closed=await orders.create(a,body,{costs:[.54],documentCount:1});
+      await pg.query("UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{certificateOrder,status}',$2::jsonb) WHERE public_id=$1",[closed.orderId,JSON.stringify(status)]);
+      assert.equal((await post(closed.orderId)).status,409);
+    }
+    env.AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED='false';assert.equal((await post()).status,403);assert.equal(collected.length,2);
+  }finally{await pg.close();}
+});
 
 test('UF/Brasil scope, national deduplication and prices use the validated coverage',()=>{
   const c={certificates:[],sellerSources:getSellerDocumentCoverage({configured:true})};
@@ -18,7 +65,7 @@ test('UF/Brasil scope, national deduplication and prices use the validated cover
   assert(df.queries.filter(q=>q.endpoint==='TribunalRegionalTrabalho').every(q=>q.params.REGIAO===10||q.params.REGIAO==='10'));
   assert(df.queries.find(q=>q.endpoint==='TribunalRegionalTrabalho').region.includes('Distrito Federal'));
   assert(certificateSelection(c,['SP'],'cnpj').queries.every(q=>q.documentTypes.includes('cnpj')));
-  assert(df.queries.some(q=>q.id==='protestos'));assert(all.queries.filter(q=>q.kind==='data').length===12);assert(all.queries.filter(q=>q.kind==='data'&&q.includePdf).length===3);assert.equal(certificatePriceCents(.54),1620);
+  assert(df.queries.some(q=>q.id==='protestos'));assert(all.queries.filter(q=>q.kind==='data').length===11);assert(!all.queries.some(q=>q.id==='protestos-basica'));assert(all.queries.filter(q=>q.kind==='data'&&q.includePdf).length===3);assert.equal(certificatePriceCents(.54),1620);
   assert.throws(()=>certificatePriceCents(-1));assert.throws(()=>certificatePriceCents(NaN));
 });
 

@@ -2,6 +2,40 @@
 
 # Análise documental do vendedor
 
+## Atualização local de 16/10/2026 — certidões CPF/CNPJ
+
+A homologação real autorizada nesta rodada ampliou os TJs para **35 opções CPF em 12 UFs** e **14 opções CNPJ em seis UFs**. Quantidade de documentos não significa cobertura jurídica integral de uma UF. São resultados do checkout local; **push e publicação em produção permanecem pendentes**. A fotografia inicial de produção (`5067c8b`) tinha 30 opções CPF/10UFs e zero TJ para CNPJ; detalhes e histórico em [Auditoria de16/10](certificate-audit-20261016.md).
+
+| UF | CPF homologadas | CNPJ homologadas |
+| --- | ---: | ---: |
+| AP | 2 | 2 |
+| BA | 2 | 2 |
+| DF | 4 | 4 |
+| ES | 6 | 3 |
+| GO | 2 | 0 |
+| PA | 2 | 0 |
+| PE | 3 | 2 |
+| PI | 3 | 0 |
+| RR | 3 | 0 |
+| RS | 2 | 1 |
+| SE | 2 | 0 |
+| TO | 4 | 0 |
+| Total | 35 | 14 |
+
+As cinco novas opções CPF são cível/criminal de BA e SE e cível do RS; o alvará do RS permanece uma entrega distinta. Para CNPJ, os portais oficiais emitiram quatro tipos no DF e cível/criminal/falência no ES. A Direct Data emitiu cível/criminal de AP, BA e PE, mais cível do RS. PDF, identidade, título e UF foram conferidos em cada combinação liberada; outras naturezas, instâncias, resultados positivos e comarcas não são presumidos a partir dessa amostra.
+
+`documentTypes` informa os perfis suportados pelo item; `validatedDocumentTypes` define os perfis homologados. Seleção, plano, custo e worker filtram esses perfis antes de coletar/cobrar. Candidatos ficam fora da oferta e somente a homologação interna pode habilitá-los; flags públicas não liberam candidatos. CNPJ não pede nascimento, RG, gênero ou filiação de pessoa física. A cobertura informa links dos 27 portais oficiais para os caminhos ainda não automatizados.
+
+O portal ES usa a URL atualizada e exige conferir o cabeçalho específico da natureza: menção a outra natureza nas observações não basta. A resposta PDF da Direct Data contendo `Found The document has moved` foi rejeitada. As consultas `ProcessosJudiciaisAgrupada` e `ProcessosJudiciaisCompleta` foram homologadas também por CNPJ, com HTTP200 e identidade no campo `documentoConsultado`; custo-base R$1,10/R$3,30. Entregam dados processuais, sem se tornarem certidão ou cópia integral dos autos.
+
+Validação: **611/611 testes Node/PGlite aprovados**. Chrome com CNPJ/fornecedores fictícios confirmou preço R$16,20, checkout antes da coleta, webhook assinado simulado, um PDF privado (200 para proprietário, 401 sem sessão e 404 para outro tenant), zero IA e zero lookup CPF. Reload não repetiu coleta; mobile390px sem overflow; 27 links oficiais conferidos. A jornada simulada não é teste de cobrança real Stripe; a emissão real dos documentos foi homologada separadamente.
+
+Tentativas não liberadas em16/10: cível CPF AC/AM/CE/PB/RN503 e MTtimeout; cível CNPJ AC/AM/CE/PB/RN503, GO/MT/RR400, PA/PI/SEtimeout e TO500; falência CPF BA400 e criminal CNPJ RS400. Os demais estados conservam os resultados históricos, sem disponibilidade atual inferida. Algumas respostas/links CPF se perderam por falha de gravação em disco e não foram reconsultados para evitar custos duplicados.
+
+Estimativa conservadora da rodada: **R$24,02**, calculada por35tentativas de certidões xR$0,54 + duas consultas cadastrais/societárias xR$0,36 +R$4,40 de processos. Não é fatura conciliada nem comprova cobrança das falhas. ProcessOnline fica desativado sem aprovação B2B/chave/contrato; DataJud não entrou no produto comercial em razão dos termos; Jusbrasil/Judit dependem de contrato. Não houve contato, compra ou substituição de credenciais de fornecedores.
+
+A tarefa principal conduz a consolidação na3000. O túnel de banco15432 continua indisponível, condição preexistente; `.env` e configuração privada preservados. Os registros datados abaixo conservam o histórico de decisões/validações anteriores; não substituem este estado local nem comprovam deploy.
+
 ## Aplicações comerciais compartilhadas
 
 `analysis-segments.js` é o catálogo único de rotas, textos, categorias e foco confiável da IA. As nove aplicações usam o mesmo formulário CPF/CNPJ, coletores por UF, enriquecimento, progresso, score, persistência e PDF. A Central organiza futuros sócios, fornecedores, parceiros, aquisição e reavaliação em **Empresas e parcerias**; diagnóstico em **Diagnóstico documental**; vendedor e locação em **Imóveis**; documentos para concorrências em **Licitações**. Os demais serviços permanecem disponíveis.
@@ -14,7 +48,11 @@ Testes: `node --test test/analysis-segments.test.mjs test/seller-review.test.mjs
 
 ## Fluxo
 
+Consultas concluídas sem PDF exibem o botão **Ver resultado**, que abre no próprio item o resumo e os dados textuais salvos. Valores zero e falsos são preservados; falta de detalhes não é apresentada como ausência de ocorrências. A abertura não repete consultas nem chama IA. O painel e o foco do botão são preservados durante o acompanhamento de outras fontes. PDFs continuam com **Abrir PDF**; falhas e fontes pendentes não recebem o botão de resultado concluído.
+
 ### Regras acordadas em 07/10/2026, 16h18
+
+A somatória da seleção permanece visível para todas as contas, inclusive administradores e contas com liberação individual. A liberação dispensa o pagamento no servidor, sem zerar o valor exibido; a interface informa a dispensa e oferece **Continuar sem pagar**. Descontos de assinante e fontes gratuitas mantêm as regras existentes. O bypass de teste também preserva o preço exibido e o valor salvo do pedido. A estimativa não registra pagamento ou receita.
 
 Emissao e nove analises compartilham a escolha de uma ou varias UFs/Brasil. Nacionais e tribunais regionais nao se repetem. O estado principal conserva o municipio opcional. A selecao automatica exclui fontes `manualOnly`; IEPTB basica e dossie QUOD completo sao opcoes separadas na emissao.
 
@@ -59,9 +97,13 @@ Uma atualização atômica no PostgreSQL concede a execução por consulta, com 
 
 ## Emissão de certidões diversas
 
-A Central organiza Análise de Vendedor e Consulta de imóveis em **Imóveis**. **Emissão de certidões** abre `#emissao-certidoes`, reutilizando os coletores e controles de custo e autorização. Esse fluxo oferece as certidões e as doze consultas complementares catalogadas (protestos, vínculos, QUOD, processos e CADIN). Comprovantes CADIN de GO/RS/SP mantêm PDF; as demais retornam dados, sem certidão oficial. Consultas complementares são opcionais, desmarcadas inicialmente e cobradas pela regra comercial por fonte descrita acima. Entrega os PDFs/dados e não inclui etapa3, consentimento OpenAI, descoberta automática de empresas ou relatório de IA.
+Em homologação, `AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED=true` habilita **Continuar sem pagar — teste** na etapa de pagamento, inclusive em pedidos pendentes anteriores. A opção inicia a coleta sem cobrar a Audita, com autorização no servidor por proprietário, registro de teste e proteção contra repetição. O preço original é preservado e nenhum `paidAt` é fabricado. Sem Stripe configurado, o pedido pode aguardar apenas essa opção; armazenamento seguro e fornecedores continuam necessários. O padrão é `false`, e desativar o flag revoga novas liberações. Custos das fontes externas e da busca cadastral permanecem. Não altera as análises com IA nem concede assinatura.
 
-A seleção é enviada com `flow: certificates`; o servidor força `sellerAiConsent=false`, restringe as fontes e persiste `sellerFlow` no JSON da consulta, sem migração. O início da análise de IA é recusado para uma emissão mesmo que solicitado diretamente à API. Históricos e retomadas do navegador são separados; consultas antigas sem marcador continuam no histórico de análise do vendedor. Não houve novas consultas pagas na validação.
+O titular começa pelo CPF ou CNPJ e pela seleção das fontes, sem os checkboxes separados de custo e autorização. O botão de continuar envia o pedido com as confirmações esperadas pela API; o preço permanece visível e o pagamento continua obrigatório antes da emissão. As análises com IA conservam o consentimento próprio. A emissão reutiliza a busca cadastral das análises antes de preparar o pedido: CPF preenche nome, nome da mãe, nascimento e gênero quando retornados; CNPJ busca a razão social. Apenas os campos exigidos pela seleção e não encontrados são solicitados manualmente, incluindo RG quando necessário. A busca CPF conserva a validação de identidade, carteira e cache por tenant/usuário/documento existentes; seu custo é informado na estimativa. Falha cadastral permite completar os campos manualmente. O enriquecimento não emite documentos, não inicia IA e não descobre empresas vinculadas automaticamente; os coletores da seleção continuam aguardando a confirmação do pagamento.
+
+A Central organiza Análise de Vendedor e Consulta de imóveis em **Imóveis**. **Emissão de certidões** abre `#emissao-certidoes`, reutilizando os coletores e controles de custo e autorização. Esse fluxo oferece as certidões e as doze consultas complementares catalogadas (protestos, vínculos, QUOD, processos e CADIN). Comprovantes CADIN de GO/RS/SP mantêm PDF; as demais retornam dados, sem certidão oficial. Consultas complementares são opcionais, desmarcadas inicialmente e cobradas pela regra comercial por fonte descrita acima. A etapa2 entrega os PDFs/dados; a etapa3 oferece análise IA opcional para assinantes, com consentimento próprio, sem descoberta automática de empresas.
+
+A seleção é enviada com `flow: certificates`; o servidor força `sellerAiConsent=false`, restringe as fontes e persiste `sellerFlow` no JSON da consulta, sem migração. A coleta não inicia IA; a análise posterior exige assinatura IA e consentimento. Históricos e retomadas do navegador são separados; consultas antigas sem marcador continuam no histórico de análise do vendedor. Não houve novas consultas pagas na validação.
 
 
 ## Encaminhamentos da reunião de 06/10/2026, 16h13
@@ -86,3 +128,11 @@ Validação: suíte geral Node/PGlite e testes de pagamento com HMAC, valor inco
 ## Análise opcional após emissão (09/10)
 
 Após coleta, assinantes IA ativos podem informar um objetivo e gerar análise/PDF privado dos documentos obtidos, sem nova consulta ou cobrança. Consentimento e assinatura conferidos no servidor, orçamento de IA respeitado, objetivo integrado ao fingerprint de recuperação. Não gera score genérico para esse objetivo personalizado; score dos demais segmentos permanece. Consulta não inicia IA automaticamente. [Decisões e validação](meeting-20261008.md).
+
+### Etapa3 — Análise IA (13/10)
+
+A navegação separa coleta, pagamento/extração e **Análise IA**. Após concluir a coleta, **Ir para Análise IA** abre uma tela própria: **Análise geral** considera o lote salvo (fontes sem retorno aparecem como lacunas); **Um documento** permite escolher individualmente uma certidão PDF ou resultado em texto concluído. Fontes indisponíveis não podem ser selecionadas. A orientação é opcional, de10 a2000 caracteres quando preenchida; sem orientação, o servidor aplica um objetivo padrão ao escopo. O campo ocupa a largura do formulário e mantém foco/contraste no celular. A tela mostra progresso, resumo, pontos de atenção, leitura por fonte, limitações e **Baixar análise em PDF**.
+
+POST `/api/seller-analysis/:id/review` aceita `analysisMode: general|document`, `sourceId` somente para documento e `purpose` opcional. O servidor resolve a fonte dentro da consulta pertencente ao tenant/usuário; não aceita conteúdo/caminho arbitrário. A execução individual envia somente a fonte selecionada à IA. Assinatura, consentimento, orçamento e claim atômico continuam obrigatórios. Não há nova coleta, cobrança de fornecedores ou migração.
+
+`request_payload.certificateReviews` preserva um resultado por escopo (`all` ou ID da fonte); `sellerReview` permanece como estado atual/lease. Relatórios antigos são preservados como análise geral ao iniciar outro escopo. GET review e PDF aceitam `?analysis=all` ou o ID codificado da fonte; acesso privado permanece. Abrir análises salvas não inicia IA. Pedidos repetidos com as mesmas evidências e orientação usam cache; uma orientação diferente atualiza apenas o respectivo escopo. A escolha da etapa/escopo é retomada na sessão do navegador. Análises comerciais e seu score mantêm o fluxo anterior.

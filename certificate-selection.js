@@ -12,7 +12,7 @@ export function certificateSelection(coverage,ufs,documentType='cpf') {
   for(const q of coverage.sellerSources?.queries||[])if(q.endpoint==='CertidaoNegativaDebitosMunicipal'&&ufs.some(uf=>q.params.MUNICIPIO.endsWith('-'+uf)))allowed.add(q.id);
   const queries=(coverage.sellerSources?.configured?coverage.sellerSources.queries||[]:[]).filter(q=>['certificate','data'].includes(q.kind)&&q.documentTypes.includes(documentType)&&allowed.has(q.id));
   const regional=q=>states.filter(state=>state.queryIds.includes(q.id)).map(state=>`${state.name} (${state.uf})`).join(', ');
-  return {courts:documentType==='cpf'?(coverage.certificates||[]).filter(c=>ufs.includes(c.uf)):[],
+  return {courts:(coverage.certificates||[]).filter(c=>ufs.includes(c.uf)&&(c.documentTypes||['cpf']).includes(documentType)),
     queries:queries.map(q=>({...q,region:q.scope==='Brasil'?'Cobertura nacional':q.params?.REGIAO?regional(q):q.scope,
       priceCents:certificateQuote([Number(q.costBrl||0)],coverage.certificateSubscriber===true).amountCents}))};
 }

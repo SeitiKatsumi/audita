@@ -117,6 +117,57 @@ test('seller collection -> AI -> persisted report -> private PDF; source failure
   }finally{await f.db.close();}
 });
 
+test('certificate analysis selects one owned source, keeps general and individual reports across restart and routes scoped PDFs',async()=>{
+  const f=await fixture();
+  try {
+    f.request.body.extraFields.sellerFlow='certificates';
+    const {consultaId:id}=await f.audit.startAudit(f.request);
+    for(let i=0;i<200;i++){const a=await f.audit.findAudit(id,f.request);if(a.resultados?.length&&a.resultados.every(r=>!['pending','running','queued'].includes(r.status)))break;await new Promise(r=>setTimeout(r,10));}
+    let allowed=true;
+    const options={...f.options,getAnalysisAccess:async()=>allowed};
+    const review=createSellerReviewService(options);
+    assert.equal((await review.get(id,owner,f.request,'all')).documents.length,3);
+    for(const selection of [{mode:'document',sourceId:'tjdft:2'},{mode:'document',sourceId:'other:0'},{mode:'general',sourceId:'tjdft:0'},{mode:'bad'},null,[]])await assert.rejects(review.start(id,owner,f.request,true,'',selection),{code:'invalid_analysis_selection'});
+    assert.equal(f.calls.length,0);
+    await f.db.query("UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{sellerAiConsent}','false') WHERE public_id=$1",[id]);
+    await assert.rejects(review.start(id,owner,f.request,false,'',{mode:'general'}),{code:'seller_ai_consent_required'});
+    await review.start(id,owner,f.request,true,'',{mode:'general'});await review.wait(id);
+    const general=await review.get(id,owner,f.request,'all');
+    assert.equal(general.status,'completed');assert.equal(general.report.analyzed,2);assert.equal(general.report.gaps,1);assert.equal(general.customPurpose,false);
+    await f.db.query("UPDATE audita_audits SET request_payload=(request_payload-'certificateReviews')||jsonb_build_object('sellerReview',(request_payload->'sellerReview')-'analysisKey'-'analysisMode'-'sourceId') WHERE public_id=$1",[id]);
+    await review.start(id,owner,f.request,true,'',{mode:'document',sourceId:'tjdft:1'});await review.wait(id);
+    const individual=await review.get(id,owner,f.request,'tjdft:1');
+    assert.equal(f.calls.length,3);assert.equal(f.calls[2].title,'CNDT');
+    assert.equal(individual.report.sources.length,1);assert.equal(individual.report.gaps,0);assert.equal(individual.report.sourceId,'tjdft:1');assert.equal(individual.report.title,'Análise de documento');
+    assert.deepEqual(individual.savedAnalyses.map(item=>item.key).sort(),['all','tjdft:1']);
+    assert.ok(!JSON.stringify(individual).includes('test.pdf'));
+    const restarted=createSellerReviewService(options);
+    assert.deepEqual((await restarted.get(id,owner,f.request,'all')).report,general.report);
+    assert.deepEqual((await restarted.get(id,owner,f.request,'tjdft:1')).report,individual.report);
+    await restarted.start(id,owner,f.request,true,'',{mode:'general'});
+    await restarted.start(id,owner,f.request,true,'',{mode:'document',sourceId:'tjdft:1'});
+    assert.equal(f.calls.length,3,'opening and requesting a saved scope does not read sources again');
+    assert.equal((await PDFDocument.load(await restarted.pdf(id,owner,'all'))).getTitle(),'Análise das certidões');
+    assert.equal((await PDFDocument.load(await restarted.pdf(id,owner,'tjdft:1'))).getTitle(),'Análise de documento');
+    await assert.rejects(restarted.get(id,owner,f.request,'tjdft:99'),{code:'invalid_analysis_selection'});
+    await assert.rejects(restarted.pdf(id,{tenantId:1,user:{id:812}},'all'),{code:'seller_analysis_not_found'});
+    allowed=false;assert.equal((await restarted.get(id,owner,f.request,'all')).canAnalyze,false);
+    await assert.rejects(restarted.start(id,owner,f.request,true,'',{mode:'document',sourceId:'tjdft:0'}),{code:'certificate_analysis_subscription_required'});
+    allowed=true;
+    const server=await readFile(new URL('../server.mjs',import.meta.url),'utf8');
+    const section=server.slice(server.indexOf('  const sellerReviewMatch ='),server.indexOf('  const publicAuditEvidenceMatch ='));
+    const context=vm.createContext({URL,sellerReviewService:restarted,getTenantIdForRequest:async req=>req.auth,readJsonBody:async req=>req.body,sendJson:(res,status,body)=>Object.assign(res,{status,body})});
+    vm.runInContext(`async function handle(pathname,request,response){${section}}`,context);
+    const invoke=async(method,path,body={})=>{const response={setHeader(){},writeHead(status,headers){this.status=status;this.headers=headers;},end(buffer){this.buffer=buffer;}};await context.handle(path.split('?')[0],{url:path,method,auth:owner,body,headers:{host:'localhost:3000',origin:'http://localhost:3000','content-type':'application/json'}},response);return response;};
+    const url=`/api/seller-analysis/${id}`;
+    assert.equal((await invoke('GET',url+'/review?analysis=tjdft%3A1')).body.report.sourceId,'tjdft:1');
+    assert.equal((await PDFDocument.load((await invoke('GET',url+'/report.pdf?analysis=all')).buffer)).getTitle(),'Análise das certidões');
+    assert.equal((await invoke('POST',url+'/review',{consent:true,purpose:'',analysisMode:'document',sourceId:'tjdft:0'})).status,202);await restarted.wait(id);
+    assert.equal((await restarted.get(id,owner,f.request,'tjdft:0')).report.analyzed,1);
+    assert.equal(f.calls.length,4);assert.equal((await restarted.get(id,owner,f.request,'all')).report.analyzed,2);
+  } finally {await f.db.close();}
+});
+
 test('all analysis segments persist their purpose through collection, AI, restart, history and private PDF',async()=>{
   const f=await fixture();
   try {

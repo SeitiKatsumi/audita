@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261016-drop-hint-green" />
+    <link rel="stylesheet" href="styles.css?v=20261019-pending" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -674,8 +674,8 @@
 
             <ol class="seller-step-nav" id="sellerStepNav" aria-label="Etapas da análise">
               <li aria-current="step"><span>1</span>Coleta de dados</li>
-              <li><span>2</span>Extração</li>
-              <li><span>3</span>Análise e relatório</li>
+              <li><button type="button" data-seller-stage="2" disabled><span>2</span><span data-seller-step-label="2">Extração</span></button></li>
+              <li><button type="button" data-seller-stage="3" disabled><span>3</span><span data-seller-step-label="3">Análise IA</span></button></li>
             </ol>
             <div id="sellerAnalysisCoverage" hidden></div><span id="sellerFlowSteps" hidden></span>
 
@@ -724,8 +724,7 @@
                 <div id="sellerAnalysisQueries" class="seller-analysis-privacy" aria-live="polite">Carregando outras consultas...</div>
                 <p><button id="certificateAudienceOpen" type="button" class="certificate-audience-link" aria-haspopup="dialog" aria-controls="certificateAudienceDialog">Para quem é este serviço?</button></p>
                 </div>
-                <label class="seller-analysis-consent" id="sellerPaidConsentLabel" hidden><input id="sellerAnalysisPaid" type="checkbox" /><span>Autorizo o custo informado para as consultas.</span></label>
-                <label class="seller-analysis-consent">
+                <label class="seller-analysis-consent" id="sellerAuthorizationLabel">
                   <input id="sellerAnalysisAuthorization" type="checkbox" required />
                   <span id="sellerAuthorizationText">Tenho autorização ou base legal para consultar este vendedor e autorizo o levantamento e a análise dos documentos pela IA da Audita (OpenAI).</span>
                 </label>
@@ -2252,8 +2251,8 @@
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
     <script type="module" src="/ir-exemption.js?v=20261016-follow-latest"></script>
     <script type="module" src="/bank-debt.js?v=20261016-follow-latest"></script>
-    <script type="module" src="charge-analysis.js?v=20261016-file-label"></script>
-    <script type="module" src="app.js?v=20261009-meeting"></script>
+    <script type="module" src="charge-analysis.js?v=20261019-pending"></script>
+    <script type="module" src="app.js?v=20261019-pending"></script>
     <script type="module" src="glosas.js?v=20261016-follow-latest"></script>
     <script type="module" src="import-audit.js?v=20261016-follow-latest"></script>
       <script type="module" src="/pis-pasep.js?v=20261016-follow-latest"></script>
