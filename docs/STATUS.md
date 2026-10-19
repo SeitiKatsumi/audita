@@ -867,3 +867,5 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Commit/push solicitados para layout compacto do chat:4 testes de envio aprovados, diff check aprovado e CSS servido na3000. Sem deploy.
 
 - 2026-10-19: Codex, codex/property-service-title: titulo do card na Central alterado para Consulta Certidoes do imovel conforme solicitado. Integrado localmente; sem commit/push/deploy.
+
+- 2026-10-19: Codex, codex/judicial-process-category: novo filtro Emissao e baixa Processos Judiciais na Central, sem servicos por enquanto; usa estado vazio existente. Integrado localmente, sem commit/push/deploy.
