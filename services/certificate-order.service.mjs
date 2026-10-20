@@ -11,7 +11,7 @@ export const certificatePriceCents=cost=>{
 };
 
 // Orders reuse audit JSON; keep the encrypted request for manual recovery after provider interruption.
-export function createCertificateOrderService({getDb,checkout,checkoutReady=()=>true,startAudit,env=process.env,now=()=>Date.now()}){
+export function createCertificateOrderService({getDb,checkout,checkoutReady=()=>true,startAudit,getPricing=async()=>undefined,env=process.env,now=()=>Date.now()}){
   const key=()=>irKey(env.AUDITA_PROFILE_ENCRYPTION_KEY);
   const testBypassEnabled=()=>env.AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED==='true';
   const canTestBypass=o=>testBypassEnabled()&&(o.flow||'certificates')==='certificates';
@@ -24,10 +24,10 @@ export function createCertificateOrderService({getDb,checkout,checkoutReady=()=>
   async function update(a,id,o){await db().query("UPDATE audita_audits SET request_payload=jsonb_set(request_payload,'{certificateOrder}',$4::jsonb),updated_at=NOW() WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3",[id,a.tenantId,a.user.id,JSON.stringify(o)]);}
   async function create(a,body,{providerCostBrl,costs=[providerCostBrl],subscriber=false,complimentary=false,documentCount}){
     signed(a);check(Array.isArray(costs)&&costs.length>0&&costs.length<=300,'invalid_certificate_price','Seleção inválida.',400);
-    costs.forEach(certificatePriceCents);
-    const id=randomUUID(),quote=certificateQuote(costs,subscriber);
+    costs.forEach(source=>certificatePriceCents(typeof source==='number'?source:source.costBrl));
+    const pricing=await getPricing(),id=randomUUID(),quote=certificateQuote(costs,subscriber,pricing);
     if(complimentary)quote.amountCents=0;
-    const order={...quote,status:quote.amountCents?'pending':'paid',flow:body.extraFields.sellerFlow||'certificates',segment:body.extraFields.sellerSegment||'analise-vendedor',documentCount,createdAt:now(),encryptedBody:seal(id,body)};
+    const order={...quote,pricingSnapshot:pricing,status:quote.amountCents?'pending':'paid',flow:body.extraFields.sellerFlow||'certificates',segment:body.extraFields.sellerSegment||'analise-vendedor',documentCount,createdAt:now(),encryptedBody:seal(id,body)};
     await db().query(`INSERT INTO audita_audits(public_id,tenant_id,requested_by_user_id,document_type,tipo_documento,document_hash,documento_hash,document_masked,subject_name,status,authorization_confirmed,request_payload)
       VALUES($1,$2,$3,$4,$4,$5,$5,$6,$7,'pending',true,$8)`,[id,a.tenantId,a.user.id,body.tipoDocumento,hashDocument(a.tenantId,body.documento),maskDocument(body.tipoDocumento,body.documento),body.extraFields.stateCourtFields.fullName,JSON.stringify({sellerFlow:order.flow,sellerSegment:order.segment,fontes:body.fontes,certificateOrder:order})]);
     if(!order.amountCents)return collect(a,id,{});
@@ -80,5 +80,5 @@ export function createCertificateOrderService({getDb,checkout,checkoutReady=()=>
     const marked=await db().query("UPDATE audita_audits SET request_payload=jsonb_set(jsonb_set(request_payload,'{certificateOrder,status}','\"paid\"'),'{certificateOrder,paidAt}',$4::jsonb),updated_at=NOW() WHERE public_id=$1 AND tenant_id=$2 AND requested_by_user_id=$3 AND request_payload->'certificateOrder'->>'status' IN ('pending','expired','failed') RETURNING public_id",[id,a.tenantId,a.user.id,JSON.stringify(now())]);
     if(marked.rows.length)await collect(a,id,{});return {tenantId:a.tenantId};
   }
-  return {create,get,collect,paymentEvent,testBypass,testBypassEnabled,ready:()=>Boolean(getDb()?.dbReady&&key())};
+  return {create,get,collect,paymentEvent,testBypass,testBypassEnabled,pricing:getPricing,ready:()=>Boolean(getDb()?.dbReady&&key())};
 }

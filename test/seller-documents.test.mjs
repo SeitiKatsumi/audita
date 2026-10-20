@@ -1,3 +1,6 @@
+import { extractPdfText } from '../services/pdf.service.mjs';
+import { certificateSelection, certificateQuote } from '../certificate-selection.js';
+import { analysisSegments } from '../analysis-segments.js';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -9,11 +12,11 @@ test('automatic state plans include federal jurisdictions and only matching muni
   const states=sellerStatePlans(coverage);
   assert.equal(states.length,27);
   const sp=states.find(s=>s.uf==='SP');
-  assert.equal(sp.queryIds.length,14);
+  assert.equal(sp.queryIds.length,15);
   assert.ok(!sp.queryIds.includes('protestos-basica'));
   assert.ok(sp.queryIds.includes('protestos')&&sp.queryIds.includes('dossie-credito-completo'));
   assert.throws(()=>planSellerDocuments(['protestos-basica'],{configured:true}),/unsupported_seller_query/);
-  assert.equal(sp.baseCostBrl,16.44);
+  assert.equal(sp.baseCostBrl,16.98);
   assert.ok(sp.queryIds.includes('vinculos'));
   const queries=coverage.sellerSources.queries;
   for(const state of states) {
@@ -357,4 +360,48 @@ test("reviewed root-scope certificates require a labelled PDF root plus the comp
     assert.equal(rejected.dados.certidoes[0].status, "failed");
     assert.equal(rejected.dados.certidoes[0].pdfPath, undefined);
   }
+});
+
+
+test('PGFN with mandatory PDF is shared by every UF, CPF/CNPJ and analysis segment, with preserved pricing rules',()=>{
+  const sellerSources=getSellerDocumentCoverage(configuration),coverage={certificates:[],sellerSources};
+  coverage.states=sellerStatePlans(coverage,'cpf');coverage.companyStates=sellerStatePlans(coverage,'cnpj');
+  assert(analysisSegments.length>=8);
+  for(const segment of analysisSegments)for(const type of ['cpf','cnpj'])for(const state of coverage.states){
+    const query=certificateSelection(coverage,[state.uf],type).queries.find(q=>q.id==='pgfn-lista-devedores');
+    assert(query,segment.id+' '+type+' '+state.uf);assert.equal(query.includePdf,true);assert.equal(query.kind,'data');
+    assert.equal(query.priceCents,certificateQuote([.54]).amountCents);assert.equal(query.evidenceKind,'consultation_receipt');
+    assert(sellerQueriesForState(sellerSources.queries,state.uf,type).some(q=>q.id===query.id));
+  }
+});
+
+test('PGFN collects a real-format fictitious private PDF for CPF/CNPJ; missing, mismatched or wrong-scope evidence never succeeds',async()=>{
+  async function pdfFor(document,title='PGFN - LISTA DE DEVEDORES DA UNIAO'){
+    const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),page=pdf.addPage();
+    page.drawText(title,{x:40,y:780,font,size:12});page.drawText('COMPROVANTE FICTICIO - SEM VALOR OFICIAL',{x:40,y:750,font,size:10});page.drawText('Documento consultado: '+document,{x:40,y:720,font,size:10});
+    return Buffer.from(await pdf.save({useObjectStreams:false}));
+  }
+  for(const [type,document]of [['cpf',CPF],['cnpj',CNPJ]]){
+    const buffer=await pdfFor(document);let saves=0;
+    const batch={...input({sellerQueries:['pgfn-lista-devedores']}),tipoDocumento:type,documento:document};
+    const query=async request=>{assert.equal(request.endpoint,'PGFNListaDevedoresUniao');assert.equal(request.parameters.GERARCOMPROVANTE,'Habilitar');assert.equal(request.parameters[type.toUpperCase()],document);return result({documentoConsultado:document,possuiDivida:false,totalDivida:0,naturezas:[]});};
+    const deps=dependencies({query,download:async()=>buffer,readPdf:extractPdfText,savePdf:async({buffer:received})=>{saves++;assert(received.equals(buffer));return{pdfPath:'private-pgfn-'+type+'.pdf'};}});
+    const output=await collectSellerDocuments(batch,deps),row=output.dados.certidoes[0];
+    assert.equal(row.status,'success');assert.equal(row.resultado,'nada_consta');assert.equal(row.details['Total da dívida informado'],'0');
+    assert.equal(output.dados.certidoesBaixadas,1);assert.equal(row.kind,'data');assert.equal(saves,1);assert.match(row.summary,/não comprova regularidade fiscal geral/);
+    for(const overrides of [
+      {query:async()=>result({documentoConsultado:document,possuiDivida:false},{urlComprovante:''})},
+      {download:async()=>await pdfFor(type==='cpf'?CNPJ:CPF)},
+      {download:async()=>await pdfFor(document,'CERTIDAO CONJUNTA RFB PGFN')},
+      {download:async()=>await pdfFor(document,'LISTA DE DEVEDORES - OUTRA FONTE')},
+      {download:async()=>Buffer.from('not a PDF')},
+      {query:async()=>result({documentoConsultado:type==='cpf'?CNPJ:CPF,possuiDivida:false})},
+    ]){
+      const failed=await collectSellerDocuments(batch,{...deps,...overrides});assert.equal(failed.dados.certidoes[0].status,'failed');assert.equal(failed.dados.certidoesBaixadas,0);assert.equal(failed.dados.certidoes[0].pdfPath,undefined);
+    }
+    const expanded=await collectSellerDocuments(batch,{...deps,download:async()=>await pdfFor(document,'PROCURADORIA GERAL DA FAZENDA NACIONAL - LISTA DE DEVEDORES'),savePdf:async()=>({pdfPath:'private-expanded.pdf'})});assert.equal(expanded.dados.certidoes[0].status,'success');
+  }
+  const positive=summarizeSellerData('PGFNListaDevedoresUniao',{possuiDivida:true,totalDivida:1250,naturezas:[{numeroInscricao:'FICTICIA-1',situacaoInscricao:'Em cobranca',total:1250}]});
+  assert.equal(positive.resultado,'consta');assert.equal(positive.details['Inscrições retornadas'],'1');assert.match(positive.details['Inscrição 1'],/FICTICIA-1/);
+  assert.equal(summarizeSellerData('PGFNListaDevedoresUniao',{totalDivida:0,naturezas:[]}).resultado,'indisponivel','zero alone never proves absence of debt');
 });

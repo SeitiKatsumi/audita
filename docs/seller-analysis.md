@@ -136,3 +136,27 @@ A navegação separa coleta, pagamento/extração e **Análise IA**. Após concl
 POST `/api/seller-analysis/:id/review` aceita `analysisMode: general|document`, `sourceId` somente para documento e `purpose` opcional. O servidor resolve a fonte dentro da consulta pertencente ao tenant/usuário; não aceita conteúdo/caminho arbitrário. A execução individual envia somente a fonte selecionada à IA. Assinatura, consentimento, orçamento e claim atômico continuam obrigatórios. Não há nova coleta, cobrança de fornecedores ou migração.
 
 `request_payload.certificateReviews` preserva um resultado por escopo (`all` ou ID da fonte); `sellerReview` permanece como estado atual/lease. Relatórios antigos são preservados como análise geral ao iniciar outro escopo. GET review e PDF aceitam `?analysis=all` ou o ID codificado da fonte; acesso privado permanece. Abrir análises salvas não inicia IA. Pedidos repetidos com as mesmas evidências e orientação usam cache; uma orientação diferente atualiza apenas o respectivo escopo. A escolha da etapa/escopo é retomada na sessão do navegador. Análises comerciais e seu score mantêm o fluxo anterior.
+
+## Processos: até 200 por execução (19/10/2026)
+
+A consulta Direct Data não recebe parâmetro de limite200. Os registros retornados são armazenados em lotes cifrados privados de até50 (também limitados por caracteres), em `storage/pdfs/seller-processes`, no volume existente de PDFs. Reutiliza `AUDITA_PROFILE_ENCRYPTION_KEY` ou, se ausente, a chave IR já configurada; não trocar essas chaves após salvar dados. Informações sigilosas e credenciais do retorno são omitidas. A prévia normalizada passou de20 para200; a tela com dados arquivados mostra50 por página.
+
+A análise de vendedor e a análise geral/individual da emissão de certidões compartilham o limite de200processos por execução. Cada bloco tem checkpoint e a ação explícita `continueProcesses:true` e `continueFrom` igual ao contador exibido, com consentimento renovado, lê os próximos blocos não concluídos. Reabrir o resultado não avança nem cobra outra consulta ao fornecedor. A mudança de objetivo reinicia a leitura daquele escopo; análises de escopos diferentes permanecem separadas.
+
+`processCoverage` informa recebidos, total declarado pelo fornecedor, efetivamente analisados e pendentes. A tela e o PDF indicam análise parcial até a cobertura recebida estar concluída; total informado maior que recebido mantém ressalva. A pontuação não fica verde por uma análise parcial. Registros antigos descartados pelo limite180mil não são recuperados por esta alteração: conferir histórico do fornecedor antes de repetir consulta paga.
+
+`GET /api/seller-analysis/:id/processes?source=fonte:indice&offset=0` entrega até50registros salvos, revalidando usuário/tenant da consulta e da origem do arquivo em caso de cache. Não chama o fornecedor nem a IA. Sem migração, dependência nova ou alteração de carteira/preço/modelo. Validação usa dados fictícios e IA simulada; capacidade e custo reais ainda dependem de homologação.
+
+Uma repetição com contador antigo devolve o estado salvo em vez de avançar outro lote; mudar objetivo/escopo exige a ação própria de análise, sem reaproveitar a continuação anterior.
+
+## PGFN — Lista de devedores da União (19/10/2026)
+
+Consulta nacional CPF/CNPJ no catálogo compartilhado de vendedor, segmentos comerciais e emissão de certidões. Usa `PGFNListaDevedoresUniao` com `GERARCOMPROVANTE=Habilitar`. O comprovante PDF é obrigatório: conteúdo, titular e identificação da lista/PGFN são validados antes de salvar e disponibilizar o arquivo privado. Totais e inscrições são preservados para análise. Ausência de dívida na lista não comprova regularidade fiscal nem substitui CND/CPEN conjunta RFB/PGFN.
+
+Contrato público: https://www.directd.com.br/central-de-ajuda/apis/catalogo/PGFNListaDevedoresUniao . Preço-base documentado R$0,36; estimativa com PDF R$0,54 segue o adicional histórico de50% já utilizado no catálogo, ainda sujeito à confirmação comercial. Multiplicador existente preservado. Testes usam respostas e documentos fictícios; emissão real e preço efetivamente faturado continuam pendentes de homologação.
+
+## Tabela global de consultas e certidões (19/10/2026)
+
+Super Admin → Preços de consultas gerencia acréscimo padrão (2900%=30×), limite de custo R$2,00, acréscimo acima do limite (900%=10×), preço por fonte gratuita R$10,00 e desconto de assinante30%. Exceções por ID da fonte permitem preço fixo final em reais (sem desconto adicional) ou acréscimo percentual. Processos agrupados e completos passam a R$199,00 cada, por CPF/CNPJ consultado. Custos de fornecedor não foram alterados.
+
+As regras globais ficam em audita_certificate_pricing, com revisão e último editor. Apenas super_admin pode ler/alterar a tabela administrativa, com proteção de origem e conflito de revisão409. Salvar exige banco disponível; não há fallback de gravação em memória. O catálogo público recebe a regra efetiva usada na prévia, e o servidor reconstrói as fontes/custos e calcula o checkout. Cada pedido conserva seu valor e snapshot da regra; alterações posteriores não reprecificam pedidos existentes. Esta página não modifica planos de assinatura, carteira, tabelas Itaú ou ProcessOnline.

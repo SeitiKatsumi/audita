@@ -13,6 +13,7 @@ const ENDPOINTS = {
   CertidaoNegativaDebitosMunicipal: { parameters: [...COMMON, "MUNICIPIO", "IM"], required: ["MUNICIPIO"] },
   CADINSecretariaFazendaEstaduais: { parameters: [...COMMON, "UF"], required: ["UF"] },
   CADINSecretariaFazendaSP: { parameters: COMMON },
+  PGFNListaDevedoresUniao: { parameters: COMMON },
   TSTCertidaoNegativaDebitosTrabalhistas: { parameters: COMMON },
   TribunalRegionalFederal: { parameters: [...COMMON, "REGIAO", "TIPO"], required: ["REGIAO", "TIPO"], regions: ["TRF1", "TRF2", "TRF3", "TRF4", "TRF5", "TRF6"], types: ["Cível", "Criminal", "FinsEleitorais"] },
   TribunalRegionalTrabalho: { parameters: [...COMMON, "REGIAO", "TIPO"], required: ["REGIAO"], regions: Array.from({ length: 24 }, (_, index) => String(index + 1)), types: ["Eletrônico", "Físico"] },

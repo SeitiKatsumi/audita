@@ -2,6 +2,24 @@
   "validatedAt": "2026-09-28",
   "queries": [
     {
+      "id": "pgfn-lista-devedores",
+      "label": "PGFN — Lista de devedores da União (com PDF)",
+      "category": "Fiscal federal",
+      "scope": "Brasil",
+      "endpoint": "PGFNListaDevedoresUniao",
+      "params": {},
+      "costBrl": 0.54,
+      "kind": "data",
+      "includePdf": true,
+      "documentTypes": ["cpf", "cnpj"],
+      "expectedText": ["LISTA DE DEVEDORES"],
+      "expectedTextAny": ["PGFN", "PROCURADORIA GERAL DA FAZENDA NACIONAL"],
+      "limitation": "Consulta à lista de devedores da União e FGTS, com comprovante PDF quando emitido e validado. Não substitui a certidão conjunta RFB/PGFN nem comprova regularidade fiscal geral. Confira natureza, papel do devedor e situação de cada inscrição.",
+      "evidenceKind": "consultation_receipt",
+      "documentationCheckedAt": "2026-10-19",
+      "integrationStatus": "pending_live_validation"
+    },
+    {
       "id": "cndt",
       "label": "CNDT — Débitos trabalhistas",
       "category": "Trabalhista",
@@ -1361,7 +1379,7 @@
         "cpf",
         "cnpj"
       ],
-      "limitation": "Base do provedor; não é certidão nem garante cobertura integral. A tela apresenta até 20 detalhes, omite informações em segredo de justiça e exige análise do papel do vendedor.",
+      "limitation": "Base do provedor; não é certidão nem garante cobertura integral. Processos recebidos são preservados com paginação; a IA analisa até 200 por execução, em lotes de até 50. Cobertura parcial é indicada. Informações em segredo de justiça são omitidas; conferir o papel do consultado.",
       "validatedAt": "2026-10-16"
     },
     {

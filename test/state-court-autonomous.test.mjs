@@ -115,3 +115,18 @@ test('CNPJ native portal keeps the company subject and legacy certificate id',as
     assert.equal(calls,1);assert.equal(result.dados.certidoesBaixadas,1);assert.equal(result.dados.certidoes[0].evidenceIdentityVerified,true);
   }finally{await rm(pdfPath,{force:true});await rmdir(directory);}
 });
+
+test('October CNPJ additions are selectable by exact type without enabling unverified CPF or duplicate paid DF certificates',()=>{
+  const pairs=[['PA','Cível'],['PI','Cível'],['PI','Criminal'],['SE','Cível'],['AP','Falência e recuperação judicial'],['BA','Falência e recuperação judicial']];
+  const configuration={configured:true,allowedUfs:[...new Set(pairs.map(([uf])=>uf)),'DF','MT']};
+  for(const [uf,type]of pairs){const plan=planAutonomousCertificates([uf],configuration,[uf+':'+type],'cnpj');assert.equal(plan.certificates.length,1);assert.equal(plan.certificates[0].type,type);}
+  for(const uf of ['AP','BA']){
+    assert.throws(()=>planAutonomousCertificates([uf],configuration,[uf+':Falência e recuperação judicial'],'cpf'),/invalid_autonomous_certificate_selection/);
+    const item=planAutonomousCertificates([uf],configuration,[uf+':Falência e recuperação judicial'],'cnpj').certificates[0];
+    assert.equal(item.providerType,'FalênciaRecuperação');
+    assert.equal(certificateScopeMatches(findStateCourtProfile(uf).stateName+' CERTIDÃO CÍVEL observação: falência',item.expectedText,uf),false);
+  }
+  assert.equal(planAutonomousCertificates(['MT'],configuration,['MT:Criminal'],'cpf').certificates.length,1);
+  assert.throws(()=>planAutonomousCertificates(['MT'],configuration,['MT:Criminal'],'cnpj'),/unsupported_autonomous_uf|invalid_autonomous_certificate_selection/);
+  const df=getAutonomousCertificateCoverage(configuration).certificates.filter(c=>c.uf==='DF'&&/Falência/i.test(c.type));assert.equal(df.length,1);assert.equal(df[0].provider,'portal');
+});

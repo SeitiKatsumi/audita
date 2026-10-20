@@ -2,6 +2,36 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 let dashboard = null;
 let currentUser = null;
+let pricingState = null;
+
+async function loadCertificatePricing(){
+  const status=$('#pricingStatus'),form=$('#certificatePricingForm');
+  status.textContent='Carregando preços…';form.querySelector('button[type=submit]').disabled=true;
+  try{
+    const data=await api('/api/super-admin/certificate-pricing');pricingState=data;
+    for(const key of ['standardMarkupPercent','highCostMarkupPercent','highCostThresholdCents','freeSourceCents','subscriberDiscountPercent'])form.elements[key].value=data.pricing[key]/(key.endsWith('Cents')?100:1);
+    $('#pricingRows').innerHTML=data.catalog.map(item=>{const rule=data.pricing.exceptions[item.key];return `<tr data-price-key="${escapeHtml(item.key)}"><td>${escapeHtml(item.label)}</td><td>${money({cents:Math.round(item.costBrl*100)})}</td><td><select aria-label="Regra para ${escapeHtml(item.label)}"><option value="default">Tabela padrão</option><option value="fixed" ${rule?.mode==='fixed'?'selected':''}>Preço fixo (R$)</option><option value="markup" ${rule?.mode==='markup'?'selected':''}>Acréscimo (%)</option></select></td><td><input aria-label="Valor para ${escapeHtml(item.label)}" type="number" min="0" max="${rule?.mode==='fixed'?10000:100000}" step="0.01" value="${rule?rule.value/(rule.mode==='fixed'?100:1):''}" ${rule?'required':'disabled'} /></td></tr>`}).join('');
+    status.textContent='Tabela carregada. Alterações só valem após salvar.';
+  }catch(error){pricingState=null;status.textContent='Não foi possível carregar a tabela. Tente recarregar.';}
+  finally{form.querySelector('button[type=submit]').disabled=!pricingState;}
+}
+$('#pricingReload').addEventListener('click',loadCertificatePricing);
+document.querySelector('[data-tab="pricing"]').addEventListener('click',loadCertificatePricing);
+$('#pricingRows').addEventListener('change',event=>{
+  if(event.target.tagName!=='SELECT')return;
+  const input=event.target.closest('tr').querySelector('input'),active=event.target.value!=='default';
+  input.disabled=!active;input.required=active;input.max=event.target.value==='fixed'?10000:100000;input.value='';
+});
+$('#certificatePricingForm').addEventListener('submit',async event=>{
+  event.preventDefault();if(!pricingState)return;
+  const form=event.currentTarget,status=$('#pricingStatus'),button=form.querySelector('button[type=submit]'),pricing={exceptions:{}};
+  for(const key of ['standardMarkupPercent','highCostMarkupPercent','highCostThresholdCents','freeSourceCents','subscriberDiscountPercent'])pricing[key]=key.endsWith('Cents')?Math.round(Number(form.elements[key].value)*100):Number(form.elements[key].value);
+  for(const row of $$('#pricingRows tr')){const mode=row.querySelector('select').value;if(mode!=='default')pricing.exceptions[row.dataset.priceKey]={mode,value:mode==='fixed'?Math.round(Number(row.querySelector('input').value)*100):Number(row.querySelector('input').value)};}
+  button.disabled=true;status.textContent='Salvando…';
+  try{pricingState=await api('/api/super-admin/certificate-pricing',{method:'PUT',body:JSON.stringify({pricing,revision:pricingState.revision})});status.textContent='Preços salvos. Novos pedidos usarão esta tabela.';}
+  catch(error){status.textContent=error.status===409?'Outra pessoa atualizou a tabela. Recarregue antes de salvar novamente.':'Não foi possível salvar os preços. Nenhuma alteração foi confirmada.';}
+  finally{button.disabled=false;}
+});
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"})[char]);
 const number = (value) => new Intl.NumberFormat("pt-BR").format(Number(value || 0));

@@ -124,6 +124,7 @@ test("seller POST validates selection and consent, persists the selected source 
       crypto, auditService,certificateOrderService,CERTIFICATE_PRICE_MULTIPLIER,certificateQuote,billingConfiguration:()=>({checkoutReady:true,webhookReady:true}), normalizeDfSellerInput, normalizeSellerInput, normalizePersonBirthDate, buildDfSellerAuditRequest, planSellerDocuments, planAutonomousCertificates, validateCnpj, personNamesMatch,
       chatAccessService:{getAccess:async(_,options)=>{assert.equal(options.includeTestAccess,false);return {source:subscriber?'entitlement':'test',active:true};}},
       getSellerDocumentCoverage,getAutonomousCertificateCoverage,sellerStatePlans,sellerQueriesForState,sellerReviewService:{ready:()=>true},
+      processOnlineRoute: async () => false,
       getTenantIdForRequest: auth, readJsonBody: async (request) => request.body,
       directDataSellerService: provider,
       directDataCertificatesService: { getStatus: () => ({ configured: true, allowedUfs: ["AP"] }) },
@@ -234,7 +235,7 @@ test("seller POST validates selection and consent, persists the selected source 
     assert.equal(automaticSaved.extraFieldsProvided.sellerState,true);
     assert.equal(automaticSaved.extraFieldsProvided.discoverCompanies,true);
     assert.equal(automaticRequest.companyCnpjs.length,0);
-    assert.equal(automaticRequest.sellerQueries.length,13);
+    assert.equal(automaticRequest.sellerQueries.length,14);
     assert.ok(automaticRequest.sellerQueries.includes('cnd-sp'));
     assert.ok(!automaticRequest.sellerQueries.includes('cnd-mg'));
     assert.ok(!automaticRequest.sellerQueries.includes('protestos-basica')&&!automaticRequest.sellerQueries.includes('dossie-credito-completo'));

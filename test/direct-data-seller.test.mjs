@@ -39,7 +39,7 @@ test("seller provider requires authorization, payment confirmation, identity, an
     [request({ endpoint: "CertidaoNegativaDebitosMunicipal", parameters: { CPF: "52998224725", MUNICIPIO: "São Paulo" } }), AUTH, "invalid_municipality"],
   ]) assert.equal((await service.query(input, auth)).reason, reason);
   assert.equal(calls, 0);
-  assert.equal(DIRECT_DATA_SELLER_ENDPOINTS.length, 20);
+  assert.equal(DIRECT_DATA_SELLER_ENDPOINTS.length, 21);
   assert.equal((await createDirectDataSellerService({ env: {} }).query(request(), AUTH)).unavailable, true);
 });
 
@@ -259,4 +259,24 @@ test("a pending tenant emission does not block another tenant", async () => {
     releaseProvider();
   }
   assert.equal((await first).result.status, "success");
+});
+
+
+test('PGFN accepts exactly one CPF or CNPJ and requests the documented PDF with scoped approval',async()=>{
+  const calls=[];
+  const service=createDirectDataSellerService({env:ENV,fetchImpl:async(url,options)=>{
+    calls.push(url);assert.equal(url.pathname,'/api/PGFNListaDevedoresUniao');
+    assert.equal(url.searchParams.get('GERARCOMPROVANTE'),'Habilitar');
+    assert.equal(url.searchParams.get('Async'),'Habilitar');
+    assert.equal(Number(url.searchParams.has('CPF'))+Number(url.searchParams.has('CNPJ')),1);
+    assert.equal(options.headers.Authorization,'Bearer test-token');
+    return new Response(JSON.stringify(PAYLOAD),{status:200});
+  }});
+  for(const [key,document]of [['CPF','52998224725'],['CNPJ','04252011000110']]){
+    const output=await service.query(request({requestId:'pgfn-'+key,endpoint:'PGFNListaDevedoresUniao',parameters:{[key]:document,GERARCOMPROVANTE:'Habilitar'}}),AUTH);
+    assert.equal(output.result.status,'success');
+  }
+  assert.equal(calls.length,2);
+  const invalid=await service.query(request({requestId:'pgfn-invalid',endpoint:'PGFNListaDevedoresUniao',parameters:{CPF:'52998224725',CNPJ:'04252011000110',GERARCOMPROVANTE:'Habilitar'}}),AUTH);
+  assert.equal(invalid.reason,'invalid_document');assert.equal(calls.length,2);
 });

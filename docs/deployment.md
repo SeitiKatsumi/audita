@@ -219,3 +219,7 @@ Depois de provisionar ou atualizar o Directus, validar tambem:
 - workflow GitHub Actions em `.github/workflows`
 
 Esses arquivos devem ser criados quando a stack tecnica for definida.
+
+## Publicação consolidada — 20/10/2026
+
+Autorizada pelo usuário. Inclui preços/admin, PGFN com comprovante, expansão estadual validada, processos200, integração ProcessOnline preparada e sidebar compartilhada no chat. Tabelas aditivas audita_certificate_pricing e audita_process_online_*; auto-migração existente da produção preservada. ProcessOnline permanece desativado sem acesso B2B; nenhuma mudança Pix/Stripe. Preservar62variáveis, dois volumes privados, backup PostgreSQL/config, rollback img-captain-audita:172 e os quatro PDFs LFS reais do pacote. Conferir CI, saúde/banco/auth, catálogo36CPF/20CNPJ, preço199 e interface publicada. Em andamento.

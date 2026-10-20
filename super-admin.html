@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex,nofollow" />
     <title>Audita — Super Admin</title>
-    <link rel="stylesheet" href="/super-admin.css?v=4" />
+    <link rel="stylesheet" href="/super-admin.css?v=5" />
   </head>
   <body>
     <main class="shell">
@@ -34,6 +34,7 @@
             <a href="/#home"><img src="/assets/nav-icons/home.svg" alt="" />Voltar à Audita</a>
             <button class="active" data-tab="overview"><img src="/assets/nav-icons/home.svg" alt="" />Visão geral</button>
             <button data-tab="users"><img src="/assets/nav-icons/settings.svg" alt="" />Usuários</button>
+            <button data-tab="pricing"><img src="/assets/nav-icons/file-dollar.svg" alt="" />Preços de consultas</button>
             <button data-tab="subscriptions"><img src="/assets/nav-icons/file-dollar.svg" alt="" />Assinaturas</button>
           </nav>
           <button class="logout" id="logoutButton">Sair</button>
@@ -59,6 +60,28 @@
             <article class="table-card"><div class="card-heading"><div><span class="index">DIRETÓRIO GLOBAL</span><h2>Usuários</h2></div><input aria-label="Buscar usuários" id="userSearch" type="search" placeholder="Buscar nome, e-mail ou organização" /></div><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Organização</th><th>Papel</th><th>Acesso</th><th>Status</th><th></th></tr></thead><tbody id="userRows"></tbody></table></div></article>
           </section>
 
+          <section class="panel" data-panel="pricing">
+            <article class="table-card">
+              <div class="card-heading"><div><span class="index">TABELA DE VENDA</span><h2>Preços de consultas e certidões</h2></div><button type="button" id="pricingReload">Recarregar tabela</button></div>
+              <p>Regras globais para vendedor, certidões e análises relacionadas. Válidas para novos pedidos; pedidos existentes mantêm o valor contratado.</p>
+              <form id="certificatePricingForm">
+                <fieldset class="pricing-fields"><legend>Regras padrão</legend>
+                  <label>Acréscimo padrão sobre o custo (%)<input name="standardMarkupPercent" type="number" min="0" max="100000" step="0.01" required /></label>
+                  <label>Acima deste custo (R$)<input name="highCostThresholdCents" type="number" min="0" max="5000" step="0.01" required /></label>
+                  <label>Acréscimo acima do limite (%)<input name="highCostMarkupPercent" type="number" min="0" max="100000" step="0.01" required /></label>
+                  <label>Preço por fonte gratuita (R$)<input name="freeSourceCents" type="number" min="0" max="10000" step="0.01" required /></label>
+                  <label>Desconto de assinante (%)<input name="subscriberDiscountPercent" type="number" min="0" max="100" step="0.01" required /></label>
+                </fieldset>
+                <p>Exemplo: acréscimo de 2900% = custo × 30. Fontes gratuitas continuam gratuitas para assinantes. Exceções com preço fixo são valores finais, sem desconto de assinante.</p>
+                <h3>Exceções por serviço</h3>
+                <p>Escolha “Tabela padrão” para remover uma exceção. Preços fixos são por documento consultado (CPF/CNPJ) e somados às demais fontes selecionadas.</p>
+                <div class="table-wrap"><table><thead><tr><th>Serviço</th><th>Custo estimado</th><th>Regra</th><th>Valor (R$ ou %)</th></tr></thead><tbody id="pricingRows"></tbody></table></div>
+                <p id="pricingStatus" role="status" aria-live="polite"></p>
+                <button type="submit" class="primary">Salvar preços</button>
+              </form>
+            </article>
+          </section>
+
           <section class="panel" data-panel="subscriptions">
             <article class="table-card"><div class="card-heading"><div><span class="index">STRIPE</span><h2>Assinaturas</h2></div><select aria-label="Filtrar assinaturas" id="subscriptionFilter"><option value="">Todos os status</option><option value="active">Ativas</option><option value="trialing">Em teste</option><option value="past_due">Em atraso</option><option value="canceled">Canceladas</option></select></div><div class="table-wrap"><table><thead><tr><th>Organização</th><th>Plano</th><th>Status</th><th>Renovação</th><th>Créditos</th><th></th></tr></thead><tbody id="subscriptionRows"></tbody></table></div></article>
           </section>
@@ -77,6 +100,6 @@
         <div class="row-actions"><button type="button" id="cancelUserEdit">Cancelar</button><button type="submit" class="primary">Salvar alterações</button></div>
       </form>
     </dialog>
-    <script type="module" src="/super-admin.js?v=3"></script>
+    <script type="module" src="/super-admin.js?v=4"></script>
   </body>
 </html>

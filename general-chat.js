@@ -41,11 +41,12 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
  const fileInput=document.querySelector('#chatAttachment'),attach=document.querySelector('#chatAttachmentButton'),pending=document.querySelector('#chatAttachmentPreview');
  const send=document.querySelector('#chatSendButton'),stop=document.querySelector('#chatStopButton');
  const history=document.querySelector('#chatThreads'),historyButton=document.querySelector('#chatHistoryButton');
- function closeHistory(){history.classList.remove('general-history-open');historyButton.setAttribute('aria-expanded','false');}
- historyButton.addEventListener('click',()=>{const open=history.classList.toggle('general-history-open');historyButton.setAttribute('aria-expanded',String(open));if(open)document.querySelector('#chatHistoryClose').focus();});
- document.querySelector('#chatHistoryClose').addEventListener('click',()=>{closeHistory();historyButton.focus();});
- history.addEventListener('keydown',e=>{if(e.key==='Escape'){closeHistory();historyButton.focus();}if(e.key==='Tab'&&history.classList.contains('general-history-open')){const buttons=[...history.querySelectorAll('a,button')].filter(n=>n.getClientRects().length&&!n.disabled),first=buttons[0],last=buttons.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}});
- document.addEventListener('click',e=>{if(history.classList.contains('general-history-open')&&!history.contains(e.target)&&!historyButton.contains(e.target))closeHistory();});
+ function closeHistory(){if(history.open)history.close();historyButton.setAttribute('aria-expanded','false');}
+ historyButton.addEventListener('click',()=>{history.showModal();historyButton.setAttribute('aria-expanded','true');});
+ document.querySelector('#chatHistoryClose').addEventListener('click',closeHistory);
+ history.addEventListener('close',()=>historyButton.setAttribute('aria-expanded','false'));
+ history.addEventListener('click',e=>{if(e.target!==history)return;const r=history.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeHistory();});
+ document.addEventListener('audita:pagechange',e=>{if(e.detail.page!=='chat')closeHistory();});
  const preview=document.createElement('dialog');preview.className='general-chat-preview';preview.innerHTML='<header><strong>Prévia do arquivo</strong><button type="button" aria-label="Fechar prévia">×</button></header><section></section>';document.body.append(preview);
  let threads=[],thread={id:uuid(),title:'Nova conversa',messages:[]},files=[],active=null,owner='',version=0,previewUrl=null,monitor=null;
  const account=()=>{const a=getAuthState();return a?.user?.id?`${a.tenantId||a.user.tenant?.id||''}:${a.user.id}`:'';};
@@ -75,7 +76,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    </div></article>`).join(''));
    if(thread.processing&&!active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status" ${busy?'class="general-chat-thinking"':''}>${escape(thread.processing.message|| (thread.processing.status==='running'?'Continuando a tarefa...':'A tarefa foi interrompida. Tente novamente.'))}</small></div></article>`);
    if(active)messages.insertAdjacentHTML('beforeend',`<article class="chat-message-row assistant">${assistantAvatar}<div class="chat-message-content"><small role="status" class="general-chat-thinking">${escape(active.status)}</small><div class="chat-message-body" data-stream>${formatGeneralChat(active.text)}</div></div></article>`);
-   list.innerHTML=threads.map(t=>`<div class="chat-thread-item ${t.id===thread.id?'active':''}"><button type="button" data-general-thread="${escape(t.id)}">${escape(t.title)}</button><button type="button" data-general-delete="${escape(t.id)}" aria-label="Excluir conversa">×</button></div>`).join('');
+   list.innerHTML=threads.length?threads.map(t=>`<div class="chat-thread-item ${t.id===thread.id?'active':''}"><button type="button" data-general-thread="${escape(t.id)}">${escape(t.title)}</button><button type="button" data-general-delete="${escape(t.id)}" aria-label="Excluir conversa">×</button></div>`).join(''):'<p class="chat-privacy-note">Nenhuma conversa salva ainda.</p>';
    pending.classList.toggle('hidden',!files.length);pending.innerHTML=files.map((f,i)=>`<span class="general-chat-pending-file"><strong title="${escape(f.name)}">${escape(f.name)}</strong><button class="general-chat-remove-file" type="button" data-remove-file="${i}" aria-label="Remover ${escape(f.name)}" ${busy?'disabled':''}>Remover <span aria-hidden="true">×</span></button></span>`).join('');
    send.disabled=busy;send.hidden=busy;attach.disabled=busy;fileInput.disabled=busy;stop.hidden=!busy;
    if(composerFocused)(busy?stop:input).focus();
