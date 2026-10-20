@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261019-composer-compact" />
+    <link rel="stylesheet" href="styles.css?v=20261020-chat-navigation" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20260925-contained-chat" />
     <link rel="stylesheet" href="/bank-debt.css?v=20260911" />
@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/energy-audit.css">
   <link rel="stylesheet" href="/import-audit.css?v=20260922-document-check">
   <link rel="stylesheet" href="/chat-subscription.css">
+  <link rel="stylesheet" href="/process-online.css?v=20261019">
   <link rel="stylesheet" href="glosas.css?v=20261005" />
 </head>
   <body>
@@ -90,7 +91,7 @@
             <span class="nav-label">IA AUDITA</span>
             <img class="nav-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" />
           </a>
-          <a href="#central-servicos" data-nav-pages="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
+          <a href="#central-servicos" data-nav-pages="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes processos-judiciais consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib">
             <img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" aria-hidden="true" />
             <span class="nav-label">Central de Serviços</span>
           </a>
@@ -128,7 +129,7 @@
       <nav class="mobile-bottom-nav" aria-label="Navegação principal mobile">
         <a href="#home"><img src="assets/audita-logo-original.png" alt="" /><span>Home</span></a>
         <a href="/chat" data-app-route="chat"><img class="nav-icon" src="assets/nav-icons/sparkles.svg" alt="" /><span>IA</span></a>
-        <a href="#central-servicos" data-nav-pages="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
+        <a href="#central-servicos" data-nav-pages="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes processos-judiciais consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib"><img class="nav-icon" src="assets/nav-icons/tool.svg" alt="" /><span>Serviços</span></a>
         <a href="#planos"><img class="nav-icon" src="assets/nav-icons/file-dollar.svg" alt="" /><span>Planos</span></a>
         <a href="#meus-dados"><img class="nav-icon" src="assets/nav-icons/settings.svg" alt="" /><span>Meus Dados</span></a>
       </nav>
@@ -151,30 +152,24 @@
 <div class="module list-panel"><table><thead><tr><th>Atendimento</th><th>Serviço</th><th>Situação</th><th>Próximo passo</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="lawyer-caseRows"></tbody></table><p id="lawyer-empty" hidden>Nenhum atendimento nesta lista.</p></div>
 <section id="lawyer-details" class="panel" hidden tabindex="-1"><button class="secondary-action" id="lawyer-closeDetails">Voltar à lista</button><div id="lawyer-detailBody"></div></section></div>
 <aside class="activity"><section class="panel"><h2>Pendências de atenção</h2><div id="lawyer-attention"></div></section><section class="panel"><h2>Atualizações recentes</h2><div id="lawyer-recent"></div></section><p class="muted">Os prazos oficiais devem ser conferidos pela equipe nos canais responsáveis.</p></aside></div></div></section>
-        <nav class="service-return page-hidden" data-page="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
+        <nav class="service-return page-hidden" data-page="auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes processos-judiciais consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
           <a href="#central-servicos"><img src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />Voltar à Central de Serviços</a>
         </nav>
 
         <section class="chat-page" id="chat" data-page="chat">
-          <aside class="chat-threads" id="chatThreads" aria-label="Conversas recentes">
-            <a class="chat-home-link" href="/#home" aria-label="Voltar à IA AUDITA">
-              <img src="assets/audita-logo-original.png" alt="" />
-              <span>IA AUDITA</span>
-            </a>
+          <dialog class="chat-threads" id="chatThreads" aria-labelledby="chatHistoryTitle">
             <div class="chat-threads-header">
-              <strong>Conversas</strong><button class="chat-icon-button chat-mobile-new" id="chatHistoryClose" type="button" aria-label="Fechar conversas">×</button>
-              <button class="chat-icon-button" id="chatNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
+              <h2 id="chatHistoryTitle">Conversas</h2>
+              <button class="chat-icon-button" id="chatHistoryClose" type="button" aria-label="Fechar conversas" autofocus>&times;</button>
             </div>
+            <button class="chat-tools-button" id="chatNewButton" type="button">Nova conversa</button>
             <div class="chat-thread-list" id="chatThreadList"></div>
-            <a class="chat-icon-button chat-back-home chat-back-sidebar" href="/#home" aria-label="Voltar para a Home" title="Voltar para a Home"><img src="assets/nav-icons/chevron-left.svg" alt="" /><span>Voltar</span></a>
             <p class="chat-privacy-note">Suas conversas e arquivos ficam vinculados à sua conta.</p>
-          </aside>
+          </dialog>
 
           <div class="chat-main">
             <header class="chat-header">
               <div class="chat-header-start">
-                <button class="chat-icon-button chat-mobile-new" id="chatHistoryButton" type="button" aria-label="Abrir conversas" aria-controls="chatThreads" aria-expanded="false">☰</button>
-                <a class="chat-icon-button chat-back-home" href="/#home" aria-label="Voltar para a Home" title="Voltar para a Home"><img src="assets/nav-icons/chevron-left.svg" alt="" /><span>Voltar</span></a>
               <a class="chat-assistant-identity" href="/#home" aria-label="Voltar à IA AUDITA">
                 <span class="chat-logo-frame"><img src="assets/audita-logo-original.png" alt="" /></span>
                 <div>
@@ -186,9 +181,9 @@
                 <button class="chat-browser-mobile-open hidden" id="chatBrowserMobileOpen" type="button">
                   Navegador <span aria-hidden="true"></span>
                 </button>
-                <a class="chat-tools-button" href="/#central-servicos">Central de Serviços</a>
                 <button class="chat-tools-button" id="chatSubscriptionButton" type="button" aria-haspopup="dialog">Assinatura IA</button>
-                <button class="chat-icon-button chat-mobile-new" id="chatMobileNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
+                <button class="chat-tools-button" id="chatHistoryButton" type="button" aria-haspopup="dialog" aria-controls="chatThreads" aria-expanded="false">Conversas</button>
+                <button class="chat-icon-button" id="chatMobileNewButton" type="button" aria-label="Nova conversa" title="Nova conversa">+</button>
               </div>
             </header>
 
@@ -317,6 +312,7 @@
         <section id="auditoria-glosas" data-page="auditoria-glosas" class="page-hidden"><div id="glosasApp" aria-label="Auditoria de glosas"></div></section>
         <section id="contas-de-luz" data-page="contas-de-luz" class="page-hidden"><div id="energyApp" aria-label="Auditoria de contas de luz"></div></section>
         <section id="auditoria-importacao" data-page="auditoria-importacao" class="page-hidden"><div id="importApp" aria-label="Auditoria assistida de importação"></div></section>
+        <section id="processos-judiciais" data-page="processos-judiciais" class="page-hidden"><div id="processOnlineModule" aria-label="Processos judiciais"></div></section>
         <section class="services-page page-hidden" id="central-servicos" data-page="central-servicos" aria-label="Central de Serviços">
           <p class="services-intro">Encontre a consulta ou análise de que você precisa.</p>
           <div class="services-categories" role="group" aria-label="Filtrar por categoria">
@@ -412,6 +408,12 @@
                 </article>
               </div>
             </section>
+<section class="services-group" data-service-group aria-labelledby="services-processos">
+<h3 id="services-processos">Emissão e baixa de processos judiciais</h3>
+<div class="services-grid"><article class="home-module-action service-card service-card-explained" data-service-card data-categories="processos-judiciais" data-keywords="processo judicial autos copia pdf cnj cpf cnpj processonline">
+<a class="service-card-entry" href="#processos-judiciais"><span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span><span class="home-module-copy"><small class="service-category-label">Processos judiciais</small><strong>Consulta e cópia de processos</strong><small>Busque processos por CPF ou CNPJ, confira o número CNJ e solicite os autos em PDF.</small></span></a>
+<details class="service-disclosure"><summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary><div class="service-expanded"><span class="service-detail"><b>Para quem é</b><span>Pessoas e empresas que precisam consultar ou obter autos de processos com acesso permitido.</span></span><span class="service-detail"><b>Como funciona</b><span>A disponibilidade depende do tribunal e das permissões de acesso. Confirme cada busca ou pedido antes de usar créditos. Após a obtenção dos autos, solicite a análise por IA.</span></span><small class="service-note">Cópia dos autos não é certidão de regularidade. Processos sigilosos podem ser indisponíveis.</small><a class="service-action" href="#processos-judiciais">Consultar processos<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a></div></details>
+</article></div></section>
 <section class="services-group" data-service-group aria-labelledby="services-certidoes">
 <h3 id="services-certidoes">Emissão de certidões</h3>
 <div class="services-grid">
@@ -2253,7 +2255,7 @@
     <script type="module" src="/ir-exemption.js?v=20261016-follow-latest"></script>
     <script type="module" src="/bank-debt.js?v=20261016-follow-latest"></script>
     <script type="module" src="charge-analysis.js?v=20261019-pending"></script>
-    <script type="module" src="app.js?v=20261019-pending"></script>
+    <script type="module" src="app.js?v=20261020-chat-navigation"></script>
     <script type="module" src="glosas.js?v=20261016-follow-latest"></script>
     <script type="module" src="import-audit.js?v=20261016-follow-latest"></script>
       <script type="module" src="/pis-pasep.js?v=20261016-follow-latest"></script>

@@ -1,7 +1,15 @@
 export const CERTIFICATE_PRICE_MULTIPLIER=30;
-export function certificateQuote(costs,subscriber=false) {
-  const baseCents=costs.reduce((sum,cost)=>sum+(cost===0?(subscriber?0:1000):Math.round(cost*100)*(cost>2?10:CERTIFICATE_PRICE_MULTIPLIER)),0);
-  const discountCents=subscriber?Math.round(baseCents*.3):0;
+export const DEFAULT_CERTIFICATE_PRICING={standardMarkupPercent:2900,highCostMarkupPercent:900,highCostThresholdCents:200,freeSourceCents:1000,subscriberDiscountPercent:30,exceptions:{'processos-agrupados':{mode:'fixed',value:19900},'processos-completos':{mode:'fixed',value:19900}}};
+export function certificateQuote(costs,subscriber=false,pricing=DEFAULT_CERTIFICATE_PRICING) {
+  let eligibleCents=0;
+  const baseCents=costs.reduce((sum,source)=>{
+    const cost=typeof source==='number'?source:source.costBrl,key=typeof source==='number'?'':source.key;
+    const rule=Object.hasOwn(pricing.exceptions,key)?pricing.exceptions[key]:null;
+    const cents=rule?.mode==='fixed'?rule.value:cost===0?(subscriber?0:pricing.freeSourceCents):Math.round(Math.round(cost*100)*(1+(rule?.value??(Math.round(cost*100)>pricing.highCostThresholdCents?pricing.highCostMarkupPercent:pricing.standardMarkupPercent))/100));
+    if(rule?.mode!=='fixed')eligibleCents+=cents;
+    return sum+cents;
+  },0);
+  const discountCents=subscriber?Math.round(eligibleCents*pricing.subscriberDiscountPercent/100):0;
   return {baseCents,discountCents,amountCents:baseCents-discountCents,subscriber};
 }
 // Coverage comes from the server's validated UF/region plans, not a second jurisdiction map.
@@ -14,5 +22,5 @@ export function certificateSelection(coverage,ufs,documentType='cpf') {
   const regional=q=>states.filter(state=>state.queryIds.includes(q.id)).map(state=>`${state.name} (${state.uf})`).join(', ');
   return {courts:(coverage.certificates||[]).filter(c=>ufs.includes(c.uf)&&(c.documentTypes||['cpf']).includes(documentType)),
     queries:queries.map(q=>({...q,region:q.scope==='Brasil'?'Cobertura nacional':q.params?.REGIAO?regional(q):q.scope,
-      priceCents:certificateQuote([Number(q.costBrl||0)],coverage.certificateSubscriber===true).amountCents}))};
+      priceCents:certificateQuote([{costBrl:Number(q.costBrl||0),key:q.id}],coverage.certificateSubscriber===true,coverage.certificatePricing).amountCents}))};
 }

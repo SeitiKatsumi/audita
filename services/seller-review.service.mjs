@@ -1,3 +1,4 @@
+import { readSellerProcessBatch, processCoverage, PROCESS_RUN_LIMIT } from './seller-processes.service.mjs';
 import { randomUUID, createHash } from 'node:crypto';
 import { readFile, lstat, realpath } from 'node:fs/promises';
 import { resolve, dirname, basename } from 'node:path';
@@ -27,7 +28,7 @@ export function calculateSellerSafetyScore(report) {
   const findings = [...new Map(usable.flatMap(s => s.findings || []).filter(f => f.priority !== 'information').map(f => [plain(`${f.category}|${f.title}|${f.quote}`), f])).values()];
   const high = findings.filter(f => f.priority === 'high').length;
   const medium = findings.filter(f => f.priority === 'medium').length;
-  const limited = Boolean(report.gaps) || sources.some(s => s.status !== 'analyzed' || s.identity !== 'compatible' || s.outcome === 'inconclusive' || s.limitations?.length || (linkedCompany(s) && s.findings?.some(f => f.priority !== 'information')));
+  const limited = Boolean(report.gaps) || report.processCoverage?.complete === false || sources.some(s => s.status !== 'analyzed' || s.identity !== 'compatible' || s.outcome === 'inconclusive' || s.limitations?.length || (linkedCompany(s) && s.findings?.some(f => f.priority !== 'information')));
   const value = Math.max(0, Math.min(limited ? 69 : 100, 100 - high * 60 - medium * 30));
   return { value, band: value >= 80 ? 'green' : value >= 50 ? 'yellow' : 'red', label: value >= 80 ? 'Menor atenção documental' : value >= 50 ? 'Atenção antes de negociar' : 'Atenção elevada antes de negociar', high, medium, limited };
 }
@@ -49,12 +50,13 @@ export function sellerSources(audit) {
     const rows = execution.dados?.certidoes;
     return (rows?.length ? rows : [{ tipo: execution.fonte, status: execution.status, rawText: execution.rawText, details: execution.dados, pdfPath: execution.pdfUrl }])
       .map((row, index) => ({
+        ...(row.processCollection ? { processCollection:row.processCollection } : {}),
         id: `${execution.fonte}:${index}`, title: row.tipo || execution.fonte,
         subject:row.subjectDocument?{name:row.details?.['Razão social']||row.tipo,document:row.subjectDocument}:null,
         status: row.status, kind: row.kind || 'certificate', scope: row.scope || row.uf || 'Conforme documento',
         checkedAt: row.checkedAt || execution.finishedAt || audit.updatedAt,
         identityVerified: row.evidenceIdentityVerified === true,
-        details: row.evidenceData && Object.keys(row.evidenceData).length ? row.evidenceData : row.details || {}, dataLimited: row.evidenceDataLimited === true,
+        details: row.evidenceData && Object.keys(row.evidenceData).length ? row.evidenceData : row.processCollection ? Object.fromEntries(Object.entries(row.details || {}).filter(([key])=>!/^Processo \d+$/.test(key))) : row.details || {}, dataLimited: row.evidenceDataLimited === true,
         summary: row.summary || '', limitation: row.limitation || '', pdfPath: row.pdfPath || '',
         text: row.rawText || '', provider: row.provider || execution.fonte,
         url: row.pdfPath ? `/audit/${audit.consultaId}/documents/${encodeURIComponent(execution.fonte)}/${index}` : '',
@@ -89,7 +91,7 @@ export function validateSellerReading(value, source, text, scanned = false) {
   return reading;
 }
 
-export function createSellerReviewService({ getDb, auditService, ai, readPdf, getAnalysisAccess = async () => false, checkAnalysisCost = async () => {}, extractText = extractSellerText, now = () => new Date() }) {
+export function createSellerReviewService({ getDb, auditService, ai, readPdf, getAnalysisAccess = async () => false, checkAnalysisCost = async () => {}, extractText = extractSellerText, readProcessBatch = readSellerProcessBatch, now = () => new Date() }) {
   const active = new Map();
   function pool() { const db = getDb(); if (!db?.dbReady || !db.pool) fail('seller_storage_unavailable', 503); return db.pool; }
   async function access(id, auth) {
@@ -175,11 +177,32 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
     if (!segment) fail('invalid_analysis_segment', 422);
     const fingerprint = certificates ? digest({ sources, purpose }) : segment.id === 'analise-vendedor' ? digest(sources) : digest({ segment: segment.id, sources });
     const previous = certificates ? certificateReviews(row.request_payload)[analysisKey] : row.request_payload.sellerReview;
-    if (previous?.status === 'completed' && previous.fingerprint === fingerprint && !previous.report.sources.some(s => s.status === 'unread')) return view(previous);
+    if (selection?.continueProcesses !== undefined && typeof selection.continueProcesses !== 'boolean') fail('invalid_analysis_selection');
+    if (selection?.continueProcesses === true && consent !== true) fail('seller_ai_consent_required');
+    if (selection?.continueProcesses === true) {
+      if(!Number.isSafeInteger(selection.continueFrom)||selection.continueFrom<0)fail('invalid_process_continuation');
+      if(!previous||previous.fingerprint!==fingerprint)fail('seller_process_scope_changed',409);
+      if(previous.processCoverage?.analyzed!==selection.continueFrom||previous.status==='running'||!previous.processCoverage?.remaining)return view(previous);
+    }
+    if (previous?.status === 'completed' && !(selection?.continueProcesses === true && previous.processCoverage?.remaining > 0) && previous.fingerprint === fingerprint && !previous.report.sources.some(s => s.status === 'unread')) return view(previous);
     if (active.has(id)) return get(id, auth, request);
     if (!ai.ready()) fail('seller_ai_unavailable', 503);
     if (sources.length > 300) fail('seller_too_many_sources', 422);
-    const state = { token: randomUUID(), fingerprint, segment: segment.id, ...(certificates ? { purpose, customPurpose, analysisKey, analysisMode: mode, sourceId: mode === 'document' ? analysisKey : null } : {}), selectedStates:row.request_payload.sellerStates||[], status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
+    const originalSources = sources;
+    const priorCheckpoints = previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {};
+    let selectedProcesses = 0;
+    sources = sources.flatMap(source => {
+      if (!source.processCollection) return [source];
+      const { processCollection, ...metadata } = source;
+      const batches = processCollection.batches.filter(batch => {
+        const checkpoint = priorCheckpoints[`${source.id}:processes:${batch.start}`];
+        if (checkpoint?.status === 'analyzed' || selectedProcesses + batch.count > PROCESS_RUN_LIMIT) return false;
+        selectedProcesses += batch.count; return true;
+      });
+      return [metadata, ...batches.map(batch => ({ ...metadata, id:`${source.id}:processes:${batch.start}`, title:`${source.title} · processos ${batch.start+1}–${batch.start+batch.count}`,
+        processCollection, processBatch:batch, processCount:batch.count, details:{}, text:'', pdfPath:'', dataLimited:false }))];
+    });
+    const state = { processCoverage:processCoverage(originalSources,priorCheckpoints), token: randomUUID(), fingerprint, segment: segment.id, ...(certificates ? { purpose, customPurpose, analysisKey, analysisMode: mode, sourceId: mode === 'document' ? analysisKey : null } : {}), selectedStates:row.request_payload.sellerStates||[], status: 'running', progress: 0, completed: 0, total: sources.length, current: 'Preparando documentos', startedAt: now().toISOString(), updatedAt: now().toISOString(), checkpoints: previous?.fingerprint === fingerprint ? previous.checkpoints || {} : {}, report: null };
     const reviewUpdate = "jsonb_set(jsonb_set(request_payload,'{sellerAiConsent}','true'::jsonb),'{sellerReview}',$4::jsonb)";
     const saved = certificates ? { ...(row.request_payload.sellerReview && !row.request_payload.sellerReview.analysisKey ? { all: row.request_payload.sellerReview } : {}), [analysisKey]: state } : null;
     const claimed = await pool().query(`UPDATE audita_audits SET request_payload=${certificates ? `jsonb_set(${reviewUpdate},'{certificateReviews}',COALESCE(request_payload->'certificateReviews','{}'::jsonb)||$6::jsonb)` : reviewUpdate}
@@ -188,11 +211,11 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       RETURNING id`, [id, auth.tenantId, auth.user.id, JSON.stringify(state), new Date(now() - 180000).toISOString(), ...(certificates ? [JSON.stringify(saved)] : [])]);
     if (!claimed.rows.length) return get(id, auth, request);
     // ponytail: two readers per report; database lease prevents duplicate work for the same audit across processes.
-    const job = run(id, auth, audit, sources, state).finally(() => active.delete(id));
+    const job = run(id, auth, audit, sources, state, originalSources).finally(() => active.delete(id));
     active.set(id, job);
     return view(state);
   }
-  async function run(id, auth, audit, sources, state) {
+  async function run(id, auth, audit, sources, state, originalSources) {
     let write = Promise.resolve(), stopped = false;
     const persist = () => { write = write.then(() => save(id, state.token, state)); return write; };
     const heartbeat = setInterval(() => { if (!stopped) persist().catch(() => { stopped = true; }); }, 30000);
@@ -204,12 +227,16 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
         while (cursor < sources.length && !stopped) {
           const index = cursor++, source = sources[index];
           state.current = source.title;
-          const { pdfPath, details, text: originalText, ...meta } = source;
+          let { pdfPath, details, text: originalText, processCollection: collection, processBatch: batch, ...meta } = source;
           const prior = state.checkpoints[source.id];
           if (prior?.status === 'analyzed') results[index] = prior;
           else if (source.status !== 'success') results[index] = { ...meta, status: 'unavailable', message: 'Fonte sem resultado válido. Não permite concluir sobre regularidade.' };
           else {
             try {
+              if (batch) {
+                await access(collection.auditId, auth);
+                details = await readProcessBatch(collection, batch);
+              }
               let text = originalText, buffer, needsVision = false;
               if (pdfPath) {
                 buffer = await loadPdf(pdfPath, auth);
@@ -221,13 +248,14 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
               if (!buffer && !plain(text) && !Object.keys(details).length) fail('empty_evidence', 422);
               if(state.purpose) await checkAnalysisCost(auth);
               if (plain(text).length + JSON.stringify(details).length > 180000) fail('source_too_large', 422);
-              const reading = validateSellerReading(await ai.read({ segment: state.segment, purpose: state.purpose, id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), source, text, scanned);
+              const reading = validateSellerReading(await ai.read({ segment: state.segment, purpose: state.purpose, id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), { ...source, details }, text, scanned);
               results[index] = { ...meta, status: 'analyzed', method: scanned ? 'Leitura visual por IA; confira a transcrição no original' : 'Texto e dados da fonte', ...reading };
             } catch {
               results[index] = { ...meta, status: 'unread', message: 'Não foi possível concluir a leitura desta fonte. Confira o original ou tente novamente.', outcome: 'inconclusive' };
             }
           }
           state.checkpoints[source.id] = results[index];
+          state.processCoverage = processCoverage(originalSources,state.checkpoints);
           state.completed++;
           state.progress = Math.round(state.completed / Math.max(1, state.total) * 95);
           await persist();
@@ -235,13 +263,19 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       }
       await Promise.all([worker(), worker()]);
       if (stopped) throw new Error('review_interrupted');
+      for (const checkpoint of Object.values(state.checkpoints)) {
+        if (checkpoint.processCount && !results.some(result => result.id === checkpoint.id)) results.push(checkpoint);
+      }
       const findings = results.flatMap(source => (source.findings || []).map(f => ({ ...f, sourceId: source.id, sourceTitle: source.title, identity: source.identity })));
       const analyzed = results.filter(r => r.status === 'analyzed').length;
       const gaps = results.filter(r => r.status !== 'analyzed' || r.outcome === 'inconclusive');
       const segment = getAnalysisSegment(state.segment);
-      const report = { id, segment: segment.id, title: state.analysisMode === 'document' ? 'Análise de documento' : state.purpose ? 'Análise das certidões' : segment.title, purpose: state.purpose, analysisMode: state.analysisMode, sourceId: state.sourceId, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: state.analysisMode === 'document' ? 'Análise limitada ao documento selecionado, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : state.purpose ? 'Análise limitada às certidões selecionadas, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
+      const report = { processCoverage:state.processCoverage, id, segment: segment.id, title: state.analysisMode === 'document' ? 'Análise de documento' : state.purpose ? 'Análise das certidões' : segment.title, purpose: state.purpose, analysisMode: state.analysisMode, sourceId: state.sourceId, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: state.analysisMode === 'document' ? 'Análise limitada ao documento selecionado, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : state.purpose ? 'Análise limitada às certidões selecionadas, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
         conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? state.purpose ? 'Foram identificados pontos que precisam de conferência no material analisado.' : 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
       };
+      if (report.processCoverage && !report.processCoverage.complete) {
+        report.scopeNotice += ` Análise parcial dos processos: ${report.processCoverage.analyzed} de ${report.processCoverage.total} registros recebidos analisados; ${report.processCoverage.reportedTotal} informados pela fonte. Cada execução lê até ${PROCESS_RUN_LIMIT}.`;
+      }
       report.executiveSummary=[report.conclusion,...findings.filter(f=>f.priority!=='information').map(f=>`${f.title}: ${f.description}`),...findings.filter(f=>f.category==='company'&&f.priority==='information').map(f=>f.description)].join('\n\n');
       if(analyzed&&typeof ai.summarize==='function') {
         if(state.purpose) await checkAnalysisCost(auth);
@@ -270,7 +304,23 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
     if (state?.status !== 'completed' || !state.report) fail('seller_report_not_ready', 409);
     return sellerReportPdf(state.report);
   }
-  return { get, start, pdf, ready: () => ai.ready() && Boolean(getDb()?.dbReady), wait: id => active.get(id) };
+  async function processes(id, auth, request, sourceId, offset = 0) {
+    await access(id, auth);
+    if (!Number.isSafeInteger(offset) || offset < 0) fail('invalid_process_offset');
+    const audit = await auditService.findAudit(id, request);
+    if (!audit || audit.unauthorized) fail('seller_analysis_not_found',404);
+    const source = sellerSources(audit).find(source=>source.id===sourceId);
+    const collection = source?.processCollection;
+    if (!collection) fail('seller_processes_not_saved',404);
+    await access(collection.auditId,auth);
+    const records=[];
+    for (const batch of collection.batches.filter(batch=>batch.start < offset+50 && batch.start+batch.count > offset)) {
+      const data=await readProcessBatch(collection,batch);
+      data.processos.forEach((record,index)=>{const position=batch.start+index;if(position>=offset&&position<offset+50)records.push({index:position+1,data:record});});
+    }
+    return {total:collection.total,reportedTotal:collection.reportedTotal,offset,limit:50,records};
+  }
+  return { processes, get, start, pdf, ready: () => ai.ready() && Boolean(getDb()?.dbReady), wait: id => active.get(id) };
 }
 
 function rowSubject(audit) { return { name: audit.subjectName || 'Titular da consulta', document: audit.documento, documentType: audit.tipoDocumento }; }

@@ -1,3 +1,4 @@
+import { saveSellerProcesses, processRecords, PROCESS_RUN_LIMIT } from './seller-processes.service.mjs';
 import { readFileSync } from "node:fs";
 import { isValidDocument, normalizeDocument } from "./audit.service.mjs";
 import { downloadCertificateEvidence } from "./state-court-autonomous.service.mjs";
@@ -127,13 +128,28 @@ export function summarizeSellerData(endpoint, data) {
       if (typeof score === "number" && Number.isFinite(score)) details["Score de crédito QUOD (provedor)"] = String(score);
     }
     summary = "Consulta de crédito QUOD obtida. Os registros retornados precisam de análise; não substitui certidão oficial.";
+  } else if (endpoint === "PGFNListaDevedoresUniao") {
+    outcome = field(data, "possuiDivida");
+    for (const [label, name] of [["Total da dívida informado", "totalDivida"], ["Total tributário informado", "totalTributario"], ["Total previdenciário informado", "totalPrevidenciario"], ["Tipo do devedor", "tipoDevedor"], ["UF informada", "uf"], ["Unidade responsável", "unidadeResponsavel"]]) {
+      const value=field(data,name); if(clean(value)!=="") details[label]=clean(value);
+    }
+    const debts=list(field(data,"naturezas"));
+    details["Inscrições retornadas"]=String(debts.length);
+    for(const [index,debt] of debts.entries()) {
+      const values=[["Inscrição","numeroInscricao"],["Tipo","tipoDivida"],["Situação","situacaoInscricao"],["Status","status"],["Total informado","total"],["Data","dataInscricao"]]
+        .filter(([,name])=>clean(field(debt,name))!=="").map(([label,name])=>`${label}: ${clean(field(debt,name),180)}`);
+      if(values.length)details[`Inscrição ${index+1}`]=values.join("; ");
+    }
+    summary = outcome === true ? "A fonte informou dívida na lista PGFN. Confira inscrições e situação atual; não substitui a certidão conjunta RFB/PGFN."
+      : outcome === false ? "A fonte não informou dívida nesta lista e data. Isso não comprova regularidade fiscal geral nem substitui a certidão conjunta RFB/PGFN."
+      : "Consulta PGFN obtida; o retorno não permite concluir se há dívida. Confira o comprovante e as inscrições.";
   } else if (endpoint.startsWith("ProcessosJudiciais")) {
     const tribunals = list(field(data, "tribunais")).slice(0, 50).map((entry) => `${clean(field(entry, "tribunal"), 80)}: ${clean(field(entry, "totalPorTribunal"), 15)}`).join("; ");
     if (tribunals) details["Processos por tribunal"] = tribunals;
     const segments = list(field(data, "segmentos")).slice(0, 20).map((entry) => `${clean(field(entry, "segmento"), 80)}: ${clean(field(entry, "totalPorSegmento"), 15)}`).join("; ");
     if (segments) details["Processos por segmento"] = segments;
     const processes = list(field(data, "processos"));
-    for (const [index, process] of processes.slice(0, 20).entries()) {
+    for (const [index, process] of processes.slice(0, PROCESS_RUN_LIMIT).entries()) {
       if (field(process, "segredoJustica") === true) {
         details[`Processo ${index + 1}`] = "Registro em segredo de justiça; detalhes omitidos.";
         continue;
@@ -151,7 +167,7 @@ export function summarizeSellerData(endpoint, data) {
       if (role) parts.push(`Papel do consultado: ${role}`);
       if (parts.length) details[`Processo ${index + 1}`] = parts.join("; ");
     }
-    if (processes.length > 20) details["Limite dos detalhes"] = `Exibidos 20 dos ${processes.length} registros retornados.`;
+    if (processes.length > PROCESS_RUN_LIMIT) details["Limite dos detalhes"] = `Prévia de ${PROCESS_RUN_LIMIT} dos ${processes.length} registros retornados. A análise avança em execuções de até ${PROCESS_RUN_LIMIT}.`;
     summary = "Consulta de processos obtida. A posição do vendedor e o conteúdo dos processos precisam de análise; não substitui certidão judicial.";
   } else if (outcome === true) summary = "O provedor informou apontamentos no escopo desta consulta. Consulte o documento e os detalhes.";
   else if (outcome === false) summary = "O provedor não informou apontamentos no escopo e na data desta consulta.";
@@ -164,6 +180,7 @@ export async function collectSellerDocuments(input, {
   download = downloadCertificateEvidence,
   readPdf = extractPdfText,
   savePdf = saveAndExtractPdfBuffer,
+  saveProcesses = saveSellerProcesses,
   collectCompany = collectPublicCompany,
   portalQuery = async (request) => (await import("./pe-fiscal-certificate.service.mjs")).collectPeFiscalCertificate(request),
   delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
@@ -227,14 +244,17 @@ export async function collectSellerDocuments(input, {
             rows[index].details["Identificação no PDF"] = "CNPJ raiz: o documento abrange os estabelecimentos previstos no seu escopo.";
           } else if (!hasExactDocument(pdfText, target)) throw new Error("evidence_identity_unverified");
           if (!Array.isArray(item.expectedText) || !item.expectedText.length || item.expectedText.some((expected) => !compact(expected) || !compact(pdfText).includes(compact(expected)))) throw new Error("evidence_scope_mismatch");
+          if (item.expectedTextAny?.length && !item.expectedTextAny.some(expected => compact(expected) && compact(pdfText).includes(compact(expected)))) throw new Error("evidence_scope_mismatch");
           const saved = await savePdf({ consultaId: input.consultaId, fonte: "seller_documents", fileName: `${id}.pdf`, buffer });
           if (!saved?.pdfPath) throw new Error("evidence_save_failed");
           pdfPath = saved.pdfPath;
         } else if (!matchedDocument) throw new Error("evidence_identity_unverified");
         const summary = summarizeSellerData(item.endpoint, data);
-        const evidenceJson = JSON.stringify(data, (key, value) => /token|senha|password|base64|urlcomprovante|documentoConsultado/i.test(key) ? undefined : value);
+        const processCollection = item.endpoint.startsWith('ProcessosJudiciais') && (processRecords(data).length || item.endpoint === 'ProcessosJudiciaisCompleta' && Number(field(data,'totalProcessos')) > 0)
+          ? await saveProcesses(data, input.consultaId) : null;
+        const evidenceJson = JSON.stringify(data, (key, value) => /token|senha|password|base64|urlcomprovante|documentoConsultado/i.test(key) || processCollection && key.toLowerCase() === 'processos' ? undefined : value);
         const evidenceDataLimited = evidenceJson.length > 180000;
-        rows[index] = { ...rows[index], status: "success", ...summary, evidenceData: evidenceDataLimited ? {} : JSON.parse(evidenceJson), evidenceDataLimited, evidenceIdentityVerified: true, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
+        rows[index] = { ...rows[index], status: "success", ...summary, ...(processCollection ? { processCollection } : {}), evidenceData: evidenceDataLimited ? {} : JSON.parse(evidenceJson), evidenceDataLimited, evidenceIdentityVerified: true, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
         if(automaticCompanies&&item.id==='vinculos') {
           const linked=[...new Set(list(field(data,'relacionamentos')).map(entry=>normalizeDocument(field(entry,'documento'))).filter(cnpj=>isValidDocument('cnpj',cnpj)))];
           for(const [companyIndex,cnpj] of linked.slice(0,5).entries()) appendJob({company:cnpj,id:`company-${companyIndex+1}`,label:`Empresa ${companyIndex+1} — cadastro e QSA`});

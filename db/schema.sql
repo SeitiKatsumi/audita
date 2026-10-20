@@ -140,6 +140,14 @@ CREATE TABLE IF NOT EXISTS audita_api_sources (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS audita_certificate_pricing (
+  id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id=TRUE),
+  pricing JSONB NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 1 CHECK(revision>0),
+  updated_by_user_id BIGINT REFERENCES audita_users(id) ON DELETE SET NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS audita_agent_settings (
   id BIGSERIAL PRIMARY KEY,
   tenant_id BIGINT,

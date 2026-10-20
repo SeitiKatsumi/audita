@@ -1,8 +1,9 @@
-import { initGeneralChat } from './general-chat.js?v=20261013-send-feedback';
+import { initGeneralChat } from './general-chat.js?v=20261020-navigation';
+import { initProcessOnline } from './process-online.js?v=20261019';
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js?v=20261013-send-feedback";
 import { analysisSegments, getAnalysisSegment } from './analysis-segments.js';
-import {certificateSelection,certificateQuote} from './certificate-selection.js?v=20261016-courts-pj';
+import {certificateSelection,certificateQuote} from './certificate-selection.js?v=20261019-pricing';
 for (const element of document.querySelectorAll('[data-page], [data-nav-pages]')) {
   for (const key of ['page', 'navPages']) {
     const pages = (element.dataset[key] || '').split(/\s+/);
@@ -275,6 +276,20 @@ const publicPages = new Set(["home", "chat", "central-servicos", "analise-vended
   ...analysisSegments.map(segment => segment.id),
   "consulta-imoveis", "isencao-ir", "pis-pasep", "analise-cobrancas", "dividas-bancarias",
   "auditoria-glosas", "auditoria-importacao", "contas-de-luz", "consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]);
+let processOnlineContext = {};
+let processOnlineOwner = null;
+const processOnlineUi = initProcessOnline({container:document.querySelector('#processOnlineModule'),onAuthRequired:()=>{processOnlineOwner=null;processOnlineContext={};showLogin('Entre para consultar seus processos.');}});
+document.addEventListener('audita:pagechange', event => {
+  if(event.detail.page === 'processos-judiciais') processOnlineUi.activate(processOnlineContext);
+  else processOnlineUi.deactivate();
+});
+window.addEventListener('audita:auth-changed', event => {
+  const auth=event.detail;
+  const owner=auth?.user?.id ? `${auth.tenantId || auth.user.tenant?.id || ''}:${auth.user.id}` : null;
+  if(owner===processOnlineOwner) return;
+  processOnlineOwner=owner;processOnlineContext={};processOnlineUi.reset();
+  if(owner && window.location.hash==='#processos-judiciais') processOnlineUi.activate();
+});
 const isGuest = () => currentAuthState.authRequired && !currentAuthState.user;
 let currentDocumentAiContext = null;
 let currentPropertySearch = null;
@@ -908,6 +923,7 @@ const pageMeta = {
   advogados: {title: "Área dos Advogados", eyebrow: "Atendimentos da equipe"},
   "contas-de-luz": { title: "Auditoria de contas de luz", eyebrow: "Energia" },
   "auditoria-importacao": { title: "Auditoria de importação", eyebrow: "NCM · II · IPI" },
+  "processos-judiciais": {title:"Emissão e baixa de processos judiciais",eyebrow:"Processos judiciais"},
   "central-servicos": {title: "Central de Serviços", eyebrow: "Consultas e análises"},
   "pis-pasep": {title:"Cotas antigas PIS/PASEP",eyebrow:"Consulta assistida"},
   "isencao-ir": { title: "Isenção e restituição de IR", eyebrow: "Triagem guiada" },
@@ -6713,8 +6729,8 @@ function updateSellerEstimate() {
   const selected = selectedSellerCertificates();
   const queries = selectedSellerQueries();
   const companyCount = sellerDocumentType()==='cnpj'?1:sellerCompanyCnpjs().length;
-  const costs=[...selected.map(item=>item.provider==='direct_data'?sellerCoverage?.pdfQueryCostBrl||.54:0),...queries.flatMap(item=>Array(item.documentTypes?.includes('cpf')?1:companyCount).fill(Number(item.costBrl||0)))];
-  const quote=certificateQuote(costs,sellerCoverage?.certificateSubscriber===true);
+  const costs=[...selected.map(item=>({key:item.id||item.uf+':'+item.type,costBrl:item.provider==='direct_data'?sellerCoverage?.pdfQueryCostBrl||.54:0})),...queries.flatMap(item=>Array(item.documentTypes?.includes('cpf')?1:companyCount).fill({key:item.id,costBrl:Number(item.costBrl||0)}))];
+  const quote=certificateQuote(costs,sellerCoverage?.certificateSubscriber===true,sellerCoverage?.certificatePricing);
   const paymentRequired=quote.amountCents>0&&sellerCoverage?.certificateComplimentary!==true;
   const target = document.querySelector("#sellerAnalysisCost");
   const state=selectedSellerState();
@@ -6724,7 +6740,7 @@ function updateSellerEstimate() {
   const identityCost=sellerDocumentType()==='cpf'&&requiredIdentity.some(field=>field!=='rg'&&!identityFields[field]) ? Number(sellerCoverage?.identityQueryCostBrl ?? .36) : 0;
   const brl=value=>`R$ ${value.toFixed(2).replace('.',',')}`;
   if(typeof sellerAnalysisSubmit!=='undefined'&&sellerAnalysisSubmit&&!sellerAnalysisSubmit.disabled)sellerAnalysisSubmit.textContent=paymentRequired?'Continuar para pagamento':sellerCoverage?.certificateComplimentary&&quote.amountCents>0?'Continuar sem pagar':isCertificateOnly()?'Obter documentos e consultas':'Avançar e iniciar extração →';
-  if(target)target.innerHTML=!isCertificateOnly()&&!state?'Selecione o estado para calcular a estimativa.':`<small>${selected.length+queries.length} fontes selecionadas · ${selectedSellerUfs().length} estados · ${sellerCoverage?.certificateComplimentary?'pagamento dispensado':'pagamento único'}</small>${quote.discountCents?`<small><s>${brl(quote.baseCents/100)}</s> · 30% de desconto de assinante</small>`:''}<strong>${brl(quote.amountCents/100)}</strong><small>${sellerCoverage?.certificateComplimentary?'Acesso individual liberado: você pode continuar sem pagar. ':''}${sellerCoverage?.certificateSubscriber?'Fontes gratuitas do provedor sem cobrança para assinantes. ':''}A coleta depende de cada fonte. ${isCertificateOnly()?'Consultas de dados não são certidões oficiais. Análise opcional incluída para assinantes IA.':'Inclui levantamento e relatório de IA; até cinco empresas vinculadas ao CPF.'}${paymentRequired&&sellerCoverage?.certificateCheckoutReady===false?(isCertificateOnly()&&sellerCoverage?.certificateTestBypassEnabled?' Pagamento indisponível; você pode usar o bypass de teste na próxima etapa.':' Pagamento indisponível neste ambiente; nenhuma coleta será iniciada.'):''}</small>${identityCost?`<small>Se necessário, o preenchimento cadastral automático usa a consulta ao CPF (${brl(identityCost)} de custo do provedor), pela carteira existente.</small>`:''}`;
+  if(target)target.innerHTML=!isCertificateOnly()&&!state?'Selecione o estado para calcular a estimativa.':`<small>${selected.length+queries.length} fontes selecionadas · ${selectedSellerUfs().length} estados · ${sellerCoverage?.certificateComplimentary?'pagamento dispensado':'pagamento único'}</small>${quote.discountCents?`<small><s>${brl(quote.baseCents/100)}</s> · ${sellerCoverage?.certificatePricing?.subscriberDiscountPercent??30}% de desconto de assinante</small>`:''}<strong>${brl(quote.amountCents/100)}</strong><small>${sellerCoverage?.certificateComplimentary?'Acesso individual liberado: você pode continuar sem pagar. ':''}${sellerCoverage?.certificateSubscriber?'Fontes gratuitas do provedor sem cobrança para assinantes. ':''}A coleta depende de cada fonte. ${isCertificateOnly()?'Consultas de dados não são certidões oficiais. Análise opcional incluída para assinantes IA.':'Inclui levantamento e relatório de IA; até cinco empresas vinculadas ao CPF.'}${paymentRequired&&sellerCoverage?.certificateCheckoutReady===false?(isCertificateOnly()&&sellerCoverage?.certificateTestBypassEnabled?' Pagamento indisponível; você pode usar o bypass de teste na próxima etapa.':' Pagamento indisponível neste ambiente; nenhuma coleta será iniciada.'):''}</small>${identityCost?`<small>Se necessário, o preenchimento cadastral automático usa a consulta ao CPF (${brl(identityCost)} de custo do provedor), pela carteira existente.</small>`:''}`;
   if(target && !isCertificateOnly()) target.innerHTML+=sellerCourtPortalsHtml(selectedSellerUfs());
   for (const selector of ["#sellerAnalysisRg", "#sellerAnalysisGender"]) {
     const field = document.querySelector(selector);
@@ -6777,7 +6793,7 @@ function renderCertificateChoices(){
   const ufs=[...document.querySelectorAll('#sellerAnalysisUfs input:checked')].map(input=>input.value);
   const selection=certificateSelection(sellerCoverage,ufs,sellerDocumentType());
   const groups=[...new Set(selection.queries.map(q=>q.category||'Outras'))];
-  const courtHtml=selection.courts.length?`<details open><summary>Tribunais estaduais — ${selection.courts.length} certidões</summary><fieldset><legend class="sr-only">Tribunais estaduais</legend>${selection.courts.map(c=>`<label class="seller-analysis-consent"><input type="checkbox" data-certificate-court value="${escapeHtml(c.id||c.uf+':'+c.type)}" checked/><span><strong>${escapeHtml(c.uf)} · ${escapeHtml(c.type)}</strong><br/>R$ ${(certificateQuote([c.provider==='direct_data'?sellerCoverage.pdfQueryCostBrl||.54:0],sellerCoverage.certificateSubscriber===true).amountCents/100).toFixed(2).replace('.',',')}</span></label>`).join('')}</fieldset></details>`:'';
+  const courtHtml=selection.courts.length?`<details open><summary>Tribunais estaduais — ${selection.courts.length} certidões</summary><fieldset><legend class="sr-only">Tribunais estaduais</legend>${selection.courts.map(c=>`<label class="seller-analysis-consent"><input type="checkbox" data-certificate-court value="${escapeHtml(c.id||c.uf+':'+c.type)}" checked/><span><strong>${escapeHtml(c.uf)} · ${escapeHtml(c.type)}</strong><br/>R$ ${(certificateQuote([{key:c.id||c.uf+':'+c.type,costBrl:c.provider==='direct_data'?sellerCoverage.pdfQueryCostBrl||.54:0}],sellerCoverage.certificateSubscriber===true,sellerCoverage.certificatePricing).amountCents/100).toFixed(2).replace('.',',')}</span></label>`).join('')}</fieldset></details>`:'';
   document.querySelector('#sellerAnalysisQueries').innerHTML=courtHtml+groups.map(category=>`<details open><summary>${escapeHtml(category)} — ${selection.queries.filter(q=>q.category===category).length} fontes</summary><fieldset><legend class="sr-only">${escapeHtml(category)}</legend>${selection.queries.filter(q=>(q.category||'Outras')===category).map(q=>`<label class="seller-analysis-consent"><input type="checkbox" value="${escapeHtml(q.id)}" ${q.kind==='certificate'?'checked':""} /><span><strong>${escapeHtml(q.label)}</strong><br/>${q.kind==='certificate'?'Certidão':q.includePdf?'Comprovante de consulta em PDF':'Consulta de dados — sem PDF oficial'} · ${escapeHtml(q.region)} · R$ ${(q.priceCents/100).toFixed(2).replace('.',',')}${q.limitation?`<br/><small>${escapeHtml(q.limitation)}</small>`:''}</span></label>`).join('')}</fieldset></details>`).join('')+sellerCourtPortalsHtml(ufs)+(ufs.length?'':'<p>Escolha os estados acima. As certidões nacionais entram uma única vez, mesmo no pacote Brasil inteiro.</p>');
 }
 function sellerPaymentKey(){return isCertificateOnly()?'auditaCertificateOrder':`auditaAnalysisOrder:${activeAnalysisSegment().id}`;}
@@ -6807,7 +6823,7 @@ async function followCertificatePayment(id){
       const statusKey=order.status+':'+bypass;
       if(lastStatus!==statusKey){
         lastStatus=statusKey;
-        sellerAnalysisResult.innerHTML=`<article class="certificate-payment"><h3>${review?(order.testBypassed?'Teste liberado — confira com a equipe':'Pagamento recebido — confira com a equipe'):closed?'Pagamento não concluído':waiting?(order.testBypassed?'Teste liberado — preparando coleta':'Pagamento confirmado — preparando coleta'):order.flow==='seller'?'Pagamento da análise':'Pagamento da emissão'}</h3><p>${order.documentCount} fontes selecionadas</p>${order.discountCents?'<p>30% de desconto de assinante aplicado.</p>':''}<strong class="certificate-price">R$ ${(order.amountCents/100).toFixed(2).replace('.',',')}</strong><p>${review?'O início da coleta precisa ser conferido pela equipe. Não pague nem envie este pedido novamente.':closed?'O pagamento falhou ou o checkout expirou. Volte à seleção para abrir um novo pedido.':waiting?(order.testBypassed?'Aguarde o início da coleta em modo de teste. Nenhum pagamento foi registrado.':'Aguarde o início da coleta. Seu pagamento já foi confirmado; não pague novamente.'):bypass?'Continue para o pagamento ou use a opção de teste abaixo.':'A coleta começa após a confirmação do pagamento. Os métodos disponíveis aparecem no checkout.'}</p><div class="certificate-payment-actions">${!review&&!closed&&!waiting&&order.checkoutUrl?'<button type="button" class="primary-action" data-certificate-pay>Ir para pagamento</button>':''}${bypass?'<button type="button" class="secondary-action" data-certificate-test>Continuar sem pagar — teste</button>':''}<button type="button" class="secondary-action" data-certificate-refresh>Verificar pagamento</button>${!waiting&&!review?'<button type="button" class="secondary-action" data-certificate-back>Voltar à seleção</button>':''}</div>${bypass?'<p>O bypass ignora a cobrança da Audita. As fontes externas podem gerar custos de consulta.</p>':''}<small role="status" data-certificate-status></small></article>`;
+        sellerAnalysisResult.innerHTML=`<article class="certificate-payment"><h3>${review?(order.testBypassed?'Teste liberado — confira com a equipe':'Pagamento recebido — confira com a equipe'):closed?'Pagamento não concluído':waiting?(order.testBypassed?'Teste liberado — preparando coleta':'Pagamento confirmado — preparando coleta'):order.flow==='seller'?'Pagamento da análise':'Pagamento da emissão'}</h3><p>${order.documentCount} fontes selecionadas</p>${order.discountCents?'<p>${sellerCoverage?.certificatePricing?.subscriberDiscountPercent??30}% de desconto de assinante aplicado.</p>':''}<strong class="certificate-price">R$ ${(order.amountCents/100).toFixed(2).replace('.',',')}</strong><p>${review?'O início da coleta precisa ser conferido pela equipe. Não pague nem envie este pedido novamente.':closed?'O pagamento falhou ou o checkout expirou. Volte à seleção para abrir um novo pedido.':waiting?(order.testBypassed?'Aguarde o início da coleta em modo de teste. Nenhum pagamento foi registrado.':'Aguarde o início da coleta. Seu pagamento já foi confirmado; não pague novamente.'):bypass?'Continue para o pagamento ou use a opção de teste abaixo.':'A coleta começa após a confirmação do pagamento. Os métodos disponíveis aparecem no checkout.'}</p><div class="certificate-payment-actions">${!review&&!closed&&!waiting&&order.checkoutUrl?'<button type="button" class="primary-action" data-certificate-pay>Ir para pagamento</button>':''}${bypass?'<button type="button" class="secondary-action" data-certificate-test>Continuar sem pagar — teste</button>':''}<button type="button" class="secondary-action" data-certificate-refresh>Verificar pagamento</button>${!waiting&&!review?'<button type="button" class="secondary-action" data-certificate-back>Voltar à seleção</button>':''}</div>${bypass?'<p>O bypass ignora a cobrança da Audita. As fontes externas podem gerar custos de consulta.</p>':''}<small role="status" data-certificate-status></small></article>`;
         sellerAnalysisResult.querySelector('[data-certificate-pay]')?.addEventListener('click',()=>{const url=new URL(order.checkoutUrl);if(url.protocol==='https:'&&url.hostname==='checkout.stripe.com')location.assign(url.href);});
         sellerAnalysisResult.querySelector('[data-certificate-test]')?.addEventListener('click',async event=>{
           const button=event.currentTarget,status=sellerAnalysisResult.querySelector('[data-certificate-status]');
@@ -6853,6 +6869,7 @@ for (const [id, checked] of [["sellerAnalysisSelectAll", true], ["sellerAnalysis
 }
 loadSellerCoverage();
 window.addEventListener('audita:auth-changed',()=>{if(isSellerAnalysisPage())loadSellerCoverage();});
+window.addEventListener('audita:auth-changed',()=>{for(const panel of document.querySelectorAll('[data-seller-process-page]')){if(panel.dataset.processOwner!==String(currentAuthState.user?.id||'')){panel.replaceChildren();delete panel.dataset.loaded;}}});
 function updateSellerMunicipalities() {
   const state=selectedSellerState(),select=document.querySelector('#sellerAnalysisMunicipality');
   if(!select) return;
@@ -6922,6 +6939,30 @@ function toggleSellerQueryResult(button) {
   panel.hidden = !panel.hidden;
   button.setAttribute('aria-expanded', String(!panel.hidden));
   button.textContent = panel.hidden ? 'Ver resultado' : 'Ocultar resultado';
+  const processes=panel.querySelector('[data-seller-process-page]');
+  if(!panel.hidden && processes && !processes.dataset.loaded) loadSellerProcessPage(processes,0);
+}
+
+async function loadSellerProcessPage(panel,offset) {
+  const actor=currentAuthState.user?.id;panel.dataset.processOwner=String(actor||'');
+  panel.textContent='Carregando processos salvos...';panel.setAttribute('aria-busy','true');
+  try {
+    const response=await fetch(`/api/seller-analysis/${encodeURIComponent(panel.dataset.audit)}/processes?source=${encodeURIComponent(panel.dataset.source)}&offset=${offset}`,{cache:'no-store'});
+    if(!response.ok)throw new Error();
+    const data=await response.json();if(!panel.isConnected||actor!==currentAuthState.user?.id)return;
+    panel.replaceChildren();panel.dataset.loaded='true';
+    const heading=document.createElement('p');heading.textContent=`Processos ${data.total?offset+1:0}–${Math.min(offset+data.records.length,data.total)} de ${data.total} recebidos · ${data.reportedTotal} informados pela fonte`;panel.append(heading);
+    for(const record of data.records) {
+      const disclosure=document.createElement('details'),title=document.createElement('summary');
+      const number=Object.entries(record.data||{}).find(([key])=>key.toLowerCase()==='numeroprocesso')?.[1];
+      title.textContent=`Processo ${record.index}${number?' · '+number:''}`;disclosure.append(title);
+      disclosure.addEventListener('toggle',()=>{if(disclosure.open&&disclosure.childElementCount===1){const pre=document.createElement('pre');pre.style.whiteSpace='pre-wrap';pre.style.overflowWrap='anywhere';pre.textContent=JSON.stringify(record.data,null,2);disclosure.append(pre);}});panel.append(disclosure);
+    }
+    for(const [label,next,disabled] of [['Anterior',Math.max(0,offset-50),offset===0],['Próximos 50',offset+50,offset+50>=data.total]]) {
+      const button=document.createElement('button');button.type='button';button.className='secondary-action';button.textContent=label;button.disabled=disabled;button.onclick=()=>loadSellerProcessPage(panel,next);panel.append(button);
+    }
+  }catch{if(panel.isConnected&&actor===currentAuthState.user?.id){panel.textContent='Não foi possível abrir os processos salvos. Seus dados continuam preservados.';const retry=document.createElement('button');retry.type='button';retry.textContent='Tentar abrir novamente';retry.onclick=()=>loadSellerProcessPage(panel,offset);panel.append(retry);}}
+  finally{panel.setAttribute('aria-busy','false');}
 }
 
 function formatSellerAnalysisElapsed(milliseconds) {
@@ -7056,11 +7097,12 @@ function renderSellerAnalysisResult(audit) {
         ? "Nada consta"
         : "";
     const detailEntries = certificate.details && typeof certificate.details === "object"
-      ? Object.entries(certificate.details).filter(([, value]) => ["string", "number", "boolean"].includes(typeof value)).slice(0, 30) : [];
+      ? Object.entries(certificate.details).filter(([label, value]) => ["string", "number", "boolean"].includes(typeof value) && (!certificate.processCollection || !/^Processo \d+$/.test(label))).slice(0, certificate.processCollection ? 30 : 210) : [];
     const details = detailEntries.map(([label, value]) => `<small><b>${escapeHtml(label)}</b>: ${escapeHtml(String(value))}</small>`).join("");
     const textResult = certificate.status === 'success' && !pdfUrl;
     const resultId = `seller-query-${encodeURIComponent(audit?.consultaId || 'current')}-${encodeURIComponent(certificate.fonte || String(index))}-${certificate.documentIndex}`;
     const resultOpen = openResults.has(resultId);
+    const processPanel = certificate.processCollection ? `<div data-seller-process-page data-audit="${escapeHtml(audit.consultaId)}" data-source="${escapeHtml(certificate.fonte+':'+certificate.documentIndex)}"><p>${Number(certificate.processCollection.total)||0} processos preservados. Abra o resultado para consultar as páginas.</p></div>` : '';
     const resultContent = detailEntries.length
       ? `<p>Consulta concluída. Dados retornados pela fonte:</p><dl>${detailEntries.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('')}</dl>`
       : `<p>${escapeHtml(certificate.summary || resultLabel || 'A fonte concluiu a consulta, mas não enviou dados adicionais no retorno.')}</p>`;
@@ -7076,7 +7118,7 @@ function renderSellerAnalysisResult(audit) {
         <span class="property-status ${escapeHtml(status.className)}">${escapeHtml(status.label)}</span>
         ${pdfUrl ? `<a class="secondary-action" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noreferrer">Abrir PDF</a>` : ""}
         ${textResult ? `<button type="button" class="secondary-action seller-query-result-toggle" id="${escapeHtml(resultId)}-toggle" data-seller-result-toggle="${escapeHtml(resultId)}" aria-controls="${escapeHtml(resultId)}" aria-expanded="${resultOpen}" aria-describedby="${escapeHtml(resultId)}-source">${resultOpen ? 'Ocultar resultado' : 'Ver resultado'}</button>
-        <div class="seller-query-result" data-seller-query-result id="${escapeHtml(resultId)}" role="region" aria-labelledby="${escapeHtml(resultId)}-source" ${resultOpen ? '' : 'hidden'}><h4>Resultado da consulta</h4>${resultContent}</div>` : ''}
+        <div class="seller-query-result" data-seller-query-result id="${escapeHtml(resultId)}" role="region" aria-labelledby="${escapeHtml(resultId)}-source" ${resultOpen ? '' : 'hidden'}><h4>Resultado da consulta</h4>${resultContent}${processPanel}</div>` : ''}
       </article>
     `;
   }).join("");
@@ -7251,13 +7293,17 @@ function renderSellerReview(target, id, state) {
       <div><p class="seller-score-title">Score de segurança documental</p><p class="seller-score-value">${report.safetyScore.value === null ? '—' : Math.max(0, Math.min(100, Number(report.safetyScore.value) || 0))}<span>/ 100</span></p><strong>${escapeHtml(report.safetyScore.label)}</strong></div>
       <div><p>Quanto maior a pontuação, menos pontos de atenção no material analisado.</p>${report.safetyScore.limited ? '<p class="seller-score-limitation">Análise limitada: há informações pendentes ou que precisam de conferência.</p>' : ''}<p class="seller-score-note">Indicador documental, não é score de crédito nem garantia de segurança do negócio.</p>
       <details><summary>Como calculamos o score</summary><p>Partimos de 100 pontos. Cada apontamento de prioridade alta reduz 60 pontos; de prioridade média, 30 pontos. Apontamentos idênticos contam uma vez. A pontuação mínima é 0.</p><p>Fontes indisponíveis, leitura inconclusiva, identidade não confirmada ou limitações impedem o verde e limitam o score a 69. Dados apenas cadastrais não permitem pontuar. Dívidas de empresas vinculadas não são atribuídas automaticamente à pessoa física.</p><p>80–100: verde · 50–79: amarelo · 0–49: vermelho. O resultado considera somente as fontes e a data desta análise.</p></details></div>
-    </section>` : ''}<p class="seller-report-summary"><strong>${escapeHtml(report.conclusion)}</strong></p><p>${report.analyzed} documentos e consultas analisados · ${report.findings.filter(f=>f.priority!=='information').length} pontos de atenção</p>
-      ${state.status === 'completed' ? `<a class="primary-action" href="/api/seller-analysis/${encodeURIComponent(id)}/report.pdf" download>${certificates ? 'Obter certidões' : 'Baixar relatório completo em PDF'}</a>` : ''}
+    </section>` : ''}<p class="seller-report-summary"><strong>${escapeHtml(report.conclusion)}</strong></p><p>${report.analyzed} ${report.processCoverage ? 'fontes e lotes analisados' : 'documentos e consultas analisados'} · ${report.findings.filter(f=>f.priority!=='information').length} pontos de atenção</p>
+      ${state.status === 'completed' ? `<a class="primary-action" href="/api/seller-analysis/${encodeURIComponent(id)}/report.pdf" download>${certificates ? 'Obter certidões' : report.processCoverage?.complete === false ? 'Baixar relatório parcial em PDF' : 'Baixar relatório completo em PDF'}</a>` : ''}
+      <p><button type="button" class="secondary-action" data-process-online-open>Obter processos completos</button></p><small>A busca e a cópia dos autos são etapas adicionais, com confirmação própria.</small>
       ${report.additionalStates?.length?`<p>Há empresas vinculadas com cadastro em ${report.additionalStates.map(escapeHtml).join(', ')}. Avalie incluir consultas do CPF nesses estados.</p><button type="button" class="secondary-action" data-seller-additional>Escolher outros estados</button><small>Nenhuma consulta adicional será iniciada sem uma nova confirmação.</small>`:''}
       ${report.findings.some(f=>f.priority!=='information') ? `<details><summary>Ver pendências e próximos passos</summary>${report.findings.filter(f=>f.priority!=='information').map(f => `<article><h4>${escapeHtml(f.title)}</h4><p>${escapeHtml(f.description)}</p><small>Fonte: ${escapeHtml(f.sourceTitle)}</small>${f.identity !== 'compatible' ? '<p>Identidade não confirmada: confira o original antes de atribuir este registro ao titular.</p>' : ''}<p><strong>Próximo passo:</strong> ${escapeHtml(f.recommendation)}</p></article>`).join('')}</details>` : ''}
       <small class="seller-analysis-result-note">Resumo do material obtido, com as pendências encontradas e providências sugeridas.</small>` : ''}
     ${!running && (!report || canRetry) ? `<p>${state.message || state.current ? escapeHtml(state.message || state.current) : 'Confira as fontes obtidas e gere a análise consolidada.'}</p>${!state.aiReady ? '<p role="alert">A análise por IA ainda não está disponível neste ambiente. Os documentos obtidos permanecem acessíveis.</p>' : `<label class="seller-analysis-consent"><input type="checkbox" data-seller-review-consent /><span>Autorizo a análise destes documentos e dados pela OpenAI e Audita.</span></label><button type="button" class="primary-action" data-seller-review-start>${canRetry ? 'Retomar análise sem refazer consultas' : 'Analisar documentos e gerar relatório'}</button>`}` : ''}
     </section>`;
+  renderSellerProcessCoverage(target,id,state);
+  const processButton=target.querySelector('[data-process-online-open]');
+  if(processButton) processButton.onclick=()=>{processOnlineContext={parentAuditId:id};window.location.hash='processos-judiciais';};
   const additional=target.querySelector('[data-seller-additional]');
   if(additional)additional.onclick=()=>{document.querySelector('#sellerChangeData')?.click();document.querySelector('#sellerStatesChoice').open=true;document.querySelectorAll('#sellerAnalysisUfs input').forEach(input=>{if(report.additionalStates.includes(input.value))input.checked=true;});updateSellerEstimate();};
   const button = target.querySelector('[data-seller-review-start]');
@@ -7270,6 +7316,19 @@ function renderSellerReview(target, id, state) {
       await loadSellerReview(id);
     } catch { button.disabled = false; button.textContent = 'Não foi possível iniciar. Tentar novamente'; }
   };
+}
+
+function renderSellerProcessCoverage(target,id,state,analysisKey) {
+  const coverage=state.processCoverage||state.report?.processCoverage;if(!coverage)return;
+  const panel=document.createElement('section');panel.className='seller-process-coverage';panel.setAttribute('aria-label','Cobertura da análise de processos');
+  const title=document.createElement('p');title.textContent=`${coverage.analyzed} de ${coverage.total} processos analisados${coverage.complete?'':' · ANÁLISE PARCIAL'}`;panel.append(title);
+  if(coverage.reportedTotal>coverage.total){const note=document.createElement('p');note.textContent=`A fonte informou ${coverage.reportedTotal}, mas retornou ${coverage.total} registros. A análise não abrange os registros ausentes.`;panel.append(note);}
+  if(coverage.remaining>0 && state.status!=='running' && state.canAnalyze!==false) {
+    const label=document.createElement('label'),consent=document.createElement('input');consent.type='checkbox';label.append(consent,document.createTextNode(' Autorizo analisar os próximos processos salvos com IA.'));panel.append(label);
+    const button=document.createElement('button');button.type='button';button.className='secondary-action';button.textContent=`Continuar próximos ${Math.min(200,coverage.remaining)}`;button.disabled=true;consent.onchange=()=>{button.disabled=!consent.checked;};
+    button.onclick=async()=>{button.disabled=true;try{const response=await fetch(`/api/seller-analysis/${encodeURIComponent(id)}/review`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({consent:true,continueProcesses:true,continueFrom:coverage.analyzed,...(analysisKey?{analysisMode:analysisKey==='all'?'general':'document',...(analysisKey==='all'?{}:{sourceId:analysisKey}),purpose:state.purpose||''}:{})})});if(!response.ok)throw new Error();await loadSellerReview(id,analysisKey);}catch{button.textContent='Não foi possível continuar. Tentar novamente';button.disabled=false;}};panel.append(button);
+  }
+  (target.querySelector('.seller-review')||target.querySelector('.certificate-analysis')||target).prepend(panel);
 }
 
 function renderCertificateAnalysis(target, id, state) {
@@ -7306,12 +7365,13 @@ function renderCertificateAnalysis(target, id, state) {
       ${!state.aiReady ? '<p role="status">A análise IA está temporariamente indisponível. Seus documentos continuam salvos.</p>' : !state.canAnalyze ? '<p role="status">Você precisa de uma assinatura IA vigente para iniciar uma análise.</p><a class="secondary-action" href="#planos">Ver planos IA</a>' : ''}
       <div class="certificate-analysis-submit"><button type="submit" class="primary-action" ${!state.aiReady || !state.canAnalyze || !available.length ? 'disabled' : ''}>${retry ? 'Retomar análise' : report ? 'Atualizar análise' : individual ? 'Analisar este documento' : 'Analisar todos os documentos'} <span aria-hidden="true">→</span></button><small>Incluída na assinatura IA.<br>Usa a coleta salva, sem novas consultas às fontes.</small></div>
     </form></details>` : ''}
-    ${report ? `<section class="certificate-analysis-report" aria-labelledby="certificateAnalysisReportTitle"><header><div><span class="certificate-analysis-eyebrow">${state.status === 'completed' ? 'ANÁLISE CONCLUÍDA' : 'LEITURA PARCIAL'}</span><h4 id="certificateAnalysisReportTitle">${individual ? 'Resultado do documento' : 'Visão geral dos documentos'}</h4><small>${Number(report.analyzed) || 0} de ${Number(report.total) || 0} fontes analisadas · ${escapeHtml(date(report.generatedAt))}</small></div>${state.status === 'completed' ? `<a class="secondary-action" href="/api/seller-analysis/${encodeURIComponent(id)}/report.pdf?analysis=${encodeURIComponent(key)}" download>Baixar análise em PDF</a>` : ''}</header><div class="certificate-analysis-summary">${String(report.executiveSummary || report.conclusion || '').split(/\n\s*\n/).filter(Boolean).map(text => `<p>${escapeHtml(text)}</p>`).join('')}</div>
+    ${report ? `<section class="certificate-analysis-report" aria-labelledby="certificateAnalysisReportTitle"><header><div><span class="certificate-analysis-eyebrow">${state.status === 'completed' && report.processCoverage?.complete !== false ? 'ANÁLISE CONCLUÍDA' : 'LEITURA PARCIAL'}</span><h4 id="certificateAnalysisReportTitle">${individual ? 'Resultado do documento' : 'Visão geral dos documentos'}</h4><small>${Number(report.analyzed) || 0} de ${Number(report.total) || 0} fontes analisadas · ${escapeHtml(date(report.generatedAt))}</small></div>${state.status === 'completed' ? `<a class="secondary-action" href="/api/seller-analysis/${encodeURIComponent(id)}/report.pdf?analysis=${encodeURIComponent(key)}" download>Baixar análise em PDF</a>` : ''}</header><div class="certificate-analysis-summary">${String(report.executiveSummary || report.conclusion || '').split(/\n\s*\n/).filter(Boolean).map(text => `<p>${escapeHtml(text)}</p>`).join('')}</div>
       ${report.findings?.filter(finding => finding.priority !== 'information').length ? `<h5>Pontos de atenção e próximos passos</h5>${report.findings.filter(finding => finding.priority !== 'information').map(finding => `<article class="certificate-analysis-finding"><strong>${escapeHtml(finding.title)}</strong><p>${escapeHtml(finding.description)}</p><small>Fonte: ${escapeHtml(finding.sourceTitle)}</small><p><b>Próximo passo:</b> ${escapeHtml(finding.recommendation)}</p></article>`).join('')}` : ''}
       ${report.sources?.length ? `<details class="certificate-analysis-readings"><summary>Ver leitura por fonte e limitações</summary>${report.sources.map(source => `<article><strong>${escapeHtml(source.title)}</strong><p>${escapeHtml(source.summary || source.message || 'Leitura não disponível.')}</p>${source.limitations?.length ? `<ul>${source.limitations.map(text => `<li>${escapeHtml(text)}</li>`).join('')}</ul>` : ''}</article>`).join('')}</details>` : ''}
       <p class="certificate-analysis-limitation">${escapeHtml(report.scopeNotice || '')}</p></section>` : state.message || retry ? `<p role="status">${escapeHtml(state.message || state.current || 'A leitura não foi concluída. Você pode retomá-la usando os documentos salvos.')}</p>` : ''}
     ${saved.length ? `<aside class="certificate-analysis-history" aria-label="Análises salvas"><h4>Análises salvas <span>${saved.length}</span></h4><p>Abra um resultado anterior sem gerar uma nova análise.</p><div>${saved.map(item => `<button type="button" class="secondary-action" data-certificate-saved="${escapeHtml(item.key)}" ${item.key === key ? 'aria-current="true"' : ''}>${escapeHtml(item.title)}<small>${escapeHtml(date(item.generatedAt))}</small></button>`).join('')}</div></aside>` : ''}
   </section>`;
+  renderSellerProcessCoverage(target,id,state,key);
   target.querySelector('[data-certificate-back]').onclick = () => { sellerReviewRun++; sessionStorage.removeItem('audita:certificate-analysis:' + id); setSellerStep(2); };
   target.querySelectorAll('[name="certificate-analysis-mode"]').forEach(input => { input.onchange = () => open(input.value === 'general' ? 'all' : available[0].id, 'mode'); });
   target.querySelectorAll('[name="certificate-analysis-source"]').forEach(input => { input.onchange = () => open(input.value, 'source'); });

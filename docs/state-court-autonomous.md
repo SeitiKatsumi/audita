@@ -70,3 +70,8 @@ O fluxo reutiliza autenticação, isolamento e histórico de auditorias existent
 - Arquivos de teste reais e PDFs ficam em diretórios privados ignorados pelo Git. O pacote entregue localmente é `output/certidoes-validadas-2026-09-28.zip`. Não expor esses arquivos por rotas estáticas.
 
 A análise de risco por IA ainda não está ativa nesta tela. Esta entrega amplia a obtenção dos documentos; não conclui toda a diligência imobiliária. Produção e GitHub ainda não receberam estas alterações.
+
+
+## Ampliação de20/10/2026
+
+Homologação real adicionou MT/CPF criminal e seis combinações CNPJ em AP, BA, PA, PI e SE. Resultado:36 opções CPF/13UFs e20 opções CNPJ/9UFs. Confira [tipos, evidências e limites](certificate-audit-20261020.md). Somente os perfis comprovados foram liberados; candidatos continuam fora do catálogo público.

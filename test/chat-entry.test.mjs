@@ -10,7 +10,9 @@ test('chat welcome keeps the composer without suggestion shortcuts', () => {
   assert.ok(!welcome.includes('data-chat-prompt'));
   assert.ok(!welcome.includes('chat-suggestions'));
   assert.ok(html.includes('id="chatInput"'));
-  assert.match(html, /class="chat-icon-button chat-back-home" href="\/#home" aria-label="Voltar para a Home"/);
+  assert.match(html, /<aside class="sidebar"[^]*?href="#home"/);
+  assert.match(html, /<dialog class="chat-threads"[^>]*aria-labelledby="chatHistoryTitle"/);
+  assert.match(html, /id="chatHistoryButton"[^>]*aria-haspopup="dialog"/);
 });
 
 test('entering AI starts blank while history selection survives renders', () => {

@@ -214,7 +214,7 @@ test("seller results preserve every source, private PDF indices and pending quer
 
 test('text results preserve zero, false, safe text and an open panel during collection without new requests', () => {
   const id='seller-query-audit-test-seller_documents-0';
-  const panel={id,hidden:true};
+  const panel={id,hidden:true,querySelector:()=>null};
   let focusCalls=0,fetchCalls=0;
   const button={dataset:{sellerResultToggle:id},textContent:'Ver resultado',attributes:{},setAttribute(name,value){this.attributes[name]=value;},focus(){focusCalls++;}};
   const result={innerHTML:'',querySelectorAll:()=>panel.hidden?[]:[panel]};

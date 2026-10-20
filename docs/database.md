@@ -81,6 +81,36 @@ isolado por tenant e usuário, com revisão global exclusiva de super_admin.
 Não aplicar ao banco compartilhado sem autorização. Configuração, limites,
 metadados e verificação isolada em [import-audit.md](import-audit.md).
 
+## ProcessOnline — pedidos e análise dos autos
+
+`db/process-online.sql` cria as tabelas privadas
+`audita_process_online_requests` e `audita_process_online_events`. A primeira
+registra dono (`tenant_id` e `user_id`), operação idempotente, pedido do fornecedor,
+estado da cópia, débito/estorno e leases de conciliação. A unicidade por
+tenant/usuário/operação impede reaproveitar uma operação para outro conteúdo.
+A segunda deduplica eventos assinados por pedido/evento e registra sua conclusão.
+As referências a tenants e usuários usam `ON DELETE RESTRICT`.
+
+O conteúdo do pedido, CPF/CNPJ/CNJ, finalidade, dados e manifesto ficam no payload
+AES-256-GCM, com a chave existente `AUDITA_PROFILE_ENCRYPTION_KEY` e AAD
+`process-online:<id>`. PDFs são arquivos privados; URLs assinadas e caminhos não
+fazem parte da resposta pública. O acesso operacional filtra também pelo usuário,
+além do tenant. O webhook encontra o pedido pelo identificador do fornecedor
+somente após conferir sua assinatura.
+
+A análise mantém `analysis_status`, `analysis_token`, `analysis_updated_at` e
+`analysis_payload` separados do coletor. O JSONB contém `{encrypted: "..."}`, com
+AAD `process-online-analysis:<id>`; checkpoints, objetivo e relatório não ficam
+em texto aberto. Claim atômico e lease de dez minutos com heartbeat protegem a
+retomada entre processos. O SHA256 do arquivo detecta mudança de evidência.
+
+O servidor lê esse script quando a migração automática está habilitada. Ambientes
+com `AUDITA_AUTO_MIGRATE=false` exigem aplicação controlada antes de habilitar o
+provedor; não alterar essa configuração ou o banco compartilhado apenas para um
+teste. O script é aditivo, sem remoção de registros existentes. Homologação local
+usa somente PGlite e dados fictícios. Configuração, limites e pendências B2B em
+[process-online.md](process-online.md).
+
 ## Usuarios
 
 Criar usuarios separados por finalidade:
@@ -131,3 +161,7 @@ O projeto pode lidar com dados sensiveis. Qualquer dado pessoal deve ter base le
 
 ## Teste local conectado à produção (17/09/2026)
 Por solicitação explícita do usuário, a configuração privada local usa um túnel SSH temporário em loopback para o banco efetivamente usado pelo app publicado. Não há porta PostgreSQL pública. AUDITA_AUTO_MIGRATE=false, AUDITA_BACKGROUND_JOBS_ENABLED=false e bootstrap vazio impedem alterações automáticas; autenticação permanece obrigatória. Ações do usuário gravam no banco compartilhado. Os volumes de arquivos continuam separados. A configuração anterior está em arquivo privado ignorado pelo Git. O túnel precisa estar ativo durante os testes.
+
+## Preços globais de consultas (19/10/2026)
+
+Migração aditiva em db/schema.sql: audita_certificate_pricing, singleton global (id=TRUE), JSON pricing, revisão inteira, updated_by_user_id e updated_at. Ausência de registro usa a tabela padrão versionada com exceções de R$199 para processos agrupados/completos. Não há atualização de pedidos antigos: o JSON certificateOrder mantém amountCents e pricingSnapshot. Deploy deve aplicar o schema antes de liberar o editor; ambientes com AUDITA_AUTO_MIGRATE=false exigem aplicação operacional da criação da tabela. Banco indisponível bloqueia gravação; não substitua configuração ou dados para testar. Testes desta alteração usam PGlite isolado.

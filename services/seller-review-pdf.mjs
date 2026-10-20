@@ -34,9 +34,10 @@ export async function sellerReportPdf(report) {
   text('Relatório de análise documental', true);
   if(report.purpose) text('Objetivo da análise: '+report.purpose);
   text(`${report.subject.name}\nDocumento: ${report.subject.document}\nConsulta: ${report.id}\nGerado em: ${new Date(report.generatedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})} (Brasília)`);
+  if(report.processCoverage){const coverage=report.processCoverage;text(`${coverage.complete?'Cobertura dos processos':'ANÁLISE PARCIAL DOS PROCESSOS'}: ${coverage.analyzed} de ${coverage.total} registros recebidos analisados; ${coverage.reportedTotal} informados pela fonte.`,true);}
   text('Resumo da análise',true);
   text(report.executiveSummary || report.conclusion);
-  text(`${report.analyzed} documentos e consultas analisados. ${report.findings.filter(f=>f.priority!=='information').length} pontos de atenção no material obtido.`);
+  text(`${report.analyzed} ${report.processCoverage ? 'fontes e lotes analisados' : 'documentos e consultas analisados'}. ${report.findings.filter(f=>f.priority!=='information').length} pontos de atenção no material obtido.`);
   const issues=report.findings.filter(f=>f.priority!=='information');
   if(issues.length) text('Pendências identificadas e próximos passos',true);
   for (const [index,f] of issues.entries()) {

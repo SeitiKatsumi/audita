@@ -30,7 +30,12 @@ import { resolveUiRoute } from "./services/ui-routing.service.mjs";
 import { createAuditService } from "./services/audit.service.mjs";
 import { createSellerReviewService } from './services/seller-review.service.mjs';
 import { createSellerReviewAI } from './services/seller-review-ai.mjs';
+import { createProcessOnlineService } from './services/process-online.service.mjs';
+import { createProcessOnlineWorkflowService } from './services/process-online-workflow.service.mjs';
+import { createProcessOnlineAnalysisService } from './services/process-online-analysis.service.mjs';
+import { createProcessOnlineRouter } from './services/process-online-routes.mjs';
 import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER,certificateQuote} from './services/certificate-order.service.mjs';
+import {createCertificatePricingService} from './services/certificate-pricing.service.mjs';
 import {billingConfiguration} from './services/billing-catalog.service.mjs';
 import { getPdfRoot } from "./services/storage.service.mjs";
 import { getAutonomousCertificateCoverage, planAutonomousCertificates } from "./services/state-court-autonomous.service.mjs";
@@ -574,6 +579,7 @@ async function initializeDatabase() {
       await pool.query(await readFile(join(root, "db", "energy-audit.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "import-audit.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "glosas.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "process-online.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-access.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-documents.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-customers.sql"), "utf8"));
@@ -1737,6 +1743,24 @@ const sellerReviewService = createSellerReviewService({
   ai: createSellerReviewAI({ recordUsage: (usage, auth, operation='seller_document_analysis') => apiUsageService.record(auth, { provider: 'openai', service: 'responses', model: process.env.AUDITA_SELLER_AI_MODEL || process.env.AUDITA_CHAT_MODEL || 'gpt-5-mini', operation, ...usage }) }),
 });
 const creditsService = createCreditsService({ getDb: () => ({ pool, dbReady }) });
+const processOnlineWorkflow = createProcessOnlineWorkflowService({
+  getDb: () => ({ pool, dbReady }), provider: createProcessOnlineService(), credits: creditsService,
+});
+const processOnlineAnalysis = createProcessOnlineAnalysisService({
+  getDb: () => ({ pool, dbReady }), workflow: processOnlineWorkflow,
+  ai: createSellerReviewAI({ recordUsage: (usage, auth) => apiUsageService.record(auth, {
+    provider: 'openai', service: 'responses', model: process.env.AUDITA_SELLER_AI_MODEL || process.env.AUDITA_CHAT_MODEL || 'gpt-5-mini',
+    operation: 'process_online_document_analysis', ...usage,
+  }) }),
+  authorize: async auth => {
+    const access = await certificateBenefits(auth);
+    if (!access.subscriber && !access.complimentary) throw Object.assign(new Error('analysis_subscription_required'), { code: 'process_online_analysis_subscription_required', status: 402 });
+    await chatAccessService.assertCanSpend(auth);
+  },
+});
+const processOnlineRoute = createProcessOnlineRouter({
+  workflow: processOnlineWorkflow, analysis: processOnlineAnalysis, getAuth: getTenantIdForRequest, sendJson,
+});
 const billingAccessService = createBillingAccessService({
   getDb: () => ({ pool, dbReady }),
   listFallbackUsers: () => [...fallbackUsers.values()],
@@ -1764,7 +1788,11 @@ const stripeBillingService = createStripeBillingService({
   onDebtPaymentEvent: (event) => bankDebtService.paymentEvent(event),
   onCertificatePaymentEvent: event => certificateOrderService.paymentEvent(event),
 });
-const certificateOrderService=createCertificateOrderService({getDb:()=>({pool,dbReady}),
+const certificatePricingService=createCertificatePricingService({getDb:()=>({pool,dbReady}),catalog:()=>[
+  ...getSellerDocumentCoverage({configured:true}).queries.map(q=>({key:q.id,label:q.label,costBrl:q.costBrl})),
+  ...getAutonomousCertificateCoverage(directDataCertificatesService.getStatus()).certificates.map(c=>({key:c.id||c.uf+':'+c.type,label:c.uf+' · '+c.type,costBrl:c.provider==='direct_data'?directDataCertificatesService.getStatus().pdfTotalCostBrl||.54:0}))
+]});
+const certificateOrderService=createCertificateOrderService({getDb:()=>({pool,dbReady}),getPricing:async()=>(await certificatePricingService.get()).pricing,
   checkout:(auth,order)=>stripeBillingService.createCertificateCheckoutSession(auth,order),
   checkoutReady:()=>billingConfiguration().checkoutReady&&billingConfiguration().webhookReady,
   startAudit:(request,options)=>auditService.startAudit(request,options)});
@@ -3747,6 +3775,19 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if(pathname==='/api/super-admin/certificate-pricing'&&['GET','PUT'].includes(request.method)){
+    response.setHeader('cache-control','private, no-store');
+    try{
+      const actor=await getTenantIdForRequest(request);
+      if(actor.unauthorized||!actor.user){sendJson(response,401,{error:'authentication_required'});return true;}
+      if(actor.user.role!=='super_admin'){sendJson(response,403,{error:'super_admin_required'});return true;}
+      if(request.method==='PUT'&&(!String(request.headers['content-type']).startsWith('application/json')||request.headers['sec-fetch-site']==='cross-site'||request.headers.origin&&new URL(request.headers.origin).host!==request.headers.host)){sendJson(response,403,{error:'same_origin_required'});return true;}
+      const result=request.method==='PUT'?await certificatePricingService.save(actor,await readJsonBody(request)):await certificatePricingService.get({required:true});
+      sendJson(response,200,{...result,catalog:certificatePricingService.catalog()});
+    }catch(error){sendJson(response,error.status||503,{error:error.code||'certificate_pricing_unavailable'});}
+    return true;
+  }
+
   if (pathname === "/api/super-admin/dashboard" && request.method === "GET") {
     try {
       const authContext = await getTenantIdForRequest(request);
@@ -3929,6 +3970,8 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  if (await processOnlineRoute(request, response)) return true;
+
   if (pathname === "/api/seller-analysis/coverage" && request.method === "GET") {
     const benefits=await certificateBenefits(await getTenantIdForRequest(request));
     const coverage = {
@@ -3937,7 +3980,7 @@ async function handleApi(request, response, pathname) {
       sellerSources: getSellerDocumentCoverage(directDataSellerService.getStatus()),
     };
     sendJson(response, 200, { ...coverage, states: sellerStatePlans(coverage), companyStates: sellerStatePlans(coverage,'cnpj'), identityQueryCostBrl:directDataPersonService.getStatus().queryCostBrl,
-      certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateSubscriber:benefits.subscriber,certificateComplimentary:benefits.complimentary,certificateTestBypassEnabled:certificateOrderService.ready()&&certificateOrderService.testBypassEnabled(),certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
+      certificatePricing:await certificateOrderService.pricing?.(),certificatePriceMultiplier:CERTIFICATE_PRICE_MULTIPLIER,certificateSubscriber:benefits.subscriber,certificateComplimentary:benefits.complimentary,certificateTestBypassEnabled:certificateOrderService.ready()&&certificateOrderService.testBypassEnabled(),certificateCheckoutReady:certificateOrderService.ready()&&billingConfiguration().checkoutReady&&billingConfiguration().webhookReady });
     return true;
   }
 
@@ -4120,9 +4163,9 @@ async function handleApi(request, response, pathname) {
       const providerCostBrl=(autonomousPlan?.maxProviderCostBrl||0)+(sellerDocumentPlan?.maxProviderCostBrl||0);
       {
         const benefits=await certificateBenefits(authContext);
-        const costs=[...(autonomousPlan?.certificates||[]).map(c=>c.provider==='direct_data'?directDataCertificatesService.getStatus().pdfTotalCostBrl||.54:0),...(sellerDocumentPlan?.queries||[]).flatMap(q=>Array(q.documentTypes.includes('cpf')?1:companyCnpjs.length).fill(Number(q.costBrl)))];
+        const costs=[...(autonomousPlan?.certificates||[]).map(c=>({key:c.id||c.uf+':'+c.type,costBrl:c.provider==='direct_data'?directDataCertificatesService.getStatus().pdfTotalCostBrl||.54:0})),...(sellerDocumentPlan?.queries||[]).flatMap(q=>Array(q.documentTypes.includes('cpf')?1:companyCnpjs.length).fill({key:q.id,costBrl:Number(q.costBrl)}))];
         if(!costs.length)costs.push(0);
-        const quote=certificateQuote(costs,benefits.subscriber);
+        const quote=certificateQuote(costs,benefits.subscriber,await certificateOrderService.pricing?.());
         const catalog=billingConfiguration();
         const testBypassAvailable=body.flow==='certificates'&&certificateOrderService.testBypassEnabled?.()===true;
         if(!certificateOrderService.ready()||quote.amountCents>0&&!benefits.complimentary&&!testBypassAvailable&&(!catalog.checkoutReady||!catalog.webhookReady)) {
@@ -4137,6 +4180,18 @@ async function handleApi(request, response, pathname) {
         message: 'Não foi possível preparar a consulta. Tente novamente ou contate a equipe.',
       });
     }
+    return true;
+  }
+
+  const sellerProcessesMatch=pathname.match(/^\/api\/seller-analysis\/([0-9a-fA-F-]{36})\/processes$/);
+  if(sellerProcessesMatch&&request.method==='GET') {
+    response.setHeader('cache-control','private, no-store');
+    try {
+      const query=new URL(request.url,'http://localhost').searchParams;
+      const offset=query.get('offset')||'0';
+      if(!/^\d{1,9}$/.test(offset))throw Object.assign(new Error(),{code:'invalid_process_offset',status:400});
+      sendJson(response,200,await sellerReviewService.processes(sellerProcessesMatch[1],await getTenantIdForRequest(request),request,query.get('source'),Number(offset)));
+    }catch(error){sendJson(response,error.status||503,{error:error.code||'seller_processes_unavailable'});}
     return true;
   }
 
@@ -4169,7 +4224,7 @@ async function handleApi(request, response, pathname) {
           sendJson(response, 403, { error: 'same_origin_required' }); return true;
         }
         const body = await readJsonBody(request);
-        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose, { mode: body.analysisMode, sourceId: body.sourceId }));
+        sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose, { mode: body.analysisMode, sourceId: body.sourceId, continueProcesses:body.continueProcesses, continueFrom:body.continueFrom }));
       } else if (sellerReviewMatch[2] === 'report.pdf') {
         const buffer = await sellerReviewService.pdf(id, auth, new URL(request.url || '/', 'http://localhost').searchParams.get('analysis'));
         response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="relatorio-audita.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });
@@ -6260,6 +6315,8 @@ const server = http.createServer(async (request, response) => {
     "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css", "general-chat.js"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");
   publicRootFiles.add('certificate-selection.js');
+  publicRootFiles.add('process-online.js');
+  publicRootFiles.add('process-online.css');
   if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;
   }

@@ -230,7 +230,8 @@
         "cnpj"
       ],
       "validatedDocumentTypes": [
-        "cpf"
+        "cpf",
+        "cnpj"
       ],
       "validatedAt": "2026-09-28"
     },
@@ -303,7 +304,8 @@
         "cnpj"
       ],
       "validatedDocumentTypes": [
-        "cpf"
+        "cpf",
+        "cnpj"
       ],
       "validatedAt": "2026-09-28"
     },
@@ -317,7 +319,8 @@
         "cnpj"
       ],
       "validatedDocumentTypes": [
-        "cpf"
+        "cpf",
+        "cnpj"
       ],
       "validatedAt": "2026-09-28"
     },
@@ -515,15 +518,18 @@
     },
     {
       "uf": "AP",
-      "type": "FalênciaRecuperação",
+      "type": "Falência e recuperação judicial",
       "provider": "direct_data",
-      "expectedText": "FALÊNCIA",
+      "expectedText": "CERTIDÃO FALÊNCIA/RECUPERAÇÃO JUDICIAL",
       "documentTypes": [
         "cpf",
         "cnpj"
       ],
-      "validatedDocumentTypes": [],
-      "availability": "requires_validation"
+      "validatedDocumentTypes": [
+        "cnpj"
+      ],
+      "availability": "partially_validated",
+      "providerType": "FalênciaRecuperação"
     },
     {
       "uf": "AM",
@@ -620,15 +626,18 @@
     },
     {
       "uf": "BA",
-      "type": "FalênciaRecuperação",
+      "type": "Falência e recuperação judicial",
       "provider": "direct_data",
-      "expectedText": "FALÊNCIA",
+      "expectedText": "CONCORDATA, FALÊNCIA, RECUPERAÇÃO JUDICIAL E EXTRAJUDICIAL",
       "documentTypes": [
         "cpf",
         "cnpj"
       ],
-      "validatedDocumentTypes": [],
-      "availability": "requires_validation"
+      "validatedDocumentTypes": [
+        "cnpj"
+      ],
+      "availability": "partially_validated",
+      "providerType": "FalênciaRecuperação"
     },
     {
       "uf": "CE",
@@ -759,7 +768,9 @@
         "cpf",
         "cnpj"
       ],
-      "validatedDocumentTypes": [],
+      "validatedDocumentTypes": [
+        "cpf"
+      ],
       "availability": "requires_validation"
     },
     {
@@ -1027,7 +1038,8 @@
         "cnpj"
       ],
       "validatedDocumentTypes": [
-        "cpf"
+        "cpf",
+        "cnpj"
       ],
       "validatedAt": "2026-10-16"
     },
