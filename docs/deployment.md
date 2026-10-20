@@ -223,3 +223,5 @@ Esses arquivos devem ser criados quando a stack tecnica for definida.
 ## Publicação consolidada — 20/10/2026
 
 Autorizada pelo usuário. Inclui preços/admin, PGFN com comprovante, expansão estadual validada, processos200, integração ProcessOnline preparada e sidebar compartilhada no chat. Tabelas aditivas audita_certificate_pricing e audita_process_online_*; auto-migração existente da produção preservada. ProcessOnline permanece desativado sem acesso B2B; nenhuma mudança Pix/Stripe. Preservar62variáveis, dois volumes privados, backup PostgreSQL/config, rollback img-captain-audita:172 e os quatro PDFs LFS reais do pacote. Conferir CI, saúde/banco/auth, catálogo36CPF/20CNPJ, preço199 e interface publicada. Em andamento.
+
+Concluída: PR31, imagem173/runtime4c09b55,672/672testes, saúde200/banco pronto/auth obrigatória, backup PostgreSQL validado e retorno172.62variáveis/2volumes/portas/webhook preservados; quatro PDFs privados reais com hashes conferidos. Evidências sanitizadas em S:/CodexBuilds/Audita-release-20261020. ProcessOnline desativado e Pix inalterado. Registro documental não exige reconstruir a imagem.
