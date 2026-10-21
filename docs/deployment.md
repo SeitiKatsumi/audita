@@ -228,4 +228,3 @@ Concluída: PR31, imagem173/runtime4c09b55,672/672testes, saúde200/banco pronto
 
 ## 2026-10-21 — Publicação de certidões conjuntas e ajustes locais
 Autorizada pelo usuário. Base main8933a1f preservada; inclui catálogo federal CPF/CNPJ em emissão e nove análises, correções sandbox ProcessOnline e versão Itaú mais recente. Sem migração/dependência nova de produção. ProcessOnline segue desativado e credencial test permanece exclusivamente local. Backup atual validado em /captain/data/audita-backups/20261021-rfb-release, pg_dump158264499bytes/644entradas; imagem de retorno176. Snapshot das62variáveis e dois volumes preservado. Publicação e verificações finais em andamento.
-
