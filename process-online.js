@@ -65,7 +65,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   const intro = el('header', 'process-online-intro');
   intro.append(el('span', 'process-online-eyebrow', 'Processos judiciais'),
     el('h2', '', 'Localize processos e solicite os autos'),
-    el('p', '', 'Verifique um número CNJ gratuitamente ou busque processos por CPF/CNPJ. A cópia integral é solicitada individualmente, após sua autorização.'),
+    el('p', '', 'Informe um número CNJ ou busque processos por CPF/CNPJ. A cópia integral é solicitada individualmente, após sua autorização.'),
     el('p', 'process-online-muted', 'As cópias não são certidões oficiais e não incluem monitoramento contínuo. Processos restritos dependem das permissões do tribunal.'));
   const configPanel = el('div', 'process-online-config'); configPanel.setAttribute('role', 'status');
   const notice = el('div', 'process-online-notice'); notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite'); notice.hidden = true;
@@ -78,34 +78,21 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   const forms = el('div', 'process-online-forms');
   const cnjSection = el('section', 'process-online-section');
   cnjSection.append(el('h3', '', 'Já tenho o número do processo'));
-  const verifyForm = el('form', 'process-online-form');
   const cnj = input('cnj', '0000000-00.0000.0.00.0000', 30); cnj.inputMode = 'numeric';
   const cnjField = field('Número CNJ', cnj);
-  const verifyButton = el('button', 'secondary-action', 'Verificar gratuitamente'); verifyButton.type = 'submit';
-  verifyForm.append(cnjField, verifyButton);
-  const verification = el('div', 'process-online-verification'); verification.hidden = true;
   const copyForm = el('form', 'process-online-form');
-  const interest = el('select'); interest.name = 'interesse'; interest.required = true;
-  for (const [value, label] of Object.entries({ parte: 'Sou parte do processo', advogado: 'Sou advogado(a)',
-    arrematante: 'Sou arrematante', sucessor: 'Sou sucessor(a)', credor: 'Sou credor(a)', outro: 'Outro interesse legítimo' })) {
-    const option = el('option', '', label); option.value = value; interest.append(option);
-  }
-  const detail = el('textarea'); detail.name = 'interesseDetalhe'; detail.rows = 2; detail.maxLength = 2000;
-  detail.placeholder = 'Informe seu vínculo ou representação e OAB, se aplicável.';
-  const copyPrice = el('p', 'process-online-cost');
   const copyConsent = consent('copyConsent', 'Autorizo a solicitação desta cópia e confirmo meu interesse legítimo.');
   const copyButton = el('button', 'primary-action', 'Solicitar cópia integral'); copyButton.type = 'submit';
-  copyForm.append(field('Meu interesse no processo', interest), field('Detalhes do interesse (opcional)', detail), copyPrice, copyConsent.label, copyButton);
-  cnjSection.append(verifyForm, verification, copyForm);
+  copyForm.append(cnjField, copyConsent.label, copyButton);
+  cnjSection.append(copyForm);
 
   const searchSection = el('section', 'process-online-section');
   searchSection.append(el('h3', '', 'Localizar por CPF ou CNPJ'), el('p', 'process-online-muted', 'A busca retorna uma lista de processos. Ela não solicita cópias automaticamente.'));
   const searchForm = el('form', 'process-online-form');
   const documento = input('documento', 'CPF ou CNPJ do titular', 22); documento.inputMode = 'numeric';
-  const searchPrice = el('p', 'process-online-cost');
   const searchConsent = consent('searchConsent', 'Tenho autorização para consultar este documento e autorizo esta busca.');
   const searchButton = el('button', 'primary-action', 'Buscar processos'); searchButton.type = 'submit';
-  searchForm.append(field('CPF ou CNPJ', documento), searchPrice, searchConsent.label, searchButton);
+  searchForm.append(field('CPF ou CNPJ', documento), searchConsent.label, searchButton);
   searchSection.append(searchForm);
   forms.append(cnjSection, searchSection);
 
@@ -130,21 +117,16 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   }
   function ready() { return state.config?.enabled === true && state.config?.ready === true && state.config?.storageReady !== false; }
   function sandbox() { return ['test', 'sandbox'].includes(state.config?.mode); }
-  function costText(kind) {
-    if (sandbox()) return 'Ambiente de testes: 0 créditos Audita e nenhum pagamento real. Apenas processos de demonstração (canários) e PDFs demonstrativos.';
-    return `${kind === 'search' ? 'Cada busca' : 'Cada cópia'}: 1 crédito da carteira Audita, autorizado antes do envio. O crédito do fornecedor é controlado pela Audita; não é uma assinatura ProcessOnline.`;
-  }
   function updateControls() {
     const paidDisabled = state.busy || !ready() || Boolean(state.pending);
     searchButton.disabled = paidDisabled || !searchConsent.check.checked;
     copyButton.disabled = paidDisabled || !copyConsent.check.checked;
-    verifyButton.disabled = state.busy || !state.config?.ready;
     historyButton.disabled = state.busy;
     retryButton.disabled = state.busy || !ready();
     retryButton.hidden = Boolean(state.pending?.review);
     retryButton.textContent = state.pending?.canRecover ? 'Retomar a mesma cópia' : 'Retomar a mesma operação';
     reconcileButton.disabled = state.busy;
-    for (const control of [cnj, documento, interest, detail, copyConsent.check, searchConsent.check]) {
+    for (const control of [cnj, documento, copyConsent.check, searchConsent.check]) {
       control.disabled = state.busy || Boolean(state.pending);
     }
     root.setAttribute('aria-busy', String(state.busy));
@@ -166,13 +148,12 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
       link.href = 'https://processonline.com.br/seja-parceiro/'; link.target = '_blank'; link.rel = 'noopener noreferrer';
       configPanel.append(link);
     }
-    copyPrice.textContent = costText('copy'); searchPrice.textContent = costText('search');
     copyConsent.label.lastChild.textContent = sandbox()
       ? 'Autorizo uma cópia demonstrativa no ambiente de testes, sem pagamento real.'
-      : 'Autorizo o uso de 1 crédito da minha carteira Audita para esta cópia e confirmo meu interesse legítimo.';
+      : 'Autorizo a solicitação desta cópia e confirmo meu interesse legítimo.';
     searchConsent.label.lastChild.textContent = sandbox()
       ? 'Tenho autorização e quero testar a busca com um documento canário, sem pagamento real.'
-      : 'Tenho autorização para consultar este documento e autorizo o uso de 1 crédito da minha carteira Audita para esta busca.';
+      : 'Tenho autorização para consultar este documento e autorizo esta busca.';
     updateControls();
   }
   async function api(path, body) {
@@ -271,7 +252,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     heading.append(refresh); details.append(heading);
     const status = el('p', 'process-online-status', STATUS[request.status] || 'Estado em conferência');
     status.setAttribute('role', 'status'); details.append(status);
-    if (request.billing) {
+    if (request.billing && request.billing.auditaCredits > 0) {
       const billing = request.billing;
       const message = request.mode === 'test' || sandbox() ? 'Ambiente de testes: nenhum crédito Audita cobrado.'
         : billing.refunded ? 'Crédito Audita devolvido à carteira.'
@@ -279,8 +260,9 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
             : billing.state === 'charged' ? `${billing.auditaCredits || 1} crédito Audita utilizado nesta operação.`
               : billing.state === 'reserved' ? 'Crédito Audita reservado para esta operação.' : 'Consumo de crédito Audita: confira o estado da operação.';
       details.append(el('p', 'process-online-muted', message));
-      if (request.status === 'review_required' && request.canRecover === true) renderRecovery(request);
+
     }
+    if (request.status === 'review_required' && request.canRecover === true) renderRecovery(request);
     if (request.mode === 'test' || sandbox()) details.append(el('p', 'process-online-sandbox', 'Demonstração: estes dados e PDFs pertencem ao ambiente de testes.'));
     if (request.kind === 'search') {
       const results = Array.isArray(request.results) ? request.results : request.resultData?.results || [];
@@ -294,9 +276,9 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
         const summary = [result.tribunal, result.classe, result.assunto, result.situacao].filter(value => typeof value === 'string').join(' · ');
         if (summary) row.append(el('p', 'process-online-muted', summary));
         row.append(button('Preparar solicitação de cópia', () => {
-          cnj.value = resultCnj; verification.hidden = true; copyConsent.check.checked = false;
+          cnj.value = resultCnj; copyConsent.check.checked = false;
           updateControls(); cnj.focus(); cnjSection.scrollIntoView?.({ block: 'nearest' });
-          showNotice('Confira o número, informe seu interesse e autorize esta cópia individualmente.');
+          showNotice('Confira o número e autorize esta cópia individualmente.');
         }), rawDetails('Metadados informados pelo parceiro', result));
         list.append(row);
       }
@@ -330,11 +312,11 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   function renderRecovery(request) {
     const area = el('section', 'process-online-recovery');
     area.append(el('h4', '', 'Retomar esta solicitação de cópia'),
-      el('p', 'process-online-muted', 'O servidor reutiliza os dados privados, a referência e a autorização desta solicitação salva. A retomada não inicia outro pedido nem debita outro crédito Audita.'));
+      el('p', 'process-online-muted', 'O servidor reutiliza os dados privados, a referência e a autorização desta solicitação salva. A retomada não inicia outro pedido.'));
     const form = el('form', 'process-online-form');
     const approval = consent('recoveryConsent', sandbox()
       ? 'Autorizo retomar esta mesma cópia demonstrativa, sem pagamento real.'
-      : 'Autorizo retomar esta mesma cópia com o crédito já autorizado, sem nova cobrança Audita.');
+      : 'Autorizo retomar esta mesma solicitação de cópia.');
     const submit = el('button', 'primary-action', 'Retomar cópia salva'); submit.type = 'submit'; submit.disabled = true;
     approval.check.addEventListener('change', () => { submit.disabled = !approval.check.checked || state.busy || !ready(); });
     form.append(approval.label, submit);
@@ -342,7 +324,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
       event.preventDefault(); if (!approval.check.checked || !ready()) return;
       run(async () => {
         const generation = state.generation;
-        const result = unwrap(await api(`/requests/${encodeURIComponent(request.id)}/recover`, { consent: true, approvedCredits: 1 }));
+        const result = unwrap(await api(`/requests/${encodeURIComponent(request.id)}/recover`, { consent: true, approvedCredits: 0 }));
         assertCurrent(generation);
         if (!result?.id || result.id !== request.id) throw new Error('A retomada ainda não foi confirmada. Confira este pedido salvo antes de tentar novamente.');
         if (!result.operationId && request.operationId) result.operationId = request.operationId;
@@ -492,28 +474,15 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     if (kind === 'copy' && state.requests.some(item => item.kind === 'copy' && ['review_required', 'submitting'].includes(item.status) && digits(item.cnj) === digits(value))) {
       throw new Error('Já existe uma solicitação deste processo aguardando conferência. Abra o pedido salvo no histórico antes de iniciar outra operação.');
     }
-    const body = { operationId: operationId(), consent: true, approvedCredits: 1,
+    const body = { operationId: operationId(), consent: true, approvedCredits: 0,
       ...(state.parentAuditId ? { parentAuditId: state.parentAuditId } : {}),
-      ...(kind === 'search' ? { documento: value } : { cnj: value, interesse: interest.value, interesseDetalhe: detail.value.trim() }) };
+      ...(kind === 'search' ? { documento: value } : { cnj: value, interesse: 'outro', interesseDetalhe: '' }) };
     state.pending = { kind, body }; updateControls(); await submitPending();
   }
-  verifyForm.addEventListener('submit', event => {
-    event.preventDefault();
-    run(async () => {
-      const generation = state.generation;
-      if (!state.config?.ready) return;
-      if (!/^[\d.\-\s]+$/.test(cnj.value) || digits(cnj.value).length !== 20) throw new Error('Informe o número CNJ completo, com 20 dígitos.');
-      const result = await api('/verify', { cnj: cnj.value.trim() });
-      assertCurrent(generation);
-      verification.replaceChildren(el('strong', '', result.exists === true ? 'Processo localizado pelo parceiro' : result.exists === false ? 'Processo não localizado pelo parceiro' : 'Verificação recebida'),
-        rawDetails('Conferir metadados da verificação gratuita', result));
-      verification.hidden = false;
-    });
-  });
   copyForm.addEventListener('submit', event => { event.preventDefault(); run(() => startOperation('copy')); });
   searchForm.addEventListener('submit', event => { event.preventDefault(); run(() => startOperation('search')); });
   for (const check of [copyConsent.check, searchConsent.check]) check.addEventListener('change', updateControls);
-  cnj.addEventListener('input', () => { copyConsent.check.checked = false; verification.hidden = true; updateControls(); });
+  cnj.addEventListener('input', () => { copyConsent.check.checked = false; updateControls(); });
   documento.addEventListener('input', () => { searchConsent.check.checked = false; updateControls(); });
   doc.addEventListener('visibilitychange', () => { if (doc.hidden) stopPoll(); else schedulePoll(); });
   renderHistory(); renderConfig();
@@ -523,9 +492,9 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     state.active = false; state.config = null; state.busy = false;
     state.requests = []; state.selected = null; state.analysis = null; state.pending = null;
     state.parentAuditId = null; state.refreshAt.clear();
-    cnj.value = ''; documento.value = ''; detail.value = ''; interest.selectedIndex = 0;
+    cnj.value = ''; documento.value = '';
     copyConsent.check.checked = false; searchConsent.check.checked = false;
-    verification.replaceChildren(); verification.hidden = true; pendingText.textContent = '';
+    pendingText.textContent = '';
     showNotice(); renderHistory(); renderDetails(); renderConfig();
   }
 

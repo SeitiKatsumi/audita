@@ -95,7 +95,7 @@ async function fixture(options = {}) {
 test('workflow validates authentication, consent, identifiers and parent ownership before persistence or provider calls', async () => {
   const f = await fixture();
   try {
-    for (const body of [input({ operationId: 'invalid' }), input({ consent: false }), input({ approvedCredits: 0 }), input({ documento: '11111111111' })]) {
+    for (const body of [input({ operationId: 'invalid' }), input({ consent: false }), input({ approvedCredits: -1 }), input({ documento: '11111111111' })]) {
       await assert.rejects(f.service.search(AUTH, body));
     }
     for (const body of [input({ cnj: '50624045520248130702' }), input({ interesse: 'unknown' }), input({ interesse: 'advogado', interesseDetalhe: 'invalid' }), input({ interesseDetalhe: '\n' })]) {
@@ -383,7 +383,7 @@ test('owner can recover by request id after reload using only the encrypted orig
   try {
     const body = input(), first = await f.service.requestCopy(AUTH, body);
     await assert.rejects(f.make().recover({ tenantId: 1, user: { id: 12 } }, first.id, { consent: true, approvedCredits: 1 }), { status: 404 });
-    await assert.rejects(f.make().recover(AUTH, first.id, { consent: true, approvedCredits: 0 }), { code: 'process_online_cost_approval_required' });
+    await assert.rejects(f.make().recover(AUTH, first.id, { consent: true, approvedCredits: -1 }), { code: 'process_online_cost_approval_required' });
     assert.equal(f.state.calls.length, 1);
     f.state.transportError = null;
     const recovered = await f.make().recover(AUTH, first.id, { consent: true, approvedCredits: 1, operationId: randomUUID(), cnj: 'invalid', interesse: 'invalid' });
@@ -428,4 +428,20 @@ test('documented HTTP410 expiry also preserves intact local files and denies a d
     assert.equal(rejected.status, 'expired'); assert.equal(rejected.parts.length, 0);
     assert.equal(f.state.calls.filter(call => call.target.includes('api-create-request')).length, 1);
   } finally { await f.close(); }
+});
+
+test('new credit-free searches and copies work without a wallet and retain safe recovery', async()=>{
+ const f=await fixture({mode:'live',walletEnabled:false,balance:0});
+ try {
+ f.env.AUDITA_CREDITS_ENABLED='false';
+ assert.equal(f.service.getStatus().ready,true);
+ const search=await f.service.search(AUTH,input({approvedCredits:0}));
+ assert.equal(search.billing.auditaCredits,0);assert.equal(f.state.debit,0);
+ f.state.transportError=new Error('timeout');
+ const copy=await f.service.requestCopy(AUTH,input({approvedCredits:0}));
+ assert.equal(copy.canRecover,true);assert.equal(copy.billing.auditaCredits,0);
+ f.state.transportError=null;
+ const recovered=await f.service.recover(AUTH,copy.id,{consent:true,approvedCredits:0});
+ assert.equal(recovered.status,'processing');assert.equal(f.state.debit,0);assert.equal(f.state.refund,0);
+ } finally {await f.close();}
 });

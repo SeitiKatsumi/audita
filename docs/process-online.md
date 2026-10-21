@@ -1,3 +1,7 @@
+# Atualização de interface e carteira — 21/10/2026
+
+A interface simplificada envia `approvedCredits: 0`: novas buscas e cópias nesse fluxo não debitam a carteira Audita nem dependem dela. O crédito do fornecedor continua sendo responsabilidade interna da integração. Operações legadas com aprovação de 1 mantêm conciliação e estorno existentes. O vínculo enviado é `outro`, com confirmação de interesse legítimo no aceite, sem declarar que o usuário é parte ou advogado. Verificação gratuita permanece apenas na API; não aparece na tela.
+
 # ProcessOnline — busca, autos privados e análise assistida
 
 Implementação local em `codex/processonline-integracao`, com transporte, fluxo

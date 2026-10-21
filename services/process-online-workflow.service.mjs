@@ -107,9 +107,9 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
   }
   function getStatus() {
     const status = providerStatus(), storageReady = Boolean(getDb?.()?.dbReady && getDb?.()?.pool && key());
-    const billingReady = status.mode === 'test' || Boolean(env.AUDITA_CREDITS_ENABLED === 'true' && credits?.getWallet && credits?.consume && credits?.grant);
+    const billingReady = true;
     return { enabled: status.enabled === true, ready: status.ready === true && storageReady && billingReady, mode: status.mode,
-      storageReady, billingReady, auditaCredits: status.mode === 'live' ? 1 : 0, providerCredits: status.mode === 'live' ? 1 : 0,
+      storageReady, billingReady, auditaCredits: 0, providerCredits: status.mode === 'live' ? 1 : 0,
       verificationCredits: 0, pollAfterMs: 30000, maxPartBytes: MAX_PART_BYTES, maxTotalBytes: MAX_TOTAL_BYTES, maxParts: MAX_PARTS };
   }
   async function owned(auth, id) {
@@ -131,7 +131,7 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
     return { id: row.id, operationId: row.operation_id, kind: row.kind, status: row.status, mode: row.mode,
       cnj: payload.input.cnj || null, parentAuditId: payload.input.parentAuditId || null,
       createdAt: row.created_at, updatedAt: row.updated_at, pollAfterMs: 30000,
-      billing: { auditaCredits: row.mode === 'live' ? 1 : 0, providerCredits: row.mode === 'live' ? 1 : 0,
+      billing: { auditaCredits: row.mode === 'live' && payload.input.approvedCredits !== 0 ? 1 : 0, providerCredits: row.mode === 'live' ? 1 : 0,
         state: row.billing_state, refunded: row.billing_state === 'refunded' },
       ...(payload.verification ? { verification: payload.verification } : {}),
       ...(payload.results ? { results: payload.results, total: payload.total, resultData: resultData(payload.resultData || {}), partialResults: payload.total > payload.results.length } : {}),
@@ -144,7 +144,7 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
               : row.status === 'processing' ? 'Aguardando a cópia do provedor.' : null } : {}),
       parts: parts.map(part => ({ index: part.index, bytes: part.bytes,
         url: `/api/process-online/requests/${row.id}/files/${part.index}` })),
-      canRecover: row.kind === 'copy' && row.status === 'review_required' && !row.provider_request_id && (row.mode === 'test' || row.billing_state === 'charged') };
+      canRecover: row.kind === 'copy' && row.status === 'review_required' && !row.provider_request_id && (row.mode === 'test' || row.billing_state === 'charged' || (row.billing_state === 'none' && decrypt(row).input.approvedCredits === 0)) };
   }
   async function update(row, values = {}, payload) {
     const columns = Object.keys(values);
@@ -161,8 +161,8 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
     authenticated(auth);
     requireValue(body && typeof body === 'object' && !Array.isArray(body), 'invalid_request');
     requireValue(typeof body.operationId === 'string' && UUID.test(body.operationId), 'invalid_operation', 'Reabra esta etapa para gerar uma operação válida.');
-    requireValue(body.consent === true && body.approvedCredits === 1, 'cost_approval_required', 'Confirme a finalidade e a autorização de um crédito antes de continuar.');
-    const input = { operationId: body.operationId.toLowerCase(), consent: true, approvedCredits: 1 };
+    requireValue(body.consent === true && [0, 1].includes(body.approvedCredits), 'cost_approval_required', 'Confirme a finalidade e a autorização antes de continuar.');
+    const input = { operationId: body.operationId.toLowerCase(), consent: true, approvedCredits: body.approvedCredits };
     if (kind === 'search') input.documento = documentNumber(body.documento);
     else {
       input.cnj = cnj(body.cnj);
@@ -186,7 +186,7 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
   const billingReference = row => `process-online:${row.id}`;
 
   async function charge(auth, row) {
-    if (row.mode !== 'live' || row.billing_state === 'charged') return row;
+    if (decrypt(row).input.approvedCredits === 0 || row.mode !== 'live' || row.billing_state === 'charged') return row;
     requireValue(env.AUDITA_CREDITS_ENABLED === 'true' && credits?.getWallet && credits?.consume && credits?.grant,
       'billing_unavailable', 'A carteira de créditos precisa estar habilitada para esta integração.', 503);
     const wallet = await credits.getWallet(auth);
@@ -234,11 +234,11 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
       row = (await db().query('SELECT * FROM audita_process_online_requests WHERE tenant_id=$1 AND user_id=$2 AND operation_id=$3', [auth.tenantId, auth.user.id, input.operationId])).rows[0];
       requireValue(row && row.request_hash === fingerprint && row.kind === kind, 'operation_conflict', 'Esta operação já foi usada para outro pedido.', 409);
       row = await settleInterrupted(row);
-      if (!(body.recover === true && kind === 'copy' && row.status === 'review_required' && !row.provider_request_id && (row.mode === 'test' || row.billing_state === 'charged'))) return publicRequest(row);
+      if (!(body.recover === true && kind === 'copy' && row.status === 'review_required' && !row.provider_request_id && (row.mode === 'test' || row.billing_state === 'charged' || (row.billing_state === 'none' && decrypt(row).input.approvedCredits === 0)))) return publicRequest(row);
       requireValue(row.mode === status.mode, 'mode_mismatch', 'Este pedido pertence a outro ambiente do provedor.', 409);
       // Recovery is explicit and uses precisely the provider idempotency key originally persisted.
       const claim = await db().query(`UPDATE audita_process_online_requests SET status='submitting',error_code=NULL,updated_at=$4
-        WHERE id=$1 AND tenant_id=$2 AND user_id=$3 AND status='review_required' AND provider_request_id IS NULL AND (mode='test' OR billing_state='charged') RETURNING *`, [row.id, auth.tenantId, auth.user.id, stamp()]);
+        WHERE id=$1 AND tenant_id=$2 AND user_id=$3 AND status='review_required' AND provider_request_id IS NULL AND (mode='test' OR billing_state IN ('charged','none')) RETURNING *`, [row.id, auth.tenantId, auth.user.id, stamp()]);
       if (!claim.rows[0]) return get(auth, row.id);
       row = claim.rows[0];
     }
@@ -411,8 +411,8 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
   }
   async function recover(auth, id, body = {}) {
     const row = await owned(auth, id);
-    requireValue(body && typeof body === 'object' && !Array.isArray(body) && body.consent === true && body.approvedCredits === 1,
-      'cost_approval_required', 'Confirme a finalidade e a autorização de um crédito antes de continuar.');
+    requireValue(body && typeof body === 'object' && !Array.isArray(body) && body.consent === true && [0, 1].includes(body.approvedCredits),
+      'cost_approval_required', 'Confirme a finalidade e a autorização antes de continuar.');
     requireValue(publicRequest(row).canRecover, 'recovery_unavailable', 'Este pedido não permite recuperação da operação paga.', 409);
     // Browser input cannot change the persisted subject, purpose, parent or operation id.
     return perform(auth, 'copy', { ...decrypt(row).input, recover: true });

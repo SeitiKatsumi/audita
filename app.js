@@ -1,5 +1,5 @@
 import { initGeneralChat } from './general-chat.js?v=20261020-navigation';
-import { initProcessOnline } from './process-online.js?v=20261019';
+import { initProcessOnline } from './process-online.js?v=20261021-simple';
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js?v=20261013-send-feedback";
 import { analysisSegments, getAnalysisSegment } from './analysis-segments.js';

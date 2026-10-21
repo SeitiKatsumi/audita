@@ -957,3 +957,13 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 ## 2026-10-21 — Arrastar documentos na Auditoria de importação
 - Solicitação adicional incluída na consolidação: seleção/arraste de PDF, PNG, JPEG e XML, um por envio, com remoção antes do upload. Preservados limites, tipo de documento, processamento e permissões.
 - 14 testes de importação, documentos e anexos aprovados após disponibilizar dependências locais no worktree; sintaxe e diff aprovados. Commit/push autorizados, sem deploy.
+
+## 2026-10-21 — Nome da categoria de processos
+- Codex, codex/renomear-download-processos: substituído baixa por download no botão e título da Central de Serviços. Integrado no localhost3000; alteração textual, diff conferido. Sem commit/push/deploy nesta solicitação.
+
+## 2026-10-21 — Simplificação de processos judiciais
+- Codex, codex/renomear-download-processos: remove verificação gratuita, campos de interesse e detalhes, e blocos de preço por cópia/busca. Finalidade genérica outro, confirmada pela autorização existente, sem presumir vínculo de parte ou advogado.
+- Novas operações da interface enviam aprovação de zero créditos Audita e não debitam carteira; custo do fornecedor permanece interno. Compatibilidade com operações antigas cobradas/estornos preservada. Sem alteração de schema. Validação inclui carteira desabilitada, saldo zero e recuperação sem débito. Integrado localmente; sem commit/push/deploy nesta solicitação.
+- Validação final: 14 testes de UI, 22 de rotas/workflow (incluindo novo fluxo sem carteira; expectativa antiga de rejeição de zero atualizada e caso repetido aprovado), sintaxe/diff aprovados. Servidor3000 reiniciado; banco local continua indisponível, sem testar consulta real.
+
+- Commit/push autorizados pelo usuário em21/10/2026. Rodada final:36/36 testes de UI, rotas e workflow aprovados; arquivos de implementação iguais ao localhost. Envio à main, sem deploy.

@@ -54,18 +54,16 @@ function fixture(handler = () => response({}), config = LIVE, requests = []) {
 }
 function approve(container, name) { const check = named(container, name); check.checked = true; check.dispatch('change'); }
 
-test('activation and free CNJ verification never trigger a paid operation, even with linked audit and prefilled document', async () => {
-  const f = fixture(call => call.url.endsWith('/verify') ? response({ exists: true, cnj: CNJ }) : response({}));
-  await f.module.activate({ parentAuditId: 'audit-fixture', cnj: CNJ, documento: '529.982.247-25' });
-  assert.equal(f.calls.filter(call => call.options.method === 'POST').length, 0);
-  assert.equal(byText(f.container, 'Solicitar cópia integral').disabled, true);
-  assert.equal(byText(f.container, 'Buscar processos').disabled, true);
-  forms(f.container)[0].dispatch('submit'); await settle();
-  const posts = f.calls.filter(call => call.options.method === 'POST');
-  assert.equal(posts.length, 1); assert.equal(posts[0].url, '/api/process-online/verify');
-  assert.deepEqual(posts[0].body, { cnj: CNJ });
-  assert.ok(f.calls.every(call => call.options.credentials === 'same-origin'));
-  f.module.deactivate();
+test('activation shows simplified forms without a verification or interest form', async () => {
+ const f=fixture(()=>response({}));
+ await f.module.activate({cnj:CNJ});
+ assert.equal(f.calls.filter(call=>call.options.method==='POST').length,0);
+ assert.equal(byText(f.container,'Verificar gratuitamente'),undefined);
+ assert.equal(named(f.container,'interesse'),undefined);
+ assert.equal(named(f.container,'interesseDetalhe'),undefined);
+ assert.doesNotMatch(f.container.textContent,/Cada cópia|Cada busca|minha carteira/);
+ assert.equal(byText(f.container,'Solicitar cópia integral').disabled,true);
+ f.module.deactivate();
 });
 
 test('paid searches require consent and selecting a result prepares a copy without requesting it', async () => {
@@ -73,11 +71,11 @@ test('paid searches require consent and selecting a result prepares a copy witho
   const f = fixture(call => call.url.endsWith('/search') ? response({ id: 'search-safe', kind: 'search', status: 'completed',
     results: [{ numero_cnj: CNJ, classe: payload, source: payload }], total: 1, resultData: { text: payload } }) : response({}));
   await f.module.activate({ documento: '529.982.247-25', parentAuditId: 'audit-safe' });
-  forms(f.container)[2].dispatch('submit'); await settle();
+  forms(f.container)[1].dispatch('submit'); await settle();
   assert.equal(f.calls.some(call => call.url.endsWith('/search')), false);
-  approve(f.container, 'searchConsent'); forms(f.container)[2].dispatch('submit'); await settle();
+  approve(f.container, 'searchConsent'); forms(f.container)[1].dispatch('submit'); await settle();
   const call = f.calls.find(item => item.url.endsWith('/search'));
-  assert.equal(call.body.consent, true); assert.equal(call.body.approvedCredits, 1);
+  assert.equal(call.body.consent, true); assert.equal(call.body.approvedCredits, 0);
   assert.equal(call.body.parentAuditId, 'audit-safe');
   assert.match(call.body.operationId, /^[\da-f-]{36}$/i);
   assert.match(f.container.textContent, /<img src=x onerror=/);
@@ -100,11 +98,11 @@ test('a lost paid response retains its operation id for manual retry and prevent
     return response({});
   });
   await f.module.activate({ documento: '52998224725' });
-  approve(f.container, 'searchConsent'); forms(f.container)[2].dispatch('submit'); await settle();
+  approve(f.container, 'searchConsent'); forms(f.container)[1].dispatch('submit'); await settle();
   assert.equal(attempts, 1);
   assert.equal(byText(f.container, 'Buscar processos').disabled, true);
   assert.match(f.container.textContent, /Confira o histórico/);
-  forms(f.container)[2].dispatch('submit'); await settle();
+  forms(f.container)[1].dispatch('submit'); await settle();
   assert.equal(attempts, 1);
   byText(f.container, 'Retomar a mesma operação').dispatch('click'); await settle();
   assert.equal(attempts, 2);
@@ -125,17 +123,17 @@ test('an ambiguous saved copy can be recovered only explicitly with its original
       billing: { state: 'charged', auditaCredits: 1 } });
   });
   await f.module.activate({ cnj: CNJ }); approve(f.container, 'copyConsent');
-  forms(f.container)[1].dispatch('submit'); await settle();
+  forms(f.container)[0].dispatch('submit'); await settle();
   assert.equal(attempts, 1); assert.equal(byText(f.container, 'Solicitar cópia integral').disabled, true);
   assert.match(f.container.textContent, /aguardando conferência/);
   assert.equal(byText(f.container, 'Retomar cópia salva').disabled, true);
-  forms(f.container)[3].dispatch('submit'); await settle();
+  forms(f.container)[2].dispatch('submit'); await settle();
   assert.equal(attempts, 1);
-  approve(f.container, 'recoveryConsent'); forms(f.container)[3].dispatch('submit'); await settle();
+  approve(f.container, 'recoveryConsent'); forms(f.container)[2].dispatch('submit'); await settle();
   assert.equal(attempts, 2);
   const requests = f.calls.filter(call => call.options.method === 'POST');
   assert.equal(requests[1].url, '/api/process-online/requests/copy-uncertain/recover');
-  assert.deepEqual(requests[1].body, { consent: true, approvedCredits: 1 });
+  assert.deepEqual(requests[1].body, { consent: true, approvedCredits: 0 });
   assert.equal(named(f.container, 'cnj').disabled, false);
   f.module.deactivate();
 });
@@ -146,12 +144,12 @@ test('a recoverable copy restored from history uses only its saved ID and requir
   const f = fixture(call => response(call.url.endsWith('/recover') ? { ...request, status: 'processing', canRecover: false } : request), LIVE, [request]);
   await f.module.activate(); byText(f.container, 'Abrir').dispatch('click'); await settle();
   assert.equal(f.calls.filter(call => call.options.method === 'POST').length, 0);
-  assert.match(f.container.textContent, /nem debita outro crédito Audita/);
+  assert.match(f.container.textContent, /não inicia outro pedido/);
   assert.equal(byText(f.container, 'Retomar cópia salva').disabled, true);
-  approve(f.container, 'recoveryConsent'); forms(f.container)[3].dispatch('submit'); await settle();
+  approve(f.container, 'recoveryConsent'); forms(f.container)[2].dispatch('submit'); await settle();
   const posts = f.calls.filter(call => call.options.method === 'POST');
   assert.equal(posts.length, 1); assert.equal(posts[0].url, '/api/process-online/requests/saved-copy/recover');
-  assert.deepEqual(posts[0].body, { consent: true, approvedCredits: 1 });
+  assert.deepEqual(posts[0].body, { consent: true, approvedCredits: 0 });
   f.module.deactivate();
 });
 
@@ -206,7 +204,7 @@ test('ready multipart copies expose only their exact private API links and AI st
   const f = fixture(call => call.url === '/api/process-online/requests' && call.options.method === 'POST'
     ? response(request) : response({ status: 'pending' }), { ...LIVE, analysisReady: true });
   await f.module.activate({ cnj: CNJ });
-  approve(f.container, 'copyConsent'); forms(f.container)[1].dispatch('submit'); await settle();
+  approve(f.container, 'copyConsent'); forms(f.container)[0].dispatch('submit'); await settle();
   const links = descendants(f.container).filter(item => item.tagName === 'A' && item.textContent.startsWith('Baixar PDF'));
   assert.equal(links.length, 2);
   assert.deepEqual(links.map(item => item.href), ['/api/process-online/requests/copy-safe/files/1', '/api/process-online/requests/copy-safe/files/2']);
@@ -214,7 +212,7 @@ test('ready multipart copies expose only their exact private API links and AI st
   assert.equal(f.calls.some(call => call.url.endsWith('/analysis')), false);
   assert.equal(byText(f.container, 'Analisar cópia com IA').disabled, true);
   const approval = named(f.container, 'analysisConsent'); approval.checked = true; approval.dispatch('change');
-  forms(f.container)[3].dispatch('submit'); await settle();
+  forms(f.container)[2].dispatch('submit'); await settle();
   assert.equal(f.calls.filter(call => call.url.endsWith('/analysis') && call.options.method === 'POST').length, 1);
   f.module.deactivate();
 });
@@ -227,11 +225,11 @@ test('disabled provider retains forms and partner activation route while sandbox
   assert.equal(partner.href, 'https://processonline.com.br/seja-parceiro/');
   approve(off.container, 'copyConsent');
   assert.equal(byText(off.container, 'Solicitar cópia integral').disabled, true);
-  assert.equal(forms(off.container).length, 3);
+  assert.equal(forms(off.container).length, 2);
   off.module.deactivate();
   const sandbox = fixture(undefined, { ...LIVE, mode: 'test', cost: { auditaCredits: 0, providerCredits: 1 } });
   await sandbox.module.activate();
-  assert.match(sandbox.container.textContent, /0 créditos Audita e nenhum pagamento real/);
+  assert.match(sandbox.container.textContent, /sem pagamento real/);
   assert.match(sandbox.container.textContent, /canários/);
   sandbox.module.deactivate();
 });
@@ -245,7 +243,7 @@ test('refreshing a known copy is throttled and visibility/deactivation stop poll
     const request = { id: 'copy-pending', kind: 'copy', status: 'processing', cnj: CNJ };
     const f = fixture(() => response(request));
     await f.module.activate({ cnj: CNJ }); approve(f.container, 'copyConsent');
-    forms(f.container)[1].dispatch('submit'); await settle();
+    forms(f.container)[0].dispatch('submit'); await settle();
     assert.equal(timers.size, 1); assert.equal([...timers.values()][0].delay, 30000);
     byText(f.container, 'Conferir andamento').dispatch('click'); await settle();
     byText(f.container, 'Conferir andamento').dispatch('click'); await settle();
