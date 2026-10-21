@@ -47,7 +47,9 @@ const records = Object.entries(states).map(([uf, name]) => {
   if (towns.length) limits.push(`Municipais somente: ${towns.join(", ")}. Não representam todos os municípios nem quitação do imóvel.`);
   const special = { AC: "Fiscal exclui dívida ativa.", GO: "Fiscal estadual cobre dívida ativa.", TO: "Fiscal estadual cobre dívida ativa.", SP: "Fiscal CPF cobre débitos não inscritos; PGE e fiscal estadual CNPJ pendentes. TRT2 e TRT15 atendem áreas diferentes.", RJ: "Fiscal SEFAZ exige complemento PGE.", PE: "Fiscal oficial somente CPF; exclui exigibilidade suspensa. Falência estadual pendente.", AP: "Falência estadual pendente.", MG: "TRF6 não cobre todos os sistemas; conferir eproc e acervo residual TRF1." };
   if (special[uf]) limits.push(special[uf]);
-  limits.push("RFB/PGFN e documentos do imóvel pendentes. Quantidade não significa cobertura jurídica completa.");
+  const pending = selected.filter(item => item.integrationStatus === 'pending_live_validation');
+  if (pending.length) limits.push(`Emissão real pendente de homologação: ${pending.map(item => item.label).join('; ')}.`);
+  limits.push("Documentos do imóvel pendentes. Quantidade não significa cobertura jurídica completa.");
   const official = seller.filter(x => x.kind === "certificate").length;
   const receipt = seller.filter(x => x.kind !== "certificate" && x.includePdf === true).length;
   const data = seller.filter(x => !hasPdf(x)).length;
@@ -58,7 +60,7 @@ const records = Object.entries(states).map(([uf, name]) => {
 assert.equal(records.length, 27);
 const rows = records.map((r, index) => [r.uf, r.name, `=SUM(D${index + 2}:F${index + 2})`, r.official, r.receipt, r.data, r.company.length, list(r.seller), list(r.company), r.limits, `Outras consultas: ${catalog.validatedAt}; TJs: ${courts.validatedAt}`, "Integrado localmente; produção pendente", "https://docs.google.com/spreadsheets/d/1myQG7FETZWMqPXPcaDNkYYPEWU3KJRRkX0QketehcnY/edit?gid=1989173279#gid=1989173279"]);
 const notes = [
-  ["Critério", "Uma opção validada conta uma vez por UF e por perfil. Nacionais aparecem em todas as 27 UFs. CPF e CNPJ são consultados separadamente."],
+  ["Critério", "Uma opção integrada conta uma vez por UF e por perfil. Nacionais aparecem em todas as 27 UFs. CPF e CNPJ são consultados separadamente. Integrações com homologação real pendente são identificadas nos limites e não comprovam emissão."],
   ["Regionais", "TRFs contam somente nas UFs de sua região; TRT2 e TRT15 contam em SP. TRT22 físico/eletrônico conta uma única vez."],
   ["Municipais", "Total inclui produtos dos municípios nomeados na linha. Para um vendedor específico, selecionar apenas municípios e jurisdições aplicáveis."],
   ["Tipos", "Certidões e comprovantes têm PDF. Dados sem PDF são consultas estruturadas. Processos agrupados/completos são dois produtos e podem trazer dados sobrepostos."],

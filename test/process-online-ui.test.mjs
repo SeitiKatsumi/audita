@@ -66,6 +66,21 @@ test('activation shows simplified forms without a verification or interest form'
  f.module.deactivate();
 });
 
+test('sandbox example fills CNJ without sending and an unhomologated search stays blocked', async () => {
+  const f = fixture(undefined, { ...LIVE, mode: 'test', searchReady: false });
+  await f.module.activate();
+  approve(f.container, 'searchConsent');
+  assert.equal(byText(f.container, 'Buscar processos').disabled, true);
+  forms(f.container)[1].dispatch('submit'); await settle();
+  approve(f.container, 'copyConsent');
+  byText(f.container, 'Usar processo de exemplo').dispatch('click');
+  assert.equal(named(f.container, 'cnj').value, '0701379-18.2025.8.01.0013');
+  assert.equal(named(f.container, 'copyConsent').checked, false);
+  assert.equal(f.calls.some(call => call.options.method === 'POST'), false);
+  assert.match(f.container.textContent, /ainda não está homologada/);
+  f.module.deactivate();
+});
+
 test('paid searches require consent and selecting a result prepares a copy without requesting it', async () => {
   const payload = '<img src=x onerror=globalThis.compromised=true>';
   const f = fixture(call => call.url.endsWith('/search') ? response({ id: 'search-safe', kind: 'search', status: 'completed',

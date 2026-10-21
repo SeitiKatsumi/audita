@@ -1,5 +1,100 @@
 # Atualização de interface e carteira — 21/10/2026
 
+## Sandbox funcional no app local
+
+`npm run dev:process-online` inicia a Audita em http://localhost:3000 com o
+PostgreSQL local persistente do helper existente (porta54329), autenticação
+obrigatória e a chave test da configuração privada. Instalação única do runtime
+dev: `npm install --prefix storage/dev-tools embedded-postgres` (pasta ignorada).
+O helper usa overrides somente no processo: preserva `.env.local`, sua URL
+original de banco e as chaves. Não conecta ao PostgreSQL de produção, não
+habilita jobs, não aceita chave live e mantém a IA desligada para custo zero.
+
+No módulo `/#processos-judiciais`, Usar processo de exemplo apenas preenche o
+CNJ oficial do sandbox e exige novo aceite antes de solicitar. A busca por
+documento é indicada como não homologada e fica desabilitada neste ambiente.
+Em live essa restrição do sandbox não se aplica. Nada é solicitado ao abrir
+a tela ou carregar o exemplo. O histórico e o PDF privado persistem no banco
+local; não são consultas de produção. Chrome confirmou login, solicitação,
+conclusão, download e reabertura após reload. PDF demonstrativo435bytes/1página.
+
+## Estimativa de custo operacional
+
+| Pacote | Compra | Cópia com CNJ conhecido | Busca + uma cópia |
+|---|---|---|---|
+| 1 crédito | R$24,99 | R$24,99 | R$49,98 (duas unidades) |
+| 10 créditos | R$210,00 | R$21,00 | R$42,00 |
+| 30 créditos | R$507,00 | R$16,90 | R$33,80 |
+| 50 créditos | R$747,00 | R$14,94 | R$29,88 |
+
+Uma busca pode localizar vários processos: pedir N cópias após uma busca
+consome 1+N créditos, não N buscas. Cada pessoa/empresa e cache são tratados
+conforme o contrato do fornecedor. Exemplo de100buscas+100cópias:200créditos,
+R$2.988,00 comprando quatro pacotes de50. Não inclui IA, armazenamento,
+tributos, meio de pagamento ou novas consultas futuras.
+
+O modelo atual deste módulo é gpt-5-mini: US$0,25/1M tokens de entrada e
+US$2,00/1M tokens de saída, segundo a página oficial consultada em21/10/2026:
+https://developers.openai.com/api/docs/models/gpt-5-mini . Cenário de100mil
+tokens de entrada e20mil de saída (incluindo raciocínio faturado):US$0,065.
+Com dólar apenas de planejamento aR$5,50, equivale aR$0,36. Não é medição de
+autos reais nem custo fixo por processo/página; scans, resumos adicionais,
+retomadas com novo objetivo e volume grande alteram o total. Nenhuma chamada
+OpenAI paga foi feita nesta homologação. Antes de definir franquia/preço de IA,
+medir uso real de documentos autorizados. O PDF mínimo do sandbox não serve
+como benchmark de custo de autos completos.
+
+Para dados reais ainda faltam chave live autorizada, compra de saldo API,
+homologação live e configuração/teste do webhook. Nenhuma dessas etapas foi
+executada pelo comando local ou pelos testes gratuitos.
+
+Painel de parceiro aprovado conferido no Chrome em 21/10/2026: saldo API zero,
+sem chaves e webhook não configurado. O botão Comprar créditos do painel exibiu:
+
+| Créditos | Total | Por crédito |
+|---|---|---|
+| 1 | R$ 24,99 | R$ 24,99 |
+| 10 | R$ 210,00 | R$ 21,00 |
+| 30 | R$ 507,00 | R$ 16,90 |
+| 50 | R$ 747,00 | R$ 14,94 |
+
+Valores apenas observados, sem compra ou comprovação de crédito em carteira.
+Na tarifa por crédito documentada, buscar CPF/CNPJ com sucesso consome um crédito
+e pedir uma cópia consome outro. Assim, busca + uma cópia custa dois créditos;
+com CNJ já conhecido, a cópia custa um. IA e custos Audita não estão incluídos.
+Planos comuns de cópias/monitoramento não comprovam franquia API B2B.
+
+Homologação gratuita executada em 21/10/2026 com chave test autorizada e salva
+somente na configuração privada local. Nenhuma compra, chave live ou ativação
+de produção. Verificação por CNJ, solicitação e PDF oficial de exemplo passaram:
+435 bytes, uma página, zero créditos cobrados. Fluxo compartilhado com PGlite
+isolado confirmou arquivo privado, isolamento por dono e reabertura sem nova
+chamada ao fornecedor. Os 54 testes pertinentes passaram.
+
+Duas diferenças do sandbox foram comprovadas: as buscas sintéticas CPF/CNPJ
+devolvem `0801234-56.2023.8.19.0001`, cujo dígito CNJ é inválido; a integração
+mantém essa rejeição, sem corrigir identificador nem relaxar produção. É uma
+pendência do fornecedor para homologar busca > seleção > cópia. Já o download
+test retorna `application/pdf` diretamente, sem o manifesto JSON documentado.
+O transporte agora aceita essa amostra pequena somente com chave test, no
+endpoint de download, e reutiliza as validações/armazenamento privado. O modo
+live continua exigindo JSON, origem permitida e manifesto completo. Webhook
+entregue pelo fornecedor, documentos reais, múltiplas partes reais e IA real
+continuam sem homologação; não foram apresentados como concluídos.
+
+Verificador gratuito em `scripts/check-process-online-sandbox.mjs`.
+O script recusa chaves live, usa somente os documentos sintéticos e um CNJ
+canário publicados no painel, verifica os contratos do transporte compartilhado,
+créditos zero, manifesto/amostra direta, tamanho, SHA256 e abertura dos PDFs. Não chama IA,
+não altera banco/configuração e não salva chaves, URLs assinadas ou autos.
+`node scripts/check-process-online-sandbox.mjs --self-check` não acessa a rede.
+Após criar e guardar a chave de teste na configuração privada local, executar
+`node --env-file=.env.local scripts/check-process-online-sandbox.mjs --execute`.
+Uma busca inválida é registrada como pendência e o verificador continua com o
+canário independente de cópia; termina com código1 para não ocultar a falha.
+Executar uma vez e inspecionar eventual falha antes de repetir; sandbox não
+substitui homologação de cobertura real, múltiplas partes ou webhook entregue.
+
 A interface simplificada envia `approvedCredits: 0`: novas buscas e cópias nesse fluxo não debitam a carteira Audita nem dependem dela. O crédito do fornecedor continua sendo responsabilidade interna da integração. Operações legadas com aprovação de 1 mantêm conciliação e estorno existentes. O vínculo enviado é `outro`, com confirmação de interesse legítimo no aceite, sem declarar que o usuário é parte ou advogado. Verificação gratuita permanece apenas na API; não aparece na tela.
 
 # ProcessOnline — busca, autos privados e análise assistida

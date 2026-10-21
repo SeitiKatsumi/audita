@@ -217,3 +217,13 @@ O detalhe por fonte permanece no [CSV de documentos](seller-document-status.csv)
 ### Atualização PGFN — 19/10/2026
 
 Após a fotografia histórica acima, foi integrada a consulta nacional `PGFNListaDevedoresUniao` para CPF/CNPJ em todos os planos compartilhados, com comprovante PDF obrigatório e validação de titular e escopo. A inclusão solicitada não equivale a homologação real: `integrationStatus=pending_live_validation`; testes fictícios cobrem sucesso e rejeição de documentos incorretos. Trata-se de comprovante da lista de devedores, não da certidão conjunta RFB/PGFN. Estimativa PDF R$0,54 segue regra histórica; preço-base público R$0,36, adicional ainda sujeito à confirmação.
+
+### Certidão conjunta Receita Federal/PGFN — 21/10/2026
+
+Incluídas CertidaoConjuntaDebitosPessoaFisica (rfb-pgfn-cpf) e CertidaoConjuntaDebitosPessoaJuridica (rfb-pgfn-cnpj) no catálogo compartilhado. Disponíveis para seleção em emissão de certidões e incluídas automaticamente nas nove análises por segmento, nas27UFs, sem duplicar fontes nacionais por estado. A análise de CPF também as solicita para até cinco empresas descobertas conforme plano existente, distinguindo os titulares.
+
+PDF solicitado por GERARCOMPROVANTE=Habilitar; identidade completa, cabeçalho fiscal federal, assinatura de formato PDF e armazenamento privado continuam obrigatórios. Retorno sem PDF ou com falha permanece indisponível; não vira certidão negativa. Situação, emissão, validade e código de controle são preservados. CPF reutiliza enriquecimento de nascimento/fallback manual; CNPJ não solicita identidade de pessoa física. Certidão positiva com efeitos de negativa não é interpretada como impedimento automático.
+
+Documentação oficial conferida: https://www.directd.com.br/central-de-ajuda/apis/catalogo/CertidaoConjuntaDebitosPessoaFisica e https://www.directd.com.br/central-de-ajuda/apis/catalogo/CertidaoConjuntaDebitosPessoaJuridica. Preço-base público R,36; estimativa com PDF R,54 segue a regra existente, sujeita à conciliação real do adicional. Regra padrão atual de venda30x resulta em R,20 por certidão antes de benefícios/exceções administráveis.
+
+Integração validada com respostas e PDFs fictícios; integrationStatus=pending_live_validation. A tentativa real de CPF descrita em28/09 permanece histórica, sem novo teste pago ou alegação de homologação real. Nenhuma produção, banco ou chave alterados.

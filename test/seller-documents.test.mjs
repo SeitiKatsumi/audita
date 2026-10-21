@@ -12,11 +12,11 @@ test('automatic state plans include federal jurisdictions and only matching muni
   const states=sellerStatePlans(coverage);
   assert.equal(states.length,27);
   const sp=states.find(s=>s.uf==='SP');
-  assert.equal(sp.queryIds.length,15);
+  assert.equal(sp.queryIds.length,16);
   assert.ok(!sp.queryIds.includes('protestos-basica'));
   assert.ok(sp.queryIds.includes('protestos')&&sp.queryIds.includes('dossie-credito-completo'));
   assert.throws(()=>planSellerDocuments(['protestos-basica'],{configured:true}),/unsupported_seller_query/);
-  assert.equal(sp.baseCostBrl,16.98);
+  assert.equal(sp.baseCostBrl,17.52);
   assert.ok(sp.queryIds.includes('vinculos'));
   const queries=coverage.sellerSources.queries;
   for(const state of states) {
@@ -40,6 +40,64 @@ const result = (data, metadata = {}) => ({ result: { status: "success", payload:
 const PDF = Buffer.from("%PDF-test");
 const PDF_TEXT = "CERTIDÃO DE DÉBITOS TRABALHISTAS BANCO NACIONAL DE DEVEDORES TRABALHISTAS 529.982.247-25";
 const dependencies = (overrides = {}) => ({ configuration, query: async () => result({ documentoConsultado: CPF, possuiProcesso: false }), download: async () => PDF, readPdf: async () => PDF_TEXT, savePdf: async () => ({ pdfPath: "private-test.pdf", rawText: "never-copy-this" }), ...overrides });
+
+test('joint federal certificates reach all shared analysis plans and certificate selections once per subject',()=>{
+  const sellerSources=getSellerDocumentCoverage(configuration),coverage={certificates:[],sellerSources};
+  coverage.states=sellerStatePlans(coverage,'cpf');coverage.companyStates=sellerStatePlans(coverage,'cnpj');
+  for(const segment of analysisSegments)for(const type of ['cpf','cnpj']) {
+    const id='rfb-pgfn-'+type;
+    for(const {uf} of coverage.states) {
+      const plans=sellerQueriesForState(sellerSources.queries,uf,type).filter(q=>q.id.startsWith('rfb-pgfn-'));
+      assert.deepEqual(plans.map(q=>q.id),[id],segment.id+' '+type+' '+uf);
+    }
+    const selected=certificateSelection(coverage,coverage.states.map(s=>s.uf),type).queries.filter(q=>q.id.startsWith('rfb-pgfn-'));
+    assert.equal(selected.length,1,'national sources are not billed once per UF');
+    assert.equal(selected[0].kind,'certificate');assert.equal(selected[0].evidenceKind,'official_certificate');
+    assert.equal(selected[0].integrationStatus,'pending_live_validation');
+    assert.equal(selected[0].priceCents,1620);
+    assert.equal(planSellerDocuments([id,id],configuration,type==='cnpj'?[CNPJ]:[]).maxProviderCostBrl,.54);
+  }
+});
+
+test('joint federal CPF/CNPJ certificates require a matching fiscal PDF and retain status, dates and control code',async()=>{
+  async function certificate(document,title='CERTIDAO POSITIVA COM EFEITOS DE NEGATIVA DE DEBITOS RELATIVOS AOS TRIBUTOS FEDERAIS E A DIVIDA ATIVA DA UNIAO') {
+    const pdf=await PDFDocument.create(),page=pdf.addPage(),font=await pdf.embedFont(StandardFonts.Helvetica);
+    page.drawText(title,{x:30,y:750,size:6,font});
+    page.drawText('FICTICIO - SEM VALOR OFICIAL - '+document,{x:30,y:720,size:10,font});
+    return Buffer.from(await pdf.save());
+  }
+  for(const [type,document] of [['cpf',CPF],['cnpj',CNPJ]]) {
+    const buffer=await certificate(document),id='rfb-pgfn-'+type;
+    const batch={...input({sellerQueries:[id],companyCnpjs:type==='cnpj'?[CNPJ]:[]}),tipoDocumento:type,documento:document};
+    const payload={documentoConsultado:document,possuiDividas:true,status:'Positiva com efeitos de negativa',emitidaAs:'21/10/2026',validaAte:'19/04/2027',codigoControleCertidao:'FICTICIO'};
+    const options=dependencies({
+      query:async request=>{
+        assert.equal(request.endpoint,type==='cpf'?'CertidaoConjuntaDebitosPessoaFisica':'CertidaoConjuntaDebitosPessoaJuridica');
+        assert.equal(request.parameters[type.toUpperCase()],document);assert.equal(request.parameters.GERARCOMPROVANTE,'Habilitar');
+        assert.equal(request.parameters.DATANASCIMENTO,type==='cpf'?'01/01/2000':undefined);
+        return result(payload);
+      },
+      download:async()=>buffer,readPdf:extractPdfText,
+      savePdf:async()=>({pdfPath:'private-joint-'+type+'.pdf'}),
+      collectCompany:async()=>({status:'success',dados:{cnpj:CNPJ,razaoSocial:'Empresa Ficticia'}}),
+    });
+    const output=await collectSellerDocuments(batch,options),row=output.dados.certidoes[0];
+    assert.equal(row.status,'success');assert.equal(output.dados.certidoesBaixadas,1);assert.equal(row.resultado,'consta');
+    assert.equal(row.details['Situação informada'],payload.status);assert.equal(row.details['Validade'],payload.validaAte);
+    assert.equal(row.details['Código de controle'],'FICTICIO');assert.match(row.summary,/efeitos de negativa/);
+    for(const override of [
+      {query:async()=>({failed:true,reason:'provider_http_500'})},
+      {query:async()=>result(payload,{urlComprovante:''})},
+      {download:async()=>certificate(type==='cpf'?CNPJ:CPF)},
+      {download:async()=>certificate(document,'PGFN - LISTA DE DEVEDORES DA UNIAO')},
+      {download:async()=>certificate(document,'TRIBUTOS FEDERAIS E DIVIDA ATIVA DA UNIAO - COMPROVANTE SEM CERTIDAO')},
+      {download:async()=>Buffer.from('not a PDF')},
+    ]) {
+      const failed=(await collectSellerDocuments(batch,{...options,...override})).dados.certidoes[0];
+      assert.equal(failed.status,'failed');assert.equal(failed.resultado,'indisponivel');assert.equal(failed.pdfPath,undefined);
+    }
+  }
+});
 
 test('company judicial data queries use only the CNPJ, retain zero totals and never claim an official PDF',async()=>{
   const ids=['processos-agrupados','processos-completos'],calls=[];

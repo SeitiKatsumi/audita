@@ -128,6 +128,11 @@ export function summarizeSellerData(endpoint, data) {
       if (typeof score === "number" && Number.isFinite(score)) details["Score de crédito QUOD (provedor)"] = String(score);
     }
     summary = "Consulta de crédito QUOD obtida. Os registros retornados precisam de análise; não substitui certidão oficial.";
+  } else if (endpoint.startsWith("CertidaoConjuntaDebitos")) {
+    for (const [label, name] of [["Título", "titulo"], ["Situação informada", "status"], ["Emissão", "emitidaAs"], ["Validade", "validaAte"], ["Código de controle", "codigoControleCertidao"]]) {
+      if (clean(field(data, name))) details[label] = clean(field(data, name));
+    }
+    summary = "Certidão conjunta Receita Federal/PGFN obtida. Confira no PDF a situação, a validade e os efeitos da certidão; apontamentos não impedem necessariamente sua emissão com efeitos de negativa.";
   } else if (endpoint === "PGFNListaDevedoresUniao") {
     outcome = field(data, "possuiDivida");
     for (const [label, name] of [["Total da dívida informado", "totalDivida"], ["Total tributário informado", "totalTributario"], ["Total previdenciário informado", "totalPrevidenciario"], ["Tipo do devedor", "tipoDevedor"], ["UF informada", "uf"], ["Unidade responsável", "unidadeResponsavel"]]) {
