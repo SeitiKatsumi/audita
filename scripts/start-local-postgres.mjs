@@ -46,6 +46,15 @@ if(!existsSync('.env.local'))await writeFile('.env.local',`APP_ENV=local\nAPP_UR
 console.log('Local PostgreSQL ready on 127.0.0.1:54329. Persistent workspace storage; credentials not displayed.');
 if(process.argv.includes('--serve')){
   const local=parseEnv(await readFile('.env.local','utf8'));
+  if(process.argv.includes('--process-online-sandbox')){
+    const key=process.env.PROCESS_ONLINE_API_KEY||local.PROCESS_ONLINE_API_KEY;
+    if(!/^po_test_[A-Za-z0-9_-]+$/.test(key||''))throw Error('ProcessOnline sandbox requires a private TEST key.');
+    // Runtime overrides only: keep the original database URL and private keys on disk unchanged.
+    Object.assign(process.env,{APP_ENV:'local',HOST:'127.0.0.1',PORT:'3000',APP_URL:'http://localhost:3000',COOKIE_SECURE:'false',
+      DATABASE_URL:`postgres://audita_local:${encodeURIComponent(password)}@127.0.0.1:54329/audita_local`,
+      AUDITA_AUTH_REQUIRED:'true',AUDITA_AUTO_MIGRATE:'true',AUDITA_BACKGROUND_JOBS_ENABLED:'false',
+      PROCESS_ONLINE_ENABLED:'true',AUDITA_SELLER_AI_ENABLED:'false'});
+  }
   const target=new URL(process.env.DATABASE_URL||local.DATABASE_URL);
   if(target.hostname!=='127.0.0.1'||target.port!=='54329'||target.pathname!=='/audita_local')throw Error('Refusing to serve against a non-local database.');
   await import('../server.mjs');

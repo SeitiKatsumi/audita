@@ -29,6 +29,22 @@ test('ProcessOnline stays disabled and does not expose its key', async () => {
   assert.equal(createProcessOnlineService({ enabled: true, apiKey: 'po_live_x\r\nInjected: secret' }).getStatus().ready, false);
 });
 
+test('only test downloads accept the bounded direct PDF actually returned by the sandbox', async () => {
+  const pdf = Buffer.from('%PDF-1.7\nSample\n%%EOF');
+  const response = () => new Response(pdf, { headers: { 'Content-Type': 'application/pdf' } });
+  const sample = fixture(response(), { apiKey: 'po_test_fictitious' });
+  const manifest = await sample.service.getDownload({ requestId: ID });
+  assert.equal(manifest.parts_count, 1);
+  assert.deepEqual(manifest.parts[0].testPdf, pdf);
+  assert.equal(manifest.parts[0].bytes, pdf.length);
+  await assert.rejects(fixture(response()).service.getDownload({ requestId: ID }), { code: 'process_online_invalid_response' });
+  await assert.rejects(fixture(response(), { apiKey: 'po_test_fictitious' }).service.verifyCNJ({ cnj: CNJ }), { code: 'process_online_invalid_response' });
+  for (const invalid of [new Response('not a PDF', { headers: { 'Content-Type': 'application/pdf' } }),
+    new Response(pdf, { headers: { 'Content-Type': 'application/pdf', 'Content-Length': String(2 * 1024 * 1024 + 1) } })]) {
+    await assert.rejects(fixture(invalid, { apiKey: 'po_test_fictitious' }).service.getDownload({ requestId: ID }));
+  }
+});
+
 test('ProcessOnline rejects malformed document, CNJ, request id and unapproved costs before sending', async () => {
   const { service, calls } = fixture({});
   for (const documento of ['11111111111', '04.252.011/0001-11', 'text52998224725']) {

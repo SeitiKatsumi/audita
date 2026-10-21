@@ -119,7 +119,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   function sandbox() { return ['test', 'sandbox'].includes(state.config?.mode); }
   function updateControls() {
     const paidDisabled = state.busy || !ready() || Boolean(state.pending);
-    searchButton.disabled = paidDisabled || !searchConsent.check.checked;
+    searchButton.disabled = paidDisabled || state.config?.searchReady === false || !searchConsent.check.checked;
     copyButton.disabled = paidDisabled || !copyConsent.check.checked;
     historyButton.disabled = state.busy;
     retryButton.disabled = state.busy || !ready();
@@ -129,6 +129,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     for (const control of [cnj, documento, copyConsent.check, searchConsent.check]) {
       control.disabled = state.busy || Boolean(state.pending);
     }
+    if (state.config?.searchReady === false) { documento.disabled = true; searchConsent.check.disabled = true; }
     root.setAttribute('aria-busy', String(state.busy));
     pendingPanel.hidden = !state.pending;
     if (state.pending) pendingText.textContent = `${state.pending.review ? 'A operação está salva e aguarda conferência.' : `O envio da ${state.pending.kind === 'search' ? 'busca' : 'cópia'} ainda não foi confirmado.`} Referência: ${state.pending.body.operationId}.`;
@@ -138,6 +139,14 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     if (ready()) {
       configPanel.append(el('strong', '', sandbox() ? 'Testes gratuitos ativos' : 'Integração disponível'),
         el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'O saldo e a autorização são conferidos no servidor antes de cada operação.'));
+      if (sandbox()) {
+        configPanel.append(button('Usar processo de exemplo', () => {
+          if (state.busy || state.pending) return;
+          cnj.value = '0701379-18.2025.8.01.0013'; copyConsent.check.checked = false; updateControls(); cnj.focus();
+        }));
+        if (state.config?.searchReady === false) configPanel.append(el('p', 'process-online-muted',
+          'A busca por CPF/CNPJ ainda não está homologada no sandbox. Para testar gratuitamente, use o número de processo de exemplo.'));
+      }
     } else {
       configPanel.append(el('strong', '', 'Integração em ativação'), el('p', '', state.config?.storageReady === false
         ? 'O armazenamento privado precisa estar disponível antes de novas solicitações.'
@@ -396,7 +405,9 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
         });
       });
       area.append(form);
-    } else area.append(el('p', 'process-online-muted', 'A análise por IA será liberada quando a configuração estiver pronta.'));
+    } else area.append(el('p', 'process-online-muted', sandbox()
+      ? 'A análise por IA está desativada neste ambiente de testes.'
+      : 'A análise por IA será liberada quando a configuração estiver pronta.'));
     details.append(area);
   }
   async function loadAnalysis(id) {
@@ -465,6 +476,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   }
   async function startOperation(kind) {
     if (!ready() || state.pending) return;
+    if (kind === 'search' && state.config?.searchReady === false) return;
     const check = kind === 'search' ? searchConsent.check : copyConsent.check;
     if (!check.checked) throw new Error('Confirme a autorização antes de continuar.');
     const value = kind === 'search' ? documento.value.trim() : cnj.value.trim();

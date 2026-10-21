@@ -109,6 +109,7 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
     const status = providerStatus(), storageReady = Boolean(getDb?.()?.dbReady && getDb?.()?.pool && key());
     const billingReady = true;
     return { enabled: status.enabled === true, ready: status.ready === true && storageReady && billingReady, mode: status.mode,
+      searchReady: status.mode === 'live',
       storageReady, billingReady, auditaCredits: 0, providerCredits: status.mode === 'live' ? 1 : 0,
       verificationCredits: 0, pollAfterMs: 30000, maxPartBytes: MAX_PART_BYTES, maxTotalBytes: MAX_TOTAL_BYTES, maxParts: MAX_PARTS };
   }
@@ -289,7 +290,8 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
     for (let index = 0; index < parts.length; index++) {
       const part = parts[index];
       requireValue(part.idx === index + 1 && Number.isSafeInteger(part.bytes) && part.bytes >= 5 && part.bytes <= MAX_PART_BYTES, 'invalid_download');
-      downloadUrl(part.url); declared += part.bytes;
+      if (!(row.mode === 'test' && Buffer.isBuffer(part.testPdf))) downloadUrl(part.url);
+      declared += part.bytes;
     }
     requireValue(declared <= MAX_TOTAL_BYTES, 'download_too_large');
     const location = await privateRoot(), files = [], written = [];
@@ -299,7 +301,9 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
         const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 120000);
         let handle, response;
         try {
-          response = await fetchImpl(downloadUrl(part.url), { method: 'GET', redirect: 'error', signal: controller.signal, headers: { Accept: 'application/pdf' } });
+          response = row.mode === 'test' && Buffer.isBuffer(part.testPdf)
+            ? new Response(part.testPdf, { headers: { 'Content-Length': String(part.bytes) } })
+            : await fetchImpl(downloadUrl(part.url), { method: 'GET', redirect: 'error', signal: controller.signal, headers: { Accept: 'application/pdf' } });
           requireValue(response?.ok && !response.redirected && (!response.url || downloadUrl(response.url) === downloadUrl(part.url)), 'invalid_download');
           const length = response.headers.get('content-length');
           requireValue(length == null || (/^\d+$/.test(length) && Number(length) === part.bytes), 'invalid_download');

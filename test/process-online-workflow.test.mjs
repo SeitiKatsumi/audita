@@ -61,6 +61,7 @@ async function fixture(options = {}) {
       return Response.json({ request_id: id, cnj: state.resultCnj || CNJ, status: state.resultStatus, credits_charged: state.charged, refunded: state.resultRefunded });
     }
     if (endpoint === 'api-download') {
+      if (state.directTestPdf) return new Response(PDF, { headers: { 'Content-Type': 'application/pdf' } });
       const parts = state.parts.map((bytes, index) => ({ idx: index + 1, bytes: bytes.length,
         url: `https://api.processonline.com.br/storage/v1/object/sign/private/${index + 1}.pdf?token=fictitious` }));
       return Response.json({ request_id: id, parts, parts_count: parts.length, download_url: parts[0]?.url,
@@ -191,6 +192,22 @@ test('known provider rejection refunds once, and pending refunds survive restart
     const done = await pending.make().refresh(AUTH, result.id);
     assert.equal(done.billing.refunded, true); assert.equal(pending.state.debit, 1); assert.equal(pending.state.refund, 1); assert.equal(pending.state.calls.length, 1);
   } finally { await pending.close(); }
+});
+
+test('direct sandbox PDF is privately stored without a second unauthenticated download', async () => {
+  const f = await fixture({ directTestPdf: true, resultStatus: 'completed' });
+  try {
+    const created = await f.service.requestCopy(AUTH, input({ approvedCredits: 0 }));
+    const ready = await f.service.refresh(AUTH, created.id);
+    assert.equal(ready.status, 'ready');
+    assert.equal(ready.parts.length, 1);
+    const file = await f.service.file(AUTH, ready.id, 1);
+    assert.deepEqual(await readFile(file.path), PDF);
+    assert.equal(f.state.downloads.length, 0);
+    assert.equal(f.state.debit, 0);
+    assert.equal(JSON.stringify(ready).includes('testPdf'), false);
+    await assert.rejects(f.service.file({ tenantId: 2, user: { id: 21 } }, ready.id, 1), { status: 404 });
+  } finally { await f.close(); }
 });
 
 test('copy becomes ready only after all parts pass private streamed PDF checks; refresh is throttled and download is owner-only', async () => {

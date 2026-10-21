@@ -80,6 +80,14 @@ test('certificate issuance enriches CPF before asking for missing data, reuses s
   assert.equal(orders.at(-1).body.extraFields.stateCourtFields.fullName,'Empresa Ficticia Ltda');
   assert.equal(orders.at(-1).body.extraFields.stateCourtFields.gender,undefined,'company payload does not fabricate personal identity');
   context.planAutonomousCertificates=planAutonomousCertificates;
+  context.directDataPersonService={lookup:async()=>({result:{document:cpf.document,fullName:'Titular Ficticio',birthDate:'1980-02-15'}})};
+  const joint={...cpf,ufs:[],courtCertificates:[],sellerQueries:['rfb-pgfn-cpf']};
+  assert.equal((await post(joint)).status,202);
+  assert.equal(orders.at(-1).body.extraFields.stateCourtFields.birthDate,'15/02/1980');
+  assert.equal(orders.at(-1).quote.providerCostBrl,.54);
+  assert.equal((await post({...joint,documentType:'cnpj',document:'04252011000110',sellerQueries:['rfb-pgfn-cnpj'],companyCnpjs:['04252011000110']})).status,202);
+  assert.equal(orders.at(-1).body.extraFields.stateCourtFields.birthDate,'');
+  assert.equal(orders.at(-1).quote.providerCostBrl,.54);
   context.billingConfiguration=()=>({checkoutReady:false,webhookReady:false});
   const manual={...cpf,fullName:'Titular Ficticio',motherName:'Mae Ficticia'};
   assert.equal((await post({...manual,testBypass:true})).status,503,'browser flags cannot skip an unconfigured checkout');
@@ -225,7 +233,7 @@ test("seller POST validates selection and consent, persists the selected source 
       assert.equal((await post({...body,automatic:true,aiConsent:true,...override})).status,400);
     }
     assert.equal(providerCalls.length,beforeAutomatic,'invalid automatic requests never call providers');
-    const automaticRequest={...body,automatic:true,state:'SP',aiConsent:true,sellerQueries:['unknown'],ufs:['XX'],companyCnpjs:['invalid']};
+    const automaticRequest={...body,automatic:true,state:'SP',birthDate:'1980-01-01',aiConsent:true,sellerQueries:['unknown'],ufs:['XX'],companyCnpjs:['invalid']};
     const automatic=await post(automaticRequest);
     assert.equal(automatic.status,202);
     assert.equal(automatic.body.checkoutRequired,true);assert.equal(providerCalls.length,beforeAutomatic,'analysis collection also waits for payment');
@@ -235,7 +243,8 @@ test("seller POST validates selection and consent, persists the selected source 
     assert.equal(automaticSaved.extraFieldsProvided.sellerState,true);
     assert.equal(automaticSaved.extraFieldsProvided.discoverCompanies,true);
     assert.equal(automaticRequest.companyCnpjs.length,0);
-    assert.equal(automaticRequest.sellerQueries.length,14);
+    assert.equal(automaticRequest.sellerQueries.length,15);
+    assert.ok(automaticRequest.sellerQueries.includes('rfb-pgfn-cpf'));
     assert.ok(automaticRequest.sellerQueries.includes('cnd-sp'));
     assert.ok(!automaticRequest.sellerQueries.includes('cnd-mg'));
     assert.ok(!automaticRequest.sellerQueries.includes('protestos-basica')&&!automaticRequest.sellerQueries.includes('dossie-credito-completo'));
@@ -301,8 +310,8 @@ test('CPF enrichment asks only missing RG; CNPJ starts company sources and persi
     sandbox.directDataPersonService.lookup=async()=>{lookups++;return {unavailable:true,reason:'provider_temporarily_unavailable'};};
     const fallback=await post({...cpf,state:'ES'});
     assert.equal(fallback.status,503);assert.equal(fallback.body.motherNameRequired,true);
-    assert.deepEqual(Array.from(fallback.body.missingFields),['fullName','motherName']);
-    const manual=await post({...cpf,state:'ES',fullName:'Pessoa Ficticia',motherName:'Mae Ficticia'});
+    assert.deepEqual(Array.from(fallback.body.missingFields),['fullName','birthDate','motherName']);
+    const manual=await post({...cpf,state:'ES',fullName:'Pessoa Ficticia',motherName:'Mae Ficticia',birthDate:'1980-02-15'});
     assert.equal(manual.status,202);assert.equal(lookups,2,'manual fallback avoids another lookup');await wait(manual.body.consultaId);
   } finally {await pg.close();}
 });

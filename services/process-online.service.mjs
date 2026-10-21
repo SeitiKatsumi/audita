@@ -94,7 +94,9 @@ export function createProcessOnlineService({
         throw fail(({ 401: 'unauthorized', 402: 'insufficient_credits', 403: 'forbidden', 404: 'not_found',
           409: 'not_ready', 410: 'expired', 422: 'invalid_request', 429: 'rate_limited' })[response.status] || 'unavailable');
       }
-      if (!/^application\/json\b/i.test(response.headers.get('content-type') || '')
+      const sandboxPdf = mode === 'test' && endpoint === 'api-download'
+        && /^application\/pdf\b/i.test(response.headers.get('content-type') || '');
+      if ((!sandboxPdf && !/^application\/json\b/i.test(response.headers.get('content-type') || ''))
         || Number(response.headers.get('content-length')) > MAX_JSON_BYTES) {
         await response.body?.cancel(); throw fail('invalid_response');
       }
@@ -104,6 +106,11 @@ export function createProcessOnlineService({
         size += chunk.length;
         if (size > MAX_JSON_BYTES) throw fail('response_too_large');
         chunks.push(chunk);
+      }
+      if (sandboxPdf) {
+        const pdf = Buffer.concat(chunks);
+        if (pdf.subarray(0, 5).toString('ascii') !== '%PDF-') throw fail('invalid_pdf');
+        return { sandboxPdf: pdf };
       }
       let result;
       try { result = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw fail('invalid_response'); }
@@ -155,6 +162,11 @@ export function createProcessOnlineService({
     },
     async getDownload({ requestId: id } = {}) {
       const result = await call('api-download', { id: requestId(id) });
+      // The approved sandbox returns its sample PDF directly, without a signed manifest.
+      if (mode === 'test' && Buffer.isBuffer(result.sandboxPdf)) {
+        return { request_id: id, parts_count: 1,
+          parts: [{ idx: 1, bytes: result.sandboxPdf.length, testPdf: result.sandboxPdf }] };
+      }
       if (result.request_id !== id || !Number.isSafeInteger(result.parts_count) || result.parts_count < 1
         || !Array.isArray(result.parts) || result.parts.length !== result.parts_count) throw fail('invalid_download');
       const parts = [...result.parts].sort((a, b) => a.idx - b.idx);

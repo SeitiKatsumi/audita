@@ -82,6 +82,7 @@ test("seller provider normalizes formatted dates, accepts documented CNPJ and al
     ["ProtestosBasica", { CNPJ: "04252011000110" }],
     ["DossieCreditoCompleto", { CNPJ: "04252011000110" }],
     ["DossieCreditoCompleto", { CPF: "52998224725" }],
+    ["CertidaoConjuntaDebitosPessoaJuridica", { CNPJ: "04.252.011/0001-10" }],
   ];
   for (const [index, [endpoint, parameters]] of cases.entries()) assert.equal((await service.query(request({ requestId: endpoint+'-'+index, endpoint, parameters }), AUTH)).result.status, "success");
   assert.equal(calls[0].searchParams.get("DATANASCIMENTO"), "01/01/2000");
