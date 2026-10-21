@@ -931,3 +931,20 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Auditoria Git somente leitura do código: fetch --all --prune, ls-remote completo (HEAD/main e todas as branches), datas de autor/committer, reflog e API GitHub autenticada. Repositório SeitiKatsumi/audita, mainf24c85e; último pushed_at2026-10-19T12:28:38Z (09h28 em São Paulo). O commit registra21h28+09, mesmo instante09h28-03. Reflog confirma fetch em19/10 16h05 e integração main16h21; horários de recebimento não são a data do commit. Nenhum commit remoto posterior encontrado.
 - Duas refs remotas fora da ancestralidade main: audit-auth-wizard (maio, raiz histórica) e jurisprudence-access (02/10). Coletor FGTS contém a implementação antiga mais alias CNPJ; serviço/importador de jurisprudências coincidem com main ao normalizar CRLF; controle de acesso tem evoluções posteriores. PR9 de jurisprudências continua aberto, mas a funcionalidade já está incorporada; nenhum PR fechado/alterado nesta auditoria.
 -49arquivos de alterações recentes (incluindo fontes novas) conferidos byte a byte entre a main local e o checkout consolidado chat-navegacao: zero divergências. Alterações recentes de ProcessOnline, processos200, PGFN, preços/admin, cobertura e chat permanecem locais sem commit/push/deploy. Nenhum checkout resetado, branch trocada ou trabalho descartado. Sem alteração funcional e sem repetir testes da aplicação por esta verificação documental.
+
+- 2026-10-21: Codex, codex/ir-entry-calculator. Duas entradas no IR: isencao e simulacao de restituicao. Quatro campos conforme referencia Liberius, resultado discriminado, projecao12meses e acrescimo10% opcionais e explicitamente hipoteticos. Periodo passado limitado a60meses completos; sem afirmar elegibilidade, taxas oficiais ou reproduzir estatisticas comerciais. Simulacao apenas em memoria, sem API/persistencia. Triagem e casos existentes preservados. Testes unitarios e regressao aprovados; navegador local bloqueado por permissao salva, verificacao visual pendente. Sem commit/push/deploy.
+
+## 2026-10-21 — Desconto de IR anterior aos 65 anos
+- Codex, codex/ir-entry-calculator: campo condicional e obrigatório quando há período anterior aos 65 anos para titular já com 65; valida valor histórico e calcula cada faixa separadamente. Integrado no checkout local da porta 3000; sem commit/push/deploy.
+- Validação: 14 testes de cálculo/fluxo/chat aprovados, incluindo valores distintos, centavos, aniversário, zero histórico, inválidos e exibição condicional. Navegador local não validado: permissão salva bloqueia acesso.
+
+## 2026-10-21 — Datas da calculadora de IR
+- Codex, codex/ir-entry-calculator: substituído seletor nativo de mês por digitação MM/AAAA, máscara de barra, teclado numérico e validação. Conversão interna preserva o cálculo e o desconto anterior aos 65. Integrado na porta 3000, sem commit/push/deploy.
+- 15 testes de cálculo/fluxo/chat passaram; sintaxe e diff aprovados. Conferência visual permanece indisponível pela permissão salva do navegador local.
+
+## 2026-10-21 — Calendário opcional no IR
+- Codex, codex/ir-entry-calculator: digitação MM/AAAA preservada e botão de calendário nas três datas, com seleção de mês/ano em português. Valor digitado e seletor sincronizados, foco de teclado e expansão acessível. Integrado na porta 3000.
+- 15 testes passaram incluindo abrir/confirmar seleção e atualização do campo. Sintaxe/diff aprovados; navegador local bloqueado pela permissão salva. Sem commit/push/deploy.
+
+## 2026-10-21 — Envio da calculadora de IR autorizado
+- Usuário autorizou commit e push. Escopo: entrada com duas opções, calculadora local, desconto anterior aos 65 anos e datas digitáveis com seletor de mês/ano. Base origin/main conferida sem divergência; 15 testes, sintaxe e diff aprovados. Envio ao GitHub nesta rodada; deploy não solicitado.

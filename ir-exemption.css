@@ -79,3 +79,25 @@ body[data-active-page="isencao-ir"] .service-return { flex: none; margin-bottom:
   body[data-active-page="isencao-ir"] .workspace { height: calc(100dvh - var(--mobile-nav-height)); padding: 16px 12px 0; }
   #isencao-ir .charge-analysis-shell { padding-left: 0; }
 }
+
+#isencao-ir .ir-entry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin-top:24px}
+#isencao-ir .ir-entry-grid article{display:flex;flex-direction:column;padding:28px;background:#0c2436;border:1px solid #28516a;border-radius:14px;gap:16px}
+#isencao-ir .ir-entry-grid h3{font-size:1.4rem;line-height:1.3;margin:0}
+#isencao-ir .ir-entry-grid p,#isencao-ir .ir-entry-grid ul{line-height:1.65;margin:0;color:#bdd4e5}
+#isencao-ir .ir-entry-grid ul{padding-left:20px;margin-bottom:10px}
+#isencao-ir .ir-entry-grid button{margin-top:auto;min-height:48px}
+#isencao-ir .ir-calculator{max-width:720px;margin:0 auto}
+#isencao-ir .ir-calculator h2{font-size:1.8rem;margin:24px 0 14px}
+#isencao-ir .ir-calculator form,#isencao-ir .ir-calculator-result{padding:24px;border:1px solid #28516a;border-radius:12px;background:#0c2436}
+#isencao-ir .ir-calculator-result{margin-top:24px;line-height:1.6}
+#isencao-ir .ir-calculator-result dl>div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #28516a}
+#isencao-ir .ir-calculator-result dd{margin:0;white-space:nowrap;color:#69ffad}
+@media(max-width:700px){#isencao-ir .ir-entry-grid{grid-template-columns:1fr}#isencao-ir .ir-entry-grid article,#isencao-ir .ir-calculator form,#isencao-ir .ir-calculator-result{padding:18px}#isencao-ir .ir-calculator-result dl>div{flex-wrap:wrap}}
+
+#isencao-ir .ir-date-field{display:grid;gap:7px;min-width:0}
+#isencao-ir .ir-date-input{display:flex;gap:8px}
+#isencao-ir .ir-date-input input{min-width:0;flex:1}
+#isencao-ir .ir-date-input button{display:grid;place-items:center;min-width:44px;border:1px solid #28516a;border-radius:8px;background:#0b2030;color:#69ffad;cursor:pointer}
+#isencao-ir .ir-month-picker{display:flex;flex-wrap:wrap;gap:12px;padding:12px;border:1px solid #28516a;border-radius:8px}
+#isencao-ir .ir-month-picker label{flex:1;min-width:100px}
+#isencao-ir .ir-month-picker button{align-self:end;min-height:44px}

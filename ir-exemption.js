@@ -6,7 +6,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const money = cents => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(cents||0)/100);
 const fmtDate = date => date ? new Date(date).toLocaleString('pt-BR') : '—';
 const apiRoot='/api/ir-exemption';
-const state={user:null,config:null,case:null,tab:'chat',editing:null,busy:false,staff:[],summaryError:false};
+const state={user:null,config:null,case:null,tab:'chat',editing:null,busy:false,staff:[],summaryError:false,entry:null,calculator:null};
 const benefitTypes={retirement:'Aposentadoria',pension:'Pensão',military:'Reforma / reserva',private:'Previdência complementar',salary:'Salário da ativa',unknown:'Não sei'};
 const shortSteps={role:'Solicitante',consent:'Autorização',identity:'Contato',subject:'Titular',benefits:'Benefícios',conditions:'Histórico médico',diagnosis:'Diagnóstico',medical:'Laudo',taxes:'Imposto',prior:'Pedidos anteriores',heir:'Espólio',documents:'Documentos'};
 const financialLabels={published:'Aguardando aceite',superseded:'Substituída',accepted:'Aceita · aguardando pagamento',payment_pending:'Pagamento em andamento',paid:'Pagamento confirmado'};
@@ -20,7 +20,7 @@ async function api(path='',options={}) {
 }
 const post=(path,body)=>api(path,{method:'POST',body:JSON.stringify(body||{})});
 async function guarded(fn){if(state.busy)return;state.busy=true;notice();$$('button[type=submit]').forEach(b=>b.disabled=true);try{await fn();}catch(e){notice(e.message);if(e.code==='case_conflict'&&state.case){await loadCase(state.case.id).catch(()=>{});}}finally{state.busy=false;$$('button[type=submit]').forEach(b=>b.disabled=false);}}
-async function loadCase(id){state.tab='chat';state.case=(await api(`/cases/${encodeURIComponent(id)}`)).case;state.editing=null;const url=new URL(location.href);url.searchParams.set('case',id);history.replaceState(null,'',url);await render();await completeSummary();scrollLatestAssistant();}
+async function loadCase(id){state.entry='triage';state.tab='chat';state.case=(await api(`/cases/${encodeURIComponent(id)}`)).case;state.editing=null;const url=new URL(location.href);url.searchParams.set('case',id);history.replaceState(null,'',url);await render();await completeSummary();scrollLatestAssistant();}
 async function updateCase(result,animate=false){state.case=result.case;state.editing=null;state.summaryError=false;await render(animate);await completeSummary();}
 async function completeSummary(){
   const c=state.case;
@@ -37,9 +37,53 @@ async function completeSummary(){
   }
 }
 async function command(action,extra={}){await updateCase(await post(`/cases/${state.case.id}/actions`,{action,revision:state.case.revision,restartFollowing:action==='answer'&&state.editing===extra.key,...extra}),action==='answer');}
-async function startCase(){if(!state.user){document.querySelector('#loginButton')?.click();return;}if(!state.config.ready){notice('O atendimento será liberado assim que o armazenamento seguro estiver configurado.');return;}state.tab='chat';const result=await post('/cases');await loadCase(result.case.id);}
+async function startCase(){if(!state.user){document.querySelector('#loginButton')?.click();return;}if(!state.config?.ready){notice('O atendimento será liberado assim que o armazenamento seguro estiver configurado.');return;}state.tab='chat';const result=await post('/cases');await loadCase(result.case.id);}
 function assistantBubble(content){return `<div class="charge-analysis-message assistant charge-analysis-intro-message"><span class="charge-analysis-avatar-anchor" aria-hidden="true"></span><div class="charge-analysis-bubble">${content}</div></div>`;}
 const {moveAssistantAvatar,scrollLatestAssistant,animateAssistant,cancelTyping}=createAuditaChatMotion({getStage:()=>$('#app'),getConversation:()=>$('.charge-analysis-conversation'),isActive:()=>document.body.dataset.activePage==='isencao-ir'});
+function irMonthToIso(value) {
+ const match=/^(0[1-9]|1[0-2])\/(\d{4})$/.exec(value||'');
+ return match?`${match[2]}-${match[1]}`:'';
+}
+function irMonthDisplay(value) {
+ const match=/^(\d{4})-(\d{2})$/.exec(value||'');
+ return match?`${match[2]}/${match[1]}`:value||'';
+}
+function maskIrMonth(value) {
+ const digits=value.replace(/\D/g,'').slice(0,6);
+ return digits.length>2?`${digits.slice(0,2)}/${digits.slice(2)}`:digits;
+}
+function needsIrBefore65(values, now = new Date()) {
+ const month=value=>/^\d{4}-(0[1-9]|1[0-2])$/.test(value||'')?Number(value.slice(0,4))*12+Number(value.slice(5))-1:NaN;
+ const current=now.getFullYear()*12+now.getMonth(),birthday65=month(values.birth)+65*12;
+ const start=Math.max(month(values.diagnosis),month(values.retirement),current-60);
+ return birthday65<=current&&start<birthday65;
+}
+function syncIrBefore65(form) {
+ const field=form.elements.namedItem('amountBefore65');
+ const needed=needsIrBefore65(Object.fromEntries(['birth','diagnosis','retirement'].map(name=>[name,irMonthToIso(form.elements.namedItem(name).value)])));
+ field.disabled=!needed;field.required=needed;field.closest('label').hidden=!needed;
+}
+function estimateIrRefund(values, now = new Date()) {
+ const current=now.getFullYear()*12+now.getMonth();
+ const month=(value,label)=>{const match=/^(\d{4})-(\d{2})$/.exec(value||'');if(!match||+match[1]<1900||+match[2]<1||+match[2]>12)throw new Error(`Confira ${label}.`);const n=+match[1]*12+(+match[2]-1);if(n>current)throw new Error(`${label} não pode estar no futuro.`);return n;};
+ const birth=month(values.birth,'o nascimento'),diagnosis=month(values.diagnosis,'o diagnóstico'),retirement=month(values.retirement,'o início do benefício');
+ if(diagnosis<birth||retirement<birth)throw new Error('Diagnóstico e benefício não podem ser anteriores ao nascimento.');
+ const amount=Number(values.amount),monthlyCents=Math.round(amount*100);
+ if(!Number.isFinite(amount)||amount<=0||monthlyCents>100000000)throw new Error('Informe um desconto mensal maior que zero e de até R$ 1.000.000,00.');
+ const start=Math.max(diagnosis,retirement,current-60),months=Math.max(0,current-start);
+ const before65=Math.max(0,Math.min(current,birth+65*12)-start),after65=months-before65;
+ const needsPrevious=needsIrBefore65(values,now),previousAmount=Number(values.amountBefore65);
+ if(needsPrevious&&(String(values.amountBefore65??'').trim()===''||!Number.isFinite(previousAmount)||previousAmount<0||previousAmount>1000000))throw new Error('Informe o desconto mensal de IR antes dos 65 anos, de zero a R$ 1.000.000,00.');
+ const before65MonthlyCents=needsPrevious?Math.round(previousAmount*100):monthlyCents;
+ const principal=before65*before65MonthlyCents+after65*monthlyCents,projection=values.projection&&months>0?12*monthlyCents:0,correction=values.correction?Math.round((principal+projection)*.10):0;
+ return {months,before65,after65,monthlyCents,before65MonthlyCents,principal,projection,correction,total:principal+projection+correction,start, current};
+}
+function entryChoices(){return `<section class="ir-entry"><h2>Como podemos ajudar?</h2><p>Escolha por onde começar sua análise de Imposto de Renda.</p><div class="ir-entry-grid"><article><h3>Isenção do Imposto de Renda por doença grave</h3><p>Para aposentados, pensionistas e reformados que desejam avaliar a isenção sobre seus benefícios.</p><ul><li>Perguntas guiadas sobre o seu caso</li><li>Envio de laudos e documentos</li><li>Análise das informações pela equipe Audita</li></ul><button type="button" class="ir-primary" data-ir-entry="triage">Quero minha isenção</button></article><article><h3>Recuperação dos valores pagos indevidamente</h3><p>Simule o IR descontado no período informado e veja uma estimativa antes de iniciar o atendimento.</p><ul><li>Simulação com datas e desconto mensal</li><li>Memória de cálculo detalhada</li><li>Resultado sujeito à conferência documental</li></ul><button type="button" class="ir-primary" data-ir-entry="calculator">Calcule seu reembolso</button></article></div></section>`;}
+function calculatorView(){const v=state.calculator||{},m=(name,label)=>{
+ const currentYear=new Date().getFullYear(),selected=irMonthToIso(irMonthDisplay(v[name]))||`${currentYear}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+ return `<div class="ir-date-field"><label for="ir-date-${name}">${label}</label><div class="ir-date-input"><input id="ir-date-${name}" type="text" inputmode="numeric" name="${name}" value="${esc(irMonthDisplay(v[name]))}" placeholder="MM/AAAA" maxlength="7" pattern="(0[1-9]|1[0-2])/[0-9]{4}" title="Digite mês e ano, por exemplo 01/1960" required><button type="button" data-ir-calendar="${name}" aria-label="Selecionar ${label.toLowerCase()} no calendário" aria-expanded="false" aria-controls="ir-calendar-${name}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></button></div><small>Mês e ano (ex.: 01/1960)</small><div id="ir-calendar-${name}" class="ir-month-picker" hidden><label>Mês<select data-ir-month>${['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((month,i)=>`<option value="${String(i+1).padStart(2,'0')}" ${Number(selected.slice(5))===i+1?'selected':''}>${month}</option>`).join('')}</select></label><label>Ano<select data-ir-year>${Array.from({length:currentYear-1899},(_,i)=>currentYear-i).map(year=>`<option ${Number(selected.slice(0,4))===year?'selected':''}>${year}</option>`).join('')}</select></label><button type="button" class="ir-secondary" data-ir-calendar-apply="${name}">Selecionar</button></div></div>`;
+ };return `<section class="ir-calculator"><button type="button" class="ir-secondary" data-ir-entry="choices">Voltar às opções</button><h2>Calculadora de restituição de IR</h2><p>Preencha os dados para simular os valores. Nenhum dado desta simulação é enviado ou salvo.</p><form id="irCalculatorForm" class="ir-form"><div class="ir-field-row">${m('birth','Data de nascimento')}${m('diagnosis','Data do primeiro laudo/diagnóstico')}</div>${m('retirement','Data da aposentadoria/pensão')}<label>Desconto de IR atual por mês (R$)<input name="amount" type="number" min="0.01" max="1000000" step="0.01" value="${esc(v.amount||'')}" placeholder="Ex.: 1000,00" required></label><label hidden>Desconto de IR antes dos 65 anos por mês (R$)<input name="amountBefore65" type="number" min="0" max="1000000" step="0.01" value="${esc(v.amountBefore65??'')}" placeholder="Ex.: 1500,00" disabled><small>Valor mensal descontado antes de completar 65 anos.</small></label><details><summary>Hipóteses da simulação</summary><label class="ir-check"><input type="checkbox" name="projection" ${v.projection===false?'':'checked'}><span>Incluir projeção de mais 12 meses de desconto (prazo hipotético, não garantido).</span></label><label class="ir-check"><input type="checkbox" name="correction" ${v.correction===false?'':'checked'}><span>Aplicar acréscimo ilustrativo de 10% (não é a Selic nem uma taxa oficial).</span></label></details><label class="ir-check"><input type="checkbox" name="privacy" required><span>Li a <a href="https://auditainteligente.com.br/politica-de-privacidade" target="_blank" rel="noopener noreferrer">Política de Privacidade</a> e entendo que o resultado é uma estimativa.</span></label><button type="submit" class="ir-primary">Calcular reembolso</button></form><div id="irCalculatorResult" aria-live="polite"></div></section>`;}
+function calculatorResult(r){return `<section class="ir-calculator-result" tabindex="-1"><h3>Cálculo detalhado</h3><dl><div><dt>Desconto mensal informado</dt><dd>${money(r.monthlyCents)}</dd></div><div><dt>Meses completos considerados</dt><dd>${r.months} (máximo 60)</dd></div><div><dt>Antes dos 65 anos · ${r.before65} meses × ${money(r.before65MonthlyCents)}</dt><dd>${money(r.before65*r.before65MonthlyCents)}</dd></div><div><dt>A partir dos 65 anos · ${r.after65} meses</dt><dd>${money(r.after65*r.monthlyCents)}</dd></div><div><dt>Subtotal do período passado</dt><dd>${money(r.principal)}</dd></div><div><dt>Projeção hipotética de 12 meses</dt><dd>${money(r.projection)}</dd></div><div><dt>Acréscimo ilustrativo de 10%</dt><dd>${money(r.correction)}</dd></div></dl><h3>Total estimado: ${money(r.total)}</h3><p>${r.months?'':'Não há meses completos anteriores ao mês atual no período informado. '}Usamos o início mais recente entre diagnóstico, benefício e limite de 60 meses. O desconto anterior aos 65 anos é aplicado aos meses desse período; o atual é aplicado a partir dos 65 anos. Para quem ainda não completou 65 anos, usamos o desconto atual. Não inclui 13º, compensações ou valores já restituídos.</p><p>A simulação não confirma direito à isenção ou restituição. Datas, retenções e atualização oficial precisam ser conferidas nos documentos. As parcelas projetadas não são valores já pagos.</p><div class="ir-toolbar"><button type="button" class="ir-secondary" data-ir-entry="calculator">Calcular novamente</button><button type="button" class="ir-primary" data-ir-entry="triage">Iniciar análise do meu caso</button></div></section>`;}
 function landing(){return assistantBubble(`<p>Olá! Vou fazer algumas perguntas rápidas sobre o benefício, os descontos de IR e a saúde do titular.</p><p>A equipe vai revisar as respostas e os documentos antes de concluir a análise.</p><p class="charge-analysis-intro-question"><strong>Para quem você está buscando a análise?</strong></p><div class="charge-analysis-actions">${Object.entries({self:'Para mim',representative:'Represento uma pessoa viva',heir:'Sou herdeiro(a)'}).map(([role,label])=>`<button type="button" data-start-role="${role}"><strong>${label}</strong></button>`).join('')}</div>${!state.user?'<p class="ir-micro">Entre na sua conta para salvar e retomar o atendimento.</p>':''}`)+(state.config?.staffRole==='super_admin'?staffSection():'');}
 function input(name,label,value='',type='text',required=false){return `<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${required?'required':''} ${type==='number'?'step="0.01" min="0"':''}></label>`;}
 function select(name,label,options,value){return `<label>${esc(label)}<select name="${name}">${Object.entries(options).map(([v,l])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(l)}</option>`).join('')}</select></label>`;}
@@ -126,16 +170,31 @@ function operatorView(){const c=state.case,docsOptions=type=>Object.fromEntries(
 function render(animate=false){
   cancelTyping();
   $('#app').setAttribute('aria-busy','false');
-  if(!state.case){$('#app').innerHTML=`<div class="charge-analysis-conversation">${landing()}</div>`;moveAssistantAvatar($('.charge-analysis-conversation'));return;}
-  $('#app').innerHTML=chatView();
+  if(state.entry==='choices'||(!state.entry&&!state.case)){ $('#app').innerHTML=entryChoices();return; }
+  if(state.entry==='calculator'){ $('#app').innerHTML=calculatorView();syncIrBefore65($('#irCalculatorForm'));return; }
+  if(!state.case){$('#app').innerHTML=`<div class="charge-analysis-conversation">${landing()}</div><button type="button" class="ir-secondary" data-ir-entry="choices">Voltar às opções</button>`;moveAssistantAvatar($('.charge-analysis-conversation'));return;}
+  $('#app').innerHTML='<button type="button" class="ir-secondary" data-ir-entry="choices">Opções do serviço</button>'+chatView();
   if(animate && state.tab==='chat') return animateAssistant();
   moveAssistantAvatar($('.charge-analysis-conversation'));
 }
-async function init(){const [auth,config]=await Promise.all([api('/api/auth/me'),api('/config')]);state.user=auth.user;state.config=config;if(['super_admin','manager'].includes(config.staffRole))state.staff=(await api('/staff')).staff;const id=new URLSearchParams(location.search).get('case');if(id&&state.user&&config.ready)await loadCase(id);else await render(true);}
+async function init(){const [auth,config]=await Promise.all([api('/api/auth/me'),api('/config')]);state.user=auth.user;state.config=config;if(['super_admin','manager'].includes(config.staffRole))state.staff=(await api('/staff')).staff;const id=new URLSearchParams(location.search).get('case');if(id&&state.user&&config.ready)await loadCase(id);else if(state.entry!=='calculator')await render(true);}
 async function submitAnswer(formEl){const q=currentQuestion(),f=new FormData(formEl),get=k=>String(f.get(k)||'');let value;
  switch(q.type){case 'consent':value={analysis:f.has('analysis'),representation:f.has('representation')};break;case 'identity':value={name:get('name'),cpf:get('cpf'),phone:get('phone'),email:get('email')};break;case 'subject':value={name:get('name'),cpf:get('cpf')};break;case 'simple-benefits':case 'benefits':value=$$('[data-row=benefit]',formEl).map(r=>({type:$('[name=type]',r).value,payer:$('[name=payer]',r).value,start:$('[name=start]',r).value||null}));break;case 'multi':value=f.getAll('conditions');break;case 'diagnosis':value={date:get('date')||null,year:get('year')?Number(get('year')):null,remission:get('remission')};break;case 'simple-taxes':case 'taxes':value={withheld:get('withheld'),periods:$$('[data-row=period]',formEl).map(r=>({benefitIndex:Number($('[name=benefitIndex]',r).value),month:$('[name=month]',r).value,paidCents:Math.round(Number($('[name=paid]',r).value)*100),refundedCents:Math.round(Number($('[name=refunded]',r).value)*100)}))};break;case 'heir':value={deathDate:get('deathDate'),relationship:get('relationship'),estate:get('estate'),representative:get('representative')};break;case 'documents':value=get('documents');break;default:return;}
  await command('answer',{key:q.key,value});$('#questionTitle')?.focus({preventScroll:true});}
 irRoot.addEventListener('click',event=>{const el=event.target.closest('button,[data-tab]');if(!el)return;
+ if(el.dataset.irCalendar){
+  const name=el.dataset.irCalendar,panel=$(`#ir-calendar-${name}`),field=$(`#ir-date-${name}`);
+  const selected=irMonthToIso(field.value);
+  if(selected){panel.querySelector('[data-ir-month]').value=selected.slice(5);panel.querySelector('[data-ir-year]').value=selected.slice(0,4);}
+  panel.hidden=!panel.hidden;el.setAttribute('aria-expanded',String(!panel.hidden));
+  if(!panel.hidden)panel.querySelector('select').focus();return;
+ }
+ if(el.dataset.irCalendarApply){
+  const name=el.dataset.irCalendarApply,panel=$(`#ir-calendar-${name}`),field=$(`#ir-date-${name}`);
+  field.value=`${panel.querySelector('[data-ir-month]').value}/${panel.querySelector('[data-ir-year]').value}`;
+  syncIrBefore65(field.form);panel.hidden=true;$(`[data-ir-calendar="${name}"]`).setAttribute('aria-expanded','false');field.focus();return;
+ }
+ if(el.dataset.irEntry){state.entry=el.dataset.irEntry;notice();render();$('#app').scrollIntoView({block:'start'});return;}
  if(el.dataset.startRole){guarded(async()=>{await startCase();if(state.case){await command('answer',{key:'role',value:el.dataset.startRole});$('#questionTitle')?.focus({preventScroll:true});}});return;}
  if(el.dataset.tab){state.tab=el.dataset.tab;state.editing=null;render();(state.tab==='chat'?$('#questionTitle'):$('#irConversationPanel'))?.focus();return;}
  if(el.dataset.edit){state.tab='chat';state.editing=el.dataset.edit;render();$('#questionTitle')?.focus({preventScroll:true});scrollLatestAssistant();return;}
@@ -155,7 +214,15 @@ irRoot.addEventListener('click',event=>{const el=event.target.closest('button,[d
  if(action==='analyze')guarded(completeSummary);
  if(action==='refresh')guarded(()=>loadCase(state.case.id));
 });
-irRoot.addEventListener('submit',event=>{const f=event.target,benefit=event.submitter?.value;event.preventDefault();guarded(async()=>{const data=new FormData(f),s=k=>String(data.get(k)||'');
+irRoot.addEventListener('input',event=>{
+ const field=event.target;
+ if(field.form?.id!=='irCalculatorForm'||!['birth','diagnosis','retirement'].includes(field.name))return;
+ const caret=field.selectionStart??field.value.length,digitsBefore=field.value.slice(0,caret).replace(/\D/g,'').length;
+ const formatted=maskIrMonth(field.value);
+ if(formatted!==field.value){field.value=formatted;const position=Math.min(formatted.length,digitsBefore+(digitsBefore>2?1:0));field.setSelectionRange(position,position);}
+ syncIrBefore65(field.form);
+});
+irRoot.addEventListener('submit',event=>{const f=event.target,benefit=event.submitter?.value;event.preventDefault();if(f.id==='irCalculatorForm'){const data=new FormData(f);state.calculator={birth:irMonthToIso(data.get('birth')),diagnosis:irMonthToIso(data.get('diagnosis')),retirement:irMonthToIso(data.get('retirement')),amount:data.get('amount'),amountBefore65:data.get('amountBefore65'),projection:data.has('projection'),correction:data.has('correction')};try{if(!data.has('privacy'))throw new Error('Confirme a leitura da política de privacidade.');notice();$('#irCalculatorResult').innerHTML=calculatorResult(estimateIrRefund(state.calculator));$('#irCalculatorResult section').focus();}catch(e){$('#irCalculatorResult').innerHTML='';notice(e.message);}return;}guarded(async()=>{const data=new FormData(f),s=k=>String(data.get(k)||'');
  if(f.id==='benefitConsentForm'){
    if(!data.has('authorize')||!Object.hasOwn(benefitTypes,benefit))return;
    await command('answer',{key:'consent',value:{analysis:true,representation:true}});
@@ -183,7 +250,7 @@ irRoot.addEventListener('submit',event=>{const f=event.target,benefit=event.subm
  else if(f.id==='staffForm'){await post('/staff',Object.fromEntries(data));state.staff=(await api('/staff')).staff;render();notice('Operador credenciado. Atribua os casos no painel da equipe.');}
  });});
 let initializing;
-function activate(){if(document.body.dataset.activePage!=='isencao-ir')return;initializing ||= init().catch(e=>{notice(e.message);$('#app').setAttribute('aria-busy','false');$('#app').innerHTML='<button type="button" class="secondary-action" id="retryInit">Tentar novamente</button>';$('#retryInit').onclick=()=>{initializing=null;activate();};});}
+function activate(){if(document.body.dataset.activePage!=='isencao-ir')return;if(!initializing)render();initializing ||= init().catch(e=>{notice(e.message);$('#app').setAttribute('aria-busy','false');render();});}
 document.addEventListener('audita:pagechange',()=>{if(document.body.dataset.activePage!=='isencao-ir')cancelTyping();activate();});
 window.addEventListener('audita:auth-changed',()=>{state.user=null;state.case=null;state.staff=[];$('#app').setAttribute('aria-busy','true');initializing=null;activate();});
 activate();
