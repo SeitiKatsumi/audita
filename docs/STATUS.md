@@ -953,3 +953,7 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Codex, codex/consolidar-anexos-20261021; base origin/main 2d1f157. Usuário autorizou concluir Remover e fazer commit/push de todas as pendências. Conferidos os diffs locais: IR, compositor e categorias já publicados; site sem alterações. Preservados os avanços remotos mais recentes de navegação e processos.
 - Área de arrastar/selecionar anexos com nomes e botão Remover por arquivo; remoção atualiza FileList e impede edição durante envio, sem abrir seletor ao remover. Arquivos temporários de teste permanecem locais.
 - 18 testes de anexos/fluxos bancários/IR aprovados, sintaxe e diff aprovados. Navegador local indisponível pela permissão salva. Envio autorizado ao GitHub, sem deploy.
+
+## 2026-10-21 — Arrastar documentos na Auditoria de importação
+- Solicitação adicional incluída na consolidação: seleção/arraste de PDF, PNG, JPEG e XML, um por envio, com remoção antes do upload. Preservados limites, tipo de documento, processamento e permissões.
+- 14 testes de importação, documentos e anexos aprovados após disponibilizar dependências locais no worktree; sintaxe e diff aprovados. Commit/push autorizados, sem deploy.

@@ -70,3 +70,15 @@ body[data-active-page="auditoria-importacao"] .service-return { padding-top: 0; 
  .import-product button { align-self: end; font-size: .85rem; }
  .import-form .import-actions { margin: 0; }
 }
+
+#importApp .import-file-drop{position:relative;cursor:pointer;border:1px dashed #2a8a82;border-radius:10px;padding:14px;gap:10px}
+#importApp .import-file-drop.dragover{background:rgba(71,255,166,.12);border-color:#5dffa8}
+#importApp .import-file-drop input[type=file]{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+#importApp .import-file-drop:focus-within{outline:2px solid #5dffa8;outline-offset:3px}
+.import-file-select{display:block;padding:8px 12px;border:1px solid #2a8a82;border-radius:6px;color:#a8dbff}
+#importApp .import-file-drop .import-drop-hint{color:#5dffa8}
+[data-import-file-names]{overflow-wrap:anywhere}[data-import-file-names]:empty{display:none}
+@media(max-width:768px),(pointer:coarse){.import-drop-hint{display:none}}
+
+.import-file-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}.import-file-row>span{min-width:0;overflow-wrap:anywhere}
+#importApp .import-file-row button{flex-shrink:0;min-height:36px;padding:6px 10px;border:1px solid #da9183;border-radius:6px;background:transparent;color:#ffb4a5;cursor:pointer}
