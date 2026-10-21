@@ -948,3 +948,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 ## 2026-10-21 — Envio da calculadora de IR autorizado
 - Usuário autorizou commit e push. Escopo: entrada com duas opções, calculadora local, desconto anterior aos 65 anos e datas digitáveis com seletor de mês/ano. Base origin/main conferida sem divergência; 15 testes, sintaxe e diff aprovados. Envio ao GitHub nesta rodada; deploy não solicitado.
+
+## 2026-10-21 — Consolidação dos anexos de Dívidas bancárias
+- Codex, codex/consolidar-anexos-20261021; base origin/main 2d1f157. Usuário autorizou concluir Remover e fazer commit/push de todas as pendências. Conferidos os diffs locais: IR, compositor e categorias já publicados; site sem alterações. Preservados os avanços remotos mais recentes de navegação e processos.
+- Área de arrastar/selecionar anexos com nomes e botão Remover por arquivo; remoção atualiza FileList e impede edição durante envio, sem abrir seletor ao remover. Arquivos temporários de teste permanecem locais.
+- 18 testes de anexos/fluxos bancários/IR aprovados, sintaxe e diff aprovados. Navegador local indisponível pela permissão salva. Envio autorizado ao GitHub, sem deploy.

@@ -1,3 +1,28 @@
+function bindDebtFileDrop(root, isBusy) {
+ root.addEventListener('click',e=>{
+  const button=e.target?.closest?.('[data-debt-remove-file]');if(!button)return;
+  e.preventDefault();e.stopPropagation();if(isBusy())return;
+  const zone=button.closest('[data-debt-file-drop]'),input=zone.querySelector('input[type=file]');if(input.disabled)return;
+  const index=Number(button.dataset.debtRemoveFile),files=Array.from(input.files||[]);
+  if(!Number.isInteger(index)||index<0||index>=files.length)return;
+  const transfer=new DataTransfer();files.forEach((file,i)=>{if(i!==index)transfer.items.add(file);});
+  input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
+  const next=zone.querySelector('[data-debt-remove-file]');(next||input).focus();
+ });
+ const zoneFor=e=>e.target?.closest?.('[data-debt-file-drop]');
+ root.addEventListener('dragover',e=>{const zone=zoneFor(e);if(!zone||!Array.from(e.dataTransfer?.types||[]).includes('Files'))return;e.preventDefault();e.dataTransfer.dropEffect=isBusy()?'none':'copy';if(!isBusy())zone.classList.add('dragover');});
+ root.addEventListener('dragleave',e=>{const zone=zoneFor(e);if(zone&&!zone.contains(e.relatedTarget))zone.classList.remove('dragover');});
+ root.addEventListener('drop',e=>{
+  const zone=zoneFor(e);if(!zone)return;e.preventDefault();zone.classList.remove('dragover');if(isBusy())return;
+  const input=zone.querySelector('input[type=file]'),files=Array.from(e.dataTransfer?.files||[]);if(!input||input.disabled||!files.length)return;
+  let message='';
+  if(files.length>15||files.some(f=>!f.size||f.size>10*1024*1024)||files.reduce((n,f)=>n+f.size,0)>40*1024*1024)message='Envie até 15 arquivos, com até 10 MB cada e 40 MB no total.';
+  else if(files.some(f=>!['application/pdf','image/png','image/jpeg'].includes(f.type)&&!(!f.type&&/\.(pdf|png|jpe?g)$/i.test(f.name))))message='Selecione arquivos PDF, PNG ou JPG.';
+  input.setCustomValidity(message);if(message){input.reportValidity();return;}
+  const transfer=new DataTransfer();files.forEach(f=>transfer.items.add(f));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));
+ });
+ root.addEventListener('change',e=>{const zone=zoneFor(e);if(!zone)return;e.target.setCustomValidity('');const escape=value=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));zone.querySelector('[data-debt-file-names]').innerHTML=Array.from(e.target.files||[]).map((f,i)=>`<span class="debt-file-row"><span>${escape(f.name)}</span><button type="button" data-debt-remove-file="${i}" aria-label="Remover ${escape(f.name)}">Remover</button></span>`).join('');});
+}
 const root=document.querySelector('#dividas-bancarias');
 const $=s=>root.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)/100);
@@ -42,7 +67,7 @@ function estimateResult(){const e=current.estimate;if(!e)return '';const rate=v=
 
 function documentList(){const docs=current?.documents||[];if(!docs.length)return '';const seen=new Set();return '<details class="debt-documents"><summary>Ver arquivos enviados</summary><ul>'+docs.filter(d=>{const key=d.kind+':'+(d.sha256||d.id);if(seen.has(key))return false;seen.add(key);return true;}).map(d=>'<li><a href="/api/bank-debt/cases/'+current.id+'/documents/'+d.id+'">'+esc(d.name)+'</a></li>').join('')+'</ul></details>';}
 function uploads(){return documentList()+(current.owner&&['paid','signature'].includes(current.status)?form('upload',select('kind','Que documento você vai enviar?',[['identity','Documento de identificação'],['address','Comprovante de residência'],['evidence','Extrato, contrato ou notificação de cobrança']])+fileInput('file',true,'Documento em PDF, PNG ou JPG'),'Anexar documento'):'');}
-function fileInput(name,required,label='Extratos em PDF, PNG ou JPG'){return '<label>'+label+'<input type="file" name="'+name+'" multiple '+(required?'required':'')+' accept="application/pdf,image/png,image/jpeg"></label><small>Você pode selecionar vários arquivos. Até 10 MB por arquivo e 40 MB no total.</small>';}
+function fileInput(name,required,label='Extratos em PDF, PNG ou JPG'){return '<label class="debt-file-drop" data-debt-file-drop><span>'+label+'</span><input type="file" name="'+name+'" multiple '+(required?'required':'')+' accept="application/pdf,image/png,image/jpeg"><span class="debt-file-select">Selecionar arquivos</span><span data-debt-file-names aria-live="polite"></span><small class="debt-drop-hint">Arraste os arquivos aqui ou clique para selecionar</small></label><small>Você pode selecionar vários arquivos. Até 10 MB por arquivo e 40 MB no total.</small>';}
 function analysisConsent(){return current?.documentConsent?'':'<p class="debt-note">Ao solicitar a análise, você autoriza a leitura dos documentos pela IA e pela equipe Audita.</p>';}
 function analysisStalled(c=current){return c?.analysisPending&&Date.now()-Date.parse(c.analysisProgress?.updatedAt||c.analysisPending)>15*60*1000;}
 function analysisProgress(){
@@ -122,6 +147,7 @@ async function refreshList(){const cases=config?.authenticated&&config.ready?(aw
 async function load(id){current=(await api('/cases/'+id)).case;edit=false;viewDocuments=false;const url=new URL(location.href);url.searchParams.set('debt_case',id);history.replaceState(null,'',url);render();await refreshList();}
 async function command(action,extra={}){current=(await post(`/cases/${current.id}/actions`,{action,revision:current.revision,...extra})).case;edit=false;viewDocuments=false;intakeNotice='';render();await refreshList();$('#debtQuestion')?.focus();}
 async function start(){intakeNotice='';if(!config?.authenticated){document.querySelector('#loginButton')?.click();return;}current=(await post('/cases')).case;await load(current.id);}
+bindDebtFileDrop(root,()=>busy);
 root.addEventListener('input',e=>{if(e.target.matches('[data-currency]'))maskCurrency(e.target);});
 root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   if(b.dataset.startAnswer!==undefined){run(async()=>{await start();if(current)await command('answer',{key:'open',value:b.dataset.startAnswer==='true'});});return;}
