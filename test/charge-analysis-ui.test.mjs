@@ -787,3 +787,17 @@ test("completed recovery goes to the lawyer instead of client filing instruction
   assert.doesNotMatch(chargeAnalysisJs, />Abrir portal oficial<\/a>/);
   assert.match(appJs, /if \(state\.lawyerJob\?\.id\)/);
 });
+
+test('recovery proceeds with classified charges while excluding pending entries',()=>{
+ const handoff=buildChargeJecHandoff({documentAvailability:'partial',caseData:{candidates:[
+ {id:'confirmed',amount:19,answer:'not_recognized'},
+ {id:'pending',amount:999,answer:'pending'},
+ {id:'recognized',amount:50,answer:'recognized'}]}});
+ assert.equal(handoff.ready,true);assert.equal(handoff.pendingCount,1);
+ assert.deepEqual(handoff.caseData.candidates.map(c=>c.id),['confirmed']);
+ assert.equal(handoff.suggestion.values.doubleRefundAmount,'38,00');
+ assert.match(handoff.suggestion.notes.join(' '),/excluídos/);
+ const blocked=buildChargeJecHandoff({documentAvailability:'partial',caseData:{candidates:[{amount:10,answer:'pending'}]}});
+ assert.equal(blocked.ready,false);assert.match(blocked.reason,/Revise os documentos/);
+ assert.match(chargeAnalysisJs,/id="chargeRecoveryBlockedReason" role="status"/);
+});

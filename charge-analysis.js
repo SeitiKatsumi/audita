@@ -533,7 +533,7 @@ export function buildChargeJecHandoff({
     (candidate) => !candidate.answer || candidate.answer === "pending",
   ).length;
   const hasRequiredDocuments = documentAvailability !== "none";
-  const ready = hasRequiredDocuments && disputedCount > 0 && pendingCount === 0;
+  const ready = hasRequiredDocuments && disputedCount > 0;
   const suggestedDouble =
     Number(calculation?.doubleWithAdjustments) > 0
       ? Number(calculation.doubleWithAdjustments)
@@ -563,10 +563,11 @@ export function buildChargeJecHandoff({
       !hasRequiredDocuments
         ? "Anexe ao menos uma fatura ou extrato antes de preparar a documentação jurídica."
         : disputedCount === 0
-        ? "Nenhuma cobrança compatível com o catálogo foi localizada nos documentos."
-        : pendingCount > 0
-          ? "Existem lançamentos sem classificação automática."
-          : "",
+        ? pendingCount > 0
+          ? "Os lançamentos ainda não foram classificados. Revise os documentos antes de prosseguir."
+          : "Nenhuma cobrança compatível com o catálogo foi localizada nos documentos."
+        : "",
+    pendingCount,
     caseData: {
       ...caseData,
       id: `guided-jec-${normalizedId}`,
@@ -596,6 +597,7 @@ export function buildChargeJecHandoff({
         caseValue: formatChargeAmountInput(suggestedCaseValue),
       },
       notes: [
+        ...(pendingCount > 0 ? ["Lançamentos pendentes de classificação foram excluídos deste encaminhamento e dos valores calculados."] : []),
         !hasRequiredDocuments
           ? "Nenhum cálculo ou encaminhamento jurídico deve ser preparado sem ao menos uma fatura ou extrato."
           : "A apuração usa somente cobranças documentadas compatíveis com as cinco famílias configuradas.",
@@ -928,8 +930,9 @@ if (stage) {
         class="primary-action"
         data-charge-action="start-recovery"
         ${handoff.ready ? "" : "disabled"}
-        ${handoff.reason ? `title="${escapeChargeHtml(handoff.reason)}"` : ""}
+        ${handoff.reason ? 'aria-describedby="chargeRecoveryBlockedReason"' : ""}
       >Prosseguir para recupera&ccedil;&atilde;o</button>
+      ${handoff.reason ? `<p id="chargeRecoveryBlockedReason" role="status">${escapeChargeHtml(handoff.reason)}</p>` : handoff.pendingCount > 0 ? '<p role="status">Você pode prosseguir com as cobranças já classificadas. Os lançamentos pendentes não serão incluídos no relatório.</p>' : ""}
     `;
   }
 

@@ -967,3 +967,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Validação final: 14 testes de UI, 22 de rotas/workflow (incluindo novo fluxo sem carteira; expectativa antiga de rejeição de zero atualizada e caso repetido aprovado), sintaxe/diff aprovados. Servidor3000 reiniciado; banco local continua indisponível, sem testar consulta real.
 
 - Commit/push autorizados pelo usuário em21/10/2026. Rodada final:36/36 testes de UI, rotas e workflow aprovados; arquivos de implementação iguais ao localhost. Envio à main, sem deploy.
+
+## 2026-10-21 — Prosseguir na recuperação Itaú
+- Codex, codex/itau-prosseguir-mobile: botão deixava o motivo de bloqueio somente em title, inacessível ao toque. Motivo agora visível/associado ao botão. Lançamentos pendentes não bloqueiam encaminhamento dos já classificados: permanecem excluídos de candidatos/valores, com aviso e nota no encaminhamento. Nenhuma liberação sem documentos ou sem cobrança classificada.
+- 46 testes UI/integração passaram, incluindo cenário misto, valores excluídos e bloqueio sem evidência. Sintaxe/diff aprovados; integrado3000, sem commit/push/deploy. Caso real da imagem não acessado e navegador local bloqueado por permissão salva.
+- Commit e push autorizados pelo usuário; base origin/main conferida sem divergência, 46 testes já aprovados e diff limpo. Publicação no GitHub; deploy não solicitado.
