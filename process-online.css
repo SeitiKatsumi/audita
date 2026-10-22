@@ -19,6 +19,13 @@
 .process-online-section h3, .process-online-history h3, .process-online-details h3 { font-size: 1.08rem; line-height: 1.45; }
 .process-online-form, .process-online-field { display: grid; gap: 10px; min-width: 0; }
 .process-online-form { gap: 16px; }
+.process-online-selection { min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.process-online-selection legend { padding: 0 6px; font-weight: 650; font-size: .9rem; }
+.process-online-selection-list { display: grid; gap: 8px; max-height: 380px; overflow-y: auto; margin-top: 12px; overscroll-behavior: contain; }
+.process-online-choice { display: flex; align-items: flex-start; gap: 10px; padding: 12px 8px; border-top: 1px solid var(--line); cursor: pointer; min-height: 44px; }
+.process-online-choice input { flex: 0 0 auto; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--teal); }
+.process-online-choice > span { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
+.process-online-price { color: var(--aqua); font-size: .88rem; }
 .process-online-field > span { font-size: .85rem; color: var(--aqua); font-weight: 600; }
 .process-online input:not([type=checkbox]), .process-online select, .process-online textarea { display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 12px 13px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--bg-elevated); color: var(--text); font: inherit; font-size: .9rem; }
 .process-online textarea { resize: vertical; }

@@ -1,4 +1,5 @@
 import {certificateSelection,certificateQuote,serviceCertificateSelection} from '../certificate-selection.js';
+import {processNumbers} from '../judicial-processes.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -35,7 +36,7 @@ test('certificate stage offers general or individual analysis, sends the selecte
 
 test('completed seller reports show numeric score, all three bands and the private PDF link; unfinished reviews do not show a score', () => {
   const code=appJs.slice(appJs.indexOf('function renderSellerReview('),appJs.indexOf('function validateCnibDocument('));
-  const context=vm.createContext({escapeHtml:value=>String(value),isCertificateOnly:()=>false});
+  const context=vm.createContext({escapeHtml:value=>String(value),isCertificateOnly:()=>false,sellerAvailableProcessNumbers:[]});
   vm.runInContext(code,context);
   for(const [value,band] of [[100,'green'],[70,'yellow'],[40,'red'],[null,'yellow']]) {
     const target={innerHTML:'',querySelector:()=>null};
@@ -169,7 +170,7 @@ test('Brazil package explicitly selects all displayed data queries; clear remove
 test("seller results preserve every source, private PDF indices and pending queries", () => {
   const result = { innerHTML: "" };
   const context = vm.createContext({
-    sellerAnalysisResult: result, Date, Number, encodeURIComponent, isCertificateOnly:()=>false,
+    sellerAnalysisResult: result, Date, Number, encodeURIComponent, isCertificateOnly:()=>false,processNumbers,sellerAvailableProcessNumbers:[],
     document:{querySelector:()=>null},
     escapeHtml: (value) => String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;"),
     selectedSellerCertificates: () => [], selectedSellerQueries: () => [], sellerCompanyCnpjs: () => [],
@@ -219,7 +220,7 @@ test('text results preserve zero, false, safe text and an open panel during coll
   const button={dataset:{sellerResultToggle:id},textContent:'Ver resultado',attributes:{},setAttribute(name,value){this.attributes[name]=value;},focus(){focusCalls++;}};
   const result={innerHTML:'',querySelectorAll:()=>panel.hidden?[]:[panel]};
   const context=vm.createContext({
-    sellerAnalysisResult:result,Date,Number,encodeURIComponent,isCertificateOnly:()=>true,
+    sellerAnalysisResult:result,Date,Number,encodeURIComponent,isCertificateOnly:()=>true,processNumbers,sellerAvailableProcessNumbers:[],
     document:{activeElement:button,querySelector:()=>null,getElementById:key=>key===id?panel:key===id+'-toggle'?button:null},
     escapeHtml:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'),
     selectedSellerCertificates:()=>[],selectedSellerQueries:()=>[],sellerCompanyCnpjs:()=>[],fetch:()=>{fetchCalls++;throw new Error('Must use saved results');},
@@ -250,4 +251,12 @@ test('text results preserve zero, false, safe text and an open panel during coll
   context.toggleSellerQueryResult(button);
   assert.equal(panel.hidden,true);assert.equal(button.attributes['aria-expanded'],'false');assert.equal(button.textContent,'Ver resultado');
   assert.equal(fetchCalls,0);
+  audit.resultados[0].dados.certidoes[0].processNumbers=['07013791820258010013'];
+  context.renderSellerAnalysisResult(audit);
+  assert.match(result.innerHTML,/data-process-copy="07013791820258010013"/);
+  assert.match(result.innerHTML,/Selecionar autos completos/);
+  audit.resultados[0].dados.certidoes[0].processNumbers=['07013791920258010013'];
+  context.renderSellerAnalysisResult(audit);
+  assert.doesNotMatch(result.innerHTML,/data-process-copy=/);
+  assert.equal(fetchCalls,0,'offers never repeat a source query');
 });

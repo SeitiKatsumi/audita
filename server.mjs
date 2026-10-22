@@ -1762,6 +1762,7 @@ const processOnlineAnalysis = createProcessOnlineAnalysisService({
 });
 const processOnlinePayments=createProcessOnlinePayments({
   getDb:()=>({pool,dbReady}),workflow:processOnlineWorkflow,
+  getPricing:async()=>(await certificatePricingService.get()).pricing,
   createCheckout:(auth,order)=>stripeBillingService.createProcessSearchCheckoutSession(auth,order),
   checkoutReady:()=>Boolean(billingConfiguration(process.env).checkoutReady&&process.env.STRIPE_WEBHOOK_SECRET),
 });
@@ -6324,6 +6325,7 @@ const server = http.createServer(async (request, response) => {
   const staticName = String(requestedPath).replace(/^\/+/, "");
   publicRootFiles.add('certificate-selection.js');
   publicRootFiles.add('process-online.js');
+  publicRootFiles.add('judicial-processes.js');
   publicRootFiles.add('process-online.css');
   if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;
