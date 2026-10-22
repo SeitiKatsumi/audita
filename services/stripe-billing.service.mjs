@@ -271,6 +271,7 @@ export function createStripeBillingService({
   onIrPaymentEvent,
   onDebtPaymentEvent,
   onCertificatePaymentEvent,
+  onProcessSearchPaymentEvent,
   fetchImpl = globalThis.fetch,
   env = process.env,
   now = () => Date.now(),
@@ -853,6 +854,22 @@ export function createStripeBillingService({
     return {id: session.id, url: session.url, expiresAt: session.expires_at};
   }
 
+  async function createProcessSearchCheckoutSession(authContext, order) {
+    const config=configuration();
+    if(!config.checkoutReady||!config.appUrl)throw new StripeBillingError('billing_not_configured','Pagamento indisponível.',503);
+    if(order.mode==='test'&&!/^(sk|rk)_test_/.test(config.secretKey))throw new StripeBillingError('payment_mode_mismatch','Use Stripe de teste para processos demonstrativos.',503);
+    const metadata={purchase_kind:'process_search',audita_tenant_id:String(authContext.tenantId),audita_user_id:String(authContext.user.id),process_search_order_id:order.id};
+    const session=await stripeRequest('/v1/checkout/sessions',{
+      mode:'payment',locale:'pt-BR',integration_identifier:config.integrationIdentifier,
+      success_url:`${config.appUrl}/?process_search_order=${order.id}#processos-judiciais`,
+      cancel_url:`${config.appUrl}/?process_search_order=${order.id}&process_payment_cancelled=1#processos-judiciais`,
+      expires_at:Math.floor(new Date(order.createdAt).getTime()/1000)+23*3600,
+      line_items:[{quantity:1,price_data:{currency:'brl',unit_amount:4990,product_data:{name:order.kind==='copy'?'Audita — cópia integral de processo por CNJ':'Audita — busca de processos por CPF/CNPJ'}}}],
+      metadata,payment_intent_data:{metadata},
+    },{idempotencyKey:`audita-process-search-${order.id}`});
+    return {id:session.id,url:session.url,expiresAt:session.expires_at};
+  }
+
   async function createCertificateCheckoutSession(authContext, order) {
     const config=configuration();
     if(!config.checkoutReady||!config.appUrl) throw new StripeBillingError('billing_not_configured','Pagamento ainda não configurado.',503);
@@ -1306,6 +1323,10 @@ export function createStripeBillingService({
 
   async function processEvent(event) {
     const object = event?.data?.object || {};
+    if(object.metadata?.purchase_kind==='process_search') {
+      if(!onProcessSearchPaymentEvent)throw new StripeBillingError('process_search_handler_unavailable','Busca indisponível.',503);
+      return onProcessSearchPaymentEvent(event);
+    }
     if(object.metadata?.purchase_kind==='certificate_order') {
       if(!onCertificatePaymentEvent) throw new StripeBillingError('certificate_handler_unavailable','Emissão indisponível.',503);
       return onCertificatePaymentEvent(event);
@@ -1425,6 +1446,7 @@ export function createStripeBillingService({
     createIrCheckoutSession,
     createDebtCheckoutSession,
     createCertificateCheckoutSession,
+    createProcessSearchCheckoutSession,
     setCancellationAtPeriodEnd,
   };
 }

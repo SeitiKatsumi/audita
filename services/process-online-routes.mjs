@@ -28,7 +28,7 @@ async function body(request, limit, raw = false) {
   } catch { throw Object.assign(new Error('invalid_json'), { code: 'process_online_invalid_json', status: 400 }); }
 }
 
-export function createProcessOnlineRouter({ workflow, analysis, getAuth, sendJson }) {
+export function createProcessOnlineRouter({ workflow, analysis, payments, getAuth, sendJson }) {
   return async function route(request, response) {
     const path = new URL(request.url, 'http://localhost').pathname;
     if (path !== prefix && !path.startsWith(prefix + '/')) return false;
@@ -53,13 +53,24 @@ export function createProcessOnlineRouter({ workflow, analysis, getAuth, sendJso
       if (match) match[1] = match[1].toLowerCase();
       if (path === prefix + '/config' && request.method === 'GET') {
         const status = workflow.getStatus();
-        sendJson(response, 200, { ...status, cost: { auditaCredits: status.auditaCredits, providerCredits: status.providerCredits }, analysisReady: analysis.ready(), partnerUrl: 'https://processonline.com.br/seja-parceiro' });
+        sendJson(response, 200, { ...status, cost: { auditaCredits: status.auditaCredits, providerCredits: status.providerCredits }, searchPayment: payments?.config() || {amountCents:4990,checkoutReady:false}, analysisReady: analysis.ready(), partnerUrl: 'https://processonline.com.br/seja-parceiro' });
+      } else if ([prefix + '/search/checkout',prefix + '/requests/checkout'].includes(path) && request.method === 'POST') {
+        if(!payments)throw Object.assign(new Error('checkout_unavailable'),{code:'process_online_checkout_unavailable',status:503});
+        sendJson(response,201,await payments.checkout(auth,await body(request,8192),path.includes('/requests/')?'copy':'search'));
+      } else if (path === prefix + '/search/orders' && request.method === 'GET') {
+        if(!payments)throw Object.assign(new Error('checkout_unavailable'),{code:'process_online_checkout_unavailable',status:503});
+        sendJson(response,200,await payments.active(auth));
+      } else if (new RegExp(`^${prefix}/search/orders/(${idPattern})$`).test(path) && request.method === 'GET') {
+        if(!payments)throw Object.assign(new Error('checkout_unavailable'),{code:'process_online_checkout_unavailable',status:503});
+        sendJson(response,200,await payments.get(auth,path.split('/').pop()));
       } else if (path === prefix + '/verify' && request.method === 'POST') {
         sendJson(response, 200, await workflow.verify(auth, await body(request, 4096)));
       } else if (path === prefix + '/search' && request.method === 'POST') {
-        sendJson(response, 201, await workflow.search(auth, await body(request, 8192)));
+        await body(request,8192);
+        sendJson(response, 402, {error:'process_online_checkout_required'});
       } else if (path === prefix + '/requests' && request.method === 'POST') {
-        sendJson(response, 201, await workflow.requestCopy(auth, await body(request, 8192)));
+        await body(request,8192);
+        sendJson(response,402,{error:'process_online_checkout_required'});
       } else if (path === prefix + '/requests' && request.method === 'GET') {
         const result = await workflow.list(auth);
         sendJson(response, 200, Array.isArray(result) ? { requests: result } : result);

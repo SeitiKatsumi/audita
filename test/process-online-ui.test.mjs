@@ -39,18 +39,19 @@ const byText = (node, text) => find(node, item => item.tagName === 'BUTTON' && i
 const forms = node => descendants(node).filter(item => item.tagName === 'FORM');
 const settle = async () => { for (let n = 0; n < 6; n++) await new Promise(resolve => setImmediate(resolve)); };
 const response = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
-const LIVE = { enabled: true, ready: true, storageReady: true, mode: 'live', cost: { auditaCredits: 1, providerCredits: 1 } };
+const LIVE = { searchPayment: { checkoutReady: true }, enabled: true, ready: true, storageReady: true, mode: 'live', cost: { auditaCredits: 1, providerCredits: 1 } };
 const CNJ = '0000001-91.2020.8.26.0100';
-function fixture(handler = () => response({}), config = LIVE, requests = []) {
+function fixture(handler = () => response({}), config = LIVE, requests = [], location = undefined, activeOrders = []) {
   const document = new Document(); const container = document.createElement('div'); const calls = [];
-  let authCalls = 0;
-  const module = initProcessOnline({ container, onAuthRequired: () => { authCalls++; }, fetchImpl: async (url, options) => {
+  let authCalls = 0; const navigations = [];
+  const module = initProcessOnline({ container, location, navigate: url => navigations.push(url), onAuthRequired: () => { authCalls++; }, fetchImpl: async (url, options) => {
     const call = { url, options, body: options.body ? JSON.parse(options.body) : undefined }; calls.push(call);
     if (url.endsWith('/config')) return response(config);
+    if (url.endsWith('/search/orders')) return response({orders:activeOrders});
     if (url === '/api/process-online/requests' && !options.method) return response({ requests });
     return handler(call);
   } });
-  return { module, container, document, calls, authCalls: () => authCalls };
+  return { module, container, document, calls, navigations, authCalls: () => authCalls };
 }
 function approve(container, name) { const check = named(container, name); check.checked = true; check.dispatch('change'); }
 
@@ -62,7 +63,7 @@ test('activation shows simplified forms without a verification or interest form'
  assert.equal(named(f.container,'interesse'),undefined);
  assert.equal(named(f.container,'interesseDetalhe'),undefined);
  assert.doesNotMatch(f.container.textContent,/Cada cópia|Cada busca|minha carteira/);
- assert.equal(byText(f.container,'Solicitar cópia integral').disabled,true);
+ assert.equal(byText(f.container,'Pagar R$ 49,90 e solicitar cópia').disabled,true);
  f.module.deactivate();
 });
 
@@ -70,7 +71,7 @@ test('sandbox example fills CNJ without sending and an unhomologated search stay
   const f = fixture(undefined, { ...LIVE, mode: 'test', searchReady: false });
   await f.module.activate();
   approve(f.container, 'searchConsent');
-  assert.equal(byText(f.container, 'Buscar processos').disabled, true);
+  assert.equal(byText(f.container, 'Pagar R$ 49,90 e buscar').disabled, true);
   forms(f.container)[1].dispatch('submit'); await settle();
   approve(f.container, 'copyConsent');
   byText(f.container, 'Usar processo de exemplo').dispatch('click');
@@ -81,76 +82,58 @@ test('sandbox example fills CNJ without sending and an unhomologated search stay
   f.module.deactivate();
 });
 
-test('paid searches require consent and selecting a result prepares a copy without requesting it', async () => {
-  const payload = '<img src=x onerror=globalThis.compromised=true>';
-  const f = fixture(call => call.url.endsWith('/search') ? response({ id: 'search-safe', kind: 'search', status: 'completed',
-    results: [{ numero_cnj: CNJ, classe: payload, source: payload }], total: 1, resultData: { text: payload } }) : response({}));
+test('search checkout requires consent and redirects without sending a supplier search', async () => {
+  const f = fixture(call => response({id:'order-safe',status:'pending',checkoutUrl:'https://checkout.stripe.com/c/pay/cs_safe'}));
   await f.module.activate({ documento: '529.982.247-25', parentAuditId: 'audit-safe' });
   forms(f.container)[1].dispatch('submit'); await settle();
-  assert.equal(f.calls.some(call => call.url.endsWith('/search')), false);
+  assert.equal(f.calls.some(call => call.options.method === 'POST'), false);
   approve(f.container, 'searchConsent'); forms(f.container)[1].dispatch('submit'); await settle();
-  const call = f.calls.find(item => item.url.endsWith('/search'));
+  const call = f.calls.find(item => item.url.endsWith('/search/checkout'));
   assert.equal(call.body.consent, true); assert.equal(call.body.approvedCredits, 0);
   assert.equal(call.body.parentAuditId, 'audit-safe');
-  assert.match(call.body.operationId, /^[\da-f-]{36}$/i);
-  assert.match(f.container.textContent, /<img src=x onerror=/);
-  assert.equal(descendants(f.container).some(item => item.tagName === 'IMG' || item.tagName === 'SCRIPT'), false);
-  byText(f.container, 'Preparar solicitação de cópia').dispatch('click'); await settle();
-  assert.equal(named(f.container, 'cnj').value, CNJ);
-  assert.equal(named(f.container, 'copyConsent').checked, false);
-  assert.equal(f.calls.filter(item => item.options.method === 'POST').length, 1);
+  assert.deepEqual(f.navigations, ['https://checkout.stripe.com/c/pay/cs_safe']);
+  assert.equal(f.calls.some(call=>call.url.endsWith('/search')),false);
+  assert.match(f.container.textContent,/R\$ 49,90/);
   f.module.deactivate();
 });
 
 test('a lost paid response retains its operation id for manual retry and prevents a second new paid operation', async () => {
   let attempts = 0;
   const f = fixture(call => {
-    if (call.url.endsWith('/search')) {
+    if (call.url.endsWith('/search/checkout')) {
       attempts++;
       if (attempts === 1) throw new Error('connection lost after commit');
-      return response({ id: 'search-existing', kind: 'search', status: 'completed', results: [], total: 0 });
+      return response({ id: 'order-existing', status: 'pending', checkoutUrl:'https://checkout.stripe.com/c/pay/cs_existing' });
     }
     return response({});
   });
   await f.module.activate({ documento: '52998224725' });
   approve(f.container, 'searchConsent'); forms(f.container)[1].dispatch('submit'); await settle();
   assert.equal(attempts, 1);
-  assert.equal(byText(f.container, 'Buscar processos').disabled, true);
+  assert.equal(byText(f.container, 'Pagar R$ 49,90 e buscar').disabled, true);
   assert.match(f.container.textContent, /Confira o histórico/);
   forms(f.container)[1].dispatch('submit'); await settle();
   assert.equal(attempts, 1);
   byText(f.container, 'Retomar a mesma operação').dispatch('click'); await settle();
   assert.equal(attempts, 2);
-  const calls = f.calls.filter(item => item.url.endsWith('/search'));
+  const calls = f.calls.filter(item => item.url.endsWith('/search/checkout'));
   assert.deepEqual(calls[0].body, calls[1].body);
   assert.equal(named(f.container, 'searchConsent').checked, false);
   assert.equal(find(f.container, item => item.className === 'process-online-pending').hidden, true);
   f.module.deactivate();
 });
 
-test('an ambiguous saved copy can be recovered only explicitly with its original operation and consent', async () => {
-  let attempts = 0, operationId;
-  const f = fixture(call => {
-    attempts++;
-    operationId ||= call.body.operationId;
-    return response({ id: 'copy-uncertain', operationId, kind: 'copy', cnj: CNJ,
-      status: attempts === 1 ? 'review_required' : 'processing', canRecover: attempts === 1,
-      billing: { state: 'charged', auditaCredits: 1 } });
-  });
-  await f.module.activate({ cnj: CNJ }); approve(f.container, 'copyConsent');
-  forms(f.container)[0].dispatch('submit'); await settle();
-  assert.equal(attempts, 1); assert.equal(byText(f.container, 'Solicitar cópia integral').disabled, true);
-  assert.match(f.container.textContent, /aguardando conferência/);
-  assert.equal(byText(f.container, 'Retomar cópia salva').disabled, true);
-  forms(f.container)[2].dispatch('submit'); await settle();
-  assert.equal(attempts, 1);
-  approve(f.container, 'recoveryConsent'); forms(f.container)[2].dispatch('submit'); await settle();
-  assert.equal(attempts, 2);
-  const requests = f.calls.filter(call => call.options.method === 'POST');
-  assert.equal(requests[1].url, '/api/process-online/requests/copy-uncertain/recover');
-  assert.deepEqual(requests[1].body, { consent: true, approvedCredits: 0 });
-  assert.equal(named(f.container, 'cnj').disabled, false);
-  f.module.deactivate();
+test('CNJ copy requires consent and uses its own paid checkout, never the direct copy endpoint', async () => {
+ const f=fixture(()=>response({id:'copy-order',kind:'copy',status:'pending',checkoutUrl:'https://checkout.stripe.com/c/pay/cs_copy'}));
+ await f.module.activate({cnj:CNJ});
+ forms(f.container)[0].dispatch('submit');await settle();assert.equal(f.calls.some(c=>c.options.method==='POST'),false);
+ approve(f.container,'copyConsent');forms(f.container)[0].dispatch('submit');await settle();
+ const posts=f.calls.filter(c=>c.options.method==='POST');assert.equal(posts.length,1);
+ assert.equal(posts[0].url,'/api/process-online/requests/checkout');assert.equal(posts[0].body.cnj,CNJ);
+ assert.deepEqual(f.navigations,['https://checkout.stripe.com/c/pay/cs_copy']);
+ assert.equal(byText(f.container,'Pagar R$ 49,90 e solicitar cópia').disabled,true);
+ assert.equal(byText(f.container,'Pagar R$ 49,90 e buscar').disabled,true);
+ f.module.deactivate();
 });
 
 test('a recoverable copy restored from history uses only its saved ID and requires fresh explicit consent', async () => {
@@ -216,15 +199,14 @@ test('ready multipart copies expose only their exact private API links and AI st
     { index: 3, url: 'https://attacker.invalid/steal' },
     { index: 4, url: '/api/process-online/requests/copy-safe/files/4?token=private' },
   ] };
-  const f = fixture(call => call.url === '/api/process-online/requests' && call.options.method === 'POST'
-    ? response(request) : response({ status: 'pending' }), { ...LIVE, analysisReady: true });
-  await f.module.activate({ cnj: CNJ });
-  approve(f.container, 'copyConsent'); forms(f.container)[0].dispatch('submit'); await settle();
+  const f = fixture(call => call.url.endsWith('/copy-safe') ? response(request) : response({ status: 'not_started' }), { ...LIVE, analysisReady: true }, [request]);
+  await f.module.activate();
+  byText(f.container,'Abrir').dispatch('click'); await settle();
   const links = descendants(f.container).filter(item => item.tagName === 'A' && item.textContent.startsWith('Baixar PDF'));
   assert.equal(links.length, 2);
   assert.deepEqual(links.map(item => item.href), ['/api/process-online/requests/copy-safe/files/1', '/api/process-online/requests/copy-safe/files/2']);
   assert.ok(links.every(item => item.rel.includes('noopener')));
-  assert.equal(f.calls.some(call => call.url.endsWith('/analysis')), false);
+  assert.equal(f.calls.some(call => call.url.endsWith('/analysis') && call.options.method==='POST'), false);
   assert.equal(byText(f.container, 'Analisar cópia com IA').disabled, true);
   const approval = named(f.container, 'analysisConsent'); approval.checked = true; approval.dispatch('change');
   forms(f.container)[2].dispatch('submit'); await settle();
@@ -239,7 +221,7 @@ test('disabled provider retains forms and partner activation route while sandbox
   const partner = descendants(off.container).find(item => item.tagName === 'A');
   assert.equal(partner.href, 'https://processonline.com.br/seja-parceiro/');
   approve(off.container, 'copyConsent');
-  assert.equal(byText(off.container, 'Solicitar cópia integral').disabled, true);
+  assert.equal(byText(off.container, 'Pagar R$ 49,90 e solicitar cópia').disabled, true);
   assert.equal(forms(off.container).length, 2);
   off.module.deactivate();
   const sandbox = fixture(undefined, { ...LIVE, mode: 'test', cost: { auditaCredits: 0, providerCredits: 1 } });
@@ -256,9 +238,8 @@ test('refreshing a known copy is throttled and visibility/deactivation stop poll
   globalThis.clearTimeout = id => timers.delete(id);
   try {
     const request = { id: 'copy-pending', kind: 'copy', status: 'processing', cnj: CNJ };
-    const f = fixture(() => response(request));
-    await f.module.activate({ cnj: CNJ }); approve(f.container, 'copyConsent');
-    forms(f.container)[0].dispatch('submit'); await settle();
+    const f = fixture(() => response(request),LIVE,[request]);
+    await f.module.activate(); byText(f.container,'Abrir').dispatch('click'); await settle();
     assert.equal(timers.size, 1); assert.equal([...timers.values()][0].delay, 30000);
     byText(f.container, 'Conferir andamento').dispatch('click'); await settle();
     byText(f.container, 'Conferir andamento').dispatch('click'); await settle();
@@ -284,7 +265,7 @@ test('reset clears private details, inputs, pending operations and context witho
   assert.equal(named(f.container, 'documento').value, '');
   assert.equal(find(f.container, item => item.className === 'process-online-details').hidden, true);
   assert.equal(find(f.container, item => item.className === 'process-online-pending').hidden, true);
-  assert.equal(byText(f.container, 'Buscar processos').disabled, true);
+  assert.equal(byText(f.container, 'Pagar R$ 49,90 e buscar').disabled, true);
   f.module.deactivate();
 });
 
@@ -329,4 +310,26 @@ test('late old-owner success and 401 cannot repopulate or clear a new owner afte
     assert.equal(f.authCalls(), 0);
     f.module.deactivate();
   }
+});
+
+test('checkout return only reads the owner order and renders confirmed search results safely', async () => {
+ const id='11111111-1111-4111-8111-111111111111';
+ const payload='<img src=x onerror=globalThis.compromised=true>';
+ const f=fixture(call=>call.url.endsWith('/'+id)?response({id,status:'fulfilled',request:{id:'search-safe',kind:'search',status:'completed',total:1,results:[{numero_cnj:CNJ,classe:payload}]}}):response({orders:[]}),LIVE,[],{search:'?process_search_order='+id});
+ await f.module.activate();
+ assert.equal(f.calls.some(call=>call.options.method==='POST'),false);
+ assert.match(f.container.textContent,/<img src=x onerror=/);
+ assert.equal(descendants(f.container).some(item=>item.tagName==='IMG'),false);
+ byText(f.container,'Preparar solicitação de cópia').dispatch('click');
+ assert.equal(named(f.container,'cnj').value,CNJ);
+ assert.equal(named(f.container,'copyConsent').checked,false);
+ f.module.deactivate();
+});
+test('reopening resumes an unfinished payment without creating another checkout', async () => {
+ const order={id:'11111111-1111-4111-8111-111111111111',status:'pending',checkoutUrl:'https://checkout.stripe.com/c/pay/cs_resume'};
+ const f=fixture(()=>response({}),LIVE,[],undefined,[order]);await f.module.activate();
+ approve(f.container,'searchConsent');assert.equal(byText(f.container,'Pagar R$ 49,90 e buscar').disabled,true);
+ assert.ok(find(f.container,item=>item.tagName==='A'&&item.href===order.checkoutUrl));
+ assert.equal(f.calls.some(call=>call.options.method==='POST'),false);
+ f.module.reset();assert.doesNotMatch(f.container.textContent,/11111111-1111/);f.module.deactivate();
 });

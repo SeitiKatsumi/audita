@@ -14,7 +14,7 @@ test('ProcessOnline HTTP preserves auth, origin, raw signatures and private resp
     search: async () => { calls.push(['paid']); return { id: 'safe' }; },
     webhook: async (buffer, signature) => { calls.push(['hook', buffer.toString(), signature]); return { accepted: true }; },
   };
-  const route = createProcessOnlineRouter({ workflow, analysis: { ready: () => false },
+  const route = createProcessOnlineRouter({ workflow, payments: { config:()=>({amountCents:4990,checkoutReady:true}), checkout:async(auth,input,kind)=>({id:input.operationId,kind,amountCents:4990}), get:async(auth,id)=>({id,status:'pending'}), active:async()=>({orders:[]}) }, analysis: { ready: () => false },
     getAuth: async req => req.headers.authorization === 'test' ? { tenantId: 7, user: { id: 8 } } : { unauthorized: true },
     sendJson: (res, status, data) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(data)); },
   });
@@ -27,6 +27,13 @@ test('ProcessOnline HTTP preserves auth, origin, raw signatures and private resp
   assert.equal((await fetch(base + '/api/process-online/search', { method: 'POST', headers: { ...headers, origin: 'https://foreign.invalid' }, body: '{}' })).status, 403);
   assert.equal((await fetch(base + '/api/process-online/search', { method: 'POST', headers, body: 'null' })).status, 400);
   assert.equal((await fetch(base + '/api/process-online/search', { method: 'POST', headers, body: JSON.stringify({ padding: 'x'.repeat(9000) }) })).status, 413);
+  assert.equal((await fetch(base + '/api/process-online/search', {method:'POST',headers,body:'{}'})).status,402);
+  const checkout = await fetch(base + '/api/process-online/search/checkout',{method:'POST',headers,body:'{"operationId":"test"}'});
+  assert.equal(checkout.status,201); assert.equal((await checkout.json()).amountCents,4990);
+  assert.equal((await fetch(base + '/api/process-online/search/checkout',{method:'POST',headers:{...headers,origin:'https://foreign.invalid'},body:'{}'})).status,403);
+  const copyCheckout=await fetch(base+'/api/process-online/requests/checkout',{method:'POST',headers,body:'{}'});
+  assert.equal(copyCheckout.status,201);assert.equal((await copyCheckout.json()).kind,'copy');
+  assert.equal((await fetch(base+'/api/process-online/requests',{method:'POST',headers,body:'{}'})).status,402);
   const config = await fetch(base + '/api/process-online/config', { headers });
   assert.equal(config.headers.get('cache-control'), 'private, no-store');
   assert.equal((await config.json()).ready, false);

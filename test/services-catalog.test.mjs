@@ -31,10 +31,12 @@ test('property analysis and certificate issuance have separate categories and de
  assert.ok(!properties.includes('href="#consulta-cnib"'));
  for(const route of ['analise-vendedor','consulta-imoveis']) assert.ok(properties.includes(`href="#${route}"`));
  assert.match(properties,/<strong>Análise de Vendedor<\/strong>/);
+ assert.match(properties,/data-categories="imoveis certidoes"/);
+ assert.match(properties,/<h3 id="services-imoveis">Imóveis Análise Vendedor<\/h3>/);
  assert.ok(certificates.includes('href="#emissao-certidoes"'));
  assert.ok(!certificates.includes('href="#analise-vendedor"'));
  assert.match(certificates,/<h3 id="services-certidoes">Emissão de certidões<\/h3>/);
- assert.match(html,/data-service-category="imoveis"[^>]*>Imóveis<\/button>/);
+ assert.match(html,/data-service-category="imoveis"[^>]*>Imóveis Análise Vendedor<\/button>/);
  assert.equal((html.match(/class="service-card-entry" href="#consulta-imoveis"/g)||[]).length,1);
 });
 

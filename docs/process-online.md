@@ -279,3 +279,12 @@ canários reais do painel, homologação dos schemas e estados, paginação efet
 busca, manifesto de uma e múltiplas partes, eventos/estornos e limites negociados.
 Não houve cadastro, compra, chamada paga ou documento de cliente nos testes desta
 implementação. Publicação e migração de produção são etapas separadas.
+
+## Busca CPF/CNPJ — Checkout Stripe (2026-10-22)
+A busca custa R$ 49,90, fixado no servidor em centavos, sem carteira Audita. `POST /api/process-online/search/checkout` valida consentimento/documento e cria um pedido privado criptografado; o número do documento não vai para metadata Stripe. O checkout é hospedado, em BRL, com métodos dinâmicos. Pix e cartão precisam estar habilitados/disponíveis na conta Stripe; a oferta efetiva é determinada pelo Stripe. A cópia integral por CNJ também custa R$49,90 e usa POST /api/process-online/requests/checkout. O tipo é vinculado ao pedido persistido; pagamento da busca não libera uma cópia.
+
+A migração aditiva `db/process-online-payments.sql` é aplicada pela inicialização do servidor. Requer banco, `AUDITA_PROFILE_ENCRYPTION_KEY`, billing/Stripe e webhook configurados, além de fornecedor pronto e busca homologada. Sandbox de busca não homologado continua bloqueado; nunca habilitar o provedor live para testar pagamentos.
+
+Assinar no webhook Stripe os eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `checkout.session.expired`. Apenas `payment_status=paid`, moeda BRL, total4990, sessão e dono correspondentes liberam execução. Retorno/cancelamento do checkout apenas consultam estado privado e não liberam serviço. Os endpoints diretos `/search` e POST `/requests` respondem402. Pedidos existentes continuam disponíveis, inclusive retomada da mesma cópia. Pedidos em aberto reaparecem para retomar o mesmo checkout; repetição de webhook usa a mesma operação persistida pelo workflow.
+
+Se a execução falhar ou ficar em conferência depois do pagamento, o histórico mantém o pedido e a referência; não cobrar nem reenviar automaticamente. A equipe deve conciliar o pedido e eventual reembolso no Stripe. Não há reembolso automático novo. Esta integração foi testada com transporte fictício e PGlite; checkout/Pix reais e webhook externo aguardam homologação. A conexão do conector Stripe exige reautenticação.

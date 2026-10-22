@@ -28,11 +28,11 @@ function privateUrl(value, requestId, suffix) {
 }
 
 /** This module never starts a search, copy request or AI analysis when activated. */
-export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onAuthRequired = () => {} } = {}) {
+export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onAuthRequired = () => {}, location = globalThis.location, navigate = url => globalThis.location.assign(url) } = {}) {
   if (!container?.ownerDocument) throw new TypeError('Informe o contêiner do módulo de processos.');
   const doc = container.ownerDocument;
   const state = { active: false, config: null, busy: false, requests: [], selected: null,
-    parentAuditId: null, pending: null, timer: null, refreshAt: new Map(), analysis: null, generation: 0, activation: 0 };
+    parentAuditId: null, pending: null, payment: null, timer: null, refreshAt: new Map(), analysis: null, generation: 0, activation: 0 };
   const el = (tag, className, text) => {
     const node = doc.createElement(tag);
     if (className) node.className = className;
@@ -82,8 +82,8 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   const cnjField = field('Número CNJ', cnj);
   const copyForm = el('form', 'process-online-form');
   const copyConsent = consent('copyConsent', 'Autorizo a solicitação desta cópia e confirmo meu interesse legítimo.');
-  const copyButton = el('button', 'primary-action', 'Solicitar cópia integral'); copyButton.type = 'submit';
-  copyForm.append(cnjField, copyConsent.label, copyButton);
+  const copyButton = el('button', 'primary-action', 'Pagar R$ 49,90 e solicitar cópia'); copyButton.type = 'submit';
+  copyForm.append(cnjField, el('p', 'process-online-price', 'R$ 49,90 — pagamento com Pix ou cartão pelo Stripe.'), copyConsent.label, copyButton);
   cnjSection.append(copyForm);
 
   const searchSection = el('section', 'process-online-section');
@@ -91,8 +91,10 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   const searchForm = el('form', 'process-online-form');
   const documento = input('documento', 'CPF ou CNPJ do titular', 22); documento.inputMode = 'numeric';
   const searchConsent = consent('searchConsent', 'Tenho autorização para consultar este documento e autorizo esta busca.');
-  const searchButton = el('button', 'primary-action', 'Buscar processos'); searchButton.type = 'submit';
-  searchForm.append(field('CPF ou CNPJ', documento), searchConsent.label, searchButton);
+  const searchButton = el('button', 'primary-action', 'Pagar R$ 49,90 e buscar'); searchButton.type = 'submit';
+  searchForm.append(field('CPF ou CNPJ', documento), el('p', 'process-online-price', 'R$ 49,90 — pagamento com Pix ou cartão pelo Stripe.'), searchConsent.label, searchButton);
+  const paymentPanel = el('div', 'process-online-payment'); paymentPanel.setAttribute('role', 'status'); paymentPanel.hidden = true;
+
   searchSection.append(searchForm);
   forms.append(cnjSection, searchSection);
 
@@ -105,7 +107,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   history.append(historyHeading, historyList);
   const details = el('section', 'process-online-details'); details.hidden = true;
   details.tabIndex = -1;
-  root.append(intro, configPanel, notice, pendingPanel, forms, history, details);
+  root.append(intro, configPanel, notice, pendingPanel, forms, paymentPanel, history, details);
   container.replaceChildren(root);
 
   function showNotice(message = '', error = false) {
@@ -119,8 +121,8 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   function sandbox() { return ['test', 'sandbox'].includes(state.config?.mode); }
   function updateControls() {
     const paidDisabled = state.busy || !ready() || Boolean(state.pending);
-    searchButton.disabled = paidDisabled || state.config?.searchReady === false || !searchConsent.check.checked;
-    copyButton.disabled = paidDisabled || !copyConsent.check.checked;
+    searchButton.disabled = paidDisabled || state.config?.searchReady === false || !state.config?.searchPayment?.checkoutReady || Boolean(state.payment && ['pending', 'paid'].includes(state.payment.status)) || !searchConsent.check.checked;
+    copyButton.disabled = paidDisabled || !state.config?.searchPayment?.checkoutReady || Boolean(state.payment && ['pending','paid'].includes(state.payment.status)) || !copyConsent.check.checked;
     historyButton.disabled = state.busy;
     retryButton.disabled = state.busy || !ready();
     retryButton.hidden = Boolean(state.pending?.review);
@@ -138,7 +140,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     configPanel.replaceChildren();
     if (ready()) {
       configPanel.append(el('strong', '', sandbox() ? 'Testes gratuitos ativos' : 'Integração disponível'),
-        el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'O saldo e a autorização são conferidos no servidor antes de cada operação.'));
+        el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'As buscas e cópias são realizadas após a confirmação do pagamento pelo Stripe.'));
       if (sandbox()) {
         configPanel.append(button('Usar processo de exemplo', () => {
           if (state.busy || state.pending) return;
@@ -157,6 +159,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
       link.href = 'https://processonline.com.br/seja-parceiro/'; link.target = '_blank'; link.rel = 'noopener noreferrer';
       configPanel.append(link);
     }
+    if (ready() && !state.config?.searchPayment?.checkoutReady) configPanel.append(el('p', 'process-online-muted', 'O pagamento está em configuração. Tente novamente mais tarde.'));
     copyConsent.label.lastChild.textContent = sandbox()
       ? 'Autorizo uma cópia demonstrativa no ambiente de testes, sem pagamento real.'
       : 'Autorizo a solicitação desta cópia e confirmo meu interesse legítimo.';
@@ -184,6 +187,9 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     }
     if (!response.ok) {
       const errors = {
+        process_online_checkout_unavailable: 'O pagamento está temporariamente indisponível. Tente novamente mais tarde.',
+        process_online_payment_mode_mismatch: 'O pagamento de teste ainda não foi configurado.',
+        process_online_checkout_needs_review: 'Este pagamento precisa de conferência. Não faça outro pagamento para a mesma busca.',
         process_online_insufficient_credits: 'Saldo insuficiente na carteira Audita. Recarregue os créditos antes de autorizar uma nova operação.',
         process_online_billing_unavailable: 'A carteira de créditos Audita ainda está em configuração.',
         process_online_invalid_document: 'Confira o CPF ou CNPJ informado.',
@@ -435,9 +441,33 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     assertCurrent(generation); state.selected = result;
     mergeRequest(state.selected); renderDetails();
   }
+  function checkoutUrl(value) {
+    try { const url = new URL(value); return url.origin === 'https://checkout.stripe.com' ? url.href : null; } catch { return null; }
+  }
+  function renderPayment() {
+    paymentPanel.replaceChildren(); paymentPanel.hidden = !state.payment;
+    if (!state.payment) return;
+    const order = state.payment;
+    const messages = { pending: 'Pagamento ainda não confirmado. Conclua o pagamento no Stripe ou confira o status abaixo.', paid: 'Pagamento confirmado. Estamos preparando sua solicitação. Não é necessário pagar novamente.', fulfilled: 'Pagamento confirmado e solicitação registrada. Confira o resultado nas suas solicitações.', expired: 'O checkout expirou. Você pode iniciar um novo pagamento.', failed: 'O pagamento não foi concluído. Você pode tentar novamente.' };
+    paymentPanel.append(el('p', '', messages[order.status] || 'Confira o estado do pagamento.'), el('p', 'process-online-muted', `Referência: ${order.id}`));
+    if (order.status === 'pending' && checkoutUrl(order.checkoutUrl)) {
+      const link = el('a', 'primary-action', 'Continuar pagamento no Stripe'); link.href = checkoutUrl(order.checkoutUrl); paymentPanel.append(link);
+    }
+    if (['pending', 'paid'].includes(order.status)) paymentPanel.append(button('Atualizar pagamento', () => run(() => loadPayment(order.id))));
+  }
+  async function loadPayment(id) {
+    const generation = state.generation;
+    const order = await api(`/search/orders/${encodeURIComponent(id)}`); assertCurrent(generation);
+    state.payment = order;
+    if (order.request?.id) { state.selected = order.request; mergeRequest(order.request); renderDetails(); }
+    renderPayment(); updateControls();
+  }
   function stopPoll() { if (state.timer) clearTimeout(state.timer); state.timer = null; }
   function schedulePoll() {
     stopPoll();
+    if (state.active && !doc.hidden && state.payment && ['pending', 'paid'].includes(state.payment.status)) {
+      state.timer = setTimeout(() => run(() => loadPayment(state.payment.id)), 5000); return;
+    }
     if (!state.active || doc.hidden || !state.selected || state.selected.kind === 'search') return;
     const copyPending = PENDING.has(state.selected.status);
     const analysisPending = COMPLETE.has(state.selected.status) && state.analysis?.status === 'running';
@@ -461,14 +491,17 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     const pending = state.pending;
     if (!pending || !ready()) return;
     try {
-      const request = unwrap(await api(pending.kind === 'search' ? '/search' : '/requests',
-        pending.body));
-      assertCurrent(generation);
-      if (!request?.id) { const error = new Error('O servidor recebeu a operação, mas a confirmação ainda precisa ser conferida no histórico.'); error.uncertain = true; throw error; }
-      if (!request.operationId) request.operationId = pending.body.operationId;
-      state.selected = request; state.analysis = null; mergeRequest(request); renderDetails(true);
-      searchConsent.check.checked = false; copyConsent.check.checked = false;
-      showNotice(request.status === 'review_required' ? 'Solicitação salva e aguardando conferência. Não inicie outra operação para o mesmo conteúdo.' : 'Solicitação salva. O histórico permite retomar o mesmo pedido sem solicitar outra cópia.');
+      if (pending) {
+        const order = await api(pending.kind==='copy'?'/requests/checkout':'/search/checkout', pending.body); assertCurrent(generation);
+        if (!order?.id) throw Object.assign(new Error('Não foi possível confirmar o checkout. Retome a mesma operação.'), { uncertain: true });
+        state.payment = order; state.pending = null; searchConsent.check.checked = false; copyConsent.check.checked = false; renderPayment();
+        if (order.status === 'pending') {
+          const url = checkoutUrl(order.checkoutUrl);
+          if (!url) throw new Error('O link do pagamento não está disponível. Confira o pagamento antes de tentar novamente.');
+          navigate(url);
+        } else await loadPayment(order.id);
+        return;
+      }
     } catch (error) {
       if (generation === state.generation && !error.uncertain) state.pending = null;
       throw error;
@@ -476,7 +509,8 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   }
   async function startOperation(kind) {
     if (!ready() || state.pending) return;
-    if (kind === 'search' && state.config?.searchReady === false) return;
+    if (!state.config?.searchPayment?.checkoutReady || state.payment && ['pending','paid'].includes(state.payment.status)) return;
+    if (kind === 'search' && (state.config?.searchReady === false || !state.config?.searchPayment?.checkoutReady || state.payment && ['pending', 'paid'].includes(state.payment.status))) return;
     const check = kind === 'search' ? searchConsent.check : copyConsent.check;
     if (!check.checked) throw new Error('Confirme a autorização antes de continuar.');
     const value = kind === 'search' ? documento.value.trim() : cnj.value.trim();
@@ -502,6 +536,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   function reset() {
     stopPoll(); state.generation++; state.activation++;
     state.active = false; state.config = null; state.busy = false;
+    state.payment = null; renderPayment();
     state.requests = []; state.selected = null; state.analysis = null; state.pending = null;
     state.parentAuditId = null; state.refreshAt.clear();
     cnj.value = ''; documento.value = '';
@@ -518,12 +553,18 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
       if (!state.pending && options.cnj) { cnj.value = String(options.cnj); copyConsent.check.checked = false; }
       if (!state.pending && options.documento) { documento.value = String(options.documento); searchConsent.check.checked = false; }
       const generation = state.generation, activation = ++state.activation;
-      const results = await Promise.allSettled([api('/config'), loadHistory()]);
+      const results = await Promise.allSettled([api('/config'), loadHistory(), api('/search/orders')]);
       if (generation !== state.generation || activation !== state.activation) return;
       if (results[0].status === 'fulfilled') state.config = results[0].value;
       else { state.config = null; showNotice(results[0].reason.message, true); }
       if (results[1].status === 'rejected' && results[0].status === 'fulfilled') showNotice(results[1].reason.message, true);
-      renderConfig(); schedulePoll();
+      if (results[2].status === 'fulfilled' && !state.payment) { state.payment = results[2].value.orders?.[0] || null; renderPayment(); }
+      renderConfig();
+      const orderId = new URLSearchParams(location?.search || '').get('process_search_order');
+      if (/^[0-9a-f-]{36}$/i.test(orderId || '')) {
+        try { await loadPayment(orderId); } catch (error) { if (generation === state.generation && !error.silent) showNotice(error.message, true); }
+      }
+      schedulePoll();
     },
     deactivate() { state.active = false; stopPoll(); },
   };

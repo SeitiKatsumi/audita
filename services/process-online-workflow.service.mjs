@@ -25,7 +25,7 @@ function problem(code, message = 'Não foi possível concluir a operação Proce
 function requireValue(condition, code, message, status) {
   if (!condition) throw problem(code, message, status);
 }
-function cnj(value) {
+export function cnj(value) {
   requireValue(typeof value === 'string' && /^[\d.\-\s]+$/.test(value), 'invalid_cnj', 'Informe um número CNJ válido.');
   const number = value.replace(/\D/g, '');
   requireValue(number.length === 20 && !/^(\d)\1+$/.test(number)

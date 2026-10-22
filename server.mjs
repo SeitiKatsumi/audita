@@ -33,6 +33,7 @@ import { createSellerReviewAI } from './services/seller-review-ai.mjs';
 import { createProcessOnlineService } from './services/process-online.service.mjs';
 import { createProcessOnlineWorkflowService } from './services/process-online-workflow.service.mjs';
 import { createProcessOnlineAnalysisService } from './services/process-online-analysis.service.mjs';
+import { createProcessOnlinePayments } from './services/process-online-payments.service.mjs';
 import { createProcessOnlineRouter } from './services/process-online-routes.mjs';
 import {createCertificateOrderService,CERTIFICATE_PRICE_MULTIPLIER,certificateQuote} from './services/certificate-order.service.mjs';
 import {createCertificatePricingService} from './services/certificate-pricing.service.mjs';
@@ -580,6 +581,7 @@ async function initializeDatabase() {
       await pool.query(await readFile(join(root, "db", "import-audit.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "glosas.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "process-online.sql"), "utf8"));
+      await pool.query(await readFile(join(root, "db", "process-online-payments.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-access.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-documents.sql"), "utf8"));
       await pool.query(await readFile(join(root, "db", "migrations", "20260922-chat-customers.sql"), "utf8"));
@@ -1758,8 +1760,13 @@ const processOnlineAnalysis = createProcessOnlineAnalysisService({
     await chatAccessService.assertCanSpend(auth);
   },
 });
+const processOnlinePayments=createProcessOnlinePayments({
+  getDb:()=>({pool,dbReady}),workflow:processOnlineWorkflow,
+  createCheckout:(auth,order)=>stripeBillingService.createProcessSearchCheckoutSession(auth,order),
+  checkoutReady:()=>Boolean(billingConfiguration(process.env).checkoutReady&&process.env.STRIPE_WEBHOOK_SECRET),
+});
 const processOnlineRoute = createProcessOnlineRouter({
-  workflow: processOnlineWorkflow, analysis: processOnlineAnalysis, getAuth: getTenantIdForRequest, sendJson,
+  workflow: processOnlineWorkflow, analysis: processOnlineAnalysis, payments:processOnlinePayments, getAuth: getTenantIdForRequest, sendJson,
 });
 const billingAccessService = createBillingAccessService({
   getDb: () => ({ pool, dbReady }),
@@ -1787,6 +1794,7 @@ const stripeBillingService = createStripeBillingService({
   onIrPaymentEvent: (event) => irExemptionService.paymentEvent(event),
   onDebtPaymentEvent: (event) => bankDebtService.paymentEvent(event),
   onCertificatePaymentEvent: event => certificateOrderService.paymentEvent(event),
+  onProcessSearchPaymentEvent: event => processOnlinePayments.paymentEvent(event),
 });
 const certificatePricingService=createCertificatePricingService({getDb:()=>({pool,dbReady}),catalog:()=>[
   ...getSellerDocumentCoverage({configured:true}).queries.map(q=>({key:q.id,label:q.label,costBrl:q.costBrl})),

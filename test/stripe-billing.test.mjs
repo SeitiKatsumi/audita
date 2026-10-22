@@ -485,3 +485,27 @@ test("demo mode lets a member activate only their own tester access", async () =
   assert.equal(calls[0].authContext.user.id, "user-1");
   assert.equal(calls[0].input.interval, "monthly");
 });
+
+test('process search Checkout charges BRL 49.90 with dynamic methods and a signed fulfillment callback', async () => {
+  let params, options, delivered=0;
+  const service=createStripeBillingService({env:configuredEnv(),
+    fetchImpl:async(url,request)=>{options=request;params=new URLSearchParams(request.body);return response({id:'cs_process',url:'https://checkout.stripe.com/c/pay/cs_process'});},
+    onProcessSearchPaymentEvent:async()=>{delivered++;return {received:true};}});
+  const order={id:'11111111-1111-4111-8111-111111111111',createdAt:new Date(),mode:'test',amountCents:1};
+  await service.createProcessSearchCheckoutSession(AUTH,order);
+  assert.equal(params.get('line_items[0][price_data][unit_amount]'),'4990');
+  assert.equal(params.get('line_items[0][price_data][currency]'),'brl');
+  assert.equal(params.get('metadata[purchase_kind]'),'process_search');
+  assert.equal(params.has('payment_method_types[0]'),false);
+  assert.equal(params.has('customer_email'),false);
+  assert.match(params.get('success_url'),/process_search_order=.*#processos-judiciais$/);
+  assert.equal(options.headers['Idempotency-Key']||options.headers['idempotency-key'],`audita-process-search-${order.id}`);
+  const body=JSON.stringify({id:'evt_process_signed',type:'checkout.session.completed',data:{object:{metadata:{purchase_kind:'process_search'}}}});
+  await assert.rejects(service.handleWebhook(body,'invalid'));assert.equal(delivered,0);
+  await service.handleWebhook(body,stripeSignature(body,'whsec_example',Math.floor(Date.now()/1000)));assert.equal(delivered,1);
+  await service.createProcessSearchCheckoutSession(AUTH,{...order,kind:'copy'});
+  assert.equal(params.get('line_items[0][price_data][unit_amount]'),'4990');
+  assert.match(params.get('line_items[0][price_data][product_data][name]'),/cópia integral/);
+  const live=createStripeBillingService({env:configuredEnv({STRIPE_SECRET_KEY:'sk_live_fictitious'})});
+  await assert.rejects(live.createProcessSearchCheckoutSession(AUTH,order),{code:'payment_mode_mismatch'});
+});

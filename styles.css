@@ -12704,3 +12704,8 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 [data-seller-process-page] > details { padding:10px 0; border-bottom:1px solid var(--line); }
 [data-seller-process-page] > button { margin:14px 10px 0 0; }
 [data-seller-process-page] summary { cursor:pointer; overflow-wrap:anywhere; }
+
+/* Destaque das opções de abrangência e público do serviço. */
+#sellerStatesChoice > summary, #certificateAudienceOpen { color: #ffad66; }
+#sellerStatesChoice > summary:hover, #certificateAudienceOpen:hover { color: #ffc48f; }
+#sellerStatesChoice > summary:focus-visible, #certificateAudienceOpen:focus-visible { outline: 2px solid #ffad66; outline-offset: 4px; border-radius: 3px; }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261020-chat-navigation" />
+    <link rel="stylesheet" href="styles.css?v=20261022-orange-options" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20261021-month-picker" />
     <link rel="stylesheet" href="/bank-debt.css?v=20261021-remove-files" />
@@ -322,7 +322,7 @@
             <button class="secondary-action" type="button" data-service-category="certidoes" aria-pressed="false">Emissão de certidões</button>
             <button class="secondary-action" type="button" data-service-category="processos-judiciais" aria-pressed="false">Emissão e download Processos Judiciais</button>
             <button class="secondary-action" type="button" data-service-category="energia" aria-pressed="false">Energia</button>
-            <button class="secondary-action" type="button" data-service-category="imoveis" aria-pressed="false">Imóveis</button>
+            <button class="secondary-action" type="button" data-service-category="imoveis" aria-pressed="false">Imóveis Análise Vendedor</button>
             <button class="secondary-action" type="button" data-service-category="importacao" aria-pressed="false">Imposto de Importação</button>
             <button class="secondary-action" type="button" data-service-category="saude" aria-pressed="false">Glosas Indevidas Plano Saúde</button>
             <button class="secondary-action" type="button" data-service-category="laudos" aria-pressed="false">Laudos</button>
@@ -435,7 +435,7 @@
 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="certidoes" data-keywords="certidao tribunal estado uf cpf cnpj pessoa física jurídica">
                   <a class="service-card-entry" href="#emissao-certidoes">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Emissão de certidões</small><strong>Emissão de certidões diversas</strong><small>Selecione as certidões disponíveis e obtenha os documentos emitidos, sem análise por IA.</small></span>
+                    <span class="home-module-copy"><small class="service-category-label">Emissão de certidões</small><strong>Emissão de certidões diversas por CPF/CNPJ</strong><small>Selecione as certidões disponíveis e obtenha os documentos emitidos, com opção de análise pela IA Audita.</small></span>
                   </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
@@ -472,7 +472,7 @@
               </div>
             </section>
 <section class="services-group" data-service-group aria-labelledby="services-imoveis">
-<h3 id="services-imoveis">Imóveis</h3>
+<h3 id="services-imoveis">Imóveis Análise Vendedor</h3>
 <div class="services-grid">
 <article class="home-module-action service-card service-card-explained" data-service-card data-categories="imoveis" data-keywords="vendedor compra venda certidao pessoa física distrito federal df tjdft">
                   <a class="service-card-entry" href="#analise-vendedor">
@@ -490,7 +490,7 @@
                     </div>
                   </details>
                 </article>
-<article class="home-module-action service-card service-card-explained" data-service-card data-categories="imoveis" data-keywords="imovel onr patrimonio matrícula cartório registro ri digital">
+<article class="home-module-action service-card service-card-explained" data-service-card data-categories="imoveis certidoes" data-keywords="imovel onr patrimonio matrícula cartório registro ri digital">
                   <a class="service-card-entry" href="#consulta-imoveis">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/building.svg" alt="" /></span>
                     <span class="home-module-copy"><small class="service-category-label">Imóveis</small><strong>Consulta Certidões do imóvel</strong><small>Pesquise registros imobiliários pelos serviços disponíveis do ONR / RI Digital.</small></span>
@@ -731,7 +731,7 @@
                   <input id="sellerAnalysisCompanyCnpjs" type="text" maxlength="500" autocomplete="off" placeholder="Separe os CNPJs por vírgula" />
                   <small>Até cinco CNPJs. Cadastro e quadro societário gratuitos; selecione abaixo as certidões empresariais pagas desejadas. A consulta de vínculos por CPF é uma opção separada.</small>
                 </label>
-                <details id="sellerStatesChoice" class="seller-analysis-privacy"><summary>Outros estados ou Brasil inteiro — opcional</summary>
+                <details id="sellerStatesChoice" class="seller-analysis-privacy"><summary>Certidões de outros estados ou Brasil inteiro</summary>
                 <fieldset id="sellerAnalysisUfs" class="seller-analysis-ufs seller-analysis-privacy"><legend>Certidões estaduais</legend></fieldset>
                 <div class="seller-analysis-privacy">
                   <button id="sellerAnalysisSelectAll" type="button" class="secondary-action">Pacote Brasil inteiro — todos os estados</button>
