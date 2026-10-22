@@ -1,4 +1,11 @@
 export const CERTIFICATE_PRICE_MULTIPLIER=30;
+export const NATIONAL_PROCESS_PAGE = 'certidao-nacional';
+export const NATIONAL_PROCESS_TITLE = 'Certidão Nacional dos processos judiciais em todos Tribunais do Brasil por CPF e CNPJ';
+export const isNationalProcessQuery = query => ['processos-agrupados', 'processos-completos'].includes(query.id);
+export function serviceCertificateSelection(coverage, ufs, documentType, national = false) {
+  const selected = certificateSelection(coverage, national ? (coverage.states || []).map(s => s.uf) : ufs, documentType);
+  return { courts: national ? [] : selected.courts, queries: selected.queries.filter(q => isNationalProcessQuery(q) === national) };
+}
 export const DEFAULT_CERTIFICATE_PRICING={standardMarkupPercent:2900,highCostMarkupPercent:900,highCostThresholdCents:200,freeSourceCents:1000,subscriberDiscountPercent:30,exceptions:{'processos-agrupados':{mode:'fixed',value:19900},'processos-completos':{mode:'fixed',value:19900}}};
 export function certificateQuote(costs,subscriber=false,pricing=DEFAULT_CERTIFICATE_PRICING) {
   let eligibleCents=0;

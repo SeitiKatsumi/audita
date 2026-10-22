@@ -1,4 +1,4 @@
-import {certificateSelection,certificateQuote} from '../certificate-selection.js';
+import {certificateSelection,certificateQuote,serviceCertificateSelection} from '../certificate-selection.js';
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
@@ -90,7 +90,7 @@ test("certificate groups show applicable sources, 30x prices and only required i
   const elements=new Map(["#sellerAnalysisCoverage","#sellerAnalysisUfs","#sellerAnalysisQueries","#sellerAnalysisCost","#sellerAnalysisBirthDate","#sellerAnalysisRg","#sellerAnalysisGender","#sellerAnalysisDocumentType","#sellerBirthDateField","#sellerRgField","#sellerGenderField","#sellerFullNameField","#sellerAnalysisMotherField"].map(s=>[s,{innerHTML:'',value:'',required:false}]));
   elements.get('#sellerAnalysisDocumentType').value='cpf';
   const selected={ufs:[],queries:[],courts:[]};
-  const context=vm.createContext({certificateSelection,certificateQuote,isCertificateOnly:()=>true,updateSellerMunicipalities:()=>{},
+  const context=vm.createContext({certificateSelection,certificateQuote,serviceCertificateSelection,isNationalProcessPage:()=>false,isCertificateOnly:()=>true,updateSellerMunicipalities:()=>{},
     document:{querySelector:s=>elements.get(s),querySelectorAll:s=>(s.includes('sellerAnalysisUfs')?selected.ufs:s.includes('data-certificate-court')?selected.courts:selected.queries).map(value=>({value}))},
     sellerAnalysisMotherName:{required:false,value:''},sellerAnalysisFullName:{required:false,value:''},sellerAnalysisCpf:{value:'04252011000110'},sellerAnalysisError:null,sellerAnalysisSubmit:{disabled:false,textContent:''},
     location:{search:''},sessionStorage:{getItem:()=>null},escapeHtml:v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'),
