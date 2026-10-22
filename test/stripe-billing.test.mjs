@@ -486,12 +486,12 @@ test("demo mode lets a member activate only their own tester access", async () =
   assert.equal(calls[0].input.interval, "monthly");
 });
 
-test('process search Checkout charges BRL 49.90 with dynamic methods and a signed fulfillment callback', async () => {
+test('process Checkout uses the server order snapshot, dynamic methods and signed fulfillment callback', async () => {
   let params, options, delivered=0;
   const service=createStripeBillingService({env:configuredEnv(),
     fetchImpl:async(url,request)=>{options=request;params=new URLSearchParams(request.body);return response({id:'cs_process',url:'https://checkout.stripe.com/c/pay/cs_process'});},
     onProcessSearchPaymentEvent:async()=>{delivered++;return {received:true};}});
-  const order={id:'11111111-1111-4111-8111-111111111111',createdAt:new Date(),mode:'test',amountCents:1};
+  const order={id:'11111111-1111-4111-8111-111111111111',createdAt:new Date(),mode:'test',amountCents:4990,kind:'search'};
   await service.createProcessSearchCheckoutSession(AUTH,order);
   assert.equal(params.get('line_items[0][price_data][unit_amount]'),'4990');
   assert.equal(params.get('line_items[0][price_data][currency]'),'brl');
@@ -506,6 +506,12 @@ test('process search Checkout charges BRL 49.90 with dynamic methods and a signe
   await service.createProcessSearchCheckoutSession(AUTH,{...order,kind:'copy'});
   assert.equal(params.get('line_items[0][price_data][unit_amount]'),'4990');
   assert.match(params.get('line_items[0][price_data][product_data][name]'),/cópia integral/);
+  await service.createProcessSearchCheckoutSession(AUTH,{...order,kind:'copy',quantity:2,amountCents:13980});
+  assert.equal(params.get('line_items[0][price_data][unit_amount]'),'13980');
+  assert.equal(params.get('line_items[0][quantity]'),'1','the persisted total is charged once');
+  assert.match(params.get('line_items[0][price_data][product_data][name]'),/\(2\)/);
+  for(const amountCents of [0,-1,0.5,NaN,2147483648])await assert.rejects(service.createProcessSearchCheckoutSession(AUTH,{...order,amountCents}),{code:'invalid_process_order'});
   const live=createStripeBillingService({env:configuredEnv({STRIPE_SECRET_KEY:'sk_live_fictitious'})});
   await assert.rejects(live.createProcessSearchCheckoutSession(AUTH,order),{code:'payment_mode_mismatch'});
+  await assert.rejects(service.createProcessSearchCheckoutSession(AUTH,{...order,mode:'live'}),{code:'payment_mode_mismatch'});
 });

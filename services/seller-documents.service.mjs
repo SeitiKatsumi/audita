@@ -1,4 +1,5 @@
 import { saveSellerProcesses, processRecords, PROCESS_RUN_LIMIT } from './seller-processes.service.mjs';
+import { processNumbers } from '../judicial-processes.js';
 import { readFileSync } from "node:fs";
 import { isValidDocument, normalizeDocument } from "./audit.service.mjs";
 import { downloadCertificateEvidence } from "./state-court-autonomous.service.mjs";
@@ -237,7 +238,7 @@ export async function collectSellerDocuments(input, {
         const returnedUf = clean(field(data, "uf")).toUpperCase();
         const expectedCity = item.params?.MUNICIPIO?.slice(0, item.params.MUNICIPIO.lastIndexOf("-"));
         if ((expectedUf && returnedUf && expectedUf !== returnedUf) || (expectedCity && field(data, "cidade") && !sameCity(field(data, "cidade"), expectedCity, expectedUf))) throw new Error("evidence_scope_mismatch");
-        let pdfPath;
+        let pdfPath, verifiedPdfText = '';
         if (item.kind === "certificate" || item.includePdf === true) {
           const evidenceUrl = field(field(payload, "metaDados"), "urlComprovante") || field(data, "urlComprovante");
           if (!portal && !evidenceUrl) throw new Error("official_pdf_unavailable");
@@ -250,6 +251,7 @@ export async function collectSellerDocuments(input, {
           } else if (!hasExactDocument(pdfText, target)) throw new Error("evidence_identity_unverified");
           if (!Array.isArray(item.expectedText) || !item.expectedText.length || item.expectedText.some((expected) => !compact(expected) || !compact(pdfText).includes(compact(expected)))) throw new Error("evidence_scope_mismatch");
           if (item.expectedTextAny?.length && !item.expectedTextAny.some(expected => compact(expected) && compact(pdfText).includes(compact(expected)))) throw new Error("evidence_scope_mismatch");
+          verifiedPdfText = pdfText;
           const saved = await savePdf({ consultaId: input.consultaId, fonte: "seller_documents", fileName: `${id}.pdf`, buffer });
           if (!saved?.pdfPath) throw new Error("evidence_save_failed");
           pdfPath = saved.pdfPath;
@@ -259,7 +261,7 @@ export async function collectSellerDocuments(input, {
           ? await saveProcesses(data, input.consultaId) : null;
         const evidenceJson = JSON.stringify(data, (key, value) => /token|senha|password|base64|urlcomprovante|documentoConsultado/i.test(key) || processCollection && key.toLowerCase() === 'processos' ? undefined : value);
         const evidenceDataLimited = evidenceJson.length > 180000;
-        rows[index] = { ...rows[index], status: "success", ...summary, ...(processCollection ? { processCollection } : {}), evidenceData: evidenceDataLimited ? {} : JSON.parse(evidenceJson), evidenceDataLimited, evidenceIdentityVerified: true, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
+        rows[index] = { ...rows[index], status: "success", ...summary, ...(processCollection ? { processCollection } : {processNumbers: processNumbers([data, verifiedPdfText])}), evidenceData: evidenceDataLimited ? {} : JSON.parse(evidenceJson), evidenceDataLimited, evidenceIdentityVerified: true, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
         if(automaticCompanies&&item.id==='vinculos') {
           const linked=[...new Set(list(field(data,'relacionamentos')).map(entry=>normalizeDocument(field(entry,'documento'))).filter(cnpj=>isValidDocument('cnpj',cnpj)))];
           for(const [companyIndex,cnpj] of linked.slice(0,5).entries()) appendJob({company:cnpj,id:`company-${companyIndex+1}`,label:`Empresa ${companyIndex+1} — cadastro e QSA`});
