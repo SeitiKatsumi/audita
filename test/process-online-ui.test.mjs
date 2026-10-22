@@ -72,7 +72,7 @@ test('activation shows simplified forms without a verification or interest form'
  f.module.deactivate();
 });
 
-test('sandbox example fills CNJ without sending and CPF search delegates to Direct Data', async () => {
+test('sandbox example fills CNJ without sending and CPF search delegates without supplier branding', async () => {
   const f = fixture(undefined, { ...LIVE, mode: 'test', searchReady: false });
   await f.module.activate();
   approve(f.container, 'searchConsent');
@@ -85,7 +85,7 @@ test('sandbox example fills CNJ without sending and CPF search delegates to Dire
   assert.equal(named(f.container, 'cnj').value, '0701379-18.2025.8.01.0013');
   assert.equal(named(f.container, 'copyConsent').checked, false);
   assert.equal(f.calls.some(call => call.options.method === 'POST'), false);
-  assert.match(f.container.textContent, /Direct Data/);
+  assert.doesNotMatch(f.container.textContent, /direct\s*data|directd/i);
   f.module.deactivate();
 });
 
@@ -221,12 +221,10 @@ test('ready multipart copies expose only their exact private API links and AI st
   f.module.deactivate();
 });
 
-test('disabled provider retains forms and partner activation route while sandbox explains zero real payments', async () => {
+test('disabled provider retains forms without partner activation advertising while sandbox explains zero real payments', async () => {
   const off = fixture(undefined, { enabled: false, ready: false, storageReady: true, mode: null });
   await off.module.activate();
-  assert.match(off.container.textContent, /Integração em ativação/);
-  const partner = descendants(off.container).find(item => item.tagName === 'A');
-  assert.equal(partner.href, 'https://processonline.com.br/seja-parceiro/');
+  assert.doesNotMatch(off.container.textContent, /Integração em ativação|parceiro B2B|Cadastro de parceiro/);
   approve(off.container, 'copyConsent');
   assert.equal(named(off.container, 'copyCheckout').disabled, true);
   assert.equal(forms(off.container).length, 2);

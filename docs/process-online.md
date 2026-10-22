@@ -1,3 +1,9 @@
+# Preparacao live — 22/10/2026
+
+Parceiro aprovado, chave live exclusiva e segredo do webhook salvos na configuracao privada de producao; nenhum segredo neste documento. api-verify gratuito autenticou com sucesso e webhook.test assinado foi aceito pela Audita200. Stripe de producao tem destino ativo e os quatro eventos de Checkout necessarios; nao foi realizado pagamento real de teste.
+
+Saldo observado:0creditos. PROCESS_ONLINE_ENABLED continuafalse ate confirmacao de recarga, porque o checkout atual nao consulta o saldo do fornecedor antes de cobrar o cliente. A recarga nao altera esse flag automaticamente: confirmar o saldo e habilitar o provedor antes de oferecer novas vendas. Primeira copia paga, autos reais/partes e entrega de evento real continuam pendentes de homologacao autorizada. Nenhum credito comprado ou consumido nesta preparacao.
+
 # Atualização de interface e carteira — 21/10/2026
 
 ## Sandbox funcional no app local
@@ -128,7 +134,7 @@ Confirmar preço, cobertura e direito de uso antes da ativação.
 | `PROCESS_ONLINE_API_KEY` | Chave B2B aprovada, `po_test_...` ou `po_live_...` |
 | `PROCESS_ONLINE_WEBHOOK_SECRET` | Secret do webhook configurado no painel |
 | `AUDITA_PROFILE_ENCRYPTION_KEY` | Chave existente dos pedidos e checkpoints |
-| `AUDITA_CREDITS_ENABLED=true` | Carteira Audita obrigatória para operações live |
+| `AUDITA_CREDITS_ENABLED=true` | Carteira apenas para operações legadas; novas cópias pagas no Stripe não debitam créditos Audita |
 
 A IA reutiliza a configuração e os modelos existentes em `createSellerReviewAI`;
 não exige nova chave ou provedor. A autorização revalida assinatura/liberação
