@@ -1,5 +1,5 @@
 import { initGeneralChat } from './general-chat.js?v=20261020-navigation';
-import { initProcessOnline } from './process-online.js?v=20261022-complete-process';
+import { initProcessOnline } from './process-online.js?v=20261022-process-clean';
 import { processNumbers, normalizedCnj } from './judicial-processes.js';
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js?v=20261013-send-feedback";

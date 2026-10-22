@@ -67,7 +67,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   const intro = el('header', 'process-online-intro');
   intro.append(el('span', 'process-online-eyebrow', 'Processos judiciais'),
     el('h2', '', 'Localize processos e solicite os autos'),
-    el('p', '', 'Informe um número CNJ ou localize processos por CPF/CNPJ na Direct Data. Escolha os processos desejados e autorize o pagamento das cópias integrais.'),
+    el('p', '', 'Informe um número CNJ ou localize processos por CPF/CNPJ. Escolha os processos desejados e autorize o pagamento das cópias integrais.'),
     el('p', 'process-online-muted', 'As cópias não são certidões oficiais e não incluem monitoramento contínuo. Processos restritos dependem das permissões do tribunal.'));
   const configPanel = el('div', 'process-online-config'); configPanel.setAttribute('role', 'status');
   const notice = el('div', 'process-online-notice'); notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite'); notice.hidden = true;
@@ -95,7 +95,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   cnjSection.append(copyForm);
 
   const searchSection = el('section', 'process-online-section');
-  searchSection.append(el('h3', '', 'Localizar por CPF ou CNPJ'), el('p', 'process-online-muted', 'Escolha a consulta detalhada da Direct Data na próxima tela, onde o valor será apresentado antes da contratação. Depois, selecione os processos para solicitar as cópias completas separadamente.'));
+  searchSection.append(el('h3', '', 'Localizar por CPF ou CNPJ'), el('p', 'process-online-muted', 'Escolha a consulta detalhada na próxima tela, onde o valor será apresentado antes da contratação. Depois, selecione os processos para solicitar as cópias completas separadamente.'));
   const searchForm = el('form', 'process-online-form');
   const documento = input('documento', 'CPF ou CNPJ do titular', 22); documento.inputMode = 'numeric';
   const searchConsent = consent('searchConsent', 'Tenho autorização para consultar este documento e autorizo esta busca.');
@@ -179,23 +179,15 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     configPanel.replaceChildren();
     if (ready()) {
       configPanel.append(el('strong', '', sandbox() ? 'Testes gratuitos ativos' : 'Integração disponível'),
-        el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'As cópias são solicitadas após a confirmação do pagamento pelo Stripe. A busca por CPF/CNPJ é feita separadamente na Direct Data.'));
+        el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'As cópias são solicitadas após a confirmação do pagamento pelo Stripe. A busca por CPF/CNPJ é feita separadamente.'));
       if (sandbox()) {
         configPanel.append(button('Usar processo de exemplo', () => {
           if (state.busy || state.pending) return;
           cnj.value = '0701379-18.2025.8.01.0013'; state.chosen.clear(); renderSelection(); copyConsent.check.checked = false; updateControls(); cnj.focus();
         }));
       }
-    } else {
-      configPanel.append(el('strong', '', 'Integração em ativação'), el('p', '', state.config?.storageReady === false
-        ? 'O armazenamento privado precisa estar disponível antes de novas solicitações.'
-        : state.config?.billingReady === false && state.config?.mode === 'live'
-          ? 'A carteira de créditos Audita precisa estar disponível antes de novas solicitações.'
-        : 'O acesso à API depende de cadastro e aprovação como parceiro B2B, além da chave de integração. A assinatura comum do site não libera a API.'));
-      const link = el('a', '', 'Cadastro de parceiro e testes gratuitos');
-      link.href = 'https://processonline.com.br/seja-parceiro/'; link.target = '_blank'; link.rel = 'noopener noreferrer';
-      configPanel.append(link);
     }
+    configPanel.hidden = !ready();
     if (ready() && (!state.config?.copyPayment?.checkoutReady || !unitAmount())) configPanel.append(el('p', 'process-online-muted', 'O pagamento está em configuração. Tente novamente mais tarde.'));
     copyConsent.label.lastChild.textContent = sandbox()
       ? 'Autorizo uma cópia demonstrativa no ambiente de testes, sem pagamento real.'
