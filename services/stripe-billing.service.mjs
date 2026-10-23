@@ -857,14 +857,15 @@ export function createStripeBillingService({
   async function createProcessSearchCheckoutSession(authContext, order) {
     const config=configuration();
     if(!config.checkoutReady||!config.appUrl)throw new StripeBillingError('billing_not_configured','Pagamento indisponível.',503);
-    if(order.mode==='test'&&!/^(sk|rk)_test_/.test(config.secretKey))throw new StripeBillingError('payment_mode_mismatch','Use Stripe de teste para processos demonstrativos.',503);
+    if(!authContext?.tenantId||!authContext?.user?.id||!(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(order?.id||''))||!Number.isSafeInteger(order.amountCents)||order.amountCents<=0||order.amountCents>2147483647||!['search','copy'].includes(order.kind)||!['test','live'].includes(order.mode)||!Number.isFinite(new Date(order.createdAt).getTime())||!Number.isSafeInteger(order.quantity??1)||(order.quantity??1)<1||(order.quantity??1)>20)throw new StripeBillingError('invalid_process_order','Pedido inválido.',400);
+    if((order.mode==='test')!==/^(sk|rk)_test_/.test(config.secretKey))throw new StripeBillingError('payment_mode_mismatch','O ambiente do pagamento precisa corresponder ao pedido.',503);
     const metadata={purchase_kind:'process_search',audita_tenant_id:String(authContext.tenantId),audita_user_id:String(authContext.user.id),process_search_order_id:order.id};
     const session=await stripeRequest('/v1/checkout/sessions',{
       mode:'payment',locale:'pt-BR',integration_identifier:config.integrationIdentifier,
       success_url:`${config.appUrl}/?process_search_order=${order.id}#processos-judiciais`,
       cancel_url:`${config.appUrl}/?process_search_order=${order.id}&process_payment_cancelled=1#processos-judiciais`,
       expires_at:Math.floor(new Date(order.createdAt).getTime()/1000)+23*3600,
-      line_items:[{quantity:1,price_data:{currency:'brl',unit_amount:4990,product_data:{name:order.kind==='copy'?'Audita — cópia integral de processo por CNJ':'Audita — busca de processos por CPF/CNPJ'}}}],
+      line_items:[{quantity:1,price_data:{currency:'brl',unit_amount:order.amountCents,product_data:{name:order.kind==='copy'?`Audita — cópia integral de processo por CNJ (${order.quantity||1})`:'Audita — busca de processos por CPF/CNPJ'}}}],
       metadata,payment_intent_data:{metadata},
     },{idempotencyKey:`audita-process-search-${order.id}`});
     return {id:session.id,url:session.url,expiresAt:session.expires_at};

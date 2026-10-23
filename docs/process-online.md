@@ -1,3 +1,9 @@
+# Preparacao live — 22/10/2026
+
+Parceiro aprovado, chave live exclusiva e segredo do webhook salvos na configuracao privada de producao; nenhum segredo neste documento. api-verify gratuito autenticou com sucesso e webhook.test assinado foi aceito pela Audita200. Stripe de producao tem destino ativo e os quatro eventos de Checkout necessarios; nao foi realizado pagamento real de teste.
+
+Saldo observado:0creditos. PROCESS_ONLINE_ENABLED continuafalse ate confirmacao de recarga, porque o checkout atual nao consulta o saldo do fornecedor antes de cobrar o cliente. A recarga nao altera esse flag automaticamente: confirmar o saldo e habilitar o provedor antes de oferecer novas vendas. Primeira copia paga, autos reais/partes e entrega de evento real continuam pendentes de homologacao autorizada. Nenhum credito comprado ou consumido nesta preparacao.
+
 # Atualização de interface e carteira — 21/10/2026
 
 ## Sandbox funcional no app local
@@ -128,7 +134,7 @@ Confirmar preço, cobertura e direito de uso antes da ativação.
 | `PROCESS_ONLINE_API_KEY` | Chave B2B aprovada, `po_test_...` ou `po_live_...` |
 | `PROCESS_ONLINE_WEBHOOK_SECRET` | Secret do webhook configurado no painel |
 | `AUDITA_PROFILE_ENCRYPTION_KEY` | Chave existente dos pedidos e checkpoints |
-| `AUDITA_CREDITS_ENABLED=true` | Carteira Audita obrigatória para operações live |
+| `AUDITA_CREDITS_ENABLED=true` | Carteira apenas para operações legadas; novas cópias pagas no Stripe não debitam créditos Audita |
 
 A IA reutiliza a configuração e os modelos existentes em `createSellerReviewAI`;
 não exige nova chave ou provedor. A autorização revalida assinatura/liberação
@@ -280,7 +286,7 @@ busca, manifesto de uma e múltiplas partes, eventos/estornos e limites negociad
 Não houve cadastro, compra, chamada paga ou documento de cliente nos testes desta
 implementação. Publicação e migração de produção são etapas separadas.
 
-## Busca CPF/CNPJ — Checkout Stripe (2026-10-22)
+## Histórico: busca CPF/CNPJ — Checkout Stripe (substituído em22/10/2026)
 A busca custa R$ 49,90, fixado no servidor em centavos, sem carteira Audita. `POST /api/process-online/search/checkout` valida consentimento/documento e cria um pedido privado criptografado; o número do documento não vai para metadata Stripe. O checkout é hospedado, em BRL, com métodos dinâmicos. Pix e cartão precisam estar habilitados/disponíveis na conta Stripe; a oferta efetiva é determinada pelo Stripe. A cópia integral por CNJ também custa R$49,90 e usa POST /api/process-online/requests/checkout. O tipo é vinculado ao pedido persistido; pagamento da busca não libera uma cópia.
 
 A migração aditiva `db/process-online-payments.sql` é aplicada pela inicialização do servidor. Requer banco, `AUDITA_PROFILE_ENCRYPTION_KEY`, billing/Stripe e webhook configurados, além de fornecedor pronto e busca homologada. Sandbox de busca não homologado continua bloqueado; nunca habilitar o provedor live para testar pagamentos.
@@ -288,3 +294,11 @@ A migração aditiva `db/process-online-payments.sql` é aplicada pela inicializ
 Assinar no webhook Stripe os eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` e `checkout.session.expired`. Apenas `payment_status=paid`, moeda BRL, total4990, sessão e dono correspondentes liberam execução. Retorno/cancelamento do checkout apenas consultam estado privado e não liberam serviço. Os endpoints diretos `/search` e POST `/requests` respondem402. Pedidos existentes continuam disponíveis, inclusive retomada da mesma cópia. Pedidos em aberto reaparecem para retomar o mesmo checkout; repetição de webhook usa a mesma operação persistida pelo workflow.
 
 Se a execução falhar ou ficar em conferência depois do pagamento, o histórico mantém o pedido e a referência; não cobrar nem reenviar automaticamente. A equipe deve conciliar o pedido e eventual reembolso no Stripe. Não há reembolso automático novo. Esta integração foi testada com transporte fictício e PGlite; checkout/Pix reais e webhook externo aguardam homologação. A conexão do conector Stripe exige reautenticação.
+
+## Fluxo atual: Direct Data → seleção → ProcessOnline
+
+O fluxo acima é mantido somente para pedidos legados. Novas buscas CPF/CNPJ vão ao serviço nacional de consultas Direct Data; a Completa retorna CNJs e a Agrupada somente estatísticas. Resultados de certidões e análises oferecem a cópia quando um CNJ válido estiver disponível. Sem nova busca paga ao preparar a oferta.
+
+`POST /api/process-online/requests/checkout` aceita um `cnj` ou `cnjs` de1–20números distintos, consentimento e total aprovado. O preço vem de Super Admin > Preços e margens, com snapshot no pedido; o webhook valida o total persistido, sem valor fixo4990. O mesmo pagamento de um lote gera operações determinísticas por CNJ e não repete cópias após replay. Busca ProcessOnline nova responde410; pedidos antigos pagos continuam válidos. A migração existente foi estendida de forma aditiva, sem apagar pedidos.
+
+Detalhes, campos das fontes, critérios de oferta e valores iniciais: [produto de processos completos](process-complete-product.md). Testes simulados não constituem publicação ou homologação live.

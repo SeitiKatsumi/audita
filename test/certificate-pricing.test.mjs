@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {PGlite} from '@electric-sql/pglite';
-import {DEFAULT_CERTIFICATE_PRICING,certificateQuote,certificateSelection} from '../certificate-selection.js';
+import {DEFAULT_CERTIFICATE_PRICING,certificateQuote,certificateSelection,processServiceQuote} from '../certificate-selection.js';
 import {createCertificatePricingService,validateCertificatePricing} from '../services/certificate-pricing.service.mjs';
 import {createCertificateOrderService} from '../services/certificate-order.service.mjs';
 
@@ -20,14 +20,38 @@ test('fixed R$199 per source, percent overrides, removed exceptions and subscrib
   const keys=new Set(catalog().map(q=>q.key));validateCertificatePricing(pricing,keys);
   for(const patch of [{standardMarkupPercent:-1},{subscriberDiscountPercent:101},{freeSourceCents:1.1},{standardMarkupPercent:'30'},{exceptions:{unknown:{mode:'fixed',value:19900}}},{exceptions:{'processos-completos':{mode:'fixed',value:1.5}}},{exceptions:{'processos-completos':{mode:'bad',value:1}}}])assert.throws(()=>validateCertificatePricing({...pricing,...patch},keys));
 });
+test('process pricing shares Direct Data rules, keeps copy separate and validates editable costs',()=>{
+  const pricing=structuredClone(DEFAULT_CERTIFICATE_PRICING),keys=new Set(catalog().map(q=>q.key));
+  assert.deepEqual(processServiceQuote('directDataSearch'),{operation:'directDataSearch',costCents:110,unitAmountCents:19900,quantity:1,amountCents:19900,totalCostCents:110,currency:'brl'});
+  assert.equal(processServiceQuote('directDataFullSearch').costCents,330);
+  assert.equal(processServiceQuote('directDataFullSearch').amountCents,19900);
+  assert.equal(processServiceQuote('processOnlineCopy',pricing,3).amountCents,14970);
+  assert.equal(processServiceQuote('processOnlineCopy',pricing).costCents,2499);
+  pricing.sourceCosts['processos-agrupados']=200;
+  pricing.exceptions['processos-agrupados']={mode:'markup',value:150};
+  assert.equal(processServiceQuote('directDataSearch',pricing).amountCents,500);
+  assert.equal(certificateQuote([{key:'processos-agrupados',costBrl:1.1}],false,pricing).amountCents,500);
+  pricing.processServices.processOnlineCopy={costCents:800,mode:'markup',value:200};
+  assert.equal(processServiceQuote('processOnlineCopy',pricing,2).amountCents,4800);
+  assert.deepEqual(validateCertificatePricing(pricing,keys),pricing);
+  for(const patch of [{sourceCosts:{unknown:100}},{sourceCosts:{'processos-agrupados':-1}},{sourceCosts:{'processos-agrupados':1.2}},{processServices:{unknown:{}}},{processServices:{processOnlineCopy:{costCents:1.2,mode:'fixed',value:100}}},{processServices:{processOnlineCopy:{costCents:100,mode:'markup',value:'200'}}},{processServices:{processOnlineCopy:{costCents:100,mode:'fixed',value:1.2}}}])assert.throws(()=>validateCertificatePricing({...pricing,...patch},keys),{status:400});
+  for(const quantity of [0,-1,201,1.5,'2'])assert.throws(()=>processServiceQuote('processOnlineCopy',pricing,quantity));
+  for(const rule of [{costCents:100,mode:'fixed',value:0},{costCents:0,mode:'markup',value:100}])assert.throws(()=>validateCertificatePricing({...pricing,processServices:{processOnlineCopy:rule}},keys),{status:400});
+  assert.throws(()=>processServiceQuote('untrustedOperation',pricing));
+});
+
 test('global price editor persists across service instances, checks role/revision and freezes existing checkout',async()=>{
   const pg=new PGlite();try{
     await pg.exec((await readFile(new URL('../db/schema.sql',import.meta.url),'utf8')).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;',''));
     await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,password_hash) VALUES(811,1,'fixture@example.test','Pessoa Ficticia','disabled')");
     const actor={tenantId:1,user:{id:811,role:'super_admin'}},make=()=>createCertificatePricingService({getDb:()=>({pool:pg,dbReady:true}),catalog});
     const service=make(),initial=await service.get(),pricing=structuredClone(initial.pricing);
+    pricing.sourceCosts['processos-agrupados']=150;
+    pricing.processServices.processOnlineCopy={costCents:1200,mode:'fixed',value:3990};
     await assert.rejects(service.save({user:{id:811,role:'admin'}},{pricing,revision:0}),{status:403});
     const saved=await service.save(actor,{pricing,revision:0});assert.equal(saved.revision,1);
+    assert.equal((await make().get()).pricing.sourceCosts['processos-agrupados'],150);
+    assert.equal(processServiceQuote('processOnlineCopy',(await make().get()).pricing).amountCents,3990);
     const checkouts=[],orders=createCertificateOrderService({getDb:()=>({pool:pg,dbReady:true}),getPricing:async()=>(await make().get()).pricing,env:{AUDITA_PROFILE_ENCRYPTION_KEY:'fixture-key-that-is-at-least-thirty-two-characters'},checkout:async(_,o)=>{checkouts.push(o);return{id:'cs_fixture',url:'https://checkout.stripe.com/c/pay/fixture'}},startAudit:async()=>{throw Error('no provider calls')}});
     const body={tipoDocumento:'cpf',documento:'52998224725',fontes:['seller_documents'],extraFields:{sellerFlow:'certificates',stateCourtFields:{fullName:'Pessoa Ficticia'}}};
     const old=await orders.create(actor,body,{costs:[{key:'processos-completos',costBrl:3.3}],subscriber:true,documentCount:1});assert.equal(old.amountCents,19900);assert.equal(checkouts[0].amountCents,19900);
@@ -37,10 +61,26 @@ test('global price editor persists across service instances, checks role/revisio
     await assert.rejects(service.save(actor,{pricing,revision:1}),{status:409});
     assert.equal((await orders.get(actor,old.orderId)).amountCents,19900);
     const next=await orders.create(actor,body,{costs:[{key:'processos-completos',costBrl:3.3}],documentCount:1});assert.equal(next.amountCents,25000);
+    const current=await service.get();current.pricing.exceptions['processos-agrupados']={mode:'markup',value:100};
+    await service.save(actor,{pricing:current.pricing,revision:current.revision});
+    const adjustedCostOrder=await orders.create(actor,body,{costs:[{key:'processos-agrupados',costBrl:1.1}],documentCount:1});
+    assert.equal(adjustedCostOrder.amountCents,300);assert.equal(checkouts.at(-1).amountCents,300);
     const unavailable=createCertificatePricingService({getDb:()=>({dbReady:false}),catalog});
     await assert.rejects(unavailable.save(actor,{pricing,revision:0}),{status:503});await assert.rejects(unavailable.get({required:true}),{status:503});
   }finally{await pg.close()}
 });
+test('legacy saved price tables gain process defaults without restoring removed source exceptions',async()=>{
+  const legacy=structuredClone(DEFAULT_CERTIFICATE_PRICING);delete legacy.processServices;delete legacy.sourceCosts;legacy.exceptions={};
+  const service=createCertificatePricingService({catalog,getDb:()=>({dbReady:true,pool:{query:async()=>({rows:[{pricing:legacy,revision:7}]})}})});
+  const {pricing,revision}=await service.get();
+  assert.equal(revision,7);assert.deepEqual(pricing.exceptions,{});assert.deepEqual(pricing.sourceCosts,{});
+  assert.equal(processServiceQuote('processOnlineCopy',pricing).amountCents,4990);
+  assert.equal(processServiceQuote('directDataSearch',pricing).amountCents,3300);
+  pricing.processServices.processOnlineCopy.value=999;
+  assert.equal(DEFAULT_CERTIFICATE_PRICING.processServices.processOnlineCopy.value,4990);
+  assert.equal(validateCertificatePricing(legacy,new Set(catalog().map(q=>q.key))).processServices.processOnlineCopy.value,4990);
+});
+
 test('pricing route rejects unauthenticated, non-super-admin and cross-site updates before persistence',async()=>{
   const source=await readFile(new URL('../server.mjs',import.meta.url),'utf8');let calls=0;
   const context=vm.createContext({URL,getTenantIdForRequest:async r=>r.actor,readJsonBody:async r=>r.body,certificatePricingService:{get:async()=>({pricing:{},revision:1}),save:async()=>{calls++;return{revision:2}},catalog},sendJson:(r,status,body)=>Object.assign(r,{status,body})});

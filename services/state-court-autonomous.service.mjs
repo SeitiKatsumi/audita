@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { processNumbers } from '../judicial-processes.js';
 import { readFile } from "node:fs/promises";
 import { saveAndExtractPdfBuffer, extractPdfText } from "./pdf.service.mjs";
 import { successResult, failedResult } from "../collectors/base.collector.mjs";
@@ -84,7 +85,7 @@ export async function collectAutonomousCertificates(input, { collectPortal, clos
         const text = await readPdf(buffer);
         if (!certificatePdfMatches(buffer, text, input.documento, extra.stateCourtFields.fullName)) throw new Error("evidence_identity_unverified");
         if (!certificateScopeMatches(text, item.expectedText, item.uf)) throw new Error("evidence_scope_mismatch");
-        rows[i] = { ...rows[i], ...certificate, uf: item.uf, tipo: rows[i].tipo, status: "success" };
+        rows[i] = { ...rows[i], ...certificate, processNumbers: processNumbers(text), uf: item.uf, tipo: rows[i].tipo, status: "success" };
       } else {
         const response = await queryCertificate({ ...extra.stateCourtFields, document: input.documento, documentType: input.tipoDocumento, uf: item.uf, certificateType: item.providerType || item.type, generatePdf: true, authorizationConfirmed: true, paidQueryConfirmed: true, requestId: `${input.consultaId}:${item.uf}:${item.type}` }, input.usageContext);
         if (!response.result?.certificate?.evidenceUrl) throw new Error(response.reason || "official_pdf_unavailable");
@@ -93,7 +94,7 @@ export async function collectAutonomousCertificates(input, { collectPortal, clos
         if (!certificatePdfMatches(buffer, text, input.documento, extra.stateCourtFields.fullName)) throw new Error("evidence_identity_unverified");
         if (!certificateScopeMatches(text, item.expectedText, item.uf)) throw new Error("evidence_scope_mismatch");
         const saved = await savePdf({ consultaId: input.consultaId, fonte: "tjdft", fileName: `${item.uf}-${i}.pdf`, buffer });
-        rows[i] = { ...rows[i], status: "success", pdfPath: saved.pdfPath, resultado: response.result.analysis.occurrence === true ? "consta" : response.result.analysis.occurrence === false ? "nada_consta" : "indisponivel", providerReference: response.result.providerReference };
+        rows[i] = { ...rows[i], status: "success", processNumbers: processNumbers(text), pdfPath: saved.pdfPath, resultado: response.result.analysis.occurrence === true ? "consta" : response.result.analysis.occurrence === false ? "nada_consta" : "indisponivel", providerReference: response.result.providerReference };
       }
       rows[i].evidenceIdentityVerified=true;
     } catch (error) {

@@ -1,3 +1,5 @@
+import { normalizedCnj } from './judicial-processes.js';
+
 const API = '/api/process-online';
 const REFRESH_MS = 30_000;
 const COMPLETE = new Set(['ready', 'completed']);
@@ -28,11 +30,11 @@ function privateUrl(value, requestId, suffix) {
 }
 
 /** This module never starts a search, copy request or AI analysis when activated. */
-export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onAuthRequired = () => {}, location = globalThis.location, navigate = url => globalThis.location.assign(url) } = {}) {
+export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onAuthRequired = () => {}, onDocumentSearch, location = globalThis.location, navigate = url => globalThis.location.assign(url) } = {}) {
   if (!container?.ownerDocument) throw new TypeError('Informe o contêiner do módulo de processos.');
   const doc = container.ownerDocument;
   const state = { active: false, config: null, busy: false, requests: [], selected: null,
-    parentAuditId: null, pending: null, payment: null, timer: null, refreshAt: new Map(), analysis: null, generation: 0, activation: 0 };
+    parentAuditId: null, available: [], chosen: new Set(), pending: null, payment: null, timer: null, refreshAt: new Map(), analysis: null, generation: 0, activation: 0 };
   const el = (tag, className, text) => {
     const node = doc.createElement(tag);
     if (className) node.className = className;
@@ -65,7 +67,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   const intro = el('header', 'process-online-intro');
   intro.append(el('span', 'process-online-eyebrow', 'Processos judiciais'),
     el('h2', '', 'Localize processos e solicite os autos'),
-    el('p', '', 'Informe um número CNJ ou busque processos por CPF/CNPJ. A cópia integral é solicitada individualmente, após sua autorização.'),
+    el('p', '', 'Informe um número CNJ ou localize processos por CPF/CNPJ. Escolha os processos desejados e autorize o pagamento das cópias integrais.'),
     el('p', 'process-online-muted', 'As cópias não são certidões oficiais e não incluem monitoramento contínuo. Processos restritos dependem das permissões do tribunal.'));
   const configPanel = el('div', 'process-online-config'); configPanel.setAttribute('role', 'status');
   const notice = el('div', 'process-online-notice'); notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite'); notice.hidden = true;
@@ -82,17 +84,23 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   const cnjField = field('Número CNJ', cnj);
   const copyForm = el('form', 'process-online-form');
   const copyConsent = consent('copyConsent', 'Autorizo a solicitação desta cópia e confirmo meu interesse legítimo.');
-  const copyButton = el('button', 'primary-action', 'Pagar R$ 49,90 e solicitar cópia'); copyButton.type = 'submit';
-  copyForm.append(cnjField, el('p', 'process-online-price', 'R$ 49,90 — pagamento com Pix ou cartão pelo Stripe.'), copyConsent.label, copyButton);
+  const selections = el('fieldset', 'process-online-selection'); selections.hidden = true;
+  const selectionList = el('div', 'process-online-selection-list');
+  const selectionLegend = el('legend', '', 'Escolha os processos para obter a cópia integral');
+  selections.append(selectionLegend, el('p', 'process-online-muted', 'Nenhum processo é selecionado automaticamente. Você pode solicitar até 20 cópias por pagamento.'), selectionList);
+  const copyPrice = el('p', 'process-online-price'); copyPrice.setAttribute('aria-live', 'polite');
+  const copyButton = el('button', 'primary-action', 'Pagamento em configuração'); copyButton.type = 'submit';
+  copyButton.name = 'copyCheckout';
+  copyForm.append(selections, cnjField, copyPrice, copyConsent.label, copyButton);
   cnjSection.append(copyForm);
 
   const searchSection = el('section', 'process-online-section');
-  searchSection.append(el('h3', '', 'Localizar por CPF ou CNPJ'), el('p', 'process-online-muted', 'A busca retorna uma lista de processos. Ela não solicita cópias automaticamente.'));
+  searchSection.append(el('h3', '', 'Localizar por CPF ou CNPJ'), el('p', 'process-online-muted', 'Escolha a consulta detalhada na próxima tela, onde o valor será apresentado antes da contratação. Depois, selecione os processos para solicitar as cópias completas separadamente.'));
   const searchForm = el('form', 'process-online-form');
   const documento = input('documento', 'CPF ou CNPJ do titular', 22); documento.inputMode = 'numeric';
   const searchConsent = consent('searchConsent', 'Tenho autorização para consultar este documento e autorizo esta busca.');
-  const searchButton = el('button', 'primary-action', 'Pagar R$ 49,90 e buscar'); searchButton.type = 'submit';
-  searchForm.append(field('CPF ou CNPJ', documento), el('p', 'process-online-price', 'R$ 49,90 — pagamento com Pix ou cartão pelo Stripe.'), searchConsent.label, searchButton);
+  const searchButton = el('button', 'primary-action', 'Localizar processos'); searchButton.type = 'submit';
+  searchForm.append(field('CPF ou CNPJ', documento), searchConsent.label, searchButton);
   const paymentPanel = el('div', 'process-online-payment'); paymentPanel.setAttribute('role', 'status'); paymentPanel.hidden = true;
 
   searchSection.append(searchForm);
@@ -119,10 +127,41 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   }
   function ready() { return state.config?.enabled === true && state.config?.ready === true && state.config?.storageReady !== false; }
   function sandbox() { return ['test', 'sandbox'].includes(state.config?.mode); }
+  function unitAmount() {
+    const value = state.config?.copyPayment?.unitAmountCents;
+    return Number.isSafeInteger(value) && value > 0 ? value : null;
+  }
+  function maxQuantity() { return Math.min(20, Math.max(1, Number(state.config?.copyPayment?.maxQuantity) || 20)); }
+  function selectedNumbers() { return state.chosen.size ? [...state.chosen] : [normalizedCnj(cnj.value)].filter(Boolean); }
+  function money(cents) { return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }).replace(/\u00a0/g, ' '); }
+  function renderSelection() {
+    selections.hidden = !state.available.length; selectionList.replaceChildren();
+    cnjField.childNodes[0].textContent = state.available.length ? 'Ou informe diretamente um número CNJ' : 'Número CNJ';
+    for (const process of state.available) {
+      const check = el('input'); check.type = 'checkbox'; check.name = `process-${process.cnj}`;
+      check.checked = state.chosen.has(process.cnj); check.disabled = state.busy || Boolean(state.pending);
+      const text = el('span'); text.append(el('strong', '', formatCnj(process.cnj)));
+      const summary = [process.tribunal, process.classe, process.assunto, process.situacao].filter(value => typeof value === 'string' && value).join(' · ');
+      if (summary) text.append(el('span', 'process-online-muted', summary));
+      const label = el('label', 'process-online-choice'); label.append(check, text); selectionList.append(label);
+      check.addEventListener('change', () => {
+        if (state.busy || state.pending) { check.checked = state.chosen.has(process.cnj); return; }
+        if (check.checked && state.chosen.size >= maxQuantity()) {
+          check.checked = false; showNotice(`Selecione até ${maxQuantity()} processos por pagamento.`, true); return;
+        }
+        if (check.checked) state.chosen.add(process.cnj); else state.chosen.delete(process.cnj);
+        cnj.value = ''; copyConsent.check.checked = false; updateControls();
+      });
+    }
+  }
   function updateControls() {
     const paidDisabled = state.busy || !ready() || Boolean(state.pending);
-    searchButton.disabled = paidDisabled || state.config?.searchReady === false || !state.config?.searchPayment?.checkoutReady || Boolean(state.payment && ['pending', 'paid'].includes(state.payment.status)) || !searchConsent.check.checked;
-    copyButton.disabled = paidDisabled || !state.config?.searchPayment?.checkoutReady || Boolean(state.payment && ['pending','paid'].includes(state.payment.status)) || !copyConsent.check.checked;
+    const quantity = selectedNumbers().length, unit = unitAmount();
+    cnj.required = state.chosen.size === 0;
+    copyPrice.textContent = unit ? `${money(unit)} por cópia · ${quantity} selecionada(s) · Total: ${money(unit * quantity)}. Pagamento no Stripe; cópias solicitadas após a confirmação.` : 'O valor das cópias ainda não está disponível. Aguarde a configuração do pagamento.';
+    copyButton.textContent = unit && quantity ? `Pagar ${money(unit * quantity)} e solicitar ${quantity === 1 ? 'cópia' : `${quantity} cópias`}` : 'Selecione um processo para continuar';
+    searchButton.disabled = state.busy || Boolean(state.pending) || typeof onDocumentSearch !== 'function' || !searchConsent.check.checked;
+    copyButton.disabled = paidDisabled || !state.config?.copyPayment?.checkoutReady || !unit || !quantity || quantity > maxQuantity() || Boolean(state.payment && ['pending','paid'].includes(state.payment.status)) || !copyConsent.check.checked;
     historyButton.disabled = state.busy;
     retryButton.disabled = state.busy || !ready();
     retryButton.hidden = Boolean(state.pending?.review);
@@ -131,7 +170,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     for (const control of [cnj, documento, copyConsent.check, searchConsent.check]) {
       control.disabled = state.busy || Boolean(state.pending);
     }
-    if (state.config?.searchReady === false) { documento.disabled = true; searchConsent.check.disabled = true; }
+    for (const check of selectionList.childNodes) check.childNodes[0].disabled = state.busy || Boolean(state.pending);
     root.setAttribute('aria-busy', String(state.busy));
     pendingPanel.hidden = !state.pending;
     if (state.pending) pendingText.textContent = `${state.pending.review ? 'A operação está salva e aguarda conferência.' : `O envio da ${state.pending.kind === 'search' ? 'busca' : 'cópia'} ainda não foi confirmado.`} Referência: ${state.pending.body.operationId}.`;
@@ -140,32 +179,20 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     configPanel.replaceChildren();
     if (ready()) {
       configPanel.append(el('strong', '', sandbox() ? 'Testes gratuitos ativos' : 'Integração disponível'),
-        el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'As buscas e cópias são realizadas após a confirmação do pagamento pelo Stripe.'));
+        el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'As cópias são solicitadas após a confirmação do pagamento pelo Stripe. A busca por CPF/CNPJ é feita separadamente.'));
       if (sandbox()) {
         configPanel.append(button('Usar processo de exemplo', () => {
           if (state.busy || state.pending) return;
-          cnj.value = '0701379-18.2025.8.01.0013'; copyConsent.check.checked = false; updateControls(); cnj.focus();
+          cnj.value = '0701379-18.2025.8.01.0013'; state.chosen.clear(); renderSelection(); copyConsent.check.checked = false; updateControls(); cnj.focus();
         }));
-        if (state.config?.searchReady === false) configPanel.append(el('p', 'process-online-muted',
-          'A busca por CPF/CNPJ ainda não está homologada no sandbox. Para testar gratuitamente, use o número de processo de exemplo.'));
       }
-    } else {
-      configPanel.append(el('strong', '', 'Integração em ativação'), el('p', '', state.config?.storageReady === false
-        ? 'O armazenamento privado precisa estar disponível antes de novas solicitações.'
-        : state.config?.billingReady === false && state.config?.mode === 'live'
-          ? 'A carteira de créditos Audita precisa estar disponível antes de novas solicitações.'
-        : 'O acesso à API depende de cadastro e aprovação como parceiro B2B, além da chave de integração. A assinatura comum do site não libera a API.'));
-      const link = el('a', '', 'Cadastro de parceiro e testes gratuitos');
-      link.href = 'https://processonline.com.br/seja-parceiro/'; link.target = '_blank'; link.rel = 'noopener noreferrer';
-      configPanel.append(link);
     }
-    if (ready() && !state.config?.searchPayment?.checkoutReady) configPanel.append(el('p', 'process-online-muted', 'O pagamento está em configuração. Tente novamente mais tarde.'));
+    configPanel.hidden = !ready();
+    if (ready() && (!state.config?.copyPayment?.checkoutReady || !unitAmount())) configPanel.append(el('p', 'process-online-muted', 'O pagamento está em configuração. Tente novamente mais tarde.'));
     copyConsent.label.lastChild.textContent = sandbox()
       ? 'Autorizo uma cópia demonstrativa no ambiente de testes, sem pagamento real.'
       : 'Autorizo a solicitação desta cópia e confirmo meu interesse legítimo.';
-    searchConsent.label.lastChild.textContent = sandbox()
-      ? 'Tenho autorização e quero testar a busca com um documento canário, sem pagamento real.'
-      : 'Tenho autorização para consultar este documento e autorizo esta busca.';
+    searchConsent.label.lastChild.textContent = 'Tenho autorização para consultar este documento. Nenhuma consulta é contratada nesta tela.';
     updateControls();
   }
   async function api(path, body) {
@@ -290,11 +317,15 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
         row.append(el('strong', '', formatCnj(resultCnj)));
         const summary = [result.tribunal, result.classe, result.assunto, result.situacao].filter(value => typeof value === 'string').join(' · ');
         if (summary) row.append(el('p', 'process-online-muted', summary));
-        row.append(button('Preparar solicitação de cópia', () => {
-          cnj.value = resultCnj; copyConsent.check.checked = false;
+        const number = normalizedCnj(resultCnj);
+        const prepare = button('Preparar solicitação de cópia', () => {
+          if (!number) return;
+          cnj.value = formatCnj(number); state.chosen.clear(); renderSelection(); copyConsent.check.checked = false;
           updateControls(); cnj.focus(); cnjSection.scrollIntoView?.({ block: 'nearest' });
           showNotice('Confira o número e autorize esta cópia individualmente.');
-        }), rawDetails('Metadados informados pelo parceiro', result));
+        });
+        prepare.disabled = !number;
+        row.append(prepare, rawDetails('Metadados informados pelo parceiro', result));
         list.append(row);
       }
       if (!results.length) list.append(el('p', '', 'Nenhum processo disponível neste resultado.'));
@@ -352,7 +383,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   function analysisReady() { return state.config?.analysisReady === true || state.config?.aiReady === true || state.config?.analysis?.ready === true; }
   function renderAnalysis(request) {
     const area = el('section', 'process-online-analysis');
-    area.append(el('h4', '', 'Análise dos autos com IA'), el('p', 'process-online-muted', 'A IA pode cometer erros. Confira as referências nos autos antes de tomar decisões. A análise não substitui a revisão de um profissional.'));
+    area.append(el('h4', '', 'Resumo e análise dos autos com IA'), el('p', 'process-online-muted', 'O resumo gerado pela IA não é uma certidão oficial de objeto e pé. A IA pode cometer erros. Confira as referências nos autos antes de tomar decisões. A análise não substitui a revisão de um profissional.'));
     const analysis = state.analysis;
     if (analysis?.coverage) {
       const coverage = analysis.coverage;
@@ -459,7 +490,14 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     const generation = state.generation;
     const order = await api(`/search/orders/${encodeURIComponent(id)}`); assertCurrent(generation);
     state.payment = order;
-    if (order.request?.id) { state.selected = order.request; mergeRequest(order.request); renderDetails(); }
+    if (Array.isArray(order.requests)) for (const request of order.requests) if (request?.id) mergeRequest(request);
+    const selected = order.request?.id ? order.request : order.requests?.[0];
+    if (selected?.id) {
+      if (state.selected?.id !== selected.id) state.analysis = null;
+      state.selected = selected; mergeRequest(selected);
+      if (selected.kind !== 'search' && COMPLETE.has(selected.status)) await loadAnalysis(selected.id);
+      assertCurrent(generation); renderDetails();
+    }
     renderPayment(); updateControls();
   }
   function stopPoll() { if (state.timer) clearTimeout(state.timer); state.timer = null; }
@@ -492,7 +530,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     if (!pending || !ready()) return;
     try {
       if (pending) {
-        const order = await api(pending.kind==='copy'?'/requests/checkout':'/search/checkout', pending.body); assertCurrent(generation);
+        const order = await api('/requests/checkout', pending.body); assertCurrent(generation);
         if (!order?.id) throw Object.assign(new Error('Não foi possível confirmar o checkout. Retome a mesma operação.'), { uncertain: true });
         state.payment = order; state.pending = null; searchConsent.check.checked = false; copyConsent.check.checked = false; renderPayment();
         if (order.status === 'pending') {
@@ -507,28 +545,33 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
       throw error;
     }
   }
-  async function startOperation(kind) {
+  async function startOperation() {
     if (!ready() || state.pending) return;
-    if (!state.config?.searchPayment?.checkoutReady || state.payment && ['pending','paid'].includes(state.payment.status)) return;
-    if (kind === 'search' && (state.config?.searchReady === false || !state.config?.searchPayment?.checkoutReady || state.payment && ['pending', 'paid'].includes(state.payment.status))) return;
-    const check = kind === 'search' ? searchConsent.check : copyConsent.check;
-    if (!check.checked) throw new Error('Confirme a autorização antes de continuar.');
-    const value = kind === 'search' ? documento.value.trim() : cnj.value.trim();
-    if (!/^[\d.\-/\s]+$/.test(value) || !(kind === 'search' ? [11, 14].includes(digits(value).length) : digits(value).length === 20)) {
-      throw new Error(kind === 'search' ? 'Informe um CPF ou CNPJ válido.' : 'Informe o número CNJ completo, com 20 dígitos.');
-    }
-    if (kind === 'copy' && state.requests.some(item => item.kind === 'copy' && ['review_required', 'submitting'].includes(item.status) && digits(item.cnj) === digits(value))) {
+    const unit = unitAmount(), numbers = selectedNumbers();
+    if (!state.config?.copyPayment?.checkoutReady || !unit || state.payment && ['pending','paid'].includes(state.payment.status)) return;
+    if (!copyConsent.check.checked) throw new Error('Confirme a autorização antes de continuar.');
+    if (!numbers.length) throw new Error('Informe um número CNJ válido ou selecione um processo localizado.');
+    if (numbers.length > maxQuantity()) throw new Error(`Selecione até ${maxQuantity()} processos por pagamento.`);
+    if (state.requests.some(item => item.kind === 'copy' && ['review_required', 'submitting'].includes(item.status) && numbers.includes(digits(item.cnj)))) {
       throw new Error('Já existe uma solicitação deste processo aguardando conferência. Abra o pedido salvo no histórico antes de iniciar outra operação.');
     }
-    const body = { operationId: operationId(), consent: true, approvedCredits: 0,
+    const amount = unit * numbers.length;
+    if (!Number.isSafeInteger(amount)) throw new Error('Não foi possível confirmar o valor. Atualize a página.');
+    const body = { operationId: operationId(), consent: true, approvedAmountCents: amount,
       ...(state.parentAuditId ? { parentAuditId: state.parentAuditId } : {}),
-      ...(kind === 'search' ? { documento: value } : { cnj: value, interesse: 'outro', interesseDetalhe: '' }) };
-    state.pending = { kind, body }; updateControls(); await submitPending();
+      ...(numbers.length === 1 ? { cnj: formatCnj(numbers[0]) } : { cnjs: numbers.map(formatCnj) }) };
+    state.pending = { kind: 'copy', body }; updateControls(); await submitPending();
   }
-  copyForm.addEventListener('submit', event => { event.preventDefault(); run(() => startOperation('copy')); });
-  searchForm.addEventListener('submit', event => { event.preventDefault(); run(() => startOperation('search')); });
+  copyForm.addEventListener('submit', event => { event.preventDefault(); run(() => startOperation()); });
+  searchForm.addEventListener('submit', event => {
+    event.preventDefault();
+    if (state.busy || state.pending || !searchConsent.check.checked || typeof onDocumentSearch !== 'function') return;
+    const value = documento.value.trim();
+    if (!/^[\d.\-/\s]+$/.test(value) || ![11, 14].includes(digits(value).length)) { showNotice('Informe um CPF ou CNPJ válido.', true); return; }
+    onDocumentSearch({ documento: digits(value) });
+  });
   for (const check of [copyConsent.check, searchConsent.check]) check.addEventListener('change', updateControls);
-  cnj.addEventListener('input', () => { copyConsent.check.checked = false; updateControls(); });
+  cnj.addEventListener('input', () => { state.chosen.clear(); renderSelection(); copyConsent.check.checked = false; updateControls(); });
   documento.addEventListener('input', () => { searchConsent.check.checked = false; updateControls(); });
   doc.addEventListener('visibilitychange', () => { if (doc.hidden) stopPoll(); else schedulePoll(); });
   renderHistory(); renderConfig();
@@ -538,7 +581,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     state.active = false; state.config = null; state.busy = false;
     state.payment = null; renderPayment();
     state.requests = []; state.selected = null; state.analysis = null; state.pending = null;
-    state.parentAuditId = null; state.refreshAt.clear();
+    state.parentAuditId = null; state.available = []; state.chosen.clear(); renderSelection(); state.refreshAt.clear();
     cnj.value = ''; documento.value = '';
     copyConsent.check.checked = false; searchConsent.check.checked = false;
     pendingText.textContent = '';
@@ -549,9 +592,19 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     reset,
     async activate(options = {}) {
       state.active = true;
-      if (options.parentAuditId !== undefined) state.parentAuditId = options.parentAuditId || null;
-      if (!state.pending && options.cnj) { cnj.value = String(options.cnj); copyConsent.check.checked = false; }
-      if (!state.pending && options.documento) { documento.value = String(options.documento); searchConsent.check.checked = false; }
+      state.parentAuditId = options.parentAuditId || null;
+      state.chosen.clear(); state.available = [];
+      const candidates = [...(Array.isArray(options.processes) ? options.processes : []), ...(Array.isArray(options.cnjs) ? options.cnjs : [])];
+      const seen = new Set();
+      for (const value of candidates.slice(0, 400)) {
+        const raw = typeof value === 'string' ? value : value?.cnj || value?.numero_cnj || value?.numeroProcesso;
+        const number = normalizedCnj(raw);
+        if (!number || seen.has(number) || seen.size >= 200) continue;
+        seen.add(number); state.available.push({ ...(value && typeof value === 'object' ? value : {}), cnj: number });
+      }
+      cnj.value = !candidates.length && normalizedCnj(options.cnj) ? formatCnj(normalizedCnj(options.cnj)) : '';
+      documento.value = options.documento ? String(options.documento) : '';
+      copyConsent.check.checked = false; searchConsent.check.checked = false; renderSelection(); updateControls();
       const generation = state.generation, activation = ++state.activation;
       const results = await Promise.allSettled([api('/config'), loadHistory(), api('/search/orders')]);
       if (generation !== state.generation || activation !== state.activation) return;
@@ -566,6 +619,9 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
       }
       schedulePoll();
     },
-    deactivate() { state.active = false; stopPoll(); },
+    deactivate() {
+      state.active = false; stopPoll(); state.chosen.clear(); state.available = []; cnj.value = ''; documento.value = '';
+      copyConsent.check.checked = false; searchConsent.check.checked = false; renderSelection(); updateControls();
+    },
   };
 }

@@ -53,7 +53,9 @@ export function createProcessOnlineRouter({ workflow, analysis, payments, getAut
       if (match) match[1] = match[1].toLowerCase();
       if (path === prefix + '/config' && request.method === 'GET') {
         const status = workflow.getStatus();
-        sendJson(response, 200, { ...status, cost: { auditaCredits: status.auditaCredits, providerCredits: status.providerCredits }, searchPayment: payments?.config() || {amountCents:4990,checkoutReady:false}, analysisReady: analysis.ready(), partnerUrl: 'https://processonline.com.br/seja-parceiro' });
+        const paymentConfig = await payments?.config(auth) || {amountCents:4990,checkoutReady:false};
+        const {copyPayment,...searchPayment}=paymentConfig;
+        sendJson(response, 200, { ...status, cost: { auditaCredits: status.auditaCredits, providerCredits: status.providerCredits }, searchPayment, copyPayment:copyPayment||{unitAmountCents:4990,amountCents:4990,checkoutReady:false,maxQuantity:20}, analysisReady: analysis.ready(), partnerUrl: 'https://processonline.com.br/seja-parceiro' });
       } else if ([prefix + '/search/checkout',prefix + '/requests/checkout'].includes(path) && request.method === 'POST') {
         if(!payments)throw Object.assign(new Error('checkout_unavailable'),{code:'process_online_checkout_unavailable',status:503});
         sendJson(response,201,await payments.checkout(auth,await body(request,8192),path.includes('/requests/')?'copy':'search'));

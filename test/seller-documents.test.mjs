@@ -41,6 +41,16 @@ const PDF = Buffer.from("%PDF-test");
 const PDF_TEXT = "CERTIDÃO DE DÉBITOS TRABALHISTAS BANCO NACIONAL DE DEVEDORES TRABALHISTAS 529.982.247-25";
 const dependencies = (overrides = {}) => ({ configuration, query: async () => result({ documentoConsultado: CPF, possuiProcesso: false }), download: async () => PDF, readPdf: async () => PDF_TEXT, savePdf: async () => ({ pdfPath: "private-test.pdf", rawText: "never-copy-this" }), ...overrides });
 
+test('validated national PDFs expose CNJs for the copy offer without leaking their text or querying again',async()=>{
+  let queries=0;
+  const data=await collectSellerDocuments(input(),dependencies({query:async()=>{queries++;return result({documentoConsultado:CPF,possuiProcesso:true});},readPdf:async()=>PDF_TEXT+' Processo 0701379-18.2025.8.01.0013'}));
+  assert.equal(queries,1);
+  assert.deepEqual(data.dados.certidoes[0].processNumbers,['07013791820258010013']);
+  assert.equal(data.dados.certidoes[0].rawText,undefined);
+  const failed=await collectSellerDocuments(input(),dependencies({readPdf:async()=>'OUTRO TITULAR Processo 0701379-18.2025.8.01.0013'}));
+  assert.equal(failed.dados.certidoes[0].status,'failed');assert.equal(failed.dados.certidoes[0].processNumbers,undefined);
+});
+
 test('joint federal certificates reach all shared analysis plans and certificate selections once per subject',()=>{
   const sellerSources=getSellerDocumentCoverage(configuration),coverage={certificates:[],sellerSources};
   coverage.states=sellerStatePlans(coverage,'cpf');coverage.companyStates=sellerStatePlans(coverage,'cnpj');

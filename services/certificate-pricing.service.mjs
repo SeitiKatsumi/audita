@@ -1,9 +1,9 @@
-import {DEFAULT_CERTIFICATE_PRICING} from '../certificate-selection.js';
+import {DEFAULT_CERTIFICATE_PRICING,normalizeCertificatePricing} from '../certificate-selection.js';
 
 const fail=(code,status)=>{throw Object.assign(new Error(code),{code,status});};
 export function validateCertificatePricing(input,keys){
   const limits={standardMarkupPercent:100000,highCostMarkupPercent:100000,highCostThresholdCents:500000,freeSourceCents:1000000,subscriberDiscountPercent:100};
-  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!Object.hasOwn(limits,k)&&k!=='exceptions'))fail('invalid_certificate_pricing',400);
+  if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!Object.hasOwn(limits,k)&&!['exceptions','sourceCosts','processServices'].includes(k)))fail('invalid_certificate_pricing',400);
   const output={};
   for(const [key,max]of Object.entries(limits)){
     const value=input[key];if(typeof value!=='number'||!Number.isFinite(value)||value<0||value>max||Math.abs(value*100-Math.round(value*100))>1e-6||key.endsWith('Cents')&&!Number.isSafeInteger(value))fail('invalid_certificate_pricing',400);output[key]=value;
@@ -14,6 +14,24 @@ export function validateCertificatePricing(input,keys){
     if(!keys.has(key)||!rule||!['fixed','markup'].includes(rule.mode)||Object.keys(rule).some(k=>!['mode','value'].includes(k))||typeof rule.value!=='number'||!Number.isFinite(rule.value)||rule.value<0||rule.value>(rule.mode==='fixed'?1000000:100000)||Math.abs(rule.value*(rule.mode==='fixed'?1:100)-Math.round(rule.value*(rule.mode==='fixed'?1:100)))>1e-6)fail('invalid_certificate_pricing',400);
     output.exceptions[key]={mode:rule.mode,value:rule.value};
   }
+  output.sourceCosts={};
+  if(input.sourceCosts!==undefined){
+    if(!input.sourceCosts||typeof input.sourceCosts!=='object'||Array.isArray(input.sourceCosts)||Object.keys(input.sourceCosts).length>300)fail('invalid_certificate_pricing',400);
+    for(const [key,cost]of Object.entries(input.sourceCosts)){
+      if(!keys.has(key)||!Number.isSafeInteger(cost)||cost<0||cost>1000000)fail('invalid_certificate_pricing',400);
+      output.sourceCosts[key]=cost;
+    }
+  }
+  output.processServices=structuredClone(DEFAULT_CERTIFICATE_PRICING.processServices);
+  if(input.processServices!==undefined){
+    if(!input.processServices||typeof input.processServices!=='object'||Array.isArray(input.processServices)||Object.keys(input.processServices).some(key=>key!=='processOnlineCopy'))fail('invalid_certificate_pricing',400);
+    const rule=input.processServices.processOnlineCopy;
+    if(rule!==undefined){
+      if(!rule||typeof rule!=='object'||Array.isArray(rule)||Object.keys(rule).some(k=>!['costCents','mode','value'].includes(k))||!Number.isSafeInteger(rule.costCents)||rule.costCents<0||rule.costCents>1000000||!['fixed','markup'].includes(rule.mode)||typeof rule.value!=='number'||!Number.isFinite(rule.value)||rule.value<0||rule.value>(rule.mode==='fixed'?1000000:100000)||Math.abs(rule.value*(rule.mode==='fixed'?1:100)-Math.round(rule.value*(rule.mode==='fixed'?1:100)))>1e-6)fail('invalid_certificate_pricing',400);
+      if((rule.mode==='fixed'?rule.value:Math.round(rule.costCents*(1+rule.value/100)))<=0)fail('invalid_certificate_pricing',400);
+      output.processServices.processOnlineCopy={costCents:rule.costCents,mode:rule.mode,value:rule.value};
+    }
+  }
   return output;
 }
 
@@ -23,7 +41,7 @@ export function createCertificatePricingService({getDb,catalog}){
     if(required)db();
     const state=getDb();if(!state?.dbReady||!state.pool)return {pricing:structuredClone(DEFAULT_CERTIFICATE_PRICING),revision:0};
     const row=(await db().query('SELECT pricing,revision,updated_at FROM audita_certificate_pricing WHERE id=TRUE')).rows[0];
-    return row?{pricing:row.pricing,revision:row.revision,updatedAt:row.updated_at}:{pricing:structuredClone(DEFAULT_CERTIFICATE_PRICING),revision:0};
+    return row?{pricing:normalizeCertificatePricing(row.pricing),revision:row.revision,updatedAt:row.updated_at}:{pricing:structuredClone(DEFAULT_CERTIFICATE_PRICING),revision:0};
   }
   async function save(actor,input){
     if(actor?.unauthorized||!actor?.user)fail('authentication_required',401);

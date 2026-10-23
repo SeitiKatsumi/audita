@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS audita_process_search_orders (
  operation_id UUID NOT NULL,
  fingerprint TEXT NOT NULL,
  encrypted_input TEXT NOT NULL,
- amount_cents INTEGER NOT NULL CHECK (amount_cents = 4990),
+ amount_cents INTEGER NOT NULL CHECK (amount_cents > 0),
  provider_mode TEXT NOT NULL CHECK (provider_mode IN ('test','live')),
  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','fulfilled','expired','failed')),
  checkout_session TEXT UNIQUE,
@@ -17,3 +17,6 @@ CREATE TABLE IF NOT EXISTS audita_process_search_orders (
 );
 
 ALTER TABLE audita_process_search_orders ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'search' CHECK (kind IN ('search','copy'));
+ALTER TABLE audita_process_search_orders DROP CONSTRAINT IF EXISTS audita_process_search_orders_amount_cents_check;
+ALTER TABLE audita_process_search_orders ADD CONSTRAINT audita_process_search_orders_amount_cents_check CHECK (amount_cents > 0);
+ALTER TABLE audita_process_search_orders ADD COLUMN IF NOT EXISTS request_ids UUID[] NOT NULL DEFAULT '{}';
