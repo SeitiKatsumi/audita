@@ -125,10 +125,7 @@ test('all catalog cards have details and preserve destinations and searchable au
   assert.ok(card.includes('<summary class="service-toggle">'));
   assert.ok(card.includes('Para quem é'));
   assert.ok(card.includes('service-note'));
-  const exams=card.includes('href="#laudos-exames"');
-  const pending=card.includes('data-categories="laudos"')&&!exams;
-  assert.equal(card.includes('href="#')||exams,!pending);
-  if(pending) assert.ok(card.includes('Em desenvolvimento'));
+  assert.ok(card.includes('class="service-card-entry" href="#'));
  }
  for(const [route,title,action,query,category] of [
   ['pis-pasep','PIS/Pasep: valores de cotas antigas','Verificar meu caso','herdeiros','beneficios'],
@@ -149,6 +146,16 @@ test('all catalog cards have details and preserve destinations and searchable au
   assert.equal(matchesService(service,query,category),true);
   assert.equal(matchesService(service,query,'bancario'),false);
  }
+});
+
+test('judicial report card links to the existing report generator', async () => {
+ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+ const card=[...html.matchAll(/<article[^]*?<\/article>/g)].map(m=>m[0]).find(c=>c.includes('Laudo para atualização de processos judiciais'));
+ assert.ok(card.includes('class="service-card-entry" href="#dividas-bancarias"'));
+ assert.ok(card.includes('class="service-action" href="#dividas-bancarias"'));
+ assert.ok(!card.includes('Em desenvolvimento'));
+ const page=html.match(/<section[^>]*id="dividas-bancarias"[^]*?id="judicialReportModule"/);
+ assert.ok(page);
 });
 
 test('charge card highlights the requested period without removing the qualification', async () => {

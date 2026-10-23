@@ -1,3 +1,6 @@
+# 2026-10-23 - Link do card de laudo judicial
+- Codex; branch codex/laudo-card-link, base origin/main (develop indisponível). Card e ação de laudo judicial ligados ao gerador existente em #dividas-bancarias, com descrição atualizada, sem alterar backend ou permissões. Integrado à main local; 12/12 testes do catálogo e diff check aprovados. Commit e push na main autorizados pelo usuário; deploy não executado nesta tarefa. Temporários em tmp preservados fora do commit.
+
 # 2026-10-22 - Produto de consulta e copia completa de processos
 - Codex; branch codex/processo-completo-produto em worktree isolado, base origin/main cf17e58 apos fetch. Escopo: conferir transcricao21/10, ofertas por CNJ nos resultados de certidoes/analises, busca CPF/CNPJ reutilizando consultas Direct Data, selecao de copias ProcessOnline e precos/custos no admin. Root: app/server/UI/docs; backend_processos: pagamentos/rotas/schema/testes; precos_processos: regras/admin/testes; fontes_cnj: auditoria somente leitura. Preservar configuracao privada, banco e alteracoes da main. Sem consultas pagas ou deploy. Concluido localmente; validacoes e limitacoes registradas ao fim deste arquivo.
 
