@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261023-report-optional" />
+    <link rel="stylesheet" href="styles.css?v=20261023-exam-upload-layout" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20261021-month-picker" />
     <link rel="stylesheet" href="/bank-debt.css?v=20261021-remove-files" />
@@ -824,8 +824,10 @@
                   <h3>Pode enviar seus exames ou laudos?</h3>
                   <p>Anexe os arquivos que você quer entender. Se quiser, conte o motivo do exame ou escreva sua dúvida.</p>
                   <form id="examConversationForm">
-                    <label for="examFiles" class="exam-drop-hint">Arraste seus exames e laudos aqui ou selecione os arquivos abaixo</label>
-                    <input id="examFiles" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple />
+                    <label for="examFiles" class="exam-drop-hint">
+                      Arraste seus exames e laudos aqui ou selecione os arquivos
+                      <input id="examFiles" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple />
+                    </label>
                     <small>Selecione um ou mais PDFs ou fotos legíveis. Até 50 MB por arquivo.</small>
                     <ul data-exam-files></ul>
                     <label for="examDescription">O que você gostaria de entender? <small>(opcional)</small></label>

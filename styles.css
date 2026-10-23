@@ -12634,7 +12634,8 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 #laudos-exames .charge-analysis-bubble { width: min(100%, 620px); min-width: 0; }
 #laudos-exames .exam-avatar { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid var(--aqua); }
 #laudos-exames form { display: grid; gap: 12px; }
-#laudos-exames .exam-drop-hint { display: block; padding: 18px; border: 2px dashed #315b70; border-radius: 10px; color: #b9dce9; cursor: pointer; text-align: center; }
+#laudos-exames .exam-drop-hint { display: block; padding: 24px; border: 2px dashed #386077; border-radius: 12px; color: #edf6fc; cursor: pointer; text-align: left; }
+#laudos-exames .exam-drop-hint input { display: block; margin-top: 14px; }
 #laudos-exames.chat-file-dragging .exam-drop-hint { border-color: #4df6bf; background: #123d46; color: #fff; }
 #laudos-exames.chat-file-dragging .charge-analysis-bubble { outline: 2px solid #4df6bf; outline-offset: 3px; }
 #laudos-exames textarea, #laudos-exames input[type=file] { padding: 12px; border: 1px solid #315b70; border-radius: 10px; background: #092134; color: #edf6fc; font: inherit; }
