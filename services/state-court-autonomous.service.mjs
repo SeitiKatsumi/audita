@@ -94,7 +94,9 @@ export async function collectAutonomousCertificates(input, { collectPortal, clos
         if (!certificatePdfMatches(buffer, text, input.documento, extra.stateCourtFields.fullName)) throw new Error("evidence_identity_unverified");
         if (!certificateScopeMatches(text, item.expectedText, item.uf)) throw new Error("evidence_scope_mismatch");
         const saved = await savePdf({ consultaId: input.consultaId, fonte: "tjdft", fileName: `${item.uf}-${i}.pdf`, buffer });
-        rows[i] = { ...rows[i], status: "success", processNumbers: processNumbers(text), pdfPath: saved.pdfPath, resultado: response.result.analysis.occurrence === true ? "consta" : response.result.analysis.occurrence === false ? "nada_consta" : "indisponivel", providerReference: response.result.providerReference };
+        const certificate = response.result.certificate;
+        const details = Object.fromEntries([['Titular',certificate.entityName],['Emissão',certificate.issueDate],['Validade',certificate.expiryDate],['Número',certificate.number],['Código de validação',certificate.validationCode],['Situação',certificate.status],['Observação',certificate.observation]].filter(([,value])=>value!==undefined&&value!==null&&value!==''));
+        rows[i] = { ...rows[i], status: "success", details, evidenceData: response.result.evidenceData, evidenceDataLimited: response.result.evidenceDataLimited, processNumbers: processNumbers(text), pdfPath: saved.pdfPath, resultado: response.result.analysis.occurrence === true ? "consta" : response.result.analysis.occurrence === false ? "nada_consta" : "indisponivel", providerReference: response.result.providerReference };
       }
       rows[i].evidenceIdentityVerified=true;
     } catch (error) {

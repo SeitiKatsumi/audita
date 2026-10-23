@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { sanitizeSellerEvidence } from './direct-data-evidence.mjs';
 
 import {
   isValidDocument,
@@ -291,6 +292,7 @@ export function normalizeDirectDataCertificateResponse(
 ) {
   const metadata = payload.metaDados || payload.metadados || {};
   const source = payload.retorno || payload.resultado || {};
+  const evidenceJson = sanitizeSellerEvidence(source);
   const analysis = analyzeDirectDataCertificateOccurrence(
     source.possuiOcorrencia,
   );
@@ -324,6 +326,8 @@ export function normalizeDirectDataCertificateResponse(
       evidenceUrl: request.generatePdf ? evidenceUrl : "",
     },
     analysis,
+    evidenceData: evidenceJson.length <= 180000 ? JSON.parse(evidenceJson) : {},
+    evidenceDataLimited: evidenceJson.length > 180000,
     disclaimer:
       "Resultado obtido via provedor de dados. Confirme autenticidade, validade e efeitos jurídicos no tribunal emissor.",
   };

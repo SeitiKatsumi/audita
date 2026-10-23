@@ -1,4 +1,6 @@
 import { saveSellerProcesses, processRecords, PROCESS_RUN_LIMIT } from './seller-processes.service.mjs';
+import { sanitizeSellerEvidence } from './direct-data-evidence.mjs';
+export { sanitizeSellerEvidence } from './direct-data-evidence.mjs';
 import { processNumbers } from '../judicial-processes.js';
 import { readFileSync } from "node:fs";
 import { isValidDocument, normalizeDocument } from "./audit.service.mjs";
@@ -229,7 +231,10 @@ export async function collectSellerDocuments(input, {
         const official = portal ? await portalQuery({ documento: target }) : null;
         const response = portal ? null : await query({ endpoint: item.endpoint, parameters, estimatedCostBrl: item.costBrl, requestId: `${input.consultaId}:${id}`, authorizationConfirmed: true, paidQueryConfirmed: extra.paidQueryConfirmed === true }, input.usageContext);
         rows[index].providerReference = clean(response?.result?.providerReference || response?.providerReference, 150);
-        if (!portal && (response?.insufficientCredits || response?.result?.status !== "success")) throw new Error(/^[a-z0-9_]{1,80}$/.test(response?.reason || "") ? response.reason : "provider_query_failed");
+        if (!portal && (response?.insufficientCredits || response?.result?.status !== "success")) {
+          rows[index].errorDetail = response?.errorDetail;
+          throw new Error(/^[a-z0-9_]{1,80}$/.test(response?.reason || "") ? response.reason : "provider_query_failed");
+        }
         const payload = response?.result?.payload;
         const data = portal ? {} : field(payload, "retorno");
         if (!portal && (!data || typeof data !== "object" || !Object.keys(data).length)) throw new Error("provider_empty_response");
@@ -259,7 +264,7 @@ export async function collectSellerDocuments(input, {
         const summary = summarizeSellerData(item.endpoint, data);
         const processCollection = item.endpoint.startsWith('ProcessosJudiciais') && (processRecords(data).length || item.endpoint === 'ProcessosJudiciaisCompleta' && Number(field(data,'totalProcessos')) > 0)
           ? await saveProcesses(data, input.consultaId) : null;
-        const evidenceJson = JSON.stringify(data, (key, value) => /token|senha|password|base64|urlcomprovante|documentoConsultado/i.test(key) || processCollection && key.toLowerCase() === 'processos' ? undefined : value);
+        const evidenceJson = sanitizeSellerEvidence(processCollection ? Object.fromEntries(Object.entries(data).filter(([key]) => key.toLowerCase() !== 'processos')) : data);
         const evidenceDataLimited = evidenceJson.length > 180000;
         rows[index] = { ...rows[index], status: "success", ...summary, ...(processCollection ? { processCollection } : {processNumbers: processNumbers([data, verifiedPdfText])}), evidenceData: evidenceDataLimited ? {} : JSON.parse(evidenceJson), evidenceDataLimited, evidenceIdentityVerified: true, details: { ...rows[index].details, ...summary.details }, ...(pdfPath ? { pdfPath } : {}), checkedAt: clean(portal ? official?.queriedAt : response.result.queriedAt) || new Date().toISOString(), providerReference: clean(response?.result?.providerReference, 150) };
         if(automaticCompanies&&item.id==='vinculos') {

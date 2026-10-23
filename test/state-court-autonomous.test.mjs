@@ -24,11 +24,14 @@ test("autonomous batch keeps a failed certificate pending in the outcome and pre
   const options = { configuration, queryCertificate: async (request) => {
     requests++;
     assert.equal(request.generatePdf, true);
-    return requests === 1 ? { result: { certificate: { evidenceUrl: "https://apiv3.directd.com.br/evidence" }, analysis: { occurrence: false } } } : { failed: true, reason: "provider_timeout" };
+    return requests === 1 ? { result: { certificate: { evidenceUrl: "https://apiv3.directd.com.br/evidence",issueDate:'23/10/2026',number:'TEST-1' }, evidenceData:{extra:{validadeDias:90}}, analysis: { occurrence: false } } } : { failed: true, reason: "provider_timeout" };
   }, download: async () => buffer, readPdf: async () => "TRIBUNAL DO AMAPA CERTIDAO CIVEL Pessoa Teste 52998224725", savePdf: async () => ({ pdfPath: "private-test.pdf" }) };
   await assert.rejects(() => collectAutonomousCertificates({ ...input, extraFields: { ...input.extraFields, paidQueryConfirmed: false } }, options), /paid_query/);
   assert.equal(requests, 0);
   const result = await collectAutonomousCertificates(input, options);
+  assert.equal(result.dados.certidoes[0].details['Emissão'],'23/10/2026');
+  assert.equal(result.dados.certidoes[0].details['Número'],'TEST-1');
+  assert.equal(result.dados.certidoes[0].evidenceData.extra.validadeDias,90);
   assert.equal(result.resultado, "indisponivel");
   assert.equal(result.dados.certidoesBaixadas, 1);
   assert.equal(result.dados.certidoesComFalha.length, 1);

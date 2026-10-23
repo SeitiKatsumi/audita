@@ -163,3 +163,6 @@ As regras globais ficam em audita_certificate_pricing, com revisão e último ed
 
 ## 2026-10-21 — Certidões conjuntas federais
 Emissão e nove análises compartilham os novos itens rfb-pgfn-cpf/rfb-pgfn-cnpj, com PDF obrigatório, nascimento do CPF por enriquecimento/fallback e CNPJ sem campos pessoais. Nacionais não repetem por UF; consultas de empresas vinculadas preservam titular e custo próprio. Integração local testada com dados fictícios, homologação real pendente. Consulte seller-document-coverage.md para condições e estimativas.
+
+## Auditoria de 23/10/2026 (local)
+Os resultados de consultas e certidoes exibem os dados estruturados recebidos tambem quando ha PDF, com campos restritos omitidos. Certidoes TJ preservam datas, numero, validacao e observacoes. A certidao fiscal SP aceita os dois titulos verificados; documentos com titular/escopo incorretos continuam rejeitados. Mensagens de falha seguras diferenciam os motivos conhecidos. Detalhes e limites em certificate-audit-20261023.md; sem deploy desta rodada.

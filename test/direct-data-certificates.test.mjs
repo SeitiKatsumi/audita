@@ -16,6 +16,12 @@ const AUTH = {
   user: { id: "user-1", name: "Pessoa Teste" },
 };
 
+test('state certificate retains complete safe evidence beyond the normalized summary',()=>{
+  const result=normalizeDirectDataCertificateResponse({retorno:{nomeEntidade:'Pessoa Fictícia',novoCampo:{dias:90,pendencia:false},token:'private'}},{documentType:'cpf',document:'52998224725',uf:'AP'});
+  assert.equal(result.evidenceData.novoCampo.dias,90);assert.equal(result.evidenceData.novoCampo.pendencia,false);
+  assert.equal(result.evidenceData.token,undefined);assert.equal(result.evidenceDataLimited,false);
+});
+
 function configuredEnv(overrides = {}) {
   return {
     DIRECT_DATA_CERTIFICATE_ENABLED: "true",

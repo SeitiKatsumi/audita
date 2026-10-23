@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { directDataFailureDetail } from '../services/direct-data-errors.mjs';
 import { createDirectDataSellerService, DIRECT_DATA_SELLER_ENDPOINTS } from "../services/direct-data-seller.service.mjs";
 
 const AUTH = { tenantId: "tenant-test", user: { id: "user-test" } };
@@ -7,6 +8,16 @@ const ENV = { DIRECT_DATA_SELLER_ENABLED: "true", DIRECT_DATA_TOKEN: "test-token
 const PAYLOAD = { metaDados: { consultaUid: "test-query", resultadoId: 1, resultado: "Sucesso" }, retorno: { possuiOcorrencia: false, numeroCertidao: "TEST-1" } };
 const request = (overrides = {}) => ({ requestId: "test-request", endpoint: "TSTCertidaoNegativaDebitosTrabalhistas", parameters: { CPF: "529.982.247-25", GERARCOMPROVANTE: "Habilitar" }, authorizationConfirmed: true, paidQueryConfirmed: true, ...overrides });
 const response = (payload = PAYLOAD, status = 200) => new Response(JSON.stringify(payload), { status });
+
+test('provider failure explanations are safe and preserve a known registry limitation', async () => {
+  const payload={metaDados:{resultadoId:2,mensagem:'As informações disponíveis na Receita Federal sobre o contribuinte são insuficientes para emitir a certidão pela Internet.'}};
+  const service=createDirectDataSellerService({env:ENV,fetchImpl:async()=>response(payload)});
+  const result=await service.query(request(),AUTH);
+  assert.equal(result.reason,'provider_reported_failure');
+  assert.match(result.errorDetail,/dados cadastrais são insuficientes/);
+  assert.match(result.errorDetail,/não comprova dívida/);
+  assert.doesNotMatch(directDataFailureDetail({metaDados:{mensagem:'https://example.test?TOKEN=secret <script>raw</script>'}},503),/secret|script|example/);
+});
 
 test('a paid certificate order skips the customer wallet; a client body cannot request that bypass',async()=>{
   let calls=0,charges=0;

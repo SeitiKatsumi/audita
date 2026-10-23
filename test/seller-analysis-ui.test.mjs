@@ -259,4 +259,15 @@ test('text results preserve zero, false, safe text and an open panel during coll
   context.renderSellerAnalysisResult(audit);
   assert.doesNotMatch(result.innerHTML,/data-process-copy=/);
   assert.equal(fetchCalls,0,'offers never repeat a source query');
+  Object.assign(audit.resultados[0].dados.certidoes[0],{pdfPath:'private.pdf',evidenceData:{extra:{quantidade:0,apontamento:false,texto:'<script>not-html</script>'},TOKEN:'hidden-secret',processos:[{segredoJustica:true,partes:['confidential-name']}]}});
+  audit.resultados[0].dados.certidoes[3].errorDetail='A fonte <recusou> a emissão.';
+  context.renderSellerAnalysisResult(audit);
+  assert.match(result.innerHTML,/Todos os dados recebidos/);
+  assert.match(result.innerHTML,/&quot;quantidade&quot;: 0/);
+  assert.match(result.innerHTML,/&quot;apontamento&quot;: false/);
+  assert.match(result.innerHTML,/&lt;script&gt;not-html&lt;\/script&gt;/);
+  assert.match(result.innerHTML,/A fonte &lt;recusou&gt; a emissão/);
+  assert.doesNotMatch(result.innerHTML,/hidden-secret|confidential-name/);
+  assert.equal((result.innerHTML.match(/data-seller-result-toggle=/g)||[]).length,3,'PDF results also expose saved data without another request');
+  assert.equal(fetchCalls,0);
 });

@@ -7144,6 +7144,15 @@ function renderSellerAnalysisResult(audit) {
   const stageLabel = getSellerAnalysisStage(audit, execution, progress, completed);
   const certificateRows = expectedTypes.map((expectedType, index) => {
     const certificate = certificates[index] || {};
+    const failureDetail = certificate.errorDetail || ({
+      official_pdf_unavailable: 'A fonte respondeu, mas não disponibilizou o PDF exigido para esta emissão.',
+      evidence_identity_unverified: 'O documento recebido não permitiu confirmar a identidade do titular e foi rejeitado.',
+      evidence_identity_mismatch: 'O titular do documento recebido não corresponde ao solicitado. O resultado foi rejeitado.',
+      evidence_name_mismatch: 'O nome recebido não corresponde ao titular informado. O resultado foi rejeitado.',
+      evidence_scope_mismatch: 'O documento recebido não corresponde ao estado ou tipo solicitado e foi rejeitado.',
+      provider_timeout: 'A fonte não respondeu dentro do prazo. Confira o histórico antes de repetir a consulta.',
+      provider_async_timeout: 'A fonte ainda não concluiu o processamento no prazo de acompanhamento. Confira o histórico antes de repetir a consulta.',
+    })[certificate.errorMessage] || (certificate.status === 'failed' ? 'A consulta não produziu um resultado validado. Isso não comprova ausência de pendências.' : '');
     const isCurrent = processing && (certificate.status === "running" || certificate.tipo === progress.currentCertificate);
     const status = getSellerCertificateStatus(certificate, processing ? "running" : audit?.status, isCurrent);
     const pdfUrl = (certificate.pdfPath || certificate.pdfDownloaded) && audit?.consultaId && certificate.fonte
@@ -7156,20 +7165,28 @@ function renderSellerAnalysisResult(audit) {
     const detailEntries = certificate.details && typeof certificate.details === "object"
       ? Object.entries(certificate.details).filter(([label, value]) => ["string", "number", "boolean"].includes(typeof value) && (!certificate.processCollection || !/^Processo \d+$/.test(label))).slice(0, certificate.processCollection ? 30 : 210) : [];
     const details = detailEntries.map(([label, value]) => `<small><b>${escapeHtml(label)}</b>: ${escapeHtml(String(value))}</small>`).join("");
-    const textResult = certificate.status === 'success' && !pdfUrl;
+    const textResult = certificate.status === 'success';
     const resultId = `seller-query-${encodeURIComponent(audit?.consultaId || 'current')}-${encodeURIComponent(certificate.fonte || String(index))}-${certificate.documentIndex}`;
     const resultOpen = openResults.has(resultId);
     const processPanel = certificate.processCollection ? `<div data-seller-process-page data-audit="${escapeHtml(audit.consultaId)}" data-source="${escapeHtml(certificate.fonte+':'+certificate.documentIndex)}"><p>${Number(certificate.processCollection.total)||0} processos preservados. Abra o resultado para consultar as páginas.</p></div>` : '';
     const numbers=certificate.status==='success'&&!certificate.processCollection?processNumbers(certificate):[];
     const processOffer=numbers.length?`<div class="seller-process-offer"><strong>${numbers.length} número(s) de processo identificado(s)</strong><p>Consulte o conteúdo dos autos em uma contratação adicional. A disponibilidade depende do tribunal e das permissões de acesso.</p><button type="button" class="secondary-action" data-process-copy="${numbers.join(',')}" data-process-audit="${escapeHtml(audit.consultaId)}">Selecionar autos completos</button></div>`:'';
-    const resultContent = detailEntries.length
+    const completeData = certificate.evidenceData && Object.keys(certificate.evidenceData).length
+      ? `<details><summary>Todos os dados recebidos</summary><pre class="seller-evidence-json">${escapeHtml(JSON.stringify(certificate.evidenceData, (key, value) => {
+        if (/token|senha|password|base64|urlcomprovante/i.test(key)) return undefined;
+        if (value && typeof value === 'object' && Object.entries(value).some(([name, flag]) => name.toLowerCase() === 'segredojustica' && flag === true)) return { segredoJustica: true };
+        if (typeof value === 'string' && /https?:\/\/\S*[?&](?:token|key|api_key|authorization|signature)=/i.test(value)) return '[URL privada omitida]';
+        return value;
+      }, 2))}</pre></details>` : '';
+    const resultContent = (detailEntries.length
       ? `<p>Consulta concluída. Dados retornados pela fonte:</p><dl>${detailEntries.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('')}</dl>`
-      : `<p>${escapeHtml(certificate.summary || resultLabel || 'A fonte concluiu a consulta, mas não enviou dados adicionais no retorno.')}</p>`;
+      : `<p>${escapeHtml(certificate.summary || resultLabel || 'A fonte concluiu a consulta, mas não enviou dados adicionais no retorno.')}</p>`) + completeData + (certificate.evidenceDataLimited ? '<p>O retorno excedeu o limite dos detalhes desta tela. Os dados apresentados são parciais; isso não comprova ausência de outras ocorrências.</p>' : '');
     return `
       <article class="seller-certificate-item">
         <div>
           <strong id="${escapeHtml(resultId)}-source">${escapeHtml(certificate.tipo || expectedType)}</strong>
           <small>${escapeHtml(certificate.summary || resultLabel || (certificate.errorMessage ? "Consulta indisponível nesta tentativa" : certificate.kind === "data" ? "Consulta de dados complementares" : "Certidão da fonte consultada"))}</small>
+          ${certificate.status === 'failed' && failureDetail ? `<small>${escapeHtml(failureDetail)}</small>` : ''}
           ${certificate.scope ? `<small>Abrangência: ${escapeHtml(certificate.scope)}</small>` : ""}
           ${certificate.checkedAt ? `<small>Consulta: ${escapeHtml(certificate.checkedAt)}</small>` : ""}
           ${details && !textResult ? `<details><summary>Ver dados da consulta</summary>${details}</details>` : ""}

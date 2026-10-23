@@ -424,7 +424,7 @@
     },
     {
       "id": "cnd-sp",
-      "label": "SP — Débitos tributários não inscritos em dívida ativa",
+      "label": "SP — Certidão de débitos estaduais",
       "category": "Fiscal estadual",
       "scope": "SP",
       "endpoint": "CertidaoNegativaDebitos",
@@ -437,10 +437,13 @@
         "cpf"
       ],
       "expectedText": [
-        "DEBITOS TRIBUTARIOS NAO INSCRITOS",
         "ESTADO DE SAO PAULO"
       ],
-      "limitation": "Não abrange dívida ativa nem débitos das empresas do titular.",
+      "expectedTextAny": [
+        "DEBITOS TRIBUTARIOS NAO INSCRITOS",
+        "DEBITOS RELATIVOS AOS TRIBUTOS ESTADUAIS E A DIVIDA ATIVA DO ESTADO DE SAO PAULO"
+      ],
+      "limitation": "Confira no PDF se a emissão abrange apenas débitos não inscritos ou também a dívida ativa estadual. Não abrange débitos das empresas do titular.",
       "evidenceKind": "official_certificate"
     },
     {

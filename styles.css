@@ -12774,3 +12774,4 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 .seller-process-offer { grid-column: 1 / -1; display: grid; gap: 10px; margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
 .seller-process-offer p { margin: 0; color: var(--muted); }
 .seller-process-offer button { justify-self: start; white-space: normal; }
+.seller-evidence-json { max-height: 26rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }

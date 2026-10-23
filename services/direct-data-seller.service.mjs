@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { directDataFailureDetail } from './direct-data-errors.mjs';
 import { isValidDocument, normalizeDocument } from "./audit.service.mjs";
 
 const UFS = "AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".split(" ");
@@ -184,8 +185,8 @@ export function createDirectDataSellerService({
       }
       if (!reply) {
         providerReference = text(field(field(response.payload, "metaDados"), "consultaUid") || providerReference).slice(0, 150);
-        if (response.status !== 200) reply = failure(`provider_http_${response.status}`, response.status);
-        else if (providerFailed(response.payload)) reply = failure("provider_reported_failure", response.status);
+        if (response.status !== 200) reply = { ...failure(`provider_http_${response.status}`, response.status), errorDetail: directDataFailureDetail(response.payload, response.status) };
+        else if (providerFailed(response.payload)) reply = { ...failure("provider_reported_failure", response.status), errorDetail: directDataFailureDetail(response.payload, response.status) };
         else if (!meaningful(field(response.payload, "retorno"))) reply = failure("provider_empty_response", response.status);
         else reply = { result: { status: "success", provider: "Direct Data", endpoint: request.endpoint, providerReference, queriedAt: now().toISOString(), payload: response.payload }, configuration };
       }

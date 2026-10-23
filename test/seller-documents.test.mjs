@@ -4,7 +4,14 @@ import { analysisSegments } from '../analysis-segments.js';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { collectSellerDocuments, getSellerDocumentCoverage, planSellerDocuments, summarizeSellerData } from "../services/seller-documents.service.mjs";
+import { collectSellerDocuments, getSellerDocumentCoverage, planSellerDocuments, summarizeSellerData, sanitizeSellerEvidence } from "../services/seller-documents.service.mjs";
+
+test('complete evidence keeps nested values but omits secrets and confidential proceedings',()=>{
+  const value=JSON.parse(sanitizeSellerEvidence({count:0,pending:false,extra:{cartorios:[{nome:'Fictício',valor:15}]},token:'secret',url:'https://example.test?TOKEN=private',processos:[{segredoJustica:true,numero:'restricted',partes:['private']},{numero:'public'}]}));
+  assert.equal(value.count,0);assert.equal(value.pending,false);assert.equal(value.extra.cartorios[0].valor,15);
+  assert.deepEqual(value.processos,[{segredoJustica:true},{numero:'public'}]);
+  assert.doesNotMatch(JSON.stringify(value),/secret|restricted|partes|TOKEN=/);
+});
 import { sellerStatePlans, sellerQueriesForState } from '../services/seller-state-plan.mjs';
 
 test('automatic state plans include federal jurisdictions and only matching municipal sources', () => {
@@ -37,6 +44,18 @@ const CNPJ = "04252011000110";
 const configuration = { configured: true };
 const input = (extra = {}) => ({ consultaId: "test-seller", documento: CPF, tipoDocumento: "cpf", usageContext: { tenantId: "test-tenant", user: { id: "test-user" } }, extraFields: { sellerQueries: ["cndt"], authorizationConfirmed: true, paidQueryConfirmed: true, stateCourtFields: { fullName: "Pessoa Teste", birthDate: "01/01/2000" }, ...extra } });
 const result = (data, metadata = {}) => ({ result: { status: "success", payload: { metaDados: { urlComprovante: "https://apiv3.directd.com.br/evidence/test.pdf", ...metadata }, retorno: data }, providerReference: "test-ref", queriedAt: "2026-09-28T15:00:00Z" } });
+
+test('SP accepts both documented fiscal titles but still rejects unrelated scope or a different holder',async()=>{
+  const payload=result({documentoConsultado:CPF,uf:'SP'});
+  for(const title of ['DEBITOS TRIBUTARIOS NAO INSCRITOS','DEBITOS RELATIVOS AOS TRIBUTOS ESTADUAIS E A DIVIDA ATIVA DO ESTADO DE SAO PAULO']) {
+    const collected=await collectSellerDocuments(input({sellerQueries:['cnd-sp']}),dependencies({query:async()=>payload,readPdf:async()=>`${CPF} ESTADO DE SAO PAULO ${title}`}));
+    assert.equal(collected.dados.certidoes[0].status,'success');
+  }
+  for(const text of [`${CPF} ESTADO DE SAO PAULO CERTIDAO MUNICIPAL`,`11144477735 ESTADO DE SAO PAULO DEBITOS TRIBUTARIOS NAO INSCRITOS`]) {
+    const collected=await collectSellerDocuments(input({sellerQueries:['cnd-sp']}),dependencies({query:async()=>payload,readPdf:async()=>text}));
+    assert.equal(collected.dados.certidoes[0].status,'failed');
+  }
+});
 const PDF = Buffer.from("%PDF-test");
 const PDF_TEXT = "CERTIDÃO DE DÉBITOS TRABALHISTAS BANCO NACIONAL DE DEVEDORES TRABALHISTAS 529.982.247-25";
 const dependencies = (overrides = {}) => ({ configuration, query: async () => result({ documentoConsultado: CPF, possuiProcesso: false }), download: async () => PDF, readPdf: async () => PDF_TEXT, savePdf: async () => ({ pdfPath: "private-test.pdf", rawText: "never-copy-this" }), ...overrides });
