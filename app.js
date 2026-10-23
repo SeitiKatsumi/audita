@@ -1,4 +1,4 @@
-import { initGeneralChat } from './general-chat.js?v=20261020-navigation';
+import { initGeneralChat, initExamConversation } from './general-chat.js?v=20261023-exams-drop';
 import { initProcessOnline } from './process-online.js?v=20261022-checkout';
 import { initServicesCatalog } from "./services-catalog.js";
 import { initChatSubscription } from "./chat-subscription.js?v=20261013-send-feedback";
@@ -272,7 +272,7 @@ let selectedAuditViews = [];
 let apiUsageDashboardData = null;
 let currentAuthState = { authRequired: true, user: null };
 let pendingGuestAction = null;
-const publicPages = new Set([NATIONAL_PROCESS_PAGE, "home", "chat", "central-servicos", "analise-vendedor", "emissao-certidoes",
+const publicPages = new Set(["laudos-exames", NATIONAL_PROCESS_PAGE, "home", "chat", "central-servicos", "analise-vendedor", "emissao-certidoes",
   ...analysisSegments.map(segment => segment.id),
   "consulta-imoveis", "isencao-ir", "pis-pasep", "analise-cobrancas", "dividas-bancarias",
   "auditoria-glosas", "auditoria-importacao", "contas-de-luz", "consulta-tjdft", "consulta-tjdft-pf", "consulta-tjdft-pj", "consulta-cnib"]);
@@ -964,6 +964,7 @@ const pageMeta = {
     title: "An\u00e1lise de cobran\u00e7as indevidas",
     eyebrow: "Triagem guiada sem IA",
   },
+  "laudos-exames": { title: "Laudo para análise de exames", eyebrow: "Análise de exames" },
   "emissao-certidoes": { title: "Emissão de certidões diversas", eyebrow: "Emissão de certidões" },
   [NATIONAL_PROCESS_PAGE]: { title: NATIONAL_PROCESS_TITLE, eyebrow: 'Consulta nacional de processos' },
   "analise-vendedor": {
@@ -10124,5 +10125,8 @@ const chatSubscription = initChatSubscription({
   },
 });
 document.querySelector("#chatSubscriptionButton")?.addEventListener("click", () => chatSubscription.open());
+initJudicialReport({getAuthState:()=>currentAuthState,subscription:chatSubscription,requestLogin:message=>showLogin(message)});
+initExamConversation({getAuthState:()=>currentAuthState,subscription:chatSubscription,requestLogin:message=>showLogin(message)});
 generalChat = initGeneralChat({getLegacyThreads:()=>chatState.threads,getAuthState:()=>currentAuthState,subscription:chatSubscription,requestLogin:(message,resume)=>{pendingGuestAction=resume;showLogin(message);}});
 initServicesCatalog(undefined, { openPlans: () => chatSubscription.open() });
+import {initJudicialReport} from './judicial-report.js?v=20261023-report-optional';

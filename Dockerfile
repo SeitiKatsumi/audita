@@ -18,6 +18,7 @@ COPY advogados.html advogados.js advogados.css ./
 COPY plans.html plans.css plans.js ./
 COPY ir-exemption.css ir-exemption.js audita-chat-motion.js pis-pasep.js pis-pasep-panel.js ./
 COPY bank-debt.css bank-debt.js ./
+COPY judicial-report.js ./
 COPY import-audit.js import-audit.css ./
 COPY glosas.js glosas.css ./
 COPY chat-subscription.js chat-subscription.css general-chat.js ./

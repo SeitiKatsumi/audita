@@ -1,5 +1,68 @@
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const uuid = () => crypto.randomUUID();
+export function initExamConversation({getAuthState, subscription, requestLogin}) {
+ const root=document.querySelector('#laudos-exames');
+ if(!root)return;
+ const form=root.querySelector('form'), filesInput=root.querySelector('[type=file]'), description=root.querySelector('textarea'), consent=root.querySelector('[type=checkbox]');
+ const selected=root.querySelector('[data-exam-files]'), transcript=root.querySelector('[data-exam-messages]'), status=root.querySelector('[role=status]'), submit=form.querySelector('button[type=submit]');
+ let files=[], documentIds=[], threadId=uuid(), busy=false, controller, revision=0, pendingRequest=null;
+ const owner=()=>getAuthState()?.user?.id;
+ const bubble=(role,text)=>{const row=document.createElement('div');row.className='charge-analysis-message '+role;row.innerHTML=(role==='assistant'?'<img class="exam-avatar" src="assets/audita-profile-assistant.png" alt="">':'')+'<div class="charge-analysis-bubble"></div>';row.lastElementChild.innerHTML=formatGeneralChat(text);transcript.append(row);row.scrollIntoView({block:'nearest',behavior:'auto'});return row.lastElementChild;};
+ const renderFiles=()=>{selected.replaceChildren();files.forEach((file,index)=>{const item=document.createElement('li');item.textContent=file.name+' ';const remove=document.createElement('button');remove.type='button';remove.textContent='Remover';remove.disabled=busy;remove.addEventListener('click',()=>{files.splice(index,1);renderFiles();});item.append(remove);selected.append(item);});};
+ const lock=value=>{busy=value;for(const el of form.elements)el.disabled=value;renderFiles();submit.textContent=value?'Analisando…':documentIds.length?'Enviar mensagem':'Enviar exames para análise';};
+ const addExamFiles=next=>{
+  if(busy||!next.length)return;
+  if(next.some(f=>! /\.(pdf|png|jpe?g)$/i.test(f.name)||f.size>50*1024*1024)){status.textContent='Envie PDF, PNG ou JPEG, de até 50 MB por arquivo.';return;}
+  files.push(...next);consent.checked=false;status.textContent='';renderFiles();
+ };
+ filesInput.addEventListener('change',()=>{addExamFiles([...filesInput.files]);filesInput.value='';});
+ bindChatFileDrop(root,{addFiles:addExamFiles,isBusy:()=>busy});
+ window.addEventListener('audita:auth-changed',()=>{revision++;controller?.abort();files=[];documentIds=[];threadId=uuid();pendingRequest=null;transcript.replaceChildren();description.value='';consent.checked=false;status.textContent='';lock(false);});
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();if(busy)return;
+  if(!files.length&&!documentIds.length){status.textContent='Anexe pelo menos um exame ou laudo.';filesInput.focus();return;}
+  if(!consent.checked){status.textContent='Confirme a autorização para analisar os arquivos.';consent.focus();return;}
+  if(!owner()){requestLogin('Entre na sua conta para analisar seus exames.');return;}
+  const run=revision, account=owner();lock(true);
+  let reply, userRow;
+  try{
+   if(!await subscription.ensureAccess('messages')||run!==revision||owner()!==account)return;
+   controller=new AbortController();
+   const text=description.value.trim();
+   for(const file of [...files]){
+    status.textContent='Lendo '+file.name+'…';
+    const doc=await subscription.analyzeDocument(file);
+    if(run!==revision||owner()!==account)return;
+    if(!doc)throw new Error('Não foi possível ler o arquivo. Tente novamente.');
+    if(!documentIds.includes(doc.id))documentIds.push(doc.id);
+    files=files.filter(f=>f!==file);renderFiles();
+   }
+   const content=EXAM_ANALYSIS_PROMPT+(text?'\n\nMinha dúvida: '+text:'');
+   const fingerprint=JSON.stringify([content,documentIds]);
+   if(pendingRequest&&pendingRequest.fingerprint!==fingerprint)throw new Error('A resposta anterior foi interrompida. Reenvie a mesma descrição antes de começar outra análise.');
+   pendingRequest ||= {fingerprint,id:uuid()};
+   userRow=bubble('user',text||'Enviei meus exames para análise.');
+   reply=bubble('assistant','Estou analisando seus arquivos…');
+   status.textContent='Analisando seus exames…';
+   const response=await fetch('/api/chat/stream',{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'content-type':'application/json'},body:JSON.stringify({threadId,requestId:pendingRequest.id,mode:'auto',documentIds,messages:[{role:'user',content}]})});
+   if(!response.ok){const data=await response.json().catch(()=>({}));if(response.status<500)pendingRequest=null;throw new Error(data.message||'Não foi possível iniciar a análise.');}
+   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',answer='',completed=false;
+   while(true){const {value,done}=await reader.read();if(done)break;if(run!==revision)return;buffer+=decoder.decode(value,{stream:true});let boundary;
+    while((boundary=buffer.indexOf('\n\n'))>=0){const block=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);const line=block.split('\n').find(l=>l.startsWith('data: '));if(!line)continue;const message=JSON.parse(line.slice(6));
+     if(message.type==='error'){if(message.quotaReleased)pendingRequest=null;throw new Error(message.message||'Não foi possível concluir a análise.');}
+     if(message.type==='delta'){answer+=message.text;reply.innerHTML=formatGeneralChat(answer);}
+     if(message.type==='status')status.textContent=message.message;
+     if(message.type==='completed'){completed=true;reply.innerHTML=formatGeneralChat(message.result.answer);}
+    }
+   }
+   if(!completed)throw new Error('Conexão interrompida. Reenvie a mesma descrição para recuperar a resposta.');
+   pendingRequest=null;description.value='';status.textContent='Você pode tirar outra dúvida ou anexar mais exames.';
+  }catch(error){if(run===revision){if(reply)reply.parentElement.remove();if(userRow)userRow.parentElement.remove();status.textContent=error.message||'Não foi possível analisar agora.';}}
+  finally{if(run===revision){lock(false);void subscription.refresh();}}
+ });
+}
+export const EXAM_ANALYSIS_PROMPT = 'Explique os exames anexados em linguagem simples, usando somente os dados legíveis dos documentos. Cite o arquivo e a página quando disponíveis, preserve valores, unidades, datas e referências do laboratório. Destaque resultados fora dessas referências sem concluir um diagnóstico. Não invente dados nem trate imagens médicas como diagnóstico radiológico. Indique limitações e perguntas para levar ao profissional de saúde. Não prescreva tratamentos ou mudanças de medicação. Esta é uma explicação informativa, não um laudo médico.';
+export function examChatEntry(search = '') { return new URLSearchParams(search).get('service') === 'exames'; }
 const recall=key=>{try{return sessionStorage.getItem(key);}catch{return null;}};
 const remember=(key,value)=>{try{sessionStorage.setItem(key,value);}catch{/* History remains available from the server. */}};
 const assistantAvatar='<span class="chat-message-avatar"><img src="assets/audita-logo-original.png" alt=""></span>';
@@ -41,6 +104,19 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
  const fileInput=document.querySelector('#chatAttachment'),attach=document.querySelector('#chatAttachmentButton'),pending=document.querySelector('#chatAttachmentPreview');
  const send=document.querySelector('#chatSendButton'),stop=document.querySelector('#chatStopButton');
  const history=document.querySelector('#chatThreads'),historyButton=document.querySelector('#chatHistoryButton');
+ const exams=examChatEntry(location.search);
+ const historyKey=accountId=>(exams?'audita:exam-chat:':'audita:general-chat:')+accountId;
+ let examConsent;
+ if(exams){
+   empty.innerHTML='<span class="chat-welcome-logo"><img src="assets/audita-logo-original.png" alt="IA AUDITA" /></span><p class="eyebrow">Análise de exames</p><h2>Vamos analisar seus exames?</h2><p>Anexe um ou mais arquivos em PDF ou fotos legíveis. Depois, clique em enviar. Se quiser, escreva também sua dúvida.</p><p>A IA explica os resultados, mas não emite laudo médico nem substitui a avaliação de um profissional de saúde.</p><a href="/#central-servicos">Voltar à Central de Serviços</a>';
+   input.placeholder='Escreva sua dúvida sobre os exames (opcional)...';
+   fileInput.accept='.pdf,.png,.jpg,.jpeg';
+   form.querySelector('small').textContent='PDF, PNG ou JPEG. Você pode anexar vários exames. Até 50 MB por arquivo.';
+   const consentLabel=document.createElement('label');
+   consentLabel.className='chat-privacy-note exam-chat-consent';
+   consentLabel.innerHTML='<input type="checkbox" id="examChatConsent"> Autorizo o envio destes exames à IA da OpenAI para análise e tenho autorização para compartilhar estes dados de saúde.';
+   form.prepend(consentLabel);examConsent=consentLabel.querySelector('input');
+ }
  function closeHistory(){if(history.open)history.close();historyButton.setAttribute('aria-expanded','false');}
  historyButton.addEventListener('click',()=>{history.showModal();historyButton.setAttribute('aria-expanded','true');});
  document.querySelector('#chatHistoryClose').addEventListener('click',closeHistory);
@@ -68,7 +144,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    empty.classList.toggle('hidden',thread.messages.length>0);
    messages.querySelectorAll('.chat-message-row').forEach(n=>n.remove());
    messages.insertAdjacentHTML('beforeend',thread.messages.map((m,index)=>`<article class="chat-message-row ${m.role==='user'?'user':'assistant'}">${m.role==='assistant'?assistantAvatar:''}<div class="chat-message-content">
-     ${m.role==='assistant'?'<strong>IA AUDITA</strong>':''}<div class="chat-message-body">${formatGeneralChat(m.content)}</div>
+     ${m.role==='assistant'?'<strong>IA AUDITA</strong>':''}<div class="chat-message-body">${formatGeneralChat(m.role==='user'&&m.content.startsWith(EXAM_ANALYSIS_PROMPT)?m.content.slice(EXAM_ANALYSIS_PROMPT.length).replace(/^\s*Minha dúvida:\s*/,'').trim()||'Analise meus exames anexados.':m.content)}</div>
      ${m.fileNames?.length?`<small>${m.fileNames.map(escape).join(' · ')}</small>`:m.documentIds?.length?'<small>Documentos vinculados a esta conversa</small>':''}
      ${(m.artifacts||[]).map(artifactHtml).join('')}
      ${m.sources?.length?`<details class="general-chat-sources"><summary>Fontes consultadas</summary>${m.sources.map(s=>safeLink(s.url)?`<a href="${escape(s.url)}" target="_blank" rel="noopener noreferrer">${escape(s.name)}</a>`:'').join('')}</details>`:''}
@@ -83,6 +159,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    requestAnimationFrame(()=>{messages.scrollTop=messages.scrollHeight;});
  }
  async function reload(){
+   if(examConsent)examConsent.checked=false;
    const run=++version;clearTimeout(monitor);owner=account();active?.controller.abort();active=null;files=[];thread={id:uuid(),title:'Nova conversa',messages:[]};threads=[];render();
    if(!owner)return;
    try{let data=await request('/api/chat/threads');
@@ -91,7 +168,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
        await request('/api/chat/threads',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({threads:legacy.map(t=>({title:t.title,messages:t.messages.slice(-40).map(m=>({role:m.role,content:String(m.content).slice(0,3000)}))}))})});
        remember('audita:chat-imported:'+owner,'1');data=await request('/api/chat/threads');
      }if(run!==version||owner!==account())return;threads=data.threads||[];
-     const saved=recall('audita:general-chat:'+owner);if(saved&&threads.some(t=>t.id===saved)){const restored=(await request('/api/chat/threads/'+saved)).thread;if(run!==version||owner!==account())return;thread=restored;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];}
+     const saved=recall(historyKey(owner));if(saved&&threads.some(t=>t.id===saved)){const restored=(await request('/api/chat/threads/'+saved)).thread;if(run!==version||owner!==account())return;thread=restored;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];}
      if(run===version&&owner===account()){render();watch();}
    }catch(e){if(run===version)showError(e.message);}
  }
@@ -100,14 +177,18 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
    const id=thread.id,run=version;
    monitor=setTimeout(async()=>{try{const data=await request('/api/chat/threads/'+id);if(run!==version||thread.id!==id)return;thread=data.thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];render();watch();}catch(e){if(run===version)showError(e.message);}},2000);
  }
- function newThread(){if(active)return;closeHistory();clearTimeout(monitor);thread={id:uuid(),title:'Nova conversa',messages:[]};files=[];showError();render();input.focus();}
+ function newThread(){if(active)return;closeHistory();clearTimeout(monitor);thread={id:uuid(),title:'Nova conversa',messages:[]};files=[];if(examConsent)examConsent.checked=false;showError();render();input.focus();}
  async function sendMessage(raw=input.value){
    const text=String(raw||'').trim();if(active||thread.processing?.status==='running'||(!text&&!files.length))return;
+   if(exams&&!files.length&&!thread.documentIds?.length){showError('Anexe pelo menos um exame para começar.');attach.focus();return;}
+   if(exams&&!examConsent.checked){showError('Confirme a autorização para analisar seus exames.');examConsent.focus();return;}
    if(!current()){requestLogin('Entre para conversar com a IA AUDITA.',()=>sendMessage(raw));return;}
    const startingAccount=account(),startingVersion=version;
    if(!await subscription.ensureAccess('messages')||active||thread.processing?.status==='running'||startingAccount!==account()||startingVersion!==version)return;
    const accountId=account(),run=version,localThread=thread,controller=new AbortController();
-   const userMessage={id:uuid(),role:'user',content:text||'Analise os arquivos anexados.',createdAt:new Date().toISOString()};
+   const content=exams ? (text.includes(EXAM_ANALYSIS_PROMPT)?text:EXAM_ANALYSIS_PROMPT+(text?'\n\nMinha dúvida: '+text:'')) : text||'Analise os arquivos anexados.';
+   if(content.length>5000){showError('Resuma sua dúvida para até 4.000 caracteres.');return;}
+   const userMessage={id:uuid(),role:'user',content,createdAt:new Date().toISOString()};
    const submittedFiles=[...files];let remainingFiles=[...submittedFiles],submitted=false;
    userMessage.fileNames=submittedFiles.map(file=>file.name);
    localThread.messages.push(userMessage);files=[];fileInput.value='';input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));
@@ -123,7 +204,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
        userMessage.id=localThread.pendingRequest.id;
      }
      localThread.pendingRequest={fingerprint,id:userMessage.id};
-     active.requestId=userMessage.id;remember('audita:general-chat:'+accountId,localThread.id);
+     active.requestId=userMessage.id;remember(historyKey(accountId),localThread.id);
      submitted=true;
      active.status='Preparando resposta';render();
      const r=await fetch('/api/chat/stream',{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'content-type':'application/json'},
@@ -149,7 +230,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
      if(localThread.title==='Nova conversa')localThread.title=userMessage.content.slice(0,65);
      localThread.updatedAt=new Date().toISOString();
      threads=[{id:localThread.id,title:localThread.title,updatedAt:localThread.updatedAt},...threads.filter(t=>t.id!==localThread.id)];
-     remember('audita:general-chat:'+accountId,localThread.id);
+     remember(historyKey(accountId),localThread.id);
    }catch(e){if(run!==version||accountId!==account())return;
      if(!submitted){localThread.messages=localThread.messages.filter(m=>m!==userMessage);files=[...remainingFiles,...files];}
      if(e.quotaReleased||e.code==='chat_reservation_finalized'){delete localThread.pendingRequest;localThread.messages=localThread.messages.filter(m=>m.id!==userMessage.id);}
@@ -167,6 +248,8 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
  });
  function addFiles(next){
    if(active||thread.processing?.status==='running'||!next.length)return;
+   if(exams&&next.some(f=>!(/\.(pdf|png|jpe?g)$/i.test(f.name)))){showError('Envie exames em PDF, PNG ou JPEG.');return;}
+   if(examConsent)examConsent.checked=false;
    if(next.some(f=>f.size>50*1024*1024)){showError('Cada arquivo pode ter até 50 MB.');return;}
    files.push(...next);showError();render();
  }
@@ -176,7 +259,7 @@ export function initGeneralChat({getAuthState,subscription,requestLogin,getLegac
  for(const id of ['chatNewButton','chatMobileNewButton'])document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();newThread();},true);
  list.addEventListener('click',async e=>{const button=e.target.closest('[data-general-thread],[data-general-delete]');if(!button)return;e.stopImmediatePropagation();if(active)return;
    try{if(button.dataset.generalDelete){await request('/api/chat/threads/'+button.dataset.generalDelete,{method:'DELETE'});threads=threads.filter(t=>t.id!==button.dataset.generalDelete);if(thread.id===button.dataset.generalDelete)newThread();render();}
-     else{thread=(await request('/api/chat/threads/'+button.dataset.generalThread)).thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];files=[];remember('audita:general-chat:'+owner,thread.id);closeHistory();render();watch();}
+     else{thread=(await request('/api/chat/threads/'+button.dataset.generalThread)).thread;thread.documentIds=[...new Set(thread.messages.flatMap(m=>m.documentIds||[]))];files=[];if(examConsent)examConsent.checked=false;remember(historyKey(owner),thread.id);closeHistory();render();watch();}
    }catch(e){showError(e.message);}
  },true);
  messages.addEventListener('click',async e=>{const b=e.target.closest('[data-copy],[data-retry],[data-preview]');if(!b)return;e.stopImmediatePropagation();

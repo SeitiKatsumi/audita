@@ -17,6 +17,7 @@ import { createLawyerQueueService, requireLawyer } from "./services/lawyer-queue
 import { createIrExemptionService } from "./services/ir-exemption.service.mjs";
 import { createBankDebtService } from "./services/bank-debt.service.mjs";
 import { createBankDebtHandler } from "./services/bank-debt-api.mjs";
+import { createJudicialReportHandler } from "./services/judicial-report-api.mjs";
 import { createIrExemptionHandler } from "./services/ir-exemption-api.mjs";
 import { createIrExtractor } from "./services/ir-exemption-ai.mjs";
 import http from "node:http";
@@ -1837,6 +1838,7 @@ const bankDebtService = createBankDebtService({
 });
 const bankDebtHandler = createBankDebtHandler({service: bankDebtService,
   getAuth: getTenantIdForRequest, readJson: readJsonBody, readBuffer: readBufferBody, sendJson});
+const judicialReportHandler = createJudicialReportHandler({getAuth:getTenantIdForRequest,readJson:readJsonBody,sendJson});
 const irExemptionService = createIrExemptionService({
   getDb: () => ({ pool, dbReady }),
   checkout: (auth, proposal) => stripeBillingService.createIrCheckoutSession(auth, proposal),
@@ -6301,6 +6303,7 @@ const server = http.createServer(async (request, response) => {
   if (await energyHandler(request, response, url)) return;
   if (await importHandler(request, response, url)) return;
   if (await glosasHandler(request, response, url)) return;
+  if (await judicialReportHandler(request, response, url)) return;
   if (await bankDebtHandler(request, response, url)) return;
   if (await handleApi(request, response, url.pathname)) {
     return;
@@ -6320,7 +6323,7 @@ const server = http.createServer(async (request, response) => {
   // Keep private storage, configuration and server implementation outside the static surface.
   const publicRootFiles = new Set(["analysis-segments.js", "glosas.js", "glosas.css", "import-audit.js", "import-audit.css", "energy-audit.js", "energy-audit.css", "services-catalog.js", "index.html", "styles.css", "app.js", "plans.html", "plans.css", "plans.js",
     "advogados.html", "advogados.js", "advogados.css", "super-admin.html", "super-admin.css", "super-admin.js", "billing-admin.js", "charge-analysis.js",
-    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css", "general-chat.js"]);
+    "charge-calculation.js", "itau-faq.js", "ir-exemption.css", "ir-exemption.js", "pis-pasep.js", "pis-pasep-panel.js", "audita-chat-motion.js", "bank-debt.js", "bank-debt.css", "chat-subscription.js", "chat-subscription.css", "general-chat.js", "judicial-report.js"]);
   const staticName = String(requestedPath).replace(/^\/+/, "");
   publicRootFiles.add('certificate-selection.js');
   publicRootFiles.add('process-online.js');

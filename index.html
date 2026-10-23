@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IA AUDITA | Elevenmind</title>
     <link rel="icon" href="assets/audita-logo-original.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=20261022-orange-options" />
+    <link rel="stylesheet" href="styles.css?v=20261023-report-optional" />
     <link rel="stylesheet" href="/plans.css?v=20260922-editar-conta" />
     <link rel="stylesheet" href="/ir-exemption.css?v=20261021-month-picker" />
     <link rel="stylesheet" href="/bank-debt.css?v=20261021-remove-files" />
@@ -152,7 +152,7 @@
 <div class="module list-panel"><table><thead><tr><th>Atendimento</th><th>Serviço</th><th>Situação</th><th>Próximo passo</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody id="lawyer-caseRows"></tbody></table><p id="lawyer-empty" hidden>Nenhum atendimento nesta lista.</p></div>
 <section id="lawyer-details" class="panel" hidden tabindex="-1"><button class="secondary-action" id="lawyer-closeDetails">Voltar à lista</button><div id="lawyer-detailBody"></div></section></div>
 <aside class="activity"><section class="panel"><h2>Pendências de atenção</h2><div id="lawyer-attention"></div></section><section class="panel"><h2>Atualizações recentes</h2><div id="lawyer-recent"></div></section><p class="muted">Os prazos oficiais devem ser conferidos pela equipe nos canais responsáveis.</p></aside></div></div></section>
-        <nav class="service-return page-hidden" data-page="certidao-nacional auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes processos-judiciais consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
+        <nav class="service-return page-hidden" data-page="laudos-exames certidao-nacional auditoria-glosas auditoria-importacao analise-vendedor emissao-certidoes processos-judiciais consulta-imoveis isencao-ir pis-pasep analise-cobrancas dividas-bancarias contas-de-luz consulta-tjdft consulta-tjdft-pf consulta-tjdft-pj consulta-cnib" aria-label="Voltar ao catálogo de serviços">
           <a href="#central-servicos"><img src="assets/nav-icons/chevron-left.svg" alt="" aria-hidden="true" />Voltar à Central de Serviços</a>
         </nav>
 
@@ -554,19 +554,19 @@
 <section class="services-group" data-service-group aria-labelledby="services-laudos">
               <h3 id="services-laudos">Laudos</h3>
               <div class="services-grid">
-                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="laudos" data-keywords="laudo exames relatório desenvolvimento">
-                  <div class="service-card-entry">
+                <article class="home-module-action service-card service-card-explained" data-service-card data-categories="laudos" data-keywords="laudo exames relatório saude pdf fotos ia">
+                  <a class="service-card-entry" href="#laudos-exames">
                     <span class="home-module-icon" aria-hidden="true"><img src="assets/nav-icons/file-dollar.svg" alt="" /></span>
-                    <span class="home-module-copy"><small class="service-category-label">Laudos</small><strong>Laudo para análise de exames</strong><small>Em desenvolvimento: informações sobre o serviço de análise de exames.</small></span>
-                  </div>
+                    <span class="home-module-copy"><small class="service-category-label">Laudos</small><strong>Laudo para análise de exames</strong><small>Anexe seus exames e tire dúvidas com a IA em uma conversa.</small></span>
+                  </a>
                   <details class="service-disclosure">
                     <summary class="service-toggle"><span class="service-more">Mais informações</span><span class="service-less">Menos informações</span><img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></summary>
                     <div class="service-expanded">
                       <a class="service-info-link" href="https://auditainteligente.com.br/servicos/laudos-de-exames" target="_blank" rel="noopener noreferrer">Saiba mais sobre este serviço <span>(abre em nova aba)</span></a>
-                      <span class="service-detail"><b>Para quem é</b><span>Quem procura informações sobre o futuro serviço de análise de exames.</span></span>
-                      <span class="service-detail"><b>Sobre o serviço</b><span>Este módulo ainda está sendo preparado. Os exames aceitos, o tipo de análise e a forma de entrega serão informados quando o serviço for disponibilizado.</span></span>
-                      <small class="service-note">Ainda não é possível enviar exames ou solicitar laudos por este módulo.</small>
-                      <span class="service-action">Em desenvolvimento</span>
+                      <span class="service-detail"><b>Para quem é</b><span>Quem deseja entender os resultados dos próprios exames ou de alguém que autorizou o compartilhamento.</span></span>
+                      <span class="service-detail"><b>Sobre o serviço</b><span>Envie um ou mais PDFs ou fotos e converse sobre os resultados. Usa o acesso à IA da sua conta.</span></span>
+                      <small class="service-note">Análise informativa por IA; não emite laudo médico nem substitui consulta com um profissional de saúde.</small>
+                      <a class="service-action" href="#laudos-exames">Anexar meus exames<img class="home-module-chevron" src="assets/nav-icons/chevron-right.svg" alt="" aria-hidden="true" /></a>
                     </div>
                   </details>
                 </article>
@@ -783,6 +783,8 @@
         </section>
 
         <section class="charge-analysis-page page-hidden" id="dividas-bancarias" data-page="dividas-bancarias">
+          <section id="judicialReportModule" aria-label="Relatório financeiro judicial"></section>
+          <details class="judicial-previous"><summary>Continuar atendimento de negociação de dívida bancária</summary>
           <div class="charge-analysis-shell">
             <header class="charge-analysis-header">
               <div class="charge-analysis-identity"><span class="charge-analysis-mark" aria-hidden="true"><img src="/assets/audita-logo-original.png" alt="" /></span><p><strong>IA AUDITA</strong> está analisando com você</p></div>
@@ -794,6 +796,7 @@
             </div>
             </div>
           </div>
+          </details>
         </section>
         <section class="charge-analysis-page" id="isencao-ir" data-page="isencao-ir">
           <div class="charge-analysis-shell">
@@ -811,6 +814,33 @@
           </div>
         </section>
 
+        <section class="charge-analysis-page" id="laudos-exames" data-page="laudos-exames">
+          <div class="charge-analysis-shell">
+            <header class="charge-analysis-header"><div class="charge-analysis-identity"><span class="charge-analysis-mark"><img src="assets/audita-logo-original.png" alt="" /></span><p><strong>IA AUDITA</strong> está analisando com você</p></div></header>
+            <div class="exam-conversation">
+              <div class="charge-analysis-message assistant">
+                <img class="exam-avatar" src="assets/audita-profile-assistant.png" alt="" />
+                <div class="charge-analysis-bubble">
+                  <h3>Pode enviar seus exames ou laudos?</h3>
+                  <p>Anexe os arquivos que você quer entender. Se quiser, conte o motivo do exame ou escreva sua dúvida.</p>
+                  <form id="examConversationForm">
+                    <label for="examFiles" class="exam-drop-hint">Arraste seus exames e laudos aqui ou selecione os arquivos abaixo</label>
+                    <input id="examFiles" type="file" accept=".pdf,.png,.jpg,.jpeg" multiple />
+                    <small>Selecione um ou mais PDFs ou fotos legíveis. Até 50 MB por arquivo.</small>
+                    <ul data-exam-files></ul>
+                    <label for="examDescription">O que você gostaria de entender? <small>(opcional)</small></label>
+                    <textarea id="examDescription" rows="3" maxlength="4000" placeholder="Ex.: Fiz um exame de sangue e gostaria de entender os resultados."></textarea>
+                    <label class="exam-permission"><input type="checkbox" /> <span>Autorizo a análise destes arquivos pela IA da OpenAI e tenho autorização para compartilhar os dados.</span></label>
+                    <button type="submit">Enviar exames para análise →</button>
+                    <small>A explicação por IA não substitui a avaliação médica.</small>
+                  </form>
+                </div>
+              </div>
+              <div data-exam-messages aria-live="polite"></div>
+              <p role="status" class="exam-status"></p>
+            </div>
+          </div>
+        </section>
         <section class="charge-analysis-page" id="analise-cobrancas" data-page="analise-cobrancas">
           <div class="charge-analysis-shell">
             <header class="charge-analysis-header">
@@ -2268,9 +2298,9 @@
     <script type="module" src="/advogados.js?v=3"></script>
     <script type="module" src="billing-admin.js?v=20260730-commercial-admin-1"></script>
     <script type="module" src="/ir-exemption.js?v=20261021-month-picker"></script>
-    <script type="module" src="/bank-debt.js?v=20261021-remove-files"></script>
+    <script type="module" src="/bank-debt.js?v=20261023-report"></script>
     <script type="module" src="charge-analysis.js?v=20261021-recovery-button"></script>
-    <script type="module" src="app.js?v=20261022-national-process"></script>
+    <script type="module" src="app.js?v=20261023-report-optional"></script>
     <script type="module" src="glosas.js?v=20261016-follow-latest"></script>
     <script type="module" src="import-audit.js?v=20261021-file-drop"></script>
       <script type="module" src="/pis-pasep.js?v=20261016-follow-latest"></script>

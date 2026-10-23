@@ -1026,3 +1026,19 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Reiniciado servidor3000; raiz200 e JavaScript novo confirmado por HTTP; rotas de pedido401 sem sessão, fontes privadas/SQL404. Health503 persiste pela conexão local de banco indisponível; não houve teste autenticado com pagamento real nem verificação visual no navegador. Migração validada no PGlite isolado.
 
 - Ajuste solicitado: preço R$49,90 e checkout nos dois formulários, CNJ/cópia e CPF/CNPJ/busca; execução correspondente só após pagamento.38/38 testes pertinentes passaram. Novas cópias diretas bloqueadas402; histórico e retomada preservados. Sem cobrança real, commit/push/deploy.
+## 2026-10-23 — Chat para análise de exames
+- Continuação: arrastar múltiplos arquivos na página de Laudos, destaque da área e mesma validação do seletor (tipo/tamanho); bloqueado durante análise. Codex, mesma branch e arquivos compartilhados.
+- Validação do arrastar: 21 testes passaram (incluindo múltiplos arquivos, tipo/tamanho, bloqueio e eventos de drag/drop); sintaxe e diff check aprovados, módulo atualizado confirmado por HTTP na3000. Nenhum arquivo real enviado.
+- Revisão solicitada: conversa própria em #laudos-exames, com avatar, pergunta pelos arquivos, descrição opcional e múltiplos anexos. Sem redirecionamento ao chat geral. Mantida integração existente; validação sem envio real de dados médicos.
+- Validado no navegador da porta3000: tela independente e bloqueio de envio sem anexo; 23 testes de regressão aprovados. Análise autenticada real não executada. Sem commit/push.
+- Codex; branch codex/laudos-exames-chat, base origin/main 7ba5b81. Escopo: reutilizar chat existente no card de exames. Arquivos compartilhados: index.html, app.js, general-chat.js e styles.css.
+- Implementado e conciliado no checkout principal para localhost:3000, preservando alterações existentes. Vários anexos, consentimento de dados de saúde e orientação informativa; integração e credenciais existentes reutilizadas, sem nova chave.
+- Testes pertinentes: 23 aprovados. Sem envio de exames reais ou chamada paga à IA; validação real depende do acesso da conta e configuração local. Sem commit, push ou deploy.
+## 2026-10-23 — Relatório financeiro judicial
+- Visual revisado com logo original incorporada ao PDF, cabeçalho azul-petróleo, destaque financeiro, dados em duas colunas e rodapé numerado. PDF básico de exemplo renderizado e conferido; sete testes aprovados. Cálculos e regras de preenchimento preservados.
+- Revisão: somente identificação processual, valor e data homologados obrigatórios. Complementos recolhidos ao final e botão único Gerar PDF. Critérios incompletos geram relatório documental, sem presumir taxas/totais atualizados.
+- Revisão validada: sete testes aprovados; PDF básico renderizado e revisado; formulário/opcionais/botão confirmados no navegador da3000, servidor reiniciado. Banco local continua indisponível; sem teste autenticado real.
+- Codex; codex/relatorio-judicial, base origin/main. Em andamento: entrada manual/decisão, conferência de critérios e PDF. Arquivos compartilhados: server.mjs, app.js, index.html, styles.css e Dockerfile. Preservar atendimento bancário anterior e mudanças de Laudos.
+- Concluído localmente: duas entradas, revisão de dados, prévia aritmética e PDF sob demanda, sem certificação judicial. Atendimento anterior preservado/recolhido. Integração conciliada na3000 sem substituir mudanças de Laudos.
+- Validação: seis testes novos aprovados; rodada com catálogo/Laudos19 aprovados e rodada com dívida13 aprovados (há sobreposição). PDF fictício renderizado/revisado; interface manual/upload conferida no navegador; assets200 e API sem sessão401. Sintaxe e diff check aprovados.
+- Pendência: banco local ECONNREFUSED; extração real da decisão e fluxo autenticado não homologados. Nenhum documento pessoal enviado, nova chave, cobrança, commit, push ou deploy.

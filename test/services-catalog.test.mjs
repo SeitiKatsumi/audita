@@ -125,8 +125,9 @@ test('all catalog cards have details and preserve destinations and searchable au
   assert.ok(card.includes('<summary class="service-toggle">'));
   assert.ok(card.includes('Para quem é'));
   assert.ok(card.includes('service-note'));
-  const pending=card.includes('data-categories="laudos"');
-  assert.equal(card.includes('href="#'),!pending);
+  const exams=card.includes('href="#laudos-exames"');
+  const pending=card.includes('data-categories="laudos"')&&!exams;
+  assert.equal(card.includes('href="#')||exams,!pending);
   if(pending) assert.ok(card.includes('Em desenvolvimento'));
  }
  for(const [route,title,action,query,category] of [

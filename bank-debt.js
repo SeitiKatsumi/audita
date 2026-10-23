@@ -23,7 +23,7 @@ function bindDebtFileDrop(root, isBusy) {
  });
  root.addEventListener('change',e=>{const zone=zoneFor(e);if(!zone)return;e.target.setCustomValidity('');const escape=value=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));zone.querySelector('[data-debt-file-names]').innerHTML=Array.from(e.target.files||[]).map((f,i)=>`<span class="debt-file-row"><span>${escape(f.name)}</span><button type="button" data-debt-remove-file="${i}" aria-label="Remover ${escape(f.name)}">Remover</button></span>`).join('');});
 }
-const root=document.querySelector('#dividas-bancarias');
+const root=document.querySelector('#dividas-bancarias .judicial-previous')||document.querySelector('#dividas-bancarias');
 const $=s=>root.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)/100);
 const currencyCents=value=>Number(String(value).replace(/\D/g,''));

@@ -40,6 +40,12 @@ Chamadas reais de teste, com dados fictícios e sem banco de produção: modelos
 
 Consulte [meeting-20261008.md](meeting-20261008.md) para decisões, testes, limite estimado de processamento e dependências externas. Transcrição usa AUDITA_CHAT_AUDIO_MODEL (padrão gpt-transcribe), com registro de duração e custo. Sem voz em tempo real.
 
+## Entrada para exames
+- O card de exames abre `#laudos-exames`, uma conversa própria no serviço, sem abrir o chat geral. Reutiliza somente autenticação, acesso à IA e processamento de documentos; não cria outra chave.
+- Aceita vários PDFs, PNGs e JPEGs; exige um exame inicial e confirmação de autorização para enviar dados de saúde à OpenAI. O aceite é renovado para novos arquivos ou conversa.
+- A orientação solicita explicação informativa, referências do documento e limitações, sem diagnóstico ou prescrição. Não é laudo médico.
+- O formulário aceita descrição opcional e perguntas posteriores. Dados em tela são limpos na mudança de sessão; respostas continuam persistidas pelo backend da conta.
+
 ## Anexos por arrastar e soltar
 - Arquivos podem ser soltos na area da conversa; destaque visual indica o destino. Ficam na lista de anexos para revisao antes de enviar, pelo mesmo fluxo do seletor. Durante processamento, novos anexos ficam bloqueados. Arrastar texto nao e interceptado.
 - Cada arquivo pendente tem botao Remover individual; ao excluir, o foco vai ao proximo anexo ou ao seletor. Remocao bloqueada durante processamento.
