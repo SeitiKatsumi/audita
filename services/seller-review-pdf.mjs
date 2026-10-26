@@ -71,18 +71,31 @@ export async function sellerReportPdf(report) {
   text(report.scopeNotice || segment.scope);
   text(`Análise de ${report.analyzed} das ${report.total} fontes do levantamento, limitada ao material obtido e à data da consulta. Originais, status e detalhes das fontes permanecem disponíveis na consulta autenticada da IA Audita.`);
   text('Leitura assistida por IA para conferência. Registros de processos ou empresas não representam automaticamente dívida pessoal do titular. Não é certidão oficial nem decisão jurídica ou garantia de regularidade.');
-  if(ps?.totals.length || ps?.total || report.processCoverage){
+  if(ps?.totals.length || ps?.total || ps?.aggregates?.length || report.processCoverage){
   next();
   text('Somatório dos valores dos processos',true);
-  text('Subtotais separados por posição do titular',true);
   const money=value=>(value/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  text('Totais agregados informados pelo fornecedor',true);
+  text('Soma aritmética dos grupos por área e polo retornados em cada consulta. Não é uma soma de processos conferidos individualmente; pode conter sobreposição e não confirma dívida ou crédito.');
+  if(!ps?.aggregates?.length)text('Não há valores agregados estruturados com identidade conferida disponíveis nesta consulta.');
+  for(const aggregate of ps?.aggregates||[]){
+    text(`Fonte: ${aggregate.source}`,true);
+    for(const [key,label] of [['defendant','Réu / polo passivo'],['claimant','Autor / exequente (polo ativo)']]){
+      const group=aggregate[key];text(label,true);
+      for(const row of group.areas)text(`${row.area}: ${money(row.cents)}`);
+      text(group.areas.length?`Subtotal agregado: ${money(group.cents)} (${group.areas.length} área(s)).`:'Não informado em grupos válidos pelo fornecedor.');
+    }
+    if(aggregate.excluded)text(`Grupos não somados por dados ausentes, papel não identificado ou valores conflitantes: ${aggregate.excluded}.`);
+  }
+  text('Agregados de consultas distintas não são somados entre si nem adicionados aos subtotais individuais abaixo.');
+  text('Subtotais por processo individual identificado',true);
   for(const [key,label] of [['defendant','Como réu / polo passivo'],['claimant','Como autor / exequente']]){
     const total=ps?.[key];
     text(label,true);
     text(total?.count?`${money(total.cents)} - ${total.count} processo(s) com valor da causa e papel identificados.`:'Não apurado: não há registros com valor e papel confirmados para este subtotal.');
   }
   text('Os subtotais não são compensados nem somados entre si. São valores de causa informados, não saldos de dívida ou créditos reconhecidos. Não incluem atualização monetária.');
-  if(ps)text(`Fora do somatório: ${ps.excluded} processos com valor/papel ausente ou conflitante; ${ps.withoutNumber} registros sem número identificável; ${ps.restricted} registros restritos; ${ps.unavailable} registros indisponíveis. Duplicatas de número foram consolidadas; valores conflitantes foram excluídos.`);
+  if(ps)text(`Fora dos subtotais individuais: ${ps.excluded} processos com valor/papel ausente ou conflitante; ${ps.withoutNumber} registros sem número identificável; ${ps.restricted} registros restritos; ${ps.unavailable} registros indisponíveis. Duplicatas de número foram consolidadas; valores conflitantes foram excluídos.`);
   else text('Este relatório salvo não contém os dados estruturados necessários à soma. Não foram somados valores mencionados no texto da IA.');
   text('A soma abrange os registros disponíveis, que podem ser menos que o total informado pela fonte. Registros de empresas vinculadas ficam fora dos totais do titular.');
   }

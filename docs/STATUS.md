@@ -1125,3 +1125,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 
 ## 2026-10-26 — Análise de certidões no acesso de teste
 - Autorizada pelo usuário a análise com acesso de teste já ativado. Correção integrada localmente, com 25/25 testes aprovados, sem liberar desconto/emissão gratuita/acesso a documentos de terceiros. Publicação e teste em produção aguardam acesso ao painel CapRover; não foram concluídos.
+
+- Publicacao autorizada26/10: runtime7b7e6e2 confirmado em /api/health, banco pronto e auth obrigatoria. Pacote completo395612160bytes teve envio interrompido antes de nova versao; pacote incremental307200bytes baseado na imagem188 preserva PDFs/assets e substitui somente server.mjs e dois servicos. Dockerfile do repositorio preservado. Acesso de teste reativado pela UI e botao de analise liberado. Teste real autorizado com dados salvos terminou0/12: HTTP429 da IA e source_too_large. Nao houve nova coleta/cobranca de fornecedor. Falha original ainda nao totalmente resolvida; proximos passos: esclarecer modalidade do429 e tratar fonte acima180000caracteres. Evidencia privada output/teste-producao-analise.jpg. Commit7b7e6e2 local; nao enviado ao GitHub nesta publicacao.
+
+## 2026-10-26 — Correção do somatório judicial
+- Codex, codex/corrige-somatorio-pdf. Agregados estruturados por área/polo são exibidos separados dos subtotais individuais; fontes distintas não são somadas. Identidade conferida, empresas relacionadas excluídas, áreas duplicadas consolidadas e valores conflitantes omitidos. Relatórios antigos recalculam no download com dados salvos, sem IA/consulta externa. 17/17 testes aprovados; prévia fictícia de duas páginas renderizada e conferida. Integrado localmente; commit/push solicitado, sem novo deploy manual.

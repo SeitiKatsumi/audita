@@ -30,13 +30,36 @@ function recordRole(p,document){
  }
  return roles.size===1?[...roles][0]:null;
 }
+function providerAggregates(source){
+ const areas=field(source.details,'areasDireito');
+ if(source.identityVerified!==true||!Array.isArray(areas))return null;
+ const rows=new Map();let excluded=0;
+ for(const area of areas){
+  const position=norm(field(area,'tipoAreaDireito')).trim();
+  const role=position==='passivo'?'defendant':position==='ativo'?'claimant':null;
+  const label=String(field(area,'areaDireito')||'').trim();
+  const cents=processMoneyCents(field(area,'totalValorProcessosArea'));
+  if(!role||!label||cents===null){excluded++;continue;}
+  const key=role+':'+norm(label),old=rows.get(key);
+  if(!old)rows.set(key,{role,area:label,cents});
+  else if(old.cents!==cents)old.conflict=true;
+ }
+ const result={source:source.title,excluded,defendant:{cents:0,areas:[]},claimant:{cents:0,areas:[]}};
+ for(const row of rows.values()){
+  const group=result[row.role];
+  if(row.conflict||!Number.isSafeInteger(group.cents+row.cents)){result.excluded++;continue;}
+  group.cents+=row.cents;group.areas.push({area:row.area,cents:row.cents});
+ }
+ return result;
+}
 // Totals use saved source records, never amounts or roles inferred from AI prose.
 export async function summarizeReportProcesses(sources,{readBatch,authorize=async()=>{}}){
- const records=new Map(), totals=[],tribunals=[];let unavailable=0,restricted=0,withoutNumber=0;
+ const records=new Map(), totals=[],tribunals=[],aggregates=[];let unavailable=0,restricted=0,withoutNumber=0;
  for(const source of sources){
   // A related company's proceedings must not become the consulted individual's totals.
   if(source.subject?.document)continue;
-  const count=Number(source.details?.['Total de processos']);
+  const aggregate=providerAggregates(source);if(aggregate)aggregates.push(aggregate);
+  const count=Number(source.details?.['Total de processos']??field(source.details,'totalProcessos'));
   if(Number.isSafeInteger(count)&&count>=0)totals.push({source:source.title,total:count});
   if(source.details?.['Processos por tribunal'])tribunals.push({source:source.title,distribution:source.details['Processos por tribunal']});
   const collection=source.processCollection;if(!collection)continue;
@@ -58,7 +81,7 @@ export async function summarizeReportProcesses(sources,{readBatch,authorize=asyn
    }
   }
  }
- const summary={totals,tribunals,total:records.size,byState:{},unknownState:0,unavailable,restricted,withoutNumber,excluded:0,defendant:{cents:0,count:0},claimant:{cents:0,count:0}};
+ const summary={version:2,aggregates,totals,tribunals,total:records.size,byState:{},unknownState:0,unavailable,restricted,withoutNumber,excluded:0,defendant:{cents:0,count:0},claimant:{cents:0,count:0}};
  for(const record of records.values()){
   if(record.uf)summary.byState[record.uf]=(summary.byState[record.uf]||0)+1;else summary.unknownState++;
   if(!record.role||record.amount===null||!Number.isSafeInteger(summary[record.role].cents+record.amount)){summary.excluded++;continue;}

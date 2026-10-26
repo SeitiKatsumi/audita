@@ -338,7 +338,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
     const state = analysisKey ? certificateReviews(row.request_payload)[analysisKey] : row.request_payload.sellerReview;
     if (state?.status !== 'completed' || !state.report) fail('seller_report_not_ready', 409);
     let report=state.report;
-    if(!report.processSummary && request){
+    if(report.processSummary?.version!==2 && request){
       const audit=await auditService.findAudit(id,request);
       if(!audit||audit.unauthorized)fail('seller_analysis_not_found',404);
       let sources=sellerSources(audit);
