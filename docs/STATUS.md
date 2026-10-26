@@ -1112,3 +1112,8 @@ Não incluir dados reais de clientes, links de casos privados, credenciais ou tr
 - Correção após retorno do usuário: addAnalysisServices reordenava os cartões alfabeticamente. Grupo certidões agora preserva ordem manual; demais grupos mantêm ordenação. Cache de módulos atualizado;13/13 testes passaram, incluindo execução da inicialização e verificação da ordem final. Integrado localmente, sem commit/push/deploy.
 
 - Sincronização26/10: main atualizada para origin/main0ce25d3 por fast-forward. Ordem manual dos cartões e demais ajustes locais preservados; backup stash mantido.22 testes de catálogo/interface aprovados. Servidor3000 reiniciado; banco local continua indisponível (ECONNREFUSED), sem alteração de credenciais. Sem push/deploy.
+
+## 2026-10-26 — PDF: logo e resumo judicial
+- Codex, codex/pdf-resumo-processos: logo vetorial Audita em cor escura; total informado por consulta, processos únicos disponíveis e UF/tribunal; página final com subtotais separados réu/passivo e autor/exequente. Dados estruturados salvos, deduplicação por número, exclusão de valor/papel conflitante, advogado, empresa vinculada e registro restrito. Relatórios antigos calculam resumo no download autenticado, sem consulta paga/IA nova.
+-16/16 testes de relatório/API/processos aprovados e prévia fictícia renderizada/conferida. Integrado na main local3000, sem commit/push/deploy. PDF recebido preservado; valores reais não foram inferidos das afirmações da IA.
+- Logo corrigida após revisão: PNG original com transparência preservada e cor escura aplicada no PDF, substituindo desenho SVG aproximado. Marca alterada para IA Audita no cabeçalho, rodapé, autoria e texto. Prévia fictícia renderizada/conferida nas2páginas;3 testes pertinentes aprovados. Sem publicação.

@@ -1,3 +1,4 @@
+import { summarizeReportProcesses } from './seller-process-summary.mjs';
 import { readSellerProcessBatch, processCoverage, PROCESS_RUN_LIMIT } from './seller-processes.service.mjs';
 import { randomUUID, createHash } from 'node:crypto';
 import { readFile, lstat, realpath } from 'node:fs/promises';
@@ -285,6 +286,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       }
       report.additionalStates=sellerAdditionalStates(sources,state.selectedStates,audit.tipoDocumento);
       if(report.additionalStates.length)report.executiveSummary+=`\n\nUma empresa vinculada tem cadastro em ${report.additionalStates.join(', ')}. Avalie consultar também o CPF nesses estados. Nenhuma consulta ou cobrança adicional foi iniciada.`;
+      report.processSummary = await summarizeReportProcesses(originalSources,{readBatch:readProcessBatch,authorize:sourceAuditId=>access(sourceAuditId,auth)});
       state.report = report;
       state.status = analyzed ? 'completed' : 'failed';
       state.progress = analyzed ? 100 : 0;
@@ -297,12 +299,20 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       await save(id, state.token, state).catch(() => {});
     } finally { stopped = true; clearInterval(heartbeat); }
   }
-  async function pdf(id, auth, analysisKey) {
+  async function pdf(id, auth, analysisKey, request) {
     const row = await access(id, auth);
     if (analysisKey && row.request_payload.sellerFlow !== 'certificates') fail('invalid_analysis_selection');
     const state = analysisKey ? certificateReviews(row.request_payload)[analysisKey] : row.request_payload.sellerReview;
     if (state?.status !== 'completed' || !state.report) fail('seller_report_not_ready', 409);
-    return sellerReportPdf(state.report);
+    let report=state.report;
+    if(!report.processSummary && request){
+      const audit=await auditService.findAudit(id,request);
+      if(!audit||audit.unauthorized)fail('seller_analysis_not_found',404);
+      let sources=sellerSources(audit);
+      if(report.analysisMode==='document')sources=sources.filter(source=>source.id===report.sourceId);
+      report={...report,processSummary:await summarizeReportProcesses(sources,{readBatch:readProcessBatch,authorize:sourceAuditId=>access(sourceAuditId,auth)})};
+    }
+    return sellerReportPdf(report);
   }
   async function processes(id, auth, request, sourceId, offset = 0) {
     await access(id, auth);

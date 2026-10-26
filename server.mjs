@@ -4237,7 +4237,7 @@ async function handleApi(request, response, pathname) {
         const body = await readJsonBody(request);
         sendJson(response, 202, await sellerReviewService.start(id, auth, request, body.consent, body.purpose, { mode: body.analysisMode, sourceId: body.sourceId, continueProcesses:body.continueProcesses, continueFrom:body.continueFrom }));
       } else if (sellerReviewMatch[2] === 'report.pdf') {
-        const buffer = await sellerReviewService.pdf(id, auth, new URL(request.url || '/', 'http://localhost').searchParams.get('analysis'));
+        const buffer = await sellerReviewService.pdf(id, auth, new URL(request.url || '/', 'http://localhost').searchParams.get('analysis'), request);
         response.writeHead(200, { 'content-type': 'application/pdf', 'content-disposition': 'attachment; filename="relatorio-audita.pdf"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-length': buffer.length });
         response.end(buffer);
       } else {
