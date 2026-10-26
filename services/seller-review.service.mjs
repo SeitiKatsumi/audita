@@ -14,6 +14,28 @@ const digest = value => createHash('sha256').update(JSON.stringify(value)).diges
 const plain = text => String(text || '').replace(/\s+/g, ' ').trim();
 const fail = (code, status = 400) => { throw Object.assign(new Error(code), { code, status }); };
 const scopeNotice = 'Análise limitada às fontes selecionadas e à data da coleta. Não substitui conferência jurídica, matrícula atualizada do imóvel, ônus, situação conjugal, poderes de representação ou débitos próprios do imóvel. Ausência de ocorrência em uma fonte não comprova ausência geral de dívidas.';
+// Persist only allowlisted diagnostics: provider messages may contain documents or credentials.
+export function sellerReadingFailure(error, stage = 'reading') {
+  const code = error?.code || error?.error?.code || error?.message;
+  const result = (code, message) => ({ code, stage, message });
+  if (code === 'chat_cost_budget_exceeded') return result('account_budget', 'O limite de gastos da análise nesta conta foi atingido. Isso não indica falta de saldo no fornecedor de consultas.');
+  if (code === 'chat_cost_unavailable') return result('account_pricing', 'Não foi possível conferir o custo de uso da IA. A equipe precisa verificar a configuração de preços.');
+  if (code === 'chat_access_required') return result('account_access', 'A conta não tem acesso ativo à análise por IA.');
+  if (stage === 'ai') {
+    if (code === 'insufficient_quota') return result('ai_quota', 'A API de IA informou cota insuficiente. A equipe precisa verificar os créditos e limites do projeto da API.');
+    if (error?.status === 401 || error?.status === 403) return result('ai_access', 'A API de IA recusou a autenticação ou permissão. A equipe precisa conferir a configuração de acesso.');
+    if (error?.status === 429) return result('ai_rate_limit', 'A API de IA limitou as solicitações. Aguarde antes de retomar.');
+    if (error?.name === 'APIConnectionTimeoutError' || code === 'ETIMEDOUT' || code === 'provider_timeout') return result('ai_timeout', 'A API de IA não respondeu dentro do prazo.');
+    if (code === 'seller_ai_output_limit') return result('ai_output_limit', 'A resposta da IA atingiu o limite de tamanho antes de concluir a leitura.');
+    if (code === 'seller_ai_incomplete') return result('ai_incomplete', 'A API de IA devolveu uma resposta incompleta.');
+    if (error?.status === 400 || error?.status === 404) return result('ai_request', 'A API de IA recusou a solicitação. A equipe precisa conferir o modelo e o formato enviado.');
+    if (error?.status >= 500 || error?.name === 'APIConnectionError') return result('ai_unavailable', 'Não foi possível comunicar com a API de IA.');
+  }
+  if (stage === 'validation' || error?.name === 'ZodError' || error?.name === 'SyntaxError') return result('invalid_reading', 'A resposta da IA não passou pela conferência de formato ou de correspondência com os documentos.');
+  if (code === 'source_too_large') return result('evidence_size', 'O material desta fonte ultrapassou o tamanho permitido por leitura.');
+  if (stage === 'evidence') return result('evidence_unavailable', 'Não foi possível abrir os dados ou arquivos salvos desta fonte. A equipe precisa verificar o armazenamento.');
+  return result('reading_failed', 'Não foi possível concluir a leitura desta fonte. A equipe precisa verificar esta execução.');
+}
 export function sellerAdditionalStates(sources,selectedStates,documentType) {
   if(documentType!=='cpf'||!selectedStates?.length)return [];
   return [...new Set(sources.filter(s=>s.identityVerified&&s.subject?.document).map(s=>s.details?.UF).filter(uf=>Object.hasOwn(SELLER_STATES,uf)&&!selectedStates.includes(uf)))];
@@ -233,6 +255,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
           if (prior?.status === 'analyzed') results[index] = prior;
           else if (source.status !== 'success') results[index] = { ...meta, status: 'unavailable', message: 'Fonte sem resultado válido. Não permite concluir sobre regularidade.' };
           else {
+            let stage = 'evidence';
             try {
               if (batch) {
                 await access(collection.auditId, auth);
@@ -247,12 +270,17 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
               }
               const scanned = Boolean(buffer && (needsVision || plain(text).length < 80));
               if (!buffer && !plain(text) && !Object.keys(details).length) fail('empty_evidence', 422);
+              stage = 'cost';
               if(state.purpose) await checkAnalysisCost(auth);
               if (plain(text).length + JSON.stringify(details).length > 180000) fail('source_too_large', 422);
-              const reading = validateSellerReading(await ai.read({ segment: state.segment, purpose: state.purpose, id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth), { ...source, details }, text, scanned);
+              stage = 'ai';
+              const response = await ai.read({ segment: state.segment, purpose: state.purpose, id: source.id, title: source.title, scope: source.scope, subject:source.subject||rowSubject(audit),identityVerified: source.identityVerified, checkedAt: source.checkedAt, analysisDate: now().toISOString(), details, text, ...(scanned ? { buffer } : {}) }, auth);
+              stage = 'validation';
+              const reading = validateSellerReading(response, { ...source, details }, text, scanned);
               results[index] = { ...meta, status: 'analyzed', method: scanned ? 'Leitura visual por IA; confira a transcrição no original' : 'Texto e dados da fonte', ...reading };
-            } catch {
-              results[index] = { ...meta, status: 'unread', message: 'Não foi possível concluir a leitura desta fonte. Confira o original ou tente novamente.', outcome: 'inconclusive' };
+            } catch (error) {
+              const failure = sellerReadingFailure(error, stage);
+              results[index] = { ...meta, status: 'unread', failure, message: failure.message, outcome: 'inconclusive' };
             }
           }
           state.checkpoints[source.id] = results[index];
@@ -274,6 +302,10 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       const report = { processCoverage:state.processCoverage, id, segment: segment.id, title: state.analysisMode === 'document' ? 'Análise de documento' : state.purpose ? 'Análise das certidões' : segment.title, purpose: state.purpose, analysisMode: state.analysisMode, sourceId: state.sourceId, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: state.analysisMode === 'document' ? 'Análise limitada ao documento selecionado, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : state.purpose ? 'Análise limitada às certidões selecionadas, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
         conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? state.purpose ? 'Foram identificados pontos que precisam de conferência no material analisado.' : 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
       };
+      if (!analyzed) {
+        const reasons = [...new Set(results.filter(source => source.failure).map(source => source.failure.message))];
+        if (reasons.length) report.conclusion += ' ' + reasons.join(' ');
+      }
       if (report.processCoverage && !report.processCoverage.complete) {
         report.scopeNotice += ` Análise parcial dos processos: ${report.processCoverage.analyzed} de ${report.processCoverage.total} registros recebidos analisados; ${report.processCoverage.reportedTotal} informados pela fonte. Cada execução lê até ${PROCESS_RUN_LIMIT}.`;
       }
@@ -292,10 +324,11 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       state.progress = analyzed ? 100 : 0;
       state.current = analyzed ? 'Relatório disponível' : 'Leitura não concluída';
       await persist();
-    } catch {
+    } catch (error) {
       stopped = true;
       state.status = 'failed';
-      state.current = 'Análise interrompida. Retome sem refazer as consultas.';
+      state.failure = sellerReadingFailure(error);
+      state.current = state.failure.message;
       await save(id, state.token, state).catch(() => {});
     } finally { stopped = true; clearInterval(heartbeat); }
   }

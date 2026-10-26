@@ -1741,7 +1741,7 @@ const auditService = createAuditService({
 });
 const sellerReviewService = createSellerReviewService({
   getDb: () => ({ pool, dbReady }), auditService,
-  getAnalysisAccess: async auth => { const benefit=await certificateBenefits(auth);return benefit.subscriber||benefit.complimentary; },
+  getAnalysisAccess: auth => certificateAnalysisAccess(auth),
   checkAnalysisCost:auth=>chatAccessService.assertCanSpend(auth),
   ai: createSellerReviewAI({ recordUsage: (usage, auth, operation='seller_document_analysis') => apiUsageService.record(auth, { provider: 'openai', service: 'responses', model: process.env.AUDITA_SELLER_AI_MODEL || process.env.AUDITA_CHAT_MODEL || 'gpt-5-mini', operation, ...usage }) }),
 });
@@ -1816,6 +1816,13 @@ async function certificateBenefits(auth) {
     throw error;
   }
   return {subscriber:access.source==='entitlement'&&access.active===true||access.source==='legacy'&&access.allowed===true,complimentary:access.source==='complimentary'};
+}
+async function certificateAnalysisAccess(auth) {
+  const benefits = await certificateBenefits(auth);
+  if (benefits.subscriber || benefits.complimentary) return true;
+  if (auth.unauthorized || !auth.user) return false;
+  const access = await chatAccessService.getAccess(auth);
+  return access.source === 'test' && access.allowed === true && access.active === true && access.testBypassAvailable === true;
 }
 const chatDocumentsService = createChatDocumentsService({
   getDb: () => ({ pool, dbReady }), accessService: chatAccessService,

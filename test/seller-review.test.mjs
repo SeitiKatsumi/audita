@@ -7,11 +7,55 @@ import { PDFDocument } from 'pdf-lib';
 import vm from 'node:vm';
 import { createAuditService } from '../services/audit.service.mjs';
 import { createSellerReviewAI } from '../services/seller-review-ai.mjs';
-import { createSellerReviewService, validateSellerReading, readSellerPdf, calculateSellerSafetyScore,sellerAdditionalStates } from '../services/seller-review.service.mjs';
+import { createSellerReviewService, validateSellerReading, readSellerPdf, calculateSellerSafetyScore,sellerAdditionalStates, sellerReadingFailure } from '../services/seller-review.service.mjs';
 import { extractPdfText } from '../services/pdf.service.mjs';
 import { analysisSegments } from '../analysis-segments.js';
 
 const owner = { tenantId: 1, user: { id: 811 } };
+test('reading diagnostics distinguish quota, rate, account budget and evidence without leaking raw errors', () => {
+  const secret = 'private-document-and-api-key';
+  const cases = [
+    [{code:'insufficient_quota',status:429}, 'ai', 'ai_quota'],
+    [{status:429}, 'ai', 'ai_rate_limit'],
+    [{code:'chat_cost_budget_exceeded'}, 'cost', 'account_budget'],
+    [{code:'chat_cost_unavailable'}, 'cost', 'account_pricing'],
+    [{status:401}, 'ai', 'ai_access'],
+    [{name:'APIConnectionTimeoutError'}, 'ai', 'ai_timeout'],
+    [{code:'seller_ai_output_limit'}, 'ai', 'ai_output_limit'],
+    [{status:400}, 'ai', 'ai_request'],
+    [{status:503}, 'ai', 'ai_unavailable'],
+    [{code:'ungrounded_finding'}, 'validation', 'invalid_reading'],
+    [{code:'ENOENT'}, 'evidence', 'evidence_unavailable'],
+    [{status:401}, 'evidence', 'evidence_unavailable'],
+    [{}, 'ai', 'reading_failed'],
+  ];
+  for (const [error, stage, expected] of cases) {
+    const diagnostic = sellerReadingFailure({...error,message:secret,stack:secret,error:{message:secret}},stage);
+    assert.equal(diagnostic.code, expected);
+    assert.ok(!JSON.stringify(diagnostic).includes(secret));
+  }
+});
+
+test('failed provider reading persists an actionable quota reason and retry clears it without another collection', async () => {
+  const f = await fixture();
+  try {
+    f.ai.read = async () => {throw Object.assign(new Error('private provider content'),{code:'insufficient_quota',status:429});};
+    const id = await f.start();
+    let state = await f.review.get(id,owner);
+    assert.equal(state.status,'failed');
+    assert.equal(state.report.analyzed,0);
+    assert.equal(state.report.sources[0].failure.code,'ai_quota');
+    assert.match(state.report.conclusion,/cota insuficiente/);
+    assert.ok(!JSON.stringify(state).includes('private provider content'));
+    f.ai.read = async () => ({...reading,findings:[],outcome:'informational'});
+    await f.review.start(id,owner,f.request,true);
+    await f.review.wait(id);
+    state = await f.review.get(id,owner);
+    assert.equal(state.status,'completed');
+    assert.equal(state.report.sources[0].failure,undefined);
+    assert.ok(!state.report.conclusion.includes('cota insuficiente'));
+  } finally {await f.db.close();}
+});
 test('other-state suggestion requires verified company evidence, omits already selected states and never starts a query',()=>{
   const source={identityVerified:true,subject:{document:'04252011000110'},details:{UF:'SP'}};
   assert.deepEqual(sellerAdditionalStates([source,source],['ES'],'cpf'),['SP']);

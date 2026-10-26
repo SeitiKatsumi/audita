@@ -43,7 +43,7 @@ export function createSellerReviewAI({ env = process.env, clientFactory, recordU
       text: { format: { type: 'json_schema', name: 'seller_document_reading', strict: true, schema: z.toJSONSchema(sellerReadingSchema) } },
     });
     await recordUsage(extractOpenAIUsage(result), auth, source.purpose ? 'certificate_document_analysis' : 'seller_document_analysis');
-    if (result.status !== 'completed' || !result.output_text) throw new Error('seller_ai_incomplete');
+    if (result.status !== 'completed' || !result.output_text) throw new Error(result.incomplete_details?.reason === 'max_output_tokens' ? 'seller_ai_output_limit' : 'seller_ai_incomplete');
     return sellerReadingSchema.parse(JSON.parse(result.output_text));
   }
   async function summarize(report,auth) {

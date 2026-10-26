@@ -30,6 +30,13 @@ persistente entre reinicios; configurar apenas apos autorizacao do responsavel.
 
 ## Principios
 
+O acesso de teste do chat, quando habilitado no servidor e explicitamente ativado
+para o usuário autenticado, também permite analisar certidões já coletadas.
+Essa autorização não altera `certificateBenefits`: não concede descontos de
+assinante, emissão gratuita ou créditos para fornecedores. Consentimento,
+propriedade dos documentos e limites técnicos continuam obrigatórios. A liberação
+de teste permanece temporária e precisa ser reativada após reiniciar o servidor.
+
 O bypass temporário da emissão de certidões exige `AUDITA_CERTIFICATE_TEST_BYPASS_ENABLED=true` no servidor; o padrão é desativado. O POST privado de `/api/certificate-orders/:id/test-bypass` exige mesma origem, sessão e propriedade por tenant/usuário. Atua somente sobre emissão pendente, com claim atômico e registro explícito de teste, preservando preço e sem criar pagamento recebido. Não libera análises comerciais nem pedidos em conferência. Desativar a configuração bloqueia novas liberações; consultas já iniciadas permanecem no histórico. O bypass da Audita não torna gratuitos os fornecedores externos.
 
 - Menor privilegio.
