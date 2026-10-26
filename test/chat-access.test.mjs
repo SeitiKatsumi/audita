@@ -72,6 +72,20 @@ test('permanent complimentary access survives restart, overrides exhausted quota
   assert.equal((await make().getAccess(approved)).remaining.messages, 0);
 });
 
+test('admin chat access survives restart without a paid grant and is revoked on demotion', async t => {
+  const admin={...auth,user:{...auth.user,role:'admin'}};
+  const {service,make,pg}=await fixture(t,{getCost:()=>assert.fail('admin has no paid budget')});
+  assert.equal((await service.getAccess(admin,{includeTestAccess:false})).source,'complimentary');
+  assert.equal((await make().getAccess(admin)).unlimited,true);
+  const held=await service.reserve(admin,{requestId:'admin-message',kind:'messages'});
+  assert.equal(held.entitlementId,null);
+  await service.complete(admin,{requestId:'admin-message'});
+  assert.equal((await pg.query('SELECT count(*)::int AS n FROM audita_chat_entitlements')).rows[0].n,0);
+  admin.user.role='member';
+  await assert.rejects(service.reserve(admin,{requestId:'revoked-admin-message',kind:'messages'}),{code:'chat_access_required'});
+  await assert.rejects(service.getAccess({...admin,tenantId:'2'}),{code:'chat_unauthorized'});
+});
+
 test('test bypass is opt-in, owner-scoped, temporary and leaves paid grants/trial unchanged', async t => {
   const { service: s, pg, make } = await fixture(t, { testBypassEnabled: true });
   const disabled = await fixture(t);

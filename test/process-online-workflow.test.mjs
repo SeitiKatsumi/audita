@@ -160,6 +160,24 @@ test('live wallet must be enabled; only a confirmed debit authorizes the externa
   } finally { await f.close(); }
 });
 
+test('admin legacy operations preserve supplier cost without wallet debit and revoked access blocks copy recovery',async()=>{
+  const f=await fixture({mode:'live',walletEnabled:false,balance:0,transportError:error('ECONNRESET')});
+  const admin={...AUTH,user:{...AUTH.user,role:'admin'}};
+  try {
+    const copy=await f.service.requestCopy(admin,input());
+    assert.equal(copy.status,'review_required');assert.equal(copy.billing.state,'complimentary');assert.equal(copy.billing.auditaCredits,0);assert.equal(copy.billing.providerCredits,1);
+    assert.equal(copy.canRecover,true);assert.equal(f.state.debit,0);assert.equal(f.state.refund,0);
+    admin.user.role='member';
+    await assert.rejects(f.service.recover(admin,copy.id,{consent:true,approvedCredits:1}),{code:'process_online_complimentary_access_required'});
+    assert.equal(f.state.calls.length,1);
+    admin.user.role='admin';f.state.transportError=null;
+    const recovered=await f.service.recover(admin,copy.id,{consent:true,approvedCredits:1});
+    assert.equal(recovered.status,'processing');assert.equal(recovered.billing.state,'complimentary');assert.equal(f.state.debit,0);
+    const stored=(await f.pg.query('SELECT * FROM audita_process_online_requests WHERE id=$1',[copy.id])).rows[0];
+    assert.equal(openIr(stored.encrypted_payload,irKey(KEY),`process-online:${copy.id}`).providerCreditsCharged,1);
+  } finally {await f.close();}
+});
+
 test('ambiguous paid search is never retried; explicit copy recovery reuses the original persisted idempotency key', async () => {
   const f = await fixture({ mode: 'live', transportError: error('ECONNRESET') });
   try {

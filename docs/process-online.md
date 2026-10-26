@@ -297,6 +297,8 @@ Se a execução falhar ou ficar em conferência depois do pagamento, o históric
 
 ## Fluxo atual: Direct Data → seleção → ProcessOnline
 
+Administradores autenticados e contas com gratuidade individual autorizada podem solicitar cópias sem Stripe ou débito da carteira. A configuração informa `copyPayment.complimentary:true` e preço zero; consentimento e fornecedores prontos continuam obrigatórios. Pedidos pendentes anteriores oferecem autorização explícita por `POST /api/process-online/requests/checkout` com `orderId` próprio e `consent:true`. A dispensa cifrada preserva preço e sessão anteriores para conciliação, com `paymentStatus:'complimentary'` e sem `paid_at` fictício. Webhook real tardio após dispensa registra necessidade de conciliação sem repetir a solicitação. GET nunca inicia coleta; revogar o perfil bloqueia novas dispensas. Sem migração ou ativação de fornecedor.
+
 O fluxo acima é mantido somente para pedidos legados. Novas buscas CPF/CNPJ vão ao serviço nacional de consultas Direct Data; a Completa retorna CNJs e a Agrupada somente estatísticas. Resultados de certidões e análises oferecem a cópia quando um CNJ válido estiver disponível. Sem nova busca paga ao preparar a oferta.
 
 `POST /api/process-online/requests/checkout` aceita um `cnj` ou `cnjs` de1–20números distintos, consentimento e total aprovado. O preço vem de Super Admin > Preços e margens, com snapshot no pedido; o webhook valida o total persistido, sem valor fixo4990. O mesmo pagamento de um lote gera operações determinísticas por CNJ e não repete cópias após replay. Busca ProcessOnline nova responde410; pedidos antigos pagos continuam válidos. A migração existente foi estendida de forma aditiva, sem apagar pedidos.

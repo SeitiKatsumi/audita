@@ -41,7 +41,7 @@ export function createSuperAdminService({ getDb, billingAdminService, updateFall
 
     const { pool, ready } = database();
     if (!ready) {
-      if (name !== null || email !== null || password !== null) return { invalid: true, reason: "user_edit_requires_database" };
+      if (role || name !== null || email !== null || password !== null) return { invalid: true, reason: "user_edit_requires_database" };
       const user = updateFallbackUser?.(targetId, { status, role });
       return user ? { user } : { notFound: true };
     }
@@ -53,18 +53,22 @@ export function createSuperAdminService({ getDb, billingAdminService, updateFall
     }
     try {
     const result = await pool.query(
-      `WITH updated AS (UPDATE audita_users
-       SET status = COALESCE(NULLIF($2, ''), status),
-           role = COALESCE(NULLIF($3, ''), role),
-           name = COALESCE($4, name),
-           email = COALESCE($5, email),
-           password_hash = COALESCE($6, password_hash),
+      `WITH previous AS (SELECT id, role FROM audita_users WHERE id = $1 AND role <> 'super_admin' FOR UPDATE),
+       updated AS (UPDATE audita_users u
+       SET status = COALESCE(NULLIF($2, ''), u.status),
+           role = COALESCE(NULLIF($3, ''), u.role),
+           name = COALESCE($4, u.name),
+           email = COALESCE($5, u.email),
+           password_hash = COALESCE($6, u.password_hash),
            updated_at = NOW()
-       WHERE id = $1 AND role <> 'super_admin'
-       RETURNING id, tenant_id, email, name, role, status, updated_at),
-       revoked AS (DELETE FROM audita_sessions WHERE user_id IN (SELECT id FROM updated) AND $6::text IS NOT NULL)
+       FROM previous p WHERE u.id = p.id
+       RETURNING u.id, u.tenant_id, u.email, u.name, u.role, u.status, u.updated_at),
+       revoked AS (DELETE FROM audita_sessions WHERE user_id IN (SELECT id FROM updated) AND $6::text IS NOT NULL),
+       audited AS (INSERT INTO audita_app_events (tenant_id, event_type, payload)
+         SELECT u.tenant_id, 'user_role_changed', jsonb_build_object('actorId', $7::text, 'targetId', u.id::text, 'fromRole', p.role, 'toRole', u.role)
+         FROM updated u JOIN previous p ON p.id = u.id WHERE p.role <> u.role)
        SELECT * FROM updated`,
-      [targetId, status, role, name, email, passwordHash],
+      [targetId, status, role, name, email, passwordHash, text(actor.user.id)],
     );
     if (!result.rows[0]) return { notFound: true };
     return { user: result.rows[0] };

@@ -240,6 +240,7 @@ const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".webmanifest": "application/manifest+json; charset=utf-8",
   ".pdf": "application/pdf",
   ".png": "image/png",
   ".svg": "image/svg+xml",
@@ -3488,7 +3489,7 @@ async function handleApi(request, response, pathname) {
     const authContext = await getTenantIdForRequest(request);
     const access = authContext.unauthorized
       ? { entitled: false, source: "none" }
-      : await stripeBillingService.itauLawyerKitAccessState(authContext);
+      : await stripeBillingService.itauLawyerKitAccessState(authContext, new URL(request.url, 'http://localhost').searchParams.get('uf'));
     const documents = itauLawyerKitDocuments.map((document) => ({
       slug: document.slug,
       title: document.title,
@@ -3508,7 +3509,7 @@ async function handleApi(request, response, pathname) {
           title: file.title,
           included: true,
           available: true,
-          downloadUrl: `/api/itau-lawyer-kit/documents/jurisprudencia-${file.order}`,
+          downloadUrl: `/api/itau-lawyer-kit/documents/jurisprudencia-${file.order}${access.unlimited ? '?uf=' + encodeURIComponent(access.uf) : ''}`,
         })));
       } catch (error) {
         jurisprudenceError = error instanceof DirectusLawyerKitError
@@ -3586,7 +3587,7 @@ async function handleApi(request, response, pathname) {
       sendJson(response, 401, { error: "authentication_required" });
       return true;
     }
-    const access = await stripeBillingService.itauLawyerKitAccessState(authContext);
+    const access = await stripeBillingService.itauLawyerKitAccessState(authContext, new URL(request.url, 'http://localhost').searchParams.get('uf'));
     if (!access.entitled) {
       sendJson(response, 403, { error: "itau_lawyer_kit_purchase_required" });
       return true;
@@ -4213,11 +4214,11 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
-  const certificateTestBypassMatch=pathname.match(/^\/api\/certificate-orders\/([0-9a-fA-F-]{36})\/test-bypass$/);
+  const certificateTestBypassMatch=pathname.match(/^\/api\/certificate-orders\/([0-9a-fA-F-]{36})\/(test-bypass|waive)$/);
   if(certificateTestBypassMatch&&request.method==='POST') {
     try {
       if(!String(request.headers['content-type']).startsWith('application/json')||request.headers['sec-fetch-site']==='cross-site'||(request.headers.origin&&new URL(request.headers.origin).host!==request.headers.host)){sendJson(response,403,{error:'same_origin_required'});return true;}
-      const order=await certificateOrderService.testBypass(await getTenantIdForRequest(request),certificateTestBypassMatch[1],request);
+      const order=await certificateOrderService[certificateTestBypassMatch[2]==='waive'?'waive':'testBypass'](await getTenantIdForRequest(request),certificateTestBypassMatch[1],request);
       sendJson(response,202,order);
     }catch(error){sendJson(response,error.statusCode||error.status||500,{error:error.code||'certificate_test_bypass_failed',message:error.code==='certificate_test_bypass_disabled'?'O bypass de teste não está habilitado neste ambiente.':'Não foi possível iniciar este pedido em modo de teste.'});}
     return true;
@@ -6337,6 +6338,9 @@ const server = http.createServer(async (request, response) => {
   publicRootFiles.add('process-online.js');
   publicRootFiles.add('judicial-processes.js');
   publicRootFiles.add('process-online.css');
+  publicRootFiles.add('manifest.webmanifest');
+  publicRootFiles.add('pwa-install.js');
+  publicRootFiles.add('pwa-sw.js');
   if (!publicRootFiles.has(staticName) && !(staticName.startsWith("assets/") && !staticName.split("/").some(p => p.startsWith(".")))) {
     response.writeHead(404, { "content-type": "text/plain; charset=utf-8" }); response.end("Not found"); return;
   }

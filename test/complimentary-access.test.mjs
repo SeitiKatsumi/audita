@@ -5,6 +5,28 @@ import { createCreditsService } from '../services/credits.service.mjs';
 import { createBillingAccessService } from '../services/billing-access.service.mjs';
 import { createStripeBillingService } from '../services/stripe-billing.service.mjs';
 
+test('only authenticated active administrators get free services; demotion restores normal billing', async t => {
+  const flag=process.env.AUDITA_CREDITS_ENABLED;
+  process.env.AUDITA_CREDITS_ENABLED='true';
+  t.after(()=>{if(flag===undefined)delete process.env.AUDITA_CREDITS_ENABLED;else process.env.AUDITA_CREDITS_ENABLED=flag;});
+  const accessService=createBillingAccessService(),billing=createStripeBillingService({accessService}),credits=createCreditsService();
+  for(const role of ['admin','super_admin']){
+    const auth={tenantId:'981',user:{id:'981',email:'admin-fixture@example.test',role,status:'active'}};
+    assert.equal(hasUnlimitedAccess(auth,{}),true);
+    assert.equal((await accessService.getEntitlement(auth)).source,'complimentary');
+    assert.equal((await billing.itauCaseAccessState(auth,['fixture'])).entitled,true);
+    assert.equal((await billing.itauLawyerKitAccessState(auth)).entitled,true);
+    assert.equal((await billing.itauLawyerKitAccessState(auth,'sp')).uf,'SP');
+    assert.equal((await billing.itauLawyerKitAccessState(auth,'XX')).uf,'');
+    assert.equal((await credits.consume(auth,{amount:100,referenceId:'admin-fixture',operation:'fixture'})).amount,0);
+    for(const input of [{...auth,unauthorized:true},{...auth,tenantId:null},{...auth,user:{...auth.user,id:null}},...['disabled','suspended'].map(status=>({...auth,user:{...auth.user,status}}))])assert.equal(hasUnlimitedAccess(input,{}),false);
+    auth.user.role='member';
+    assert.equal((await accessService.getEntitlement(auth)).entitled,false);
+    assert.equal((await credits.getWallet(auth)).enabled,true);
+  }
+  for(const role of ['owner','analyst','member','lawyer','manager'])assert.equal(hasUnlimitedAccess({tenantId:981,user:{id:981,role}},{}),false);
+});
+
 test('complimentary access is exact, authenticated, revocable and does not change roles or another wallet', async t => {
   const previous = process.env.AUDITA_UNLIMITED_ACCESS_EMAILS, creditsFlag = process.env.AUDITA_CREDITS_ENABLED;
   process.env.AUDITA_UNLIMITED_ACCESS_EMAILS = ' approved@example.test ';

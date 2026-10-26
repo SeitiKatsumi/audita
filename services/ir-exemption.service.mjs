@@ -3,10 +3,12 @@ import {mkdir,writeFile,readFile,unlink} from 'node:fs/promises';
 import {resolve,join} from 'node:path';
 import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';
 import {IR_VERSION,IR_DOCUMENT_TYPES,IR_STATUSES,IR_SOURCES,IrError,requireIr,irSteps,validateAnswer,documentChecklist,analyzeIr,sealIr,openIr,irKey} from './ir-exemption-domain.mjs';
+import {hasUnlimitedAccess} from './complimentary-access.mjs';
 
 const uuid=()=>crypto.randomUUID();
 const safe=(value,max=2000)=>String(value||'').trim().slice(0,max);
 const idValid=id=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id));
+const contracted=offer=>offer.state==='paid'||offer.paymentWaived===true&&offer.state==='accepted';
 const transitions={triage:['documents_pending','review'],documents_pending:['review'],review:['documents_pending','preparation'],preparation:['review','filed'],filed:['requirement','decision'],requirement:['filed','review','decision'],decision:['preparation','closed'],closed:['review']};
 export function createIrExemptionService({getDb,env=process.env,checkout,extractor,now=()=>new Date()}={}) {
   const key=()=>irKey(env.AUDITA_IR_ENCRYPTION_KEY);
@@ -34,12 +36,21 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
   async function save(db,c,payload,status=c.status) {await db.query('UPDATE audita_ir_cases SET encrypted_payload=$2,status=$3,revision=revision+1,updated_at=NOW() WHERE id=$1',[c.id,encrypt('case',c.id,payload),status]);}
   async function documents(db,id) {return (await db.query('SELECT * FROM audita_ir_documents WHERE case_id=$1 ORDER BY created_at',[id])).rows.map(r=>({id:r.id,createdAt:r.created_at,...decrypt('document',r)}));}
   async function proposals(db,id) {return (await db.query('SELECT * FROM audita_ir_proposals WHERE case_id=$1 ORDER BY version DESC',[id])).rows.map(r=>({id:r.id,version:r.version,kind:r.kind,amountCents:Number(r.amount_cents),state:r.state,acceptedAt:r.accepted_at,paidAt:r.paid_at,...decrypt('proposal',r)}));}
+  async function waivePayment(db,a,auth,offer) {
+    const payload=decrypt('proposal',offer);
+    if(payload.paymentWaived)return true;
+    if(!a.owner||!hasUnlimitedAccess(auth,env))return false;
+    payload.paymentWaived=true;payload.paymentWaiver={by:auth.user.id,role:auth.user.role,at:now().toISOString(),reason:'complimentary_access'};
+    await db.query("UPDATE audita_ir_proposals SET state='accepted',encrypted_payload=$2 WHERE id=$1",[offer.id,encrypt('proposal',offer.id,payload)]);
+    await event(db,a.row,auth,'proposal_payment_waived',{proposalId:offer.id,message:'Pagamento dispensado por acesso gratuito. Aceite e revisão preservados.'});
+    return true;
+  }
   async function view(db,a,auth) {
     const docs=await documents(db,a.row.id), offers=await proposals(db,a.row.id);
     const history=(await db.query(`SELECT * FROM audita_ir_events WHERE case_id=$1 ${a.operator?'':'AND internal=FALSE'} ORDER BY created_at DESC LIMIT 200`,[a.row.id])).rows.map(r=>({id:r.id,kind:r.kind,internal:r.internal,createdAt:r.created_at,...decrypt('event',r)}));
     const steps=irSteps(a.payload.answers,a.payload.intakeVersion),index=steps.findIndex(s=>!s.optional&&a.payload.answers[s.key]===undefined);
     return {id:a.row.id,revision:a.row.revision,status:a.row.status,createdAt:a.row.created_at,updatedAt:a.row.updated_at,assignedUserId:a.row.assigned_user_id,
-      permissions:{owner:a.owner,operator:a.operator,assign:a.role==='super_admin'||a.role==='manager'},
+      permissions:{owner:a.owner,operator:a.operator,assign:a.role==='super_admin'||a.role==='manager',paymentWaiverAllowed:a.owner&&hasUnlimitedAccess(auth,env)},
       ...a.payload,documents:docs,proposals:offers,events:history,steps,question:index===-1?null:steps[index],progress:{completed:index===-1?steps.length:index,total:steps.length},checklist:documentChecklist(a.payload.answers)};
   }
   async function configuration(auth) {
@@ -66,7 +77,7 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
         const steps=irSteps(p.answers,p.intakeVersion),target=steps.findIndex(s=>s.key===input.key),next=steps.findIndex(s=>!s.optional&&p.answers[s.key]===undefined);
         requireIr(target>=0&&(next===-1||target<=next),'invalid_step','Conclua a pergunta atual primeiro.');
         requireIr(p.answers.consent||['role','consent'].includes(input.key),'consent_required','Confirme a autorização antes de informar dados.');
-        const accepted=(await db.query("SELECT id FROM audita_ir_proposals WHERE case_id=$1 AND state IN ('accepted','payment_pending')",[id])).rows;
+        const accepted=(await proposals(db,id)).filter(p=>['accepted','payment_pending'].includes(p.state)&&!p.paymentWaived);
         requireIr(!accepted.length,'payment_in_progress','Finalize o pagamento pendente antes de alterar as informações.',409);
         p.answers[input.key]=validateAnswer(input.key,input.value,p.answers);
         if(input.restartFollowing===true){
@@ -103,8 +114,8 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
         requireIr(a.operator,'operator_required','Acesso restrito à equipe.',403);
         requireIr(transitions[a.row.status]?.includes(input.status),'invalid_transition','Transição de situação inválida.');
         if(input.status==='preparation') {
-          const paid=(await db.query("SELECT id FROM audita_ir_proposals WHERE case_id=$1 AND state='paid'",[id])).rows;
-          requireIr(p.review&&paid.length,'payment_required','Revisão e pagamento confirmado são necessários.');
+          const hired=(await proposals(db,id)).some(contracted);
+          requireIr(p.review&&hired,'payment_required','Revisão e contratação com pagamento confirmado ou dispensado são necessárias.');
         }
         if(input.status==='filed')requireIr(p.protocols.length,'protocol_required','Registre o protocolo e o comprovante.');
         if(input.status==='decision')requireIr(p.outcomes.exemption||p.outcomes.refund,'evidence_required','Registre uma decisão ou restituição com evidência.');
@@ -121,8 +132,8 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
         await save(db,a.row,p);await event(db,a.row,auth,'task_updated',{message:'Lista de tarefas atualizada.'});
       } else if(action==='protocol') {
         requireIr(a.operator,'operator_required','Acesso restrito à equipe.',403);
-        const paid=(await db.query("SELECT id FROM audita_ir_proposals WHERE case_id=$1 AND state='paid'",[id])).rows;
-        requireIr(paid.length&&p.review,'payment_required','Revisão e contratação são necessárias para registrar protocolo.');
+        const hired=(await proposals(db,id)).some(contracted);
+        requireIr(hired&&p.review,'payment_required','Revisão e contratação são necessárias para registrar protocolo.');
         const data=input.protocol||{},docs=await documents(db,id);
         requireIr(docs.some(d=>d.id===data.documentId&&d.type==='protocol'),'evidence_required','Anexe o comprovante de protocolo.');
         requireIr(['administrative','judicial'].includes(data.kind)&&safe(data.number)&&safe(data.authority),'invalid_protocol','Informe tipo, órgão e número.');
@@ -177,8 +188,8 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
     requireIr(a.payload.review,'review_required','Revise as informações antes da proposta.');
     const amount=Number(input.amountCents);requireIr(['adm','ouro'].includes(input.kind)&&Number.isSafeInteger(amount)&&amount>=100&&amount<=1000000000,'invalid_proposal','Informe plano e preço válido (mínimo R$ 1).');
     requireIr(safe(input.scope)&&safe(input.terms),'invalid_proposal','Descreva entregas e condições.');
-    const old=await proposals(db,id);requireIr(!old.some(p=>['accepted','payment_pending'].includes(p.state)),'payment_in_progress','Há proposta aceita ou pagamento pendente.',409);
-    const paid=old.filter(p=>p.state==='paid');
+    const old=await proposals(db,id);requireIr(!old.some(p=>['accepted','payment_pending'].includes(p.state)&&!p.paymentWaived),'payment_in_progress','Há proposta aceita ou pagamento pendente.',409);
+    const paid=old.filter(contracted);
     requireIr(!paid.length||(input.kind==='ouro'&&paid.every(p=>p.kind==='adm')&&input.additional===true),'invalid_upgrade','Após ADM pago, publique apenas upgrade Ouro com valor adicional explícito.');
     requireIr(!(a.payload.answers.role==='heir'&&input.kind==='adm'&&!safe(input.rationale)),'review_required','Registre a justificativa da via administrativa para o espólio.');
     await db.query("UPDATE audita_ir_proposals SET state='superseded' WHERE case_id=$1 AND state='published'",[id]);
@@ -188,14 +199,15 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
   });}
   async function acceptProposal(auth,id,proposalId,input) {return transaction(async db=>{
     const a=await access(db,auth,id,true);requireIr(a.owner,'owner_required','Somente o solicitante pode aceitar.',403);requireIr(input.accepted===true,'acceptance_required','Confirme o aceite das condições.');
-    const offer=(await proposals(db,id)).find(p=>p.id===proposalId);requireIr(offer&&offer.state==='published'&&offer.version===input.version,'proposal_conflict','Proposta não está disponível para aceite.',409);
+    const offer=(await db.query('SELECT * FROM audita_ir_proposals WHERE id=$1 AND case_id=$2',[proposalId,id])).rows[0];requireIr(offer&&offer.state==='published'&&offer.version===input.version,'proposal_conflict','Proposta não está disponível para aceite.',409);
     requireIr(a.payload.review,'review_required','A equipe precisa revisar os documentos atualizados.');
-    await db.query("UPDATE audita_ir_proposals SET state='accepted',accepted_at=NOW() WHERE id=$1",[proposalId]);await save(db,a.row,a.payload);await event(db,a.row,auth,'proposal_accepted',{proposalId,version:offer.version,message:'Proposta aceita. Aguardando pagamento.'});return view(db,await access(db,auth,id),auth);
+    await db.query("UPDATE audita_ir_proposals SET state='accepted',accepted_at=NOW() WHERE id=$1",[proposalId]);const waived=await waivePayment(db,a,auth,offer);await save(db,a.row,a.payload);await event(db,a.row,auth,'proposal_accepted',{proposalId,version:offer.version,message:waived?'Proposta aceita com pagamento dispensado.':'Proposta aceita. Aguardando pagamento.'});return view(db,await access(db,auth,id),auth);
   });}
   async function createCheckout(auth,id,proposalId) {return transaction(async db=>{
     const a=await access(db,auth,id,true);requireIr(a.owner,'owner_required','Somente o solicitante pode pagar.',403);
     const r=(await db.query('SELECT * FROM audita_ir_proposals WHERE id=$1 AND case_id=$2',[proposalId,id])).rows[0];
     requireIr(r&&['accepted','payment_pending'].includes(r.state),'proposal_conflict','Aceite uma proposta disponível antes de pagar.',409);
+    if(await waivePayment(db,a,auth,r)){if(!decrypt('proposal',r).paymentWaived)await save(db,a.row,a.payload);return {paymentWaived:true,case:await view(db,await access(db,auth,id),auth)};}
     if(r.checkout_url&&new Date(r.checkout_expires_at)>now())return {url:r.checkout_url};
     // Do not create another session until the previous one is confirmed expired by Stripe.
     requireIr(!r.checkout_id,'checkout_pending','Aguardando confirmação do pagamento ou expiração pelo provedor. Atualize em instantes.',409);
@@ -219,7 +231,8 @@ export function createIrExemptionService({getDb,env=process.env,checkout,extract
         requireIr(obj.currency==='brl'&&Number(obj.amount_total)===Number(r.amount_cents),'invalid_payment_amount','Valor do pagamento não corresponde à proposta.');
         await db.query("UPDATE audita_ir_proposals SET state='paid',paid_at=NOW() WHERE id=$1",[r.id]);await event(db,c,null,'payment_confirmed',{message:'Pagamento confirmado.',proposalId:r.id},false,`stripe:${stripeEvent.id}`);
       } else if(['checkout.session.expired','checkout.session.async_payment_failed'].includes(stripeEvent.type)) {
-        await db.query("UPDATE audita_ir_proposals SET state='accepted',checkout_id=NULL,checkout_url=NULL,checkout_expires_at=NULL,checkout_attempt=checkout_attempt+1 WHERE id=$1",[r.id]);await event(db,c,null,'payment_retry',{message:'Pagamento não concluído. Você pode tentar novamente.'},false,`stripe:${stripeEvent.id}`);
+        const waived=decrypt('proposal',r).paymentWaived===true;
+        await db.query("UPDATE audita_ir_proposals SET state='accepted',checkout_id=NULL,checkout_url=NULL,checkout_expires_at=NULL,checkout_attempt=checkout_attempt+1 WHERE id=$1",[r.id]);await event(db,c,null,waived?'payment_checkout_closed':'payment_retry',{message:waived?'Checkout anterior encerrado. A dispensa de pagamento permanece.':'Pagamento não concluído. Você pode tentar novamente.'},false,`stripe:${stripeEvent.id}`);
       } else return {ignored:true,tenantId:c.tenant_id};
       await save(db,c,decrypt('case',c));return {tenantId:c.tenant_id};
     });

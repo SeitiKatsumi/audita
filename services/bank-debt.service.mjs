@@ -1,6 +1,7 @@
 import {analyzeStatements,debtPlan} from './bank-debt-analysis.mjs';
 import {estimateDebt,estimateText} from './bank-debt-estimate.mjs';
 import {randomUUID} from 'node:crypto';
+import {hasUnlimitedAccess} from './complimentary-access.mjs';
 import {PDFDocument} from 'pdf-lib';
 import {DEBT_VERSION,DEBT_TERMS,DEBT_QUESTIONS,debtDetails,debtClaimant,debtReview,debtParse,debtRequire,debtLegalTexts,debtTriageStatus} from './bank-debt-domain.mjs';
 import {debtHash,debtDocuments,debtPdf} from './bank-debt-pdf.mjs';
@@ -157,8 +158,8 @@ export function createBankDebtService({getDb,checkout,paymentRequired=true,rateP
     debtRequire(['offer','payment_pending'].includes(r.status)&&(p.review||p.docOffer),'O cálculo Audita precisa ser validado antes da contratação.',409);
     debtRequire(input.accepted===true&&input.reviewId===(p.review||p.docOffer).id,'Confirme a análise e as condições atuais.');
     debtRequire(!p.paymentProcessing,'Seu pagamento está em processamento. Aguarde a confirmação antes de tentar novamente.',409);
-    if(!paymentRequired){
-      debtRequire(!p.checkout,'Existe uma sessão de pagamento anterior. Aguarde sua expiração antes de continuar sem cobrança.',409);
+    if(!paymentRequired||hasUnlimitedAccess(auth)){
+      debtRequire(!p.checkout||hasUnlimitedAccess(auth),'Existe uma sessão de pagamento anterior. Aguarde sua expiração antes de continuar sem cobrança.',409);
       p.paid={amountCents:0,at:now().toISOString(),method:'waived'};
       p.purchaseAcceptance={version:DEBT_VERSION,at:now().toISOString(),reviewId:(p.review||p.docOffer).id,terms:DEBT_TERMS};
       r.status='paid';await save(c,r,auth,'contracted_without_payment');return {case:await view(c,r,auth)};

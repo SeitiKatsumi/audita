@@ -2,6 +2,8 @@
 
 ## Acesso comercial individual
 
+Os perfis autenticados `admin` e `super_admin` têm uso sem cobrança nos módulos e serviços, pela regra central `hasUnlimitedAccess`. Somente Super Admin pode atribuir ou remover o perfil Administrador no diretório de usuários. O perfil vigente é lido do banco em cada requisição; remover o perfil revoga novas dispensas. `owner`, operadores e usuários comuns conservam seus contratos. A dispensa não amplia acesso a documentos de terceiros, atribuições profissionais, consentimento ou limites técnicos; custos dos fornecedores continuam existindo. Não representa pagamento recebido nem assinatura Stripe.
+
 Jurisprudencias do card de cobrancas: `/api/jurisprudence` exige sessao e plano
 pago vigente (incluindo Experimente/Standard legado) ou liberacao individual ja
 autorizada. Cotas esgotadas nao bloqueiam a leitura; bypass gratuito de chat nao

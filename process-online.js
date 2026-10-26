@@ -127,9 +127,10 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   }
   function ready() { return state.config?.enabled === true && state.config?.ready === true && state.config?.storageReady !== false; }
   function sandbox() { return ['test', 'sandbox'].includes(state.config?.mode); }
+  function complimentary() { return state.config?.copyPayment?.complimentary === true; }
   function unitAmount() {
     const value = state.config?.copyPayment?.unitAmountCents;
-    return Number.isSafeInteger(value) && value > 0 ? value : null;
+    return Number.isSafeInteger(value) && (value > 0 || value === 0 && complimentary()) ? value : null;
   }
   function maxQuantity() { return Math.min(20, Math.max(1, Number(state.config?.copyPayment?.maxQuantity) || 20)); }
   function selectedNumbers() { return state.chosen.size ? [...state.chosen] : [normalizedCnj(cnj.value)].filter(Boolean); }
@@ -158,10 +159,10 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     const paidDisabled = state.busy || !ready() || Boolean(state.pending);
     const quantity = selectedNumbers().length, unit = unitAmount();
     cnj.required = state.chosen.size === 0;
-    copyPrice.textContent = unit ? `${money(unit)} por cópia · ${quantity} selecionada(s) · Total: ${money(unit * quantity)}. Pagamento no Stripe; cópias solicitadas após a confirmação.` : 'O valor das cópias ainda não está disponível. Aguarde a configuração do pagamento.';
-    copyButton.textContent = unit && quantity ? `Pagar ${money(unit * quantity)} e solicitar ${quantity === 1 ? 'cópia' : `${quantity} cópias`}` : 'Selecione um processo para continuar';
+    copyPrice.textContent = complimentary() ? `Acesso sem cobrança · ${quantity} cópia(s) selecionada(s).` : unit !== null ? `${money(unit)} por cópia · ${quantity} selecionada(s) · Total: ${money(unit * quantity)}. Pagamento no Stripe; cópias solicitadas após a confirmação.` : 'O valor das cópias ainda não está disponível. Aguarde a configuração do pagamento.';
+    copyButton.textContent = unit !== null && quantity ? complimentary() ? 'Solicitar cópias sem pagar' : `Pagar ${money(unit * quantity)} e solicitar ${quantity === 1 ? 'cópia' : `${quantity} cópias`}` : 'Selecione um processo para continuar';
     searchButton.disabled = state.busy || Boolean(state.pending) || typeof onDocumentSearch !== 'function' || !searchConsent.check.checked;
-    copyButton.disabled = paidDisabled || !state.config?.copyPayment?.checkoutReady || !unit || !quantity || quantity > maxQuantity() || Boolean(state.payment && ['pending','paid'].includes(state.payment.status)) || !copyConsent.check.checked;
+    copyButton.disabled = paidDisabled || !state.config?.copyPayment?.checkoutReady || unit === null || !quantity || quantity > maxQuantity() || Boolean(state.payment && ['pending','paid'].includes(state.payment.status)) || !copyConsent.check.checked;
     historyButton.disabled = state.busy;
     retryButton.disabled = state.busy || !ready();
     retryButton.hidden = Boolean(state.pending?.review);
@@ -179,7 +180,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     configPanel.replaceChildren();
     if (ready()) {
       configPanel.append(el('strong', '', sandbox() ? 'Testes gratuitos ativos' : 'Integração disponível'),
-        el('p', '', sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'As cópias são solicitadas após a confirmação do pagamento pelo Stripe. A busca por CPF/CNPJ é feita separadamente.'));
+        el('p', '', complimentary() ? 'Seu acesso permite solicitar cópias sem pagamento. A autorização de consulta continua obrigatória.' : sandbox() ? 'Use somente os canários fornecidos pelo parceiro. Todo PDF deste ambiente é demonstrativo.' : 'As cópias são solicitadas após a confirmação do pagamento pelo Stripe. A busca por CPF/CNPJ é feita separadamente.'));
       if (sandbox()) {
         configPanel.append(button('Usar processo de exemplo', () => {
           if (state.busy || state.pending) return;
@@ -188,7 +189,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
       }
     }
     configPanel.hidden = !ready();
-    if (ready() && (!state.config?.copyPayment?.checkoutReady || !unitAmount())) configPanel.append(el('p', 'process-online-muted', 'O pagamento está em configuração. Tente novamente mais tarde.'));
+    if (ready() && (!state.config?.copyPayment?.checkoutReady || unitAmount() === null)) configPanel.append(el('p', 'process-online-muted', 'O pagamento está em configuração. Tente novamente mais tarde.'));
     copyConsent.label.lastChild.textContent = sandbox()
       ? 'Autorizo uma cópia demonstrativa no ambiente de testes, sem pagamento real.'
       : 'Autorizo a solicitação desta cópia e confirmo meu interesse legítimo.';
@@ -479,9 +480,15 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
     paymentPanel.replaceChildren(); paymentPanel.hidden = !state.payment;
     if (!state.payment) return;
     const order = state.payment;
+    const waiverAvailable=order.status==='pending'&&order.complimentaryAvailable===true;
     const messages = { pending: 'Pagamento ainda não confirmado. Conclua o pagamento no Stripe ou confira o status abaixo.', paid: 'Pagamento confirmado. Estamos preparando sua solicitação. Não é necessário pagar novamente.', fulfilled: 'Pagamento confirmado e solicitação registrada. Confira o resultado nas suas solicitações.', expired: 'O checkout expirou. Você pode iniciar um novo pagamento.', failed: 'O pagamento não foi concluído. Você pode tentar novamente.' };
-    paymentPanel.append(el('p', '', messages[order.status] || 'Confira o estado do pagamento.'), el('p', 'process-online-muted', `Referência: ${order.id}`));
-    if (order.status === 'pending' && checkoutUrl(order.checkoutUrl)) {
+    paymentPanel.append(el('p', '', waiverAvailable ? 'Seu perfil permite autorizar este pedido sem pagamento.' : order.complimentary ? order.status === 'fulfilled' ? 'Solicitação registrada sem cobrança. Confira o resultado nas suas solicitações.' : 'Acesso sem cobrança. Preparando sua solicitação.' : messages[order.status] || 'Confira o estado do pagamento.'), el('p', 'process-online-muted', `Referência: ${order.id}`));
+    if (waiverAvailable) paymentPanel.append(button('Autorizar e continuar sem pagar', () => run(async () => {
+      const generation=state.generation;
+      const released=await api('/requests/checkout',{orderId:order.id,consent:true}); assertCurrent(generation);
+      state.payment=released; await loadPayment(released.id);
+    }), true));
+    if (!order.complimentary && !waiverAvailable && order.status === 'pending' && checkoutUrl(order.checkoutUrl)) {
       const link = el('a', 'primary-action', 'Continuar pagamento no Stripe'); link.href = checkoutUrl(order.checkoutUrl); paymentPanel.append(link);
     }
     if (['pending', 'paid'].includes(order.status)) paymentPanel.append(button('Atualizar pagamento', () => run(() => loadPayment(order.id))));
@@ -533,7 +540,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
         const order = await api('/requests/checkout', pending.body); assertCurrent(generation);
         if (!order?.id) throw Object.assign(new Error('Não foi possível confirmar o checkout. Retome a mesma operação.'), { uncertain: true });
         state.payment = order; state.pending = null; searchConsent.check.checked = false; copyConsent.check.checked = false; renderPayment();
-        if (order.status === 'pending') {
+        if (order.status === 'pending' && !order.complimentary) {
           const url = checkoutUrl(order.checkoutUrl);
           if (!url) throw new Error('O link do pagamento não está disponível. Confira o pagamento antes de tentar novamente.');
           navigate(url);
@@ -548,7 +555,7 @@ export function initProcessOnline({ container, fetchImpl = globalThis.fetch, onA
   async function startOperation() {
     if (!ready() || state.pending) return;
     const unit = unitAmount(), numbers = selectedNumbers();
-    if (!state.config?.copyPayment?.checkoutReady || !unit || state.payment && ['pending','paid'].includes(state.payment.status)) return;
+    if (!state.config?.copyPayment?.checkoutReady || unit === null || state.payment && ['pending','paid'].includes(state.payment.status)) return;
     if (!copyConsent.check.checked) throw new Error('Confirme a autorização antes de continuar.');
     if (!numbers.length) throw new Error('Informe um número CNJ válido ou selecione um processo localizado.');
     if (numbers.length > maxQuantity()) throw new Error(`Selecione até ${maxQuantity()} processos por pagamento.`);

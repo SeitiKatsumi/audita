@@ -12775,3 +12775,21 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
 .seller-process-offer p { margin: 0; color: var(--muted); }
 .seller-process-offer button { justify-self: start; white-space: normal; }
 .seller-evidence-json { max-height: 26rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+
+.pwa-install { position: fixed; z-index: 35; right: max(16px, env(safe-area-inset-right)); bottom: calc(var(--mobile-nav-height, 0px) + 16px); display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 14px; border: 1px solid #315669; border-radius: 24px; background: #0b2637; color: #a9d5df; box-shadow: 0 3px 14px #0004; font: inherit; font-size: .8rem; cursor: pointer; }
+.pwa-install[hidden] { display: none; }
+.pwa-install svg { width: 20px; height: 20px; }
+.pwa-install:hover { background: #13394b; color: #fff; }
+.pwa-install:focus-visible, .pwa-install-guide button:focus-visible { outline: 2px solid #55f5c3; outline-offset: 3px; }
+.pwa-install-guide { width: min(420px, calc(100% - 32px)); max-height: 85dvh; box-sizing: border-box; padding: 24px; border: 1px solid #315669; border-radius: 16px; color: #e5f3fa; background: #071b2b; }
+.pwa-install-guide::backdrop { background: #0009; }
+.pwa-install-guide h2 { margin: 0 0 16px; font-size: 1.2rem; }
+.pwa-install-guide ol { padding-left: 22px; line-height: 1.65; }
+.pwa-install-guide li + li { margin-top: 10px; }
+.pwa-install-guide p { color: #a9c6d5; font-size: .85rem; }
+.pwa-install-guide button { min-height: 44px; padding: 10px 20px; border: 1px solid #315669; border-radius: 8px; color: #e5f3fa; background: #123449; font: inherit; cursor: pointer; }
+@media (max-width: 960px) {
+  .pwa-install { width: 44px; padding: 0; justify-content: center; }
+  .pwa-install span { display: none; }
+  body:has(.login-screen:not(.hidden)) .pwa-install { bottom: calc(16px + env(safe-area-inset-bottom)); }
+}

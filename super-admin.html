@@ -50,13 +50,14 @@
             <div class="metrics">
               <article><small>MRR estimado</small><strong id="metricMrr">—</strong><span>receita recorrente mensal</span></article>
               <article><small>Assinaturas ativas</small><strong id="metricActive">—</strong><span id="metricPastDue">—</span></article>
-              <article><small>Usuários</small><strong id="metricUsers">—</strong><span>em todas as organizações</span></article>
+              <article><small>Usuários</small><strong id="metricUsers">—</strong><span id="userAccessSummary">em todas as organizações</span></article>
               <article class="accent"><small>Créditos em carteira</small><strong id="metricCredits">—</strong><span>saldo total da plataforma</span></article>
             </div>
             <article class="table-card compact"><div class="card-heading"><div><span class="index">ÚLTIMOS EVENTOS</span><h2>Atividade de cobrança</h2></div><button class="refresh" data-refresh>Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>Evento</th><th>Organização</th><th>Status</th><th>Data</th></tr></thead><tbody id="eventRows"></tbody></table></div></article>
           </section>
 
           <section class="panel" data-panel="users">
+            <p>Administrador e Super Admin usam todos os módulos e serviços sem cobrança. Apenas o Super Admin pode conceder ou remover o perfil Administrador.</p>
             <article class="table-card"><div class="card-heading"><div><span class="index">DIRETÓRIO GLOBAL</span><h2>Usuários</h2></div><input aria-label="Buscar usuários" id="userSearch" type="search" placeholder="Buscar nome, e-mail ou organização" /></div><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Organização</th><th>Papel</th><th>Acesso</th><th>Status</th><th></th></tr></thead><tbody id="userRows"></tbody></table></div></article>
           </section>
 
@@ -104,6 +105,6 @@
         <div class="row-actions"><button type="button" id="cancelUserEdit">Cancelar</button><button type="submit" class="primary">Salvar alterações</button></div>
       </form>
     </dialog>
-    <script type="module" src="/super-admin.js?v=20261022-process-product"></script>
+    <script type="module" src="/super-admin.js?v=20261026-admin-access"></script>
   </body>
 </html>

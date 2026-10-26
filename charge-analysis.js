@@ -1515,7 +1515,7 @@ if (stage) {
           { title: "Decisão de suspensão do processo", available: true },
         ];
     const entitled = Boolean(state.lawyerKit.access?.entitled);
-    const selectedUf = entitled
+    const selectedUf = entitled && !state.lawyerKit.access?.unlimited
       ? String(state.lawyerKit.access?.uf || "")
       : state.lawyerKit.uf;
     const price = Number(product?.price?.cents || 39999) / 100;
@@ -1530,16 +1530,16 @@ if (stage) {
       <section class="charge-lawyer-kit" aria-labelledby="chargeLawyerKitTitle">
         <div class="charge-lawyer-kit-heading">
           <div>
-            <p class="eyebrow">Pagamento único</p>
+            <p class="eyebrow">${state.lawyerKit.access?.unlimited ? 'Acesso sem cobrança' : 'Pagamento único'}</p>
             <h3 id="chargeLawyerKitTitle">Kit profissional Itaú</h3>
             <p>Material documental para consulta e apoio à análise jurídica.</p>
           </div>
-          <strong>${formatChargeCurrency(price)}</strong>
+          <strong>${formatChargeCurrency(price)}${state.lawyerKit.access?.unlimited ? '<small>Valor de referência · pagamento dispensado</small>' : ''}</strong>
         </div>
-        ${entitled
+        ${entitled && !state.lawyerKit.access?.unlimited
           ? `<p class="charge-lawyer-kit-note">Estado das jurisprudências: <strong>${escapeChargeHtml(selectedUf || "não definido")}</strong></p>`
           : `<div class="charge-recovery-form-grid">
-              <label class="wide"><span>Estado das jurisprudências</span><select id="lawyerKitUf" required><option value="">Selecione</option>${RECOVERY_UFS.map((uf) => `<option value="${uf}" ${selectedUf === uf ? "selected" : ""}>${uf}</option>`).join("")}</select></label>
+              <label class="wide"><span>Estado das jurisprudências</span><select id="lawyerKitUf" required ${state.lawyerKit.loading ? 'disabled' : ''}><option value="">Selecione</option>${RECOVERY_UFS.map((uf) => `<option value="${uf}" ${selectedUf === uf ? "selected" : ""}>${uf}</option>`).join("")}</select></label>
             </div>`}
         <ul class="charge-lawyer-kit-documents">
           ${documents.map((document) => `
@@ -1584,7 +1584,7 @@ if (stage) {
     try {
       const [catalogResponse, kitResponse] = await Promise.all([
         fetch("/api/billing/plans", { headers: { accept: "application/json" } }),
-        fetch("/api/itau-lawyer-kit", { headers: { accept: "application/json" } }),
+        fetch(`/api/itau-lawyer-kit?uf=${encodeURIComponent(state.lawyerKit.uf || '')}`, { headers: { accept: "application/json" } }),
       ]);
       const catalog = await catalogResponse.json().catch(() => ({}));
       const kit = await kitResponse.json().catch(() => ({}));
@@ -2444,7 +2444,8 @@ if (stage) {
     if (event.target.id === "lawyerKitUf") {
       state.lawyerKit.uf = String(event.target.value || "").toUpperCase();
       state.lawyerKit.error = "";
-      renderLawyerKit();
+      if (state.lawyerKit.access?.unlimited) void loadLawyerKit();
+      else renderLawyerKit();
     }
     if (event.target.id === "chargeAnalysisFile") {
       const files = Array.from(event.target.files || []);

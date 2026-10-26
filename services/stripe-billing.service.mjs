@@ -728,9 +728,9 @@ export function createStripeBillingService({
       : { entitled: false, source: "none" };
   }
 
-  async function itauLawyerKitAccessState(authContext) {
+  async function itauLawyerKitAccessState(authContext, uf = '') {
     if (!authContext?.tenantId) return { unauthorized: true };
-    if (hasUnlimitedAccess(authContext)) return { entitled: true, source: 'complimentary', unlimited: true, uf: '' };
+    if (hasUnlimitedAccess(authContext)) return { entitled: true, source: 'complimentary', unlimited: true, uf: normalizeUf(uf) };
     const { pool, ready } = db();
     if (!ready) {
       const purchase = [...memoryEvents.values()].findLast(

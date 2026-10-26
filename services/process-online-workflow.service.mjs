@@ -4,6 +4,7 @@ import { mkdir, lstat, realpath, open, unlink } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 import { sealIr, openIr, irKey } from './ir-exemption-domain.mjs';
 import { validateCpf, validateCnpj } from './audit.service.mjs';
+import { hasUnlimitedAccess } from './complimentary-access.mjs';
 import { getPdfRoot } from './storage.service.mjs';
 import { verifyProcessOnlineWebhook } from './process-online.service.mjs';
 
@@ -132,8 +133,8 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
     return { id: row.id, operationId: row.operation_id, kind: row.kind, status: row.status, mode: row.mode,
       cnj: payload.input.cnj || null, parentAuditId: payload.input.parentAuditId || null,
       createdAt: row.created_at, updatedAt: row.updated_at, pollAfterMs: 30000,
-      billing: { auditaCredits: row.mode === 'live' && payload.input.approvedCredits !== 0 ? 1 : 0, providerCredits: row.mode === 'live' ? 1 : 0,
-        state: row.billing_state, refunded: row.billing_state === 'refunded' },
+      billing: { auditaCredits: !payload.complimentary && row.mode === 'live' && payload.input.approvedCredits !== 0 ? 1 : 0, providerCredits: row.mode === 'live' ? 1 : 0,
+        state: payload.complimentary ? 'complimentary' : row.billing_state, refunded: row.billing_state === 'refunded' },
       ...(payload.verification ? { verification: payload.verification } : {}),
       ...(payload.results ? { results: payload.results, total: payload.total, resultData: resultData(payload.resultData || {}), partialResults: payload.total > payload.results.length } : {}),
       ...(row.error_code ? { errorCode: row.error_code } : {}),
@@ -145,7 +146,7 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
               : row.status === 'processing' ? 'Aguardando a cópia do provedor.' : null } : {}),
       parts: parts.map(part => ({ index: part.index, bytes: part.bytes,
         url: `/api/process-online/requests/${row.id}/files/${part.index}` })),
-      canRecover: row.kind === 'copy' && row.status === 'review_required' && !row.provider_request_id && (row.mode === 'test' || row.billing_state === 'charged' || (row.billing_state === 'none' && decrypt(row).input.approvedCredits === 0)) };
+      canRecover: row.kind === 'copy' && row.status === 'review_required' && !row.provider_request_id && (payload.complimentary || row.mode === 'test' || row.billing_state === 'charged' || (row.billing_state === 'none' && payload.input.approvedCredits === 0)) };
   }
   async function update(row, values = {}, payload) {
     const columns = Object.keys(values);
@@ -187,6 +188,10 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
   const billingReference = row => `process-online:${row.id}`;
 
   async function charge(auth, row) {
+    if (decrypt(row).complimentary) {
+      requireValue(hasUnlimitedAccess(auth, env), 'complimentary_access_required', 'A liberação sem cobrança foi removida.', 403);
+      return row;
+    }
     if (decrypt(row).input.approvedCredits === 0 || row.mode !== 'live' || row.billing_state === 'charged') return row;
     requireValue(env.AUDITA_CREDITS_ENABLED === 'true' && credits?.getWallet && credits?.consume && credits?.grant,
       'billing_unavailable', 'A carteira de créditos precisa estar habilitada para esta integração.', 503);
@@ -230,12 +235,13 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
       (id,tenant_id,user_id,operation_id,kind,mode,status,request_hash,encrypted_payload)
       VALUES ($1,$2,$3,$4,$5,$6,'submitting',$7,$8)
       ON CONFLICT (tenant_id,user_id,operation_id) DO NOTHING RETURNING *`,
-    [id, auth.tenantId, auth.user.id, input.operationId, kind, status.mode, fingerprint, seal(id, { input })])).rows[0];
+    [id, auth.tenantId, auth.user.id, input.operationId, kind, status.mode, fingerprint, seal(id, { input, ...(hasUnlimitedAccess(auth, env) ? { complimentary: true } : {}) })])).rows[0];
     if (!row) {
       row = (await db().query('SELECT * FROM audita_process_online_requests WHERE tenant_id=$1 AND user_id=$2 AND operation_id=$3', [auth.tenantId, auth.user.id, input.operationId])).rows[0];
       requireValue(row && row.request_hash === fingerprint && row.kind === kind, 'operation_conflict', 'Esta operação já foi usada para outro pedido.', 409);
       row = await settleInterrupted(row);
-      if (!(body.recover === true && kind === 'copy' && row.status === 'review_required' && !row.provider_request_id && (row.mode === 'test' || row.billing_state === 'charged' || (row.billing_state === 'none' && decrypt(row).input.approvedCredits === 0)))) return publicRequest(row);
+      if (!(body.recover === true && publicRequest(row).canRecover)) return publicRequest(row);
+      if (decrypt(row).complimentary) requireValue(hasUnlimitedAccess(auth, env), 'complimentary_access_required', 'A liberação sem cobrança foi removida.', 403);
       requireValue(row.mode === status.mode, 'mode_mismatch', 'Este pedido pertence a outro ambiente do provedor.', 409);
       // Recovery is explicit and uses precisely the provider idempotency key originally persisted.
       const claim = await db().query(`UPDATE audita_process_online_requests SET status='submitting',error_code=NULL,updated_at=$4
@@ -250,7 +256,7 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
         requireValue(Number.isSafeInteger(result?.total) && result.total >= result.results?.length && [0, 1].includes(result.credits_charged), 'invalid_response');
         const results = publicResults(result.results);
         resultData(result);
-        row = await update(row, { status: 'completed', error_code: null }, { input, results, total: result.total, resultData: result, providerCreditsCharged: result.credits_charged });
+        row = await update(row, { status: 'completed', error_code: null }, { ...decrypt(row), input, results, total: result.total, resultData: result, providerCreditsCharged: result.credits_charged });
         if (result.total === 0) row = await refund(row);
       } else {
         const result = await provider.requestCopy({ cnj: input.cnj, interesse: input.interesse, interesseDetalhe: input.interesseDetalhe, approval: approval(row) });
@@ -258,7 +264,7 @@ export function createProcessOnlineWorkflowService({ getDb, provider, env = proc
           && [0, 1].includes(result.credits_charged), 'invalid_response');
         // completed means provider-ready; private files are not ready until every part is checked.
         row = await update(row, { status: result.status === 'completed' ? 'processing' : result.status, provider_request_id: result.request_id, error_code: null },
-          { input, providerStatus: result.status, providerCreditsCharged: result.credits_charged });
+          { ...decrypt(row), input, providerStatus: result.status, providerCreditsCharged: result.credits_charged });
         if (result.refunded === true || (TERMINAL_FAILURES.includes(result.status) && result.credits_charged === 0)) row = await refund(row);
         if (result.status === 'completed') return reconcile(row, { force: true });
       }

@@ -12,6 +12,7 @@ RUN npm ci --omit=dev
 
 COPY energy-audit.js energy-audit.css services-catalog.js index.html styles.css app.js billing-admin.js charge-analysis.js charge-calculation.js itau-faq.js server.mjs ./
 COPY analysis-segments.js ./
+COPY manifest.webmanifest pwa-install.js pwa-sw.js ./
 COPY certificate-selection.js ./
 COPY judicial-processes.js ./
 COPY process-online.js process-online.css ./

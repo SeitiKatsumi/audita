@@ -30,9 +30,19 @@ sua organização; `lawyer` vê apenas casos explicitamente atribuídos, inclusi
 outras organizações. Proprietários de contas comerciais não são operadores.
 O titular da conta vê seus próprios casos; advogado não aceita nem paga em seu lugar.
 
+Titulares com acesso gratuito (inclusive `admin` e `super_admin`) aceitam a proposta
+sem abrir Stripe. A dispensa fica no payload criptografado como `paymentWaived` e
+`paymentWaiver` (autor, função, momento e motivo), com evento próprio; não gera
+pagamento, recibo ou `paidAt` fictícios. A contratação dispensada permite preparação
+e registro de protocolo, mantendo revisão profissional, evidências e permissões.
+Uma proposta já aceita pode receber a dispensa pela ação de continuar com acesso
+gratuito. Checkout anterior permanece identificável para processar um pagamento
+real ou a expiração; nenhuma nova sessão é criada. A expiração preserva a dispensa.
+Upgrade ADM para Ouro continua exigindo nova proposta e aceite explícito.
+
 Propostas são imutáveis após publicação. Novas versões substituem propostas ainda
-não aceitas; propostas aceitas devem terminar seu ciclo de pagamento antes de nova
-publicação. Upgrade é nova proposta com valor adicional explícito. Comprovantes,
+não aceitas; propostas aceitas devem ter pagamento confirmado ou dispensado antes
+de nova publicação. Upgrade é nova proposta com valor adicional explícito. Comprovantes,
 contratos e procurações são anexados; equipe revisa e protocola fora do Audita.
 Nenhuma decisão de direito ou concessão é automática. Datas, cálculos e enquadramento
 jurídico são revisados antes da publicação da proposta.

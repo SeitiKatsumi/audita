@@ -57,6 +57,37 @@ test('test bypass requires server opt-in, same-origin owner access and collects 
   }finally{await pg.close();}
 });
 
+test('promoted admin can waive an existing seller order once; ownership, origin and later demotion remain enforced',async()=>{
+  const pg=new PGlite(),collected=[];let checkouts=0;
+  try{
+    await pg.exec((await readFile(new URL('../db/schema.sql',import.meta.url),'utf8')).replace('CREATE EXTENSION IF NOT EXISTS pgcrypto;',''));
+    await pg.exec("INSERT INTO audita_users(id,tenant_id,email,name,password_hash,role) VALUES(811,1,'waiver@example.test','Pessoa Fictícia','disabled','member')");
+    const owner={tenantId:1,user:{id:811,role:'member',status:'active'}},admin={...owner,user:{...owner.user,role:'admin'}},env={AUDITA_PROFILE_ENCRYPTION_KEY:'fixture-key-that-is-at-least-thirty-two-characters'};
+    const orders=createCertificateOrderService({getDb:()=>({pool:pg,dbReady:true}),env,checkout:async()=>{checkouts++;return {id:'cs_promotion_fixture',url:'https://checkout.stripe.com/c/pay/promotion_fixture'};},startAudit:async(request,options)=>{collected.push(request.body);assert.equal(options.authContext.user.role,'admin');await new Promise(resolve=>setTimeout(resolve,10));return {consultaId:options.consultaId};}});
+    const body={tipoDocumento:'cpf',documento:'52998224725',fontes:['tjdft'],extraFields:{sellerFlow:'seller',sellerAiConsent:true,stateCourtFields:{fullName:'Pessoa Fictícia'},authorizationConfirmed:true}};
+    const pending=await orders.create(owner,body,{costs:[.54],documentCount:1});assert.equal(pending.status,'pending');assert.equal(pending.complimentaryAvailable,false);assert.equal(pending.amountCents,1620);assert.equal(checkouts,1);assert.equal(collected.length,0);
+    const source=await readFile(new URL('../server.mjs',import.meta.url),'utf8'),context=vm.createContext({URL,certificateOrderService:orders,getTenantIdForRequest:async request=>request.auth||{unauthorized:true},sendJson:(response,status,body)=>Object.assign(response,{status,body})});
+    vm.runInContext(`async function handle(pathname,request,response){${source.slice(source.indexOf('  const certificateTestBypassMatch='),source.indexOf('  const sellerReviewMatch ='))}}`,context);
+    const headers={'content-type':'application/json',host:'fixture.test',origin:'https://fixture.test'},path='/api/certificate-orders/'+pending.orderId;
+    const request=async(method='POST',auth=admin,extraHeaders={})=>{const response={};await context.handle(path+(method==='POST'?'/waive':''),{method,auth,headers:{...headers,...extraHeaders},body:{role:'admin'}},response);return response;};
+    assert.equal((await request('POST',null)).status,401);assert.equal((await request('POST',owner)).status,403);
+    await pg.query("UPDATE audita_users SET role='admin' WHERE id=811");
+    const available=await request('GET');assert.equal(available.status,200);assert.equal(available.body.complimentaryAvailable,true);assert.equal(available.body.status,'pending');assert.equal(collected.length,0,'viewing a promoted account does not collect or waive implicitly');
+    for(const extra of [{'sec-fetch-site':'cross-site'},{origin:'https://another.test'},{'content-type':'text/plain'}])assert.equal((await request('POST',admin,extra)).status,403);
+    for(const foreign of [{tenantId:2,user:{...admin.user}},{tenantId:1,user:{...admin.user,id:812}}])assert.equal((await request('POST',foreign)).status,404);
+    assert.equal(collected.length,0);assert.equal((await orders.get(admin,pending.orderId)).status,'pending');
+    const responses=await Promise.all([request(),request()]);assert(responses.every(r=>r.status===202));assert.equal(collected.length,1);assert.deepEqual(collected[0],body);assert.equal(checkouts,1);
+    assert.equal((await request()).status,202);assert.equal(collected.length,1,'authorized replay is idempotent');
+    const complete=(await request('GET')).body;assert.equal(complete.status,'started');assert.equal(complete.complimentary,true);assert.equal(complete.complimentaryAvailable,false);assert.equal(complete.testBypassed,false);assert.equal(complete.amountCents,pending.amountCents);assert.equal(complete.checkoutUrl,undefined);
+    const saved=async()=>(await pg.query('SELECT request_payload FROM audita_audits WHERE public_id=$1',[pending.orderId])).rows[0].request_payload.certificateOrder;
+    const waived=await saved();assert.equal(waived.paidAt,undefined);assert.equal(waived.testBypassed,undefined);assert.equal(waived.waivedBy,811);assert.equal(typeof waived.waivedAt,'number');assert.equal(waived.amountCents,1620);assert.deepEqual(waived.checkout,{id:'cs_promotion_fixture',url:pending.checkoutUrl});
+    await pg.query("UPDATE audita_users SET role='member' WHERE id=811");assert.equal((await request('POST',owner)).status,403,'replaying after demotion cannot dispense payment');assert.equal(collected.length,1);
+    const late={id:'evt_promotion_late',type:'checkout.session.completed',data:{object:{id:'cs_promotion_fixture',mode:'payment',currency:'brl',amount_total:1620,payment_status:'paid',metadata:{purchase_kind:'certificate_order',audita_tenant_id:'1',audita_user_id:'811',certificate_order_id:pending.orderId}}}};
+    await orders.paymentEvent(late);await orders.paymentEvent({...late,id:'evt_promotion_late_replay'});await orders.paymentEvent({...late,id:'evt_promotion_expiry',type:'checkout.session.expired'});
+    assert.equal(collected.length,1);assert.equal(checkouts,1);assert.equal((await orders.get(owner,pending.orderId)).status,'started');assert.deepEqual((await saved()).checkout,waived.checkout);assert.equal((await saved()).amountCents,1620);
+  }finally{await pg.close();}
+});
+
 test('UF/Brasil scope, national deduplication and prices use the validated coverage',()=>{
   const c={certificates:[],sellerSources:getSellerDocumentCoverage({configured:true})};
   c.states=sellerStatePlans(c);c.companyStates=sellerStatePlans(c,'cnpj');

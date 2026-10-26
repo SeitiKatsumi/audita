@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {runInNewContext} from 'node:vm';
 import {PGlite} from '@electric-sql/pglite';
 import {PDFDocument} from 'pdf-lib';
 import {createIrExemptionService,queryDatajud} from '../services/ir-exemption.service.mjs';
@@ -129,6 +130,44 @@ test('pagamento assíncrono, falha e nova tentativa sem concessão prematura',as
  let c=await reviewed();c=await service.publishProposal(admin,c.id,{revision:c.revision,kind:'adm',amountCents:10000,scope:'Pedido',terms:'Condições'});const p=c.proposals[0];c=await service.acceptProposal(owner,c.id,p.id,{version:p.version,accepted:true});await service.createCheckout(owner,c.id,p.id);
  await service.paymentEvent(stripeEvent(c,p,'checkout.session.completed',{payment_status:'unpaid'}));assert.equal((await service.get(owner,c.id)).proposals[0].state,'payment_pending');
  await service.paymentEvent(stripeEvent(c,p,'checkout.session.async_payment_failed',{payment_status:'unpaid'}));assert.equal((await service.get(owner,c.id)).proposals[0].state,'accepted');await service.createCheckout(owner,c.id,p.id);assert.equal(checkoutCalls.at(-1).attempt,2);
+});
+test('titular admin e super_admin aceita sem Stripe; mantém revisão, permissões e aceite de upgrade',async()=>{
+ for(const role of ['admin','super_admin']){
+  const complimentary={...owner,user:{...owner.user,role}},calls=checkoutCalls.length;
+  let c=await reviewed();c=await service.publishProposal(admin,c.id,{revision:c.revision,kind:'adm',amountCents:10000,scope:'Requerimento fictício',terms:'Revisão profissional obrigatória'});const offer=c.proposals[0];
+  await assert.rejects(()=>service.createCheckout(complimentary,c.id,offer.id),{code:'proposal_conflict'});
+  await assert.rejects(()=>service.acceptProposal(complimentary,c.id,offer.id,{version:offer.version,accepted:false}),{code:'acceptance_required'});
+  await assert.rejects(()=>service.acceptProposal(admin,c.id,offer.id,{version:offer.version,accepted:true}),{code:'owner_required'});
+  c=await service.acceptProposal(complimentary,c.id,offer.id,{version:offer.version,accepted:true});
+  assert.equal(c.proposals[0].paymentWaived,true);assert.equal(c.proposals[0].state,'accepted');assert.equal(c.proposals[0].paidAt,null);assert.equal(c.proposals[0].paymentWaiver.by,owner.user.id);assert.equal(c.permissions.operator,role==='super_admin');
+  const waived=await service.createCheckout(complimentary,c.id,offer.id);assert.equal(waived.paymentWaived,true);assert.equal(waived.url,undefined);assert.equal(checkoutCalls.length,calls);
+  c=await action(waived.case,admin,'status',{status:'preparation'});
+  c=await evidence(c,'protocol');c=await action(c,admin,'protocol',{protocol:{kind:'administrative',number:'PROTOCOLO-FICTICIO',authority:'Órgão fictício',date:'2026-09-01',documentId:c.documents.find(d=>d.type==='protocol').id}});assert.equal(c.status,'filed');
+  await assert.rejects(()=>service.publishProposal(admin,c.id,{revision:c.revision,kind:'ouro',amountCents:20000,scope:'Upgrade fictício',terms:'Novo aceite'}),{code:'invalid_upgrade'});
+  c=await service.publishProposal(admin,c.id,{revision:c.revision,kind:'ouro',amountCents:20000,scope:'Upgrade fictício',terms:'Novo aceite',additional:true});const upgrade=c.proposals[0];
+  assert.equal(upgrade.additional,true);assert.equal(upgrade.paymentWaived,undefined);await assert.rejects(()=>service.createCheckout(complimentary,c.id,upgrade.id),{code:'proposal_conflict'});
+  c=await service.acceptProposal(complimentary,c.id,upgrade.id,{version:upgrade.version,accepted:true});assert.equal(c.proposals[0].paymentWaived,true);assert.equal(checkoutCalls.length,calls);
+ }
+});
+test('promoção do titular dispensa proposta aceita, preserva checkout anterior e expiração sem cobrança nova',async()=>{
+ let c=await reviewed();c=await service.publishProposal(admin,c.id,{revision:c.revision,kind:'adm',amountCents:10000,scope:'Pedido fictício',terms:'Condições'});const offer=c.proposals[0];c=await service.acceptProposal(owner,c.id,offer.id,{version:offer.version,accepted:true});await service.createCheckout(owner,c.id,offer.id);
+ const calls=checkoutCalls.length,complimentary={...owner,user:{...owner.user,role:'admin'}};
+ let resumed=await service.createCheckout(complimentary,c.id,offer.id);assert.equal(resumed.paymentWaived,true);assert.equal(resumed.case.proposals[0].paidAt,null);
+ resumed=await service.createCheckout(complimentary,c.id,offer.id);assert.equal(checkoutCalls.length,calls);assert.equal(resumed.case.events.filter(e=>e.kind==='proposal_payment_waived').length,1);
+ let stored=(await pg.query('SELECT * FROM audita_ir_proposals WHERE id=$1',[offer.id])).rows[0];assert.equal(stored.checkout_id,`cs_test_${offer.id}_1`);
+ await service.paymentEvent(stripeEvent(c,offer,'checkout.session.expired',{payment_status:'unpaid'}));c=await service.get(owner,c.id);assert.equal(c.proposals[0].paymentWaived,true);assert.equal(c.proposals[0].paidAt,null);assert.ok(c.events.some(e=>e.kind==='payment_checkout_closed'));assert.equal(c.events.some(e=>e.kind==='payment_retry'),false);
+ stored=(await pg.query('SELECT * FROM audita_ir_proposals WHERE id=$1',[offer.id])).rows[0];assert.equal(stored.checkout_id,null);
+ assert.equal((await service.createCheckout(owner,c.id,offer.id)).paymentWaived,true);assert.equal(checkoutCalls.length,calls);
+ c=await action(await service.get(owner,c.id),owner,'answer',{key:'medical',value:'available'});assert.equal(c.review,null);c=await action(c,admin,'status',{status:'review'});await assert.rejects(()=>action(c,admin,'status',{status:'preparation'}),{code:'payment_required'});
+ c=await reviewed();c=await service.publishProposal(admin,c.id,{revision:c.revision,kind:'adm',amountCents:12000,scope:'Segundo pedido fictício',terms:'Condições'});const other=c.proposals[0];c=await service.acceptProposal(owner,c.id,other.id,{version:other.version,accepted:true});assert.equal((await service.createCheckout(complimentary,c.id,other.id)).paymentWaived,true);assert.equal(checkoutCalls.length,calls);
+ c=await reviewed();c=await service.publishProposal(admin,c.id,{revision:c.revision,kind:'adm',amountCents:12000,scope:'Pagamento anterior fictício',terms:'Condições'});const pending=c.proposals[0];c=await service.acceptProposal(owner,c.id,pending.id,{version:pending.version,accepted:true});await service.createCheckout(owner,c.id,pending.id);await service.createCheckout(complimentary,c.id,pending.id);await service.paymentEvent(stripeEvent(c,pending));c=await service.get(owner,c.id);assert.equal(c.proposals[0].state,'paid');assert.ok(c.proposals[0].paidAt);assert.equal(c.proposals[0].paymentWaived,true);assert.equal(c.events.filter(e=>e.kind==='payment_confirmed').length,1);
+});
+test('proposta dispensada exibe acesso gratuito sem link de checkout; aceite antigo oferece retomada',async()=>{
+ const source=await readFile(new URL('../ir-exemption.js',import.meta.url),'utf8');const render=source.slice(source.indexOf('function proposalsView()'),source.indexOf('function timelineView()'));
+ const proposal={id:'fixture',state:'accepted',kind:'adm',version:1,amountCents:10000,scope:'Teste',terms:'Condições',paymentWaived:true,paymentWaiver:{at:'2026-09-10T10:00:00Z'}},state={case:{permissions:{owner:true,paymentWaiverAllowed:true},proposals:[proposal]}};
+ const context={state,esc:String,money:String,fmtDate:String,financialLabels:{accepted:'Aceita · aguardando pagamento'},form:()=>'',check:()=>''};
+ let html=runInNewContext(`${render};proposalsView()`,context);assert.match(html,/Aceita · pagamento dispensado/);assert.doesNotMatch(html,/data-checkout=/);assert.doesNotMatch(html,/Pagamento confirmado/);
+ delete proposal.paymentWaived;html=runInNewContext(`${render};proposalsView()`,context);assert.match(html,/Continuar com acesso gratuito/);assert.match(html,/data-checkout="fixture"/);
 });
 test('DataJud valida tribunal, falta de configuração, erro e processo ausente',async()=>{
  const p={number:'00000000020264010000',tribunal:'trf1'};

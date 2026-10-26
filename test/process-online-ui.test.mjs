@@ -143,6 +143,24 @@ test('CNJ copy requires consent and uses its own paid checkout, never the direct
  f.module.deactivate();
 });
 
+test('complimentary copies keep explicit consent, approve zero and show a waiver without Stripe navigation or paid confirmation',async()=>{
+ const order={id:'complimentary-order',kind:'copy',status:'fulfilled',complimentary:true,paymentStatus:'complimentary',amountCents:0,requestIds:['complimentary-copy']};
+ const request={id:'complimentary-copy',kind:'copy',cnj:CNJ,status:'processing',billing:{state:'complimentary',auditaCredits:0,providerCredits:1}};
+ const f=fixture(call=>response(call.options.method==='POST'?order:{...order,request,requests:[request]}),
+   {...LIVE,copyPayment:{checkoutReady:true,complimentary:true,unitAmountCents:0,amountCents:0,baseCents:4990,maxQuantity:20}});
+ await f.module.activate({cnj:CNJ});
+ assert.match(f.container.textContent,/Acesso sem cobrança/);
+ assert.equal(named(f.container,'copyCheckout').disabled,true);
+ forms(f.container)[0].dispatch('submit');await settle();
+ assert.equal(f.calls.some(call=>call.options.method==='POST'),false);
+ approve(f.container,'copyConsent');assert.equal(named(f.container,'copyCheckout').disabled,false);
+ forms(f.container)[0].dispatch('submit');await settle();
+ const posts=f.calls.filter(call=>call.options.method==='POST');assert.equal(posts.length,1);
+ assert.equal(posts[0].url,'/api/process-online/requests/checkout');assert.equal(posts[0].body.approvedAmountCents,0);assert.equal(posts[0].body.consent,true);
+ assert.deepEqual(f.navigations,[]);assert.match(f.container.textContent,/Solicitação registrada sem cobrança/);
+ assert.doesNotMatch(f.container.textContent,/Pagamento confirmado/);f.module.deactivate();
+});
+
 test('a recoverable copy restored from history uses only its saved ID and requires fresh explicit consent', async () => {
   const request = { id: 'saved-copy', operationId: 'saved-operation', kind: 'copy', cnj: CNJ,
     status: 'review_required', canRecover: true, billing: { state: 'charged', auditaCredits: 1 } };
@@ -337,6 +355,24 @@ test('reopening resumes an unfinished payment without creating another checkout'
  assert.ok(find(f.container,item=>item.tagName==='A'&&item.href===order.checkoutUrl));
  assert.equal(f.calls.some(call=>call.options.method==='POST'),false);
  f.module.reset();assert.doesNotMatch(f.container.textContent,/11111111-1111/);f.module.deactivate();
+});
+
+test('promoted admin explicitly authorizes a saved pending order without navigating its old Stripe session',async()=>{
+ const pending={id:'11111111-1111-4111-8111-111111111111',status:'pending',complimentaryAvailable:true,checkoutUrl:'https://checkout.stripe.com/c/pay/cs_old'};
+ const fulfilled={...pending,status:'fulfilled',complimentary:true,paymentStatus:'complimentary',amountCents:0,checkoutUrl:null};
+ let authorized=false;
+ const f=fixture(call=>{
+   if(call.options.method==='POST'){authorized=true;return response(fulfilled);}
+   return response(authorized?fulfilled:pending);
+ },{...LIVE,copyPayment:{...LIVE.copyPayment,complimentary:true,unitAmountCents:0}},[],undefined,[pending]);
+ await f.module.activate({cnj:CNJ});
+ assert.equal(f.calls.some(call=>call.options.method==='POST'),false);
+ assert.equal(find(f.container,item=>item.tagName==='A'&&item.href===pending.checkoutUrl),undefined);
+ byText(f.container,'Autorizar e continuar sem pagar').dispatch('click');await settle();
+ const posts=f.calls.filter(call=>call.options.method==='POST');assert.equal(posts.length,1);
+ assert.equal(posts[0].url,'/api/process-online/requests/checkout');assert.deepEqual(posts[0].body,{orderId:pending.id,consent:true});
+ assert.deepEqual(f.navigations,[]);assert.match(f.container.textContent,/Solicitação registrada sem cobrança/);
+ assert.doesNotMatch(f.container.textContent,/Pagamento confirmado/);f.module.deactivate();
 });
 
 test('several valid CNJs require explicit selection and consent, charging only the selected copies at configured unit price', async () => {
