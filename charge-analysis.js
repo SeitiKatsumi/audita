@@ -346,6 +346,45 @@ function formatChargeCurrency(value) {
   });
 }
 
+export function buildChargeCompletionMarkup(job = {}) {
+  const id = String(job?.id || '');
+  const pdfUrl = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    ? `/api/jec/petitions/${encodeURIComponent(id)}/pdf` : '';
+  const summary = job?.analysisSummary;
+  const metric = (label, value, money = false) => typeof value === 'number' && Number.isFinite(value)
+    ? `<div><dt>${escapeChargeHtml(label)}</dt><dd>${escapeChargeHtml(money ? formatChargeCurrency(value) : String(value))}</dd></div>` : '';
+  return `<section class="charge-analysis-finish charge-recovery-complete">
+    <h2>Sua solicitação está completa.</h2>
+    <p>O advogado responsável iniciará a análise da documentação gerada e, havendo concordância entre as partes, realizará o protocolo perante o Tribunal competente.</p>
+    <p>Solicitação: <strong>${escapeChargeHtml(id)}</strong></p>
+    <section class="charge-completion-summary" aria-label="Resumo da análise">
+      <h3>Resumo da análise</h3>
+      ${summary ? `<p>${summary.documentaryCoverage === 'partial' ? 'Apuração parcial, limitada aos documentos enviados.' : 'Apuração baseada nos documentos enviados e nos lançamentos que você não reconheceu.'}</p>
+      <dl class="charge-completion-values">
+        ${metric('Documentos analisados', summary.documentCount)}
+        ${metric('Lançamentos não reconhecidos', summary.disputedCount)}
+        ${metric('Valor original identificado', summary.totalDisputed, true)}
+        ${metric('Principal atualizado', summary.values?.updatedPrincipal, true)}
+        ${metric('Repetição em dobro com ajustes', summary.values?.doubleWithAdjustments, true)}
+        ${metric('Perdas e danos — referência para revisão', summary.values?.damagesAmount, true)}
+        ${metric('Valor estimado da causa', summary.values?.estimatedClaimValue, true)}
+      </dl><p class="charge-completion-note">Os valores constam no documento encaminhado e estão sujeitos à revisão do advogado. Não representam garantia de restituição ou indenização.</p>`
+      : '<p>Os detalhes desta solicitação estão disponíveis no PDF completo abaixo.</p>'}
+    </section>
+    ${pdfUrl ? `<section class="charge-completion-document" aria-label="Petição completa em PDF">
+      <h3>Sua petição completa</h3>
+      <p>Consulte o mesmo PDF encaminhado ao advogado, com a petição, o relatório técnico, ${summary?.values ? 'a memória de cálculo e ' : ''}os anexos gerados.</p>
+      <div class="charge-completion-actions">
+        <a class="primary-action" href="${pdfUrl}" target="_blank" rel="noopener noreferrer">Abrir PDF completo</a>
+        <a class="secondary-action" href="${pdfUrl}?download=1" download="peticao-completa-itau.pdf">Baixar PDF</a>
+      </div>
+      <iframe class="charge-completion-pdf" src="${pdfUrl}" title="Prévia da petição completa e relatório técnico" loading="lazy"></iframe>
+      <p class="charge-completion-note">Se a prévia não aparecer no seu navegador, use “Abrir PDF completo”. Este documento está sujeito à revisão do advogado; a solicitação ainda não é um protocolo judicial.</p>
+    </section>` : ''}
+    <button type="button" class="secondary-action" data-charge-action="restart">Iniciar nova análise</button>
+  </section>`;
+}
+
 export function buildChargeAuditSnapshot(caseData = {}) {
   const candidates = Array.isArray(caseData.candidates) ? caseData.candidates : [];
   const totalDetected = candidates.reduce(
@@ -751,6 +790,24 @@ if (stage) {
     };
   }
 
+  let recoveryOwner;
+  window.addEventListener('audita:auth-changed', event => {
+    const user = event.detail?.user;
+    const owner = user ? `${user.tenant?.id || user.tenant_id || ''}:${user.id}` : '';
+    if (recoveryOwner !== undefined && owner !== recoveryOwner) {
+      resetRecovery();
+      if (state.screen === 'recovery') {
+        state.screen = 'triage';
+        state.caseData = null;
+        state.caseBatches = [];
+        state.selectedFiles = [];
+        state.selectedFile = null;
+      }
+      render();
+    }
+    recoveryOwner = owner;
+  });
+
   const assistantAvatarAsset = "assets/audita-profile-assistant.png";
   const assistantAvatarPreload = new Image();
   assistantAvatarPreload.src = assistantAvatarAsset;
@@ -938,6 +995,7 @@ if (stage) {
 
   async function loadRecoveryDependencies() {
     if (state.recovery.loading) return;
+    const recovery = state.recovery;
     state.recovery.loading = true;
     render();
 
@@ -948,6 +1006,7 @@ if (stage) {
       ]);
       if (profileResponse.ok) {
         const profileData = await profileResponse.json().catch(() => ({}));
+        if (state.recovery !== recovery) return;
         state.recovery.claimant = {
           ...(profileData.profile || {}),
           ...state.recovery.claimant,
@@ -955,6 +1014,7 @@ if (stage) {
       }
       if (portalsResponse.ok) {
         const portalsData = await portalsResponse.json().catch(() => ({}));
+        if (state.recovery !== recovery) return;
         state.recovery.portals = Array.isArray(portalsData.portals)
           ? portalsData.portals
           : [];
@@ -962,8 +1022,7 @@ if (stage) {
     } catch {
       // O preenchimento manual continua disponivel se perfil ou catalogo falharem.
     } finally {
-      state.recovery.loading = false;
-      render();
+      if (state.recovery === recovery) { state.recovery.loading = false; render(); }
     }
   }
 
@@ -1959,12 +2018,7 @@ if (stage) {
   }
 
   function renderRecoveryGuide() {
-    stage.innerHTML = `<section class="charge-analysis-finish" role="status">
-      <h2>Sua solicitação está completa.</h2>
-      <p>O advogado responsável da Audita dará início ao protocolo da sua petição no tribunal competente da sua região.</p>
-      <p>Solicitação: <strong>${escapeChargeHtml(state.recovery.job?.id || "")}</strong></p>
-      <button type="button" class="primary-action" data-charge-action="restart">Iniciar nova análise</button>
-    </section>`;
+    stage.innerHTML = buildChargeCompletionMarkup(state.recovery.job);
   }
 
   function renderRecovery() {
@@ -2077,6 +2131,7 @@ if (stage) {
     state.recovery.error = "";
     render();
 
+    const recovery = state.recovery;
     let shouldGenerate = false;
     try {
       const response = await fetch("/api/jec/petitions/prepare", {
@@ -2085,6 +2140,7 @@ if (stage) {
         body: JSON.stringify(recoveryPayload(claimant)),
       });
       const data = await response.json().catch(() => ({}));
+      if (state.recovery !== recovery) return;
       if (response.status === 401) {
         document.querySelector("#loginButton")?.click();
         throw new Error("Entre na IA AUDITA para preparar o Relatório Técnico.");
@@ -2099,10 +2155,11 @@ if (stage) {
       state.recovery.phase = "report";
       shouldGenerate = data.prepared.ready;
     } catch (error) {
-      state.recovery.error = error?.message || "Falha ao preparar o Relatório Técnico.";
+      if (state.recovery === recovery) state.recovery.error = error?.message || "Falha ao preparar o Relatório Técnico.";
     } finally {
-      state.recovery.busy = false;
+      if (state.recovery === recovery) state.recovery.busy = false;
     }
+    if (state.recovery !== recovery) return;
     if (shouldGenerate) await downloadRecoveryReport(claimant, attachments);
     else render();
   }
@@ -2112,6 +2169,7 @@ if (stage) {
     attachments = state.recovery.attachments,
   ) {
     if (state.recovery.busy || !state.recovery.prepared?.ready || !attachments) return;
+    const recovery = state.recovery;
     state.recovery.busy = true;
     state.recovery.error = "";
     render();
@@ -2140,17 +2198,19 @@ if (stage) {
         throw new Error(recoveryApiError(data, "Não foi possível gerar o PDF agora."));
       }
       const result = await response.json();
+      if (state.recovery !== recovery) return;
       if (!result.job?.id) throw new Error("A solicitação não foi confirmada. Tente novamente.");
       state.recovery.job = result.job;
       state.recovery.pdfGeneratedAt = new Date().toISOString();
       state.recovery.guideUf = claimant.uf || state.recovery.guideUf || "";
       state.recovery.phase = "guide";
     } catch (error) {
-      state.recovery.error = error?.message || "Falha ao gerar o Relatório Técnico.";
-      state.recovery.phase = "report";
+      if (state.recovery === recovery) {
+        state.recovery.error = error?.message || "Falha ao gerar o Relatório Técnico.";
+        state.recovery.phase = "report";
+      }
     } finally {
-      state.recovery.busy = false;
-      render();
+      if (state.recovery === recovery) { state.recovery.busy = false; render(); }
     }
   }
 

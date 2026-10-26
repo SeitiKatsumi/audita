@@ -783,7 +783,7 @@ test("recovery report reuses calculated values without asking for another review
 
 test("completed recovery goes to the lawyer instead of client filing instructions", () => {
   assert.match(chargeAnalysisJs, /Sua solicitação está completa/);
-  assert.match(chargeAnalysisJs, /O advogado responsável da Audita dará início ao protocolo/);
+  assert.match(chargeAnalysisJs, /O advogado responsável iniciará a análise da documentação gerada e, havendo concordância entre as partes, realizará o protocolo perante o Tribunal competente/);
   assert.doesNotMatch(chargeAnalysisJs, />Abrir portal oficial<\/a>/);
   assert.match(appJs, /if \(state\.lawyerJob\?\.id\)/);
 });

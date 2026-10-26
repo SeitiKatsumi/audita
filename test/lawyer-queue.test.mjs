@@ -27,11 +27,23 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   const client = { id: 101, tenant_id: 1, role: "member" };
   const lawyer = { id: 102, role: "lawyer" }, other = { id: 103, role: "lawyer" };
   const pdf = Buffer.from("%PDF-test");
-  const input = { key: "same-case", claimant: { fullName: "Cliente", uf: "SP", city: "Jundiaí" },
+  const analysisSummary = { documentCount: 1, disputedCount: 2, totalDisputed: 80, documentaryCoverage: 'partial', values: { estimatedClaimValue: 4700 } };
+  const input = { key: "same-case", claimant: { fullName: "Cliente", uf: "SP", city: "Jundiaí", analysisSummary },
     acceptance: { id: "acceptance", accepted: true }, documents: { report: pdf, powerOfAttorney: pdf, agreement: pdf },
     sources: [{ name: "extrato.pdf", type: "application/pdf", base64: pdf.toString("base64") }] };
   const job = await queue.submit(client, input);
   assert.equal((await queue.submit(client, input)).id, job.id);
+  assert.deepEqual(job.analysisSummary, analysisSummary);
+  assert.deepEqual(Buffer.from(await queue.customerReport(client, job.id)), pdf);
+  await assert.rejects(queue.customerReport(null, job.id), { status: 401 });
+  await assert.rejects(queue.customerReport({ ...client, status: 'disabled' }, job.id), { status: 403 });
+  await assert.rejects(queue.customerReport(client, '../other'), { status: 404 });
+  await assert.rejects(queue.customerReport({ ...client, id: 103 }, job.id), { status: 404 });
+  await assert.rejects(queue.customerReport({ ...client, tenant_id: 999 }, job.id), { status: 404 });
+  await assert.rejects(queue.customerReport({ ...client, id: 103, role: 'super_admin' }, job.id), { status: 404 });
+  const repeated = await queue.submit(client, { ...input, claimant: { ...input.claimant, analysisSummary: { totalDisputed: 999999 } }, documents: { ...input.documents, report: Buffer.from('%PDF-new') } });
+  assert.deepEqual(repeated.analysisSummary, analysisSummary);
+  assert.deepEqual(Buffer.from(await queue.customerReport(client, job.id)), pdf);
   assert.equal((await queue.list(lawyer)).length, 1);
   assert.equal((await queue.list(lawyer))[0].client_name, null);
   await assert.rejects(queue.document(lawyer, job.id, "report"), { status: 404 });
@@ -60,6 +72,8 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   await db.close();
   db = new PGlite({ loadDataDir: saved });
   assert.equal((await queue.list(winner))[0].protocol_number, "12345");
+  assert.deepEqual(Buffer.from(await queue.customerReport(client, job.id)), pdf);
+  assert.deepEqual((await queue.submit(client, input)).analysisSummary, analysisSummary);
   assert.deepEqual(Buffer.from((await queue.document(winner, job.id, "agreement")).bytes), pdf);
   await db.close();
 });

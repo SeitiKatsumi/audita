@@ -4699,6 +4699,25 @@ async function handleApi(request, response, pathname) {
     return true;
   }
 
+  const customerPetitionPdf = pathname.match(/^\/api\/jec\/petitions\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/pdf$/i);
+  if (customerPetitionPdf && request.method === "GET") {
+    try {
+      const user = await getSessionUser(request);
+      const pdf = await lawyerQueue.customerReport(user, customerPetitionPdf[1]);
+      const download = new URL(request.url, 'http://localhost').searchParams.get('download') === '1';
+      response.writeHead(200, {
+        'content-type': 'application/pdf', 'content-length': pdf.length,
+        'content-disposition': `${download ? 'attachment' : 'inline'}; filename="peticao-completa-itau.pdf"`,
+        'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff',
+        'x-frame-options': 'SAMEORIGIN', 'content-security-policy': "frame-ancestors 'self'",
+      });
+      response.end(pdf);
+    } catch (error) {
+      sendJson(response, error.status || 500, { message: error.status ? error.message : 'Não foi possível abrir sua petição agora.' });
+    }
+    return true;
+  }
+
   if (pathname === "/api/jec/petitions/prepare" && request.method === "POST") {
     try {
       const authContext = await getTenantIdForRequest(request);
@@ -4982,7 +5001,20 @@ async function handleApi(request, response, pathname) {
         const powerOfAttorney = Buffer.from(await createPowerOfAttorneyPdf({ claimant: prepared.claimant, acceptance }));
         const agreement = Buffer.from(await createLegalServicesAgreementPdf({ claimant: prepared.claimant, acceptance }));
         const key = JSON.stringify([body.caseData || {}, body.caseId || "", prepared.claimant.document]);
-        const job = await lawyerQueue.submit(authContext.user, { key, claimant: prepared.claimant,
+        const report = prepared.calculationReport;
+        const analysisSummary = {
+          documentCount: prepared.attachments.evidenceFiles.length,
+          disputedCount: prepared.disputedCount,
+          totalDisputed: prepared.totalDisputed,
+          documentaryCoverage: prepared.attachments.documentaryCoverage,
+          values: report ? {
+            updatedPrincipal: report.updatedPrincipal,
+            doubleWithAdjustments: report.doubleWithAdjustments,
+            damagesAmount: report.damagesAmount,
+            estimatedClaimValue: report.estimatedClaimValue,
+          } : null,
+        };
+        const job = await lawyerQueue.submit(authContext.user, { key, claimant: { ...prepared.claimant, analysisSummary },
           acceptance, documents: { report: pdf, powerOfAttorney, agreement }, sources });
         sendJson(response, 200, { job });
         return true;

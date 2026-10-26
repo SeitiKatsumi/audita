@@ -27,7 +27,7 @@ export function createLawyerQueueService({ getDb }) {
       (tenant_id, user_id, submission_key, claimant, acceptance, report_pdf, power_of_attorney_pdf, agreement_pdf, source_documents)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       ON CONFLICT (user_id, submission_key) DO UPDATE SET submission_key = EXCLUDED.submission_key
-      RETURNING id, status, created_at`, [user.tenant_id, user.id,
+      RETURNING id, status, created_at, claimant->'analysisSummary' AS "analysisSummary"`, [user.tenant_id, user.id,
       createHash("sha256").update(key).digest("hex"), claimant, acceptance,
       documents.report, documents.powerOfAttorney, documents.agreement, JSON.stringify(sources)]);
     return result.rows[0];
@@ -74,6 +74,16 @@ export function createLawyerQueueService({ getDb }) {
     return { bytes: result.rows[0].pdf, name: `${name}.pdf`, type: "application/pdf" };
   }
 
+  async function customerReport(user, id) {
+    if (!user?.id || !user.tenant_id) throw queueError(401, "Entre na Audita para acessar sua petição.");
+    if (user.status && user.status !== 'active') throw queueError(403, "Acesso indisponível.");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) throw queueError(404, "Documento não encontrado.");
+    const result = await db().query(`SELECT report_pdf AS pdf FROM audita_lawyer_jobs
+      WHERE id = $1 AND user_id = $2 AND tenant_id = $3`, [id, user.id, user.tenant_id]);
+    if (!result.rows[0]?.pdf) throw queueError(404, "Documento não encontrado.");
+    return Buffer.from(result.rows[0].pdf);
+  }
+
   async function complete(user, id, protocol) {
     requireLawyer(user);
     const number = String(protocol || "").trim();
@@ -83,5 +93,5 @@ export function createLawyerQueueService({ getDb }) {
     if (!result.rows[0]) throw queueError(409, "O caso não está disponível para conclusão por sua conta.");
     return result.rows[0];
   }
-  return { submit, list, claim, document, complete };
+  return { submit, list, claim, document, customerReport, complete };
 }
