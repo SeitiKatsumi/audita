@@ -166,3 +166,24 @@ test('charge card highlights the requested period without removing the qualifica
  assert.ok(card.indexOf('Confira as 133 bandeiras no chat') > card.indexOf('Para quem é'));
  assert.ok(card.indexOf('Confira as 133 bandeiras no chat') < card.indexOf('Como podemos ajudar'));
 });
+
+test('catalog initialization preserves the manual certificate order while sorting other groups', async () => {
+ const {runInNewContext}=await import('node:vm');
+ const source=await readFile(new URL('../services-catalog.js',import.meta.url),'utf8');
+ const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+ const section=html.match(/<section[^>]*aria-labelledby="services-certidoes"[\s\S]*?<\/section>/)[0];
+ assert.match(section,/data-service-order="manual"/);
+ const titles=[...section.matchAll(/<strong>(.*?)<\/strong>/g)].map(m=>m[1]);
+ const makeGroup=(label,names,manual)=>{
+  const cards=names.map(text=>({querySelector:()=>({textContent:text})}));
+  const grid={append(card){cards.splice(cards.indexOf(card),1);cards.push(card);}};
+  return {dataset:{serviceOrder:manual?'manual':''},cards,querySelector:s=>s==='h3'?{textContent:label}:grid,querySelectorAll:()=>cards};
+ };
+ const certificates=makeGroup('Emissão de certidões',titles,true), other=makeGroup('Outro',['Zebra','Alfa'],false);
+ const root={querySelectorAll:s=>s==='[data-service-group]'?[certificates,other]:[],querySelector:()=>({append(){}})};
+ const functionSource=source.slice(source.indexOf('function addAnalysisServices'),source.indexOf('export function matchesService'));
+ runInNewContext(functionSource+';addAnalysisServices(root);',{root,analysisSegments:[]});
+ assert.match(certificates.cards[0].querySelector().textContent,/Emissão de certidões diversas/);
+ assert.match(certificates.cards[1].querySelector().textContent,/Certidão Nacional/);
+ assert.deepEqual(other.cards.map(c=>c.querySelector().textContent),['Alfa','Zebra']);
+});

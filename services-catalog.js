@@ -26,7 +26,7 @@ function addAnalysisServices(root) {
   const compare = (a, b) => a.localeCompare(b, 'pt-BR');
   const groups = [...root.querySelectorAll('[data-service-group]')];
   groups.sort((a,b) => compare(a.querySelector('h3').textContent,b.querySelector('h3').textContent)).forEach(g => root.querySelector('#servicesGrid').append(g));
-  for (const group of groups) [...group.querySelectorAll('[data-service-card]')].sort((a,b)=>compare(a.querySelector('strong').textContent,b.querySelector('strong').textContent)).forEach(card=>group.querySelector('.services-grid').append(card));
+  for (const group of groups.filter(group => group.dataset.serviceOrder !== 'manual')) [...group.querySelectorAll('[data-service-card]')].sort((a,b)=>compare(a.querySelector('strong').textContent,b.querySelector('strong').textContent)).forEach(card=>group.querySelector('.services-grid').append(card));
   [...root.querySelectorAll('[data-service-category]')].filter(b=>b.dataset.serviceCategory !== 'all').sort((a,b)=>compare(a.textContent,b.textContent)).forEach(b=>root.querySelector('[data-service-category="all"]').parentElement.append(b));
 }
 
