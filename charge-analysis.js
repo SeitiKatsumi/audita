@@ -1978,7 +1978,7 @@ if (stage) {
           <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" target="_blank" rel="noopener noreferrer">Ler a procuração</a> e <a href="/api/jec/legal-services-contract/preview" target="_blank" rel="noopener noreferrer">ler o contrato</a>. A IA AUDITA preencherá seus dados e gerará um PDF separado para cada documento.</p>
           <label class="jec-confirmation">
             <input type="checkbox" name="powerOfAttorneyAccepted" ${powerOfAttorneyAcceptance.accepted ? "checked" : ""} />
-            <span>Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Jurídicos e Honorários Advocatícios, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.</span>
+            <span>Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Advocatícios com Honorários de Êxito, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.</span>
           </label>
           <p>A data, a hora e o mesmo identificador serão registrados nos dois PDFs. Não é necessário desenhar a assinatura.</p>
         </div>

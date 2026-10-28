@@ -240,8 +240,8 @@ test("electronic acceptance requires the typed claimant name", () => {
     {
       accepted: true,
       signerName: "joao DA SILVA",
-      statement: "Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Jurídicos e Honorários Advocatícios, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.",
-      version: "2026-10-16-contract-2",
+      statement: "Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Advocatícios com Honorários de Êxito, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.",
+      version: "2026-10-28-contract-3",
     },
   );
   assert.throws(
@@ -335,12 +335,12 @@ test("legal-services contract preserves the supplied terms and uses the same com
     },
   };
   const html = buildLegalServicesAgreementHtml(document);
-  assert.match(html, /CONTRATO DE PRESTAÇÃO DE SERVIÇOS JURÍDICOS E HONORÁRIOS ADVOCATÍCIOS/);
+  assert.match(html, /CONTRATO DE PRESTAÇÃO DE SERVIÇOS ADVOCATÍCIOS COM HONORÁRIOS DE ÊXITO/);
   assert.match(html, /30% \(trinta por cento\)/);
-  assert.match(html, /fica totalmente isento\(a\) do pagamento de taxas judiciárias/);
-  assert.match(html, /CONTRATADO NÃO interporá recurso/);
-  assert.match(html, /risco financeiro direto[\s\S]*?ZERO/);
-  assert.match(html, /Advogado responsável pendente de vinculação/);
+  assert.match(html, /responsabilidade do CLIENTE pelas despesas processuais/);
+  assert.match(html, /interposição de recursos e apresentação de contrarrazões/);
+  assert.doesNotMatch(html, /risco financeiro direto[\s\S]*?ZERO/);
+  assert.match(html, /nome completo ou sociedade de advocacia/);
   assert.match(html, /Assinado eletronicamente pelo contratante/);
   assert.match(html, /Maria José &lt;Cliente&gt;/);
   assert.match(html, /ID shared-a/);

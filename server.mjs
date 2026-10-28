@@ -109,12 +109,12 @@ import {
 } from "./services/jec-petition.service.mjs";
 import {
   appendJecPetitionAttachments,
-  buildLegalServicesAgreementHtml,
   createLegalServicesAgreementPdf,
   createPowerOfAttorneyPdf,
   createJecPetitionPdf,
   validatePowerOfAttorneyAcceptance,
 } from "./services/jec-petition-pdf.service.mjs";
+import { buildItauContractPreviewHtml } from "./services/itau-contract-preview.mjs";
 import {
   createJecTestimonyService,
   JecTestimonyError,
@@ -4777,7 +4777,7 @@ async function handleApi(request, response, pathname) {
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
     });
-    response.end(buildLegalServicesAgreementHtml());
+    response.end(buildItauContractPreviewHtml());
     return true;
   }
 
