@@ -1535,6 +1535,7 @@ if (stage) {
                   <b class="charge-tier-discount">${escapeChargeHtml(String(selectedTier.discountPercent))}% DE DESCONTO NA PRIMEIRA COMPRA</b>
                   <strong class="charge-tier-price">${escapeChargeHtml(formatChargeCurrency(Number(selectedTier.price?.cents || 0) / 100))}</strong>
                   <b class="charge-tier-installments">em 10x no cartão sem juros!</b>
+                  <p class="charge-tier-exclusive-offer"><strong>Assinantes do plano de 12 meses da IA Audita estão isentos deste pagamento para continuar no serviço Itaú.</strong></p>
                   <ul class="charge-tier-inclusions" aria-label="Itens incluídos na contratação">
                     <li>
                       <strong>Relatório Técnico de Auditoria Financeira</strong>
