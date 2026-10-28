@@ -874,6 +874,9 @@ export async function appendJecPetitionAttachments(basePdf, attachments = []) {
     );
     const pages = await output.copyPages(source, source.getPageIndices());
     for (const page of pages) output.addPage(page);
+    if (attachment.preserveOriginal && attachment.name) {
+      await output.attach(bytes, attachment.name, { mimeType: "application/pdf", description: label });
+    }
   }
 
   return output.save();

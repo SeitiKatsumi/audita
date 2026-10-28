@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { PDFDocument, PDFName, PDFRawStream, decodePDFRawStream } from "pdf-lib";
 import { createLawyerQueueService, requireLawyer } from "../services/lawyer-queue.service.mjs";
 import { resolveUiRoute } from "../services/ui-routing.service.mjs";
 
@@ -26,7 +27,9 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   const queue = createLawyerQueueService({ getDb: () => ({ pool: db, dbReady: true }) });
   const client = { id: 101, tenant_id: 1, role: "member" };
   const lawyer = { id: 102, role: "lawyer" }, other = { id: 103, role: "lawyer" };
-  const pdf = Buffer.from("%PDF-test");
+  const fixture = await PDFDocument.create();
+  fixture.addPage([300, 400]);
+  const pdf = Buffer.from(await fixture.save());
   const analysisSummary = { documentCount: 1, disputedCount: 2, totalDisputed: 80, documentaryCoverage: 'partial', values: { estimatedClaimValue: 4700 } };
   const input = { key: "same-case", claimant: { fullName: "Cliente", uf: "SP", city: "Jundiaí", analysisSummary },
     acceptance: { id: "acceptance", accepted: true }, documents: { report: pdf, powerOfAttorney: pdf, agreement: pdf },
@@ -34,7 +37,7 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   const job = await queue.submit(client, input);
   assert.equal((await queue.submit(client, input)).id, job.id);
   assert.deepEqual(job.analysisSummary, analysisSummary);
-  assert.deepEqual(Buffer.from(await queue.customerReport(client, job.id)), pdf);
+  assert.equal((await PDFDocument.load(await queue.customerReport(client, job.id))).getPageCount(), 3);
   await assert.rejects(queue.customerReport(null, job.id), { status: 401 });
   await assert.rejects(queue.customerReport({ ...client, status: 'disabled' }, job.id), { status: 403 });
   await assert.rejects(queue.customerReport(client, '../other'), { status: 404 });
@@ -43,7 +46,7 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   await assert.rejects(queue.customerReport({ ...client, id: 103, role: 'super_admin' }, job.id), { status: 404 });
   const repeated = await queue.submit(client, { ...input, claimant: { ...input.claimant, analysisSummary: { totalDisputed: 999999 } }, documents: { ...input.documents, report: Buffer.from('%PDF-new') } });
   assert.deepEqual(repeated.analysisSummary, analysisSummary);
-  assert.deepEqual(Buffer.from(await queue.customerReport(client, job.id)), pdf);
+  assert.equal((await PDFDocument.load(await queue.customerReport(client, job.id))).getPageCount(), 3);
   assert.equal((await queue.list(lawyer)).length, 1);
   assert.equal((await queue.list(lawyer))[0].client_name, null);
   await assert.rejects(queue.document(lawyer, job.id, "report"), { status: 404 });
@@ -61,7 +64,7 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   await assert.rejects(queue.claim(supervisor,job.id),{status:403});
   await assert.rejects(queue.list({id:101,role:'member'}),{status:403});
   await assert.rejects(queue.document(loser, job.id, "report"), { status: 404 });
-  assert.deepEqual(Buffer.from((await queue.document(winner, job.id, "report")).bytes), pdf);
+  assert.equal((await PDFDocument.load((await queue.document(winner, job.id, "report")).bytes)).getPageCount(), 3);
   assert.deepEqual(Buffer.from((await queue.document(winner, job.id, "source-0")).bytes), pdf);
   await assert.rejects(queue.document(winner, job.id, "source-1"), { status: 404 });
   await assert.rejects(queue.complete(loser, job.id, "12345"), { status: 409 });
@@ -72,8 +75,33 @@ test("queue persists, deduplicates, claims once and restricts documents and comp
   await db.close();
   db = new PGlite({ loadDataDir: saved });
   assert.equal((await queue.list(winner))[0].protocol_number, "12345");
-  assert.deepEqual(Buffer.from(await queue.customerReport(client, job.id)), pdf);
+  assert.equal((await PDFDocument.load(await queue.customerReport(client, job.id))).getPageCount(), 3);
   assert.deepEqual((await queue.submit(client, input)).analysisSummary, analysisSummary);
   assert.deepEqual(Buffer.from((await queue.document(winner, job.id, "agreement")).bytes), pdf);
   await db.close();
+});
+
+test('complete Itau download appends saved power and all statement pages, preserving exact originals', async () => {
+  const makePdf = async sizes => { const doc = await PDFDocument.create(); sizes.forEach(size => doc.addPage(size)); return Buffer.from(await doc.save()); };
+  const report = await makePdf([[300,400]]);
+  const power = await makePdf([[310,410]]);
+  const statement = await makePdf([[320,420],[330,430]]);
+  let row = { pdf: report, power_of_attorney_pdf: power, source_documents: [{name:'extrato.pdf',type:'application/pdf',base64:statement.toString('base64')}], claimant:{analysisSummary:{documentCount:1}} };
+  const queue = createLawyerQueueService({getDb:()=>({dbReady:true,pool:{query:async()=>({rows:[row]})}})});
+  const user={id:1,tenant_id:1}, id='00000000-0000-4000-8000-000000000001';
+  const bytes = await queue.customerReport(user,id);
+  const doc = await PDFDocument.load(bytes);
+  assert.deepEqual(doc.getPages().map(p=>[p.getWidth(),p.getHeight()]), [[300,400],[310,410],[320,420],[330,430]]);
+  const names=doc.catalog.lookup(PDFName.of('Names')).lookup(PDFName.of('EmbeddedFiles')).lookup(PDFName.of('Names'));
+  const originals=[];
+  for(let i=0;i<names.size();i+=2){const spec=names.lookup(i+1); const stream=spec.lookup(PDFName.of('EF')).lookup(PDFName.of('F'),PDFRawStream); originals.push(Buffer.from(decodePDFRawStream(stream).decode()));}
+  assert.deepEqual(originals,[power,statement]);
+  assert.equal((await PDFDocument.load(await queue.customerReport(user,id))).getPageCount(),4);
+  assert.deepEqual(row.pdf, report);
+  row={...row,source_documents:[]};
+  await assert.rejects(queue.customerReport(user,id),{status:422});
+  row={...row,power_of_attorney_pdf:null};
+  await assert.rejects(queue.customerReport(user,id),{status:422});
+  row={...row,claimant:{module:'bank_debt'}};
+  assert.deepEqual(await queue.customerReport(user,id),report);
 });

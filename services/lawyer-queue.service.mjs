@@ -1,4 +1,25 @@
 import { createHash } from "node:crypto";
+import { appendJecPetitionAttachments } from "./jec-petition-pdf.service.mjs";
+
+async function completeItauReport(row) {
+  // Other modules own their report composition. Legacy Itaú jobs have no module.
+  if (row.claimant?.module && row.claimant.module !== "itau") return Buffer.from(row.pdf);
+  if (!row.power_of_attorney_pdf?.length) throw queueError(422, "A procuração não está disponível neste atendimento. Solicite a conferência dos documentos.");
+  const sources = row.source_documents || [];
+  if (!Array.isArray(sources) || sources.some(source => !source?.base64)) {
+    throw queueError(422, "Os documentos originais deste atendimento estão incompletos.");
+  }
+  if (Number(row.claimant?.analysisSummary?.documentCount || 0) > sources.length) {
+    throw queueError(422, "Faltam extratos originais neste atendimento. Solicite a conferência dos documentos.");
+  }
+  return Buffer.from(await appendJecPetitionAttachments(row.pdf, [
+    { label: "Procuração", name: "procuracao.pdf", bytes: row.power_of_attorney_pdf, preserveOriginal: true },
+    ...sources.map((source, index) => ({
+      label: "Extrato ou fatura original", name: `extrato-${index + 1}-${source.name || "documento"}`,
+      bytes: Buffer.from(source.base64, "base64"), preserveOriginal: true,
+    })),
+  ]));
+}
 
 export function queueError(status, message) {
   return Object.assign(new Error(message), { status });
@@ -68,20 +89,20 @@ export function createLawyerQueueService({ getDb }) {
       return { bytes: Buffer.from(source.base64, "base64"), name: source.name, type: source.type };
     }
     if (!Object.hasOwn(columns, name)) throw queueError(404, "Documento não encontrado.");
-    const result = await db().query(`SELECT ${columns[name]} AS pdf FROM audita_lawyer_jobs
+    const result = await db().query(`SELECT ${columns[name]} AS pdf, power_of_attorney_pdf, source_documents, claimant FROM audita_lawyer_jobs
       WHERE id = $1 AND lawyer_id = $2`, [id, user.id]);
     if (!result.rows[0]) throw queueError(404, "Solicitação não encontrada entre seus casos.");
-    return { bytes: result.rows[0].pdf, name: `${name}.pdf`, type: "application/pdf" };
+    return { bytes: name === "report" ? await completeItauReport(result.rows[0]) : result.rows[0].pdf, name: `${name}.pdf`, type: "application/pdf" };
   }
 
   async function customerReport(user, id) {
     if (!user?.id || !user.tenant_id) throw queueError(401, "Entre na Audita para acessar sua petição.");
     if (user.status && user.status !== 'active') throw queueError(403, "Acesso indisponível.");
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id))) throw queueError(404, "Documento não encontrado.");
-    const result = await db().query(`SELECT report_pdf AS pdf FROM audita_lawyer_jobs
+    const result = await db().query(`SELECT report_pdf AS pdf, power_of_attorney_pdf, source_documents, claimant FROM audita_lawyer_jobs
       WHERE id = $1 AND user_id = $2 AND tenant_id = $3`, [id, user.id, user.tenant_id]);
     if (!result.rows[0]?.pdf) throw queueError(404, "Documento não encontrado.");
-    return Buffer.from(result.rows[0].pdf);
+    return completeItauReport(result.rows[0]);
   }
 
   async function complete(user, id, protocol) {
