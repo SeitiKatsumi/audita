@@ -204,7 +204,7 @@ As estimativas dos arquivos de teste não conciliam a cobrança efetiva do prove
 
 A emissão foi validada com os dados autorizados desta rodada. Variações cadastrais, documentos positivos, indisponibilidade do órgão e casos que exigem análise manual podem impedir uma nova emissão. O módulo coleta documentos e apresenta os retornos; a análise jurídica consolidada de risco por IA continua pendente.
 
-A proteção contra reemissão e a fila de saldo funcionam dentro de um processo do serviço. Antes de operar múltiplas réplicas ou compartilhar cobrança concorrente com outros serviços, é necessária reserva de créditos no banco. Após reinício ou resultado inconclusivo, conferir o histórico do fornecedor antes de repetir uma consulta paga.
+A proteção contra reemissão e a fila de saldo funcionam dentro de um processo do serviço. A fila de saldo é mantida para operações que debitam a carteira; pedidos já liberados pelo servidor executam até três fontes por lote sem aguardar essa trava, mantendo os mesmos identificadores e a deduplicação. Antes de operar múltiplas réplicas ou compartilhar cobrança concorrente com outros serviços, é necessária reserva de créditos no banco. Após reinício ou resultado inconclusivo, conferir o histórico do fornecedor antes de repetir uma consulta paga.
 
 Pacote privado de homologação: `output/documentos-vendedor-validados-2026-09-28.zip`, com 123 PDFs (120 certidões e três comprovantes). Esse pacote contém os documentos reais dos testes e não é publicado no Git ou em rota estática.
 

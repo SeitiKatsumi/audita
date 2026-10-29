@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { saveAndExtractPdfBuffer, extractPdfText } from "./pdf.service.mjs";
 import { successResult, failedResult } from "../collectors/base.collector.mjs";
 import { findStateCourtProfile, listStateCourtProfiles } from "./state-courts.service.mjs";
+import { collectInParallel } from './collection-concurrency.mjs';
 
 const coverage = JSON.parse(readFileSync(new URL("../data/state-court-autonomous.json", import.meta.url), "utf8"));
 const compact = (value) => String(value || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -64,6 +65,17 @@ export async function downloadCertificateEvidence(url, fetchImpl = fetch) {
   return Buffer.concat(chunks);
 }
 
+function portalFailureDetail(message, input) {
+  let detail = String(message || "").split(/\r?\n/)[0];
+  for (const value of [input.documento, ...Object.values(input.extraFields?.stateCourtFields || {})]) {
+    if (typeof value === "string" && value.trim().length >= 3) detail = detail.replaceAll(value.trim(), "[dado omitido]");
+  }
+  return detail.replace(/https?:\/\/\S+/gi, "[endereço omitido]")
+    .replace(/(?:Bearer\s+|(?:TOKEN|API_KEY|PASSWORD)=)[^\s&]+/gi, "[credencial omitida]")
+    .replace(/\b(?:\d[.\-/\s]*){11,14}\b/g, "[documento omitido]")
+    .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, "[e-mail omitido]").slice(0, 400);
+}
+
 export async function collectAutonomousCertificates(input, { collectPortal, closeAssisted, queryCertificate, configuration, includeCandidates = false, download = downloadCertificateEvidence, savePdf = saveAndExtractPdfBuffer, readPdf = extractPdfText } = {}) {
   const extra = input.extraFields || {};
   if (extra.authorizationConfirmed !== true) throw new Error("authorization_required");
@@ -71,16 +83,34 @@ export async function collectAutonomousCertificates(input, { collectPortal, clos
   const plan = planAutonomousCertificates(extra.autonomousUfs, configuration, extra.autonomousCertificates, input.tipoDocumento, { includeCandidates });
   if (plan.certificates.some((item) => item.provider === "direct_data") && extra.paidQueryConfirmed !== true) throw new Error("paid_query_confirmation_required");
   const rows = plan.certificates.map((item) => ({ uf: item.uf, tipo: `${item.uf} · ${item.type}`, status: "pending", resultado: "indisponivel", provider: item.provider }));
-  for (let i = 0; i < plan.certificates.length; i++) {
-    const item = plan.certificates[i];
-    await input.onProgress?.({ stage: "autonomous_certificates", total: rows.length, completed: i, currentCertificate: rows[i].tipo, certidoes: rows });
+  let completed=0, portalTurn=Promise.resolve(), progressWrites=Promise.resolve();
+  function progress() {
+    const snapshot={stage:completed===rows.length?'completed':'autonomous_certificates',total:rows.length,completed,currentCertificate:rows.find(row=>row.status==='running')?.tipo||rows.find(row=>row.status==='pending')?.tipo||'',certidoes:structuredClone(rows)};
+    progressWrites=progressWrites.then(()=>input.onProgress?.(snapshot));
+    return progressWrites;
+  }
+  await progress();
+  await collectInParallel(plan.certificates, async (item,i) => {
+    let release;
+    if(item.provider==='portal') {
+      const previous=portalTurn;portalTurn=new Promise(resolve=>{release=resolve;});await previous;
+    }
+    rows[i].status='running';
     try {
       if (item.provider === "portal") {
         const birthDate = extra.stateCourtFields.birthDate?.split("/").reverse().join("-");
         const native = await collectPortal({ ...input, onProgress: undefined, extraFields: { ...extra, autonomousUfs: [], stateCourtUf: item.uf, stateCourtName: item.uf === "DF" ? "TJDFT" : `TJ${item.uf}`, stateCourtUrl: "", stateCourtFields: { ...extra.stateCourtFields, birthDate, instance: "1", nature: item.portalType, certificateKind: item.portalType }, stateCourtCertificateTypes: [item.portalType], tjdftCertificateTypes: [item.portalType] } });
         if (native.dados?.assistedSession) await closeAssisted?.(native.dados.assistedSession);
         const certificate = native.dados?.certidoes?.[0];
-        if (!certificate?.pdfPath) throw new Error("official_pdf_unavailable");
+        if (!certificate?.pdfPath) {
+          const missingFields = (native.dados?.missingFields || []).filter(field => ["firstName", "fullName", "motherName", "fatherName", "birthDate", "rg", "gender", "email"].includes(field));
+          const message = certificate?.errorMessage || native.errorMessage;
+          const code = certificate?.errorCode || (missingFields.length ? "portal_identity_fields_required" : message ? "portal_collection_failed" : "official_pdf_unavailable");
+          throw Object.assign(new Error(/^[a-z_]{1,80}$/.test(code) ? code : "portal_collection_failed"), {
+            errorDetail: portalFailureDetail(message, input), missingFields,
+            errorStage: /^[a-z_]{1,48}$/.test(certificate?.errorStage || "") ? certificate.errorStage : "",
+          });
+        }
         const buffer = await readFile(certificate.pdfPath);
         const text = await readPdf(buffer);
         if (!certificatePdfMatches(buffer, text, input.documento, extra.stateCourtFields.fullName)) throw new Error("evidence_identity_unverified");
@@ -100,9 +130,19 @@ export async function collectAutonomousCertificates(input, { collectPortal, clos
       }
       rows[i].evidenceIdentityVerified=true;
     } catch (error) {
-      rows[i] = { ...rows[i], status: "failed", errorMessage: /^[a-z_]+$/.test(error.message) ? error.message : "certificate_unavailable" };
+      rows[i] = { ...rows[i], status: "failed", errorMessage: /^[a-z_]+$/.test(error.message) ? error.message : "certificate_unavailable",
+        ...(item.provider === "portal" ? {
+          errorDetail: error.errorDetail || portalFailureDetail(error.message, input),
+          ...(error.errorStage ? { errorStage: error.errorStage } : {}),
+          ...(error.missingFields?.length ? { missingFields: error.missingFields } : {}),
+        } : {}),
+      };
+    } finally {
+      release?.();
     }
-  }
+    completed++;
+    await progress();
+  });
   const downloaded = rows.filter((item) => item.pdfPath).length;
   const dados = { modo: "autonomous", certidoes: rows, totalCertidoes: rows.length, certidoesBaixadas: downloaded, certidoesComFalha: rows.filter((item) => item.status !== "success").map((item) => item.tipo), progress: { stage: "completed", completed: rows.length, total: rows.length, updatedAt: new Date().toISOString() }, resumo: `${downloaded} de ${rows.length} certidões obtidas. A cobertura se limita aos estados e tipos selecionados.` };
   if (!downloaded) return failedResult("tjdft", "Nenhum PDF oficial disponível nesta tentativa.", dados);

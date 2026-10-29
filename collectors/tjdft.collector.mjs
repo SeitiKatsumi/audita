@@ -6869,13 +6869,17 @@ export async function saveNativeCertificatePdf(input, fileName, buffer) {
   return { pdfPath, rawText };
 }
 
-async function collectCertificate({ context, input, firstName, motherName, fatherName, certificateType }) {
+export async function collectCertificate({ context, input, firstName, motherName, fatherName, certificateType }) {
   const page = await context.newPage();
+  let errorStage = "portal_open";
   try {
     page.setDefaultTimeout(envNumber("TJDFT_STEP_TIMEOUT_MS", input.timeoutMs || 30000));
     await page.goto(OFFICIAL_URL, { waitUntil: "domcontentloaded" });
+    errorStage = "identity_confirmation";
     await fillTjdftFirstStep(page, input.documento, firstName, certificateType);
+    errorStage = "affiliation_confirmation";
     if (input.tipoDocumento !== "cnpj") await fillTjdftSecondStep(page, motherName, fatherName);
+    errorStage = "pdf_link";
     const { downloadUrl, pageText } = await readResult(page);
 
     if (!downloadUrl) {
@@ -6885,9 +6889,12 @@ async function collectCertificate({ context, input, firstName, motherName, fathe
         resultado: SOURCE_RESULT.ERRO,
         pageText,
         errorMessage: "TJDFT nao retornou link de download.",
+        errorCode: "portal_pdf_link_missing",
+        errorStage,
       };
     }
 
+    errorStage = "pdf_download";
     const pdfResponse = await fetch(downloadUrl);
     if (!pdfResponse.ok) {
       return {
@@ -6897,10 +6904,13 @@ async function collectCertificate({ context, input, firstName, motherName, fathe
         pageText,
         downloadUrl,
         errorMessage: `Falha ao baixar PDF TJDFT: HTTP ${pdfResponse.status}`,
+        errorCode: "portal_pdf_download_failed",
+        errorStage,
       };
     }
 
     const buffer = Buffer.from(await pdfResponse.arrayBuffer());
+    errorStage = "pdf_processing";
     const { pdfPath, rawText } = await saveNativeCertificatePdf(input, `tjdft-${certificateType.id}.pdf`, buffer);
 
     const textForAnalysis = rawText || "";
@@ -6920,6 +6930,8 @@ async function collectCertificate({ context, input, firstName, motherName, fathe
       status: "failed",
       resultado: SOURCE_RESULT.ERRO,
       errorMessage: error.message,
+      errorCode: /^[a-z_]{1,80}$/.test(error.message) ? error.message : error.name === "TimeoutError" ? "portal_timeout" : "portal_collection_failed",
+      errorStage,
     };
   } finally {
     await page.close();

@@ -139,7 +139,7 @@ test("home links to the service catalog without duplicate module shortcuts", () 
 });
 
 test("charge analysis exposes a guided flow without an open chat input", () => {
-  const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page"');
+  const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page" id="analise-cobrancas"');
   const moduleEnd = indexHtml.indexOf('<section class="assistant-workbench"', moduleStart);
   const moduleMarkup = indexHtml.slice(moduleStart, moduleEnd);
 
@@ -152,7 +152,7 @@ test("charge analysis exposes a guided flow without an open chat input", () => {
 });
 
 test("charge analysis keeps progress internal without rendering the step rail", () => {
-  const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page"');
+  const moduleStart = indexHtml.indexOf('<section class="charge-analysis-page" id="analise-cobrancas"');
   const moduleEnd = indexHtml.indexOf('<section class="assistant-workbench"', moduleStart);
   const moduleMarkup = indexHtml.slice(moduleStart, moduleEnd);
 

@@ -174,7 +174,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
     if (certificates) {
       if (!await getAnalysisAccess(auth)) fail('certificate_analysis_subscription_required', 402);
       if (purpose !== undefined && (typeof purpose !== 'string' || purpose.trim().length > 0 && purpose.trim().length < 10 || purpose.length > 2000 || /[\u0000-\u0008]/.test(purpose))) fail('invalid_analysis_purpose');
-      purpose = purpose?.trim() || 'Analise os documentos e dados obtidos, resuma os pontos de atenção e indique o que precisa de conferência.';
+      purpose = purpose?.trim() || 'Analise os documentos e dados obtidos, apresente conclusões objetivas sobre os resultados e indique providências para as pendências concretas.';
       await checkAnalysisCost(auth);
     }
     if (consent !== true && row.request_payload.sellerAiConsent !== true) fail('seller_ai_consent_required');
@@ -191,7 +191,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
         const selected = sources.find(source => source.id === selection.sourceId && source.status === 'success');
         if (!selected) fail('invalid_analysis_selection');
         sources = [selected];
-        if (!customPurpose) purpose = 'Analise somente o documento ou consulta selecionado, explique o resultado e indique os pontos que precisam de conferência.';
+        if (!customPurpose) purpose = 'Analise somente o documento ou consulta selecionado, apresente a conclusão sustentada pela fonte e indique providências somente para pendências concretas.';
         analysisKey = selected.id;
       } else analysisKey = 'all';
       if (!sources.some(source => source.status === 'success')) fail('certificate_no_available_sources', 422);
@@ -300,7 +300,7 @@ export function createSellerReviewService({ getDb, auditService, ai, readPdf, ge
       const gaps = results.filter(r => r.status !== 'analyzed' || r.outcome === 'inconclusive');
       const segment = getAnalysisSegment(state.segment);
       const report = { processCoverage:state.processCoverage, id, segment: segment.id, title: state.analysisMode === 'document' ? 'Análise de documento' : state.purpose ? 'Análise das certidões' : segment.title, purpose: state.purpose, analysisMode: state.analysisMode, sourceId: state.sourceId, generatedAt: now().toISOString(), subject: rowSubject(audit), scopeNotice: state.analysisMode === 'document' ? 'Análise limitada ao documento selecionado, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : state.purpose ? 'Análise limitada às certidões selecionadas, à identidade conferida e à data da coleta. Não comprova regularidade geral nem substitui avaliação profissional.' : segment.id === 'analise-vendedor' ? scopeNotice : `Análise limitada às fontes e à data da coleta. ${segment.scope}`, sources: results, findings, analyzed, total: results.length, gaps: gaps.length,
-        conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? state.purpose ? 'Foram identificados pontos que precisam de conferência no material analisado.' : 'Foram identificados pontos que exigem conferência antes da negociação.' : 'Não foram identificados apontamentos restritivos no material analisado.',
+        conclusion: !analyzed ? 'Não foi possível concluir a análise documental.' : findings.some(f => f.priority !== 'information') ? 'Foram identificadas pendências documentais no material analisado.' : 'Não foram identificados apontamentos restritivos no material analisado.',
       };
       if (!analyzed) {
         const reasons = [...new Set(results.filter(source => source.failure).map(source => source.failure.message))];

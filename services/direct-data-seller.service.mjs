@@ -125,7 +125,7 @@ export function createDirectDataSellerService({
   // ponytail: process-local deduplication; persistent operation records are needed across restarts/replicas.
   // Never evict submitted requests automatically: an eviction could permit another paid emission.
   const requests = new Map();
-  // Serializes this service's wallet check, emission and settlement within one process.
+  // Serializes unreleased wallet checks, emissions and settlement within one process.
   // Other processes/replicas or credit consumers still require a shared database reservation.
   const tenantOperations = new Map();
   const cacheLimit = positiveInteger(env.DIRECT_DATA_SELLER_CACHE_MAX_ENTRIES, 1000);
@@ -248,7 +248,7 @@ export function createDirectDataSellerService({
     const cached = requests.get(cacheKey);
     if (cached) return cached.fingerprint === fingerprint ? structuredClone(await cached.task) : invalid("request_id_conflict");
     if (requests.size >= cacheLimit) return { unavailable: true, reason: "idempotency_capacity_reached", configuration };
-    const operation = creditsService ? executeForTenant(tenantId, request, authContext) : execute(request, authContext);
+    const operation = creditsService && authContext.paidCertificateOrder !== true ? executeForTenant(tenantId, request, authContext) : execute(request, authContext);
     const task = operation.then((reply) => {
       if (!reply.result && !reply.providerRequestSubmitted) requests.delete(cacheKey);
       return reply;

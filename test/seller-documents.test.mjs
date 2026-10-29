@@ -262,6 +262,35 @@ test("seller batch preserves good certificates and data when another query fails
   assert.doesNotMatch(JSON.stringify(output), /never-copy-this|documentoConsultado|urlComprovante/);
 });
 
+test('three sources run concurrently and persist finished results while the first source still waits',async t=>{
+  let release,notify,active=0,peak=0,writing=0;
+  const slow=new Promise(resolve=>{release=resolve;}),fastProgress=new Promise(resolve=>{notify=resolve;});
+  t.after(()=>release());let timeout;t.after(()=>clearTimeout(timeout));
+  const updates=[],calls=[],ids=['protestos','vinculos','credito-quod','processos-agrupados','processos-completos','cadin-mg'];
+  const batch=input({sellerQueries:ids});
+  batch.onProgress=async snapshot=>{assert.equal(++writing,1);await new Promise(setImmediate);updates.push(snapshot);writing--;if(snapshot.completed===5)notify();};
+  const task=collectSellerDocuments(batch,dependencies({query:async request=>{
+    calls.push(request.requestId);peak=Math.max(peak,++active);
+    if(request.endpoint==='ProtestosOnline')await slow;else await new Promise(setImmediate);
+    active--;return request.endpoint==='DetalhamentoNegativo'?{reason:'provider_timeout'}:result({documentoConsultado:CPF,processos:[],relacionamentos:[]});
+  }}));
+  await Promise.race([fastProgress,new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error('slow source blocked the remaining sources')),1500);})]);
+  assert.equal(peak,3);assert.equal(new Set(calls).size,6);
+  assert.equal(updates.at(-1).certidoes[0].status,'running');assert.equal(updates[0].certidoes[0].status,'pending');
+  release();const output=await task;
+  assert.deepEqual(output.dados.certidoes.map(row=>row.id),ids);
+  assert.equal(output.dados.consultasObtidas,5);assert.equal(output.dados.certidoes[2].errorMessage,'provider_timeout');
+  assert.deepEqual(updates.map(p=>p.completed),[0,1,2,3,4,5,6]);assert.equal(updates.at(-1).stage,'completed');
+});
+
+test('a failed progress write stops new emissions and drains already running sources before rejecting',async()=>{
+  let active=0,calls=0;
+  const batch=input({sellerQueries:['protestos','vinculos','credito-quod','processos-agrupados','processos-completos','cadin-mg']});
+  batch.onProgress=async p=>{if(p.completed)throw Error('storage_unavailable');};
+  await assert.rejects(collectSellerDocuments(batch,dependencies({query:async()=>{calls++;active++;await new Promise(setImmediate);active--;return result({documentoConsultado:CPF,processos:[],relacionamentos:[]});}})),/storage_unavailable/);
+  assert.equal(active,0);assert.equal(calls,3);
+});
+
 test("seller certificate identity and all expected scope phrases are required before saving", async () => {
   let saved = 0;
   for (const overrides of [
@@ -365,17 +394,18 @@ test("company queries require selected valid CNPJs, multiply cost and isolate ev
   assert.equal(plan.queries.length, 2);
   assert.equal(plan.maxProviderCostBrl, 1.62);
   const requests = [], saved = [];
-  let target;
   const options = dependencies({ delay: async () => {}, query: async request => {
     requests.push(request);
-    target = request.parameters.CNPJ;
+    const target = request.parameters.CNPJ;
     assert.equal(request.parameters.CPF, undefined);
-    return result({ inscricao: target, nome: "Empresa diferente do nome do vendedor", possuiIrregularidade: false });
-  }, readPdf: async () => `CERTIFICADO DE REGULARIDADE DO FGTS CAIXA ECONOMICA FEDERAL ${target}`, savePdf: async ({ fileName }) => { saved.push(fileName); return { pdfPath: fileName }; }, collectCompany: async request => ({ status: "success", dados: { cnpj: request.documento, razaoSocial: "Empresa Teste" } }) });
+    const reply=result({ inscricao: target, nome: "Empresa diferente do nome do vendedor", possuiIrregularidade: false });
+    reply.result.payload.metaDados.urlComprovante=`https://apiv3.directd.com.br/evidence/${target}`;
+    return reply;
+  }, download:async url=>Buffer.from(`%PDF-test CERTIFICADO DE REGULARIDADE DO FGTS CAIXA ECONOMICA FEDERAL ${url.split('/').at(-1)}`), readPdf: async buffer => buffer.toString(), savePdf: async ({ fileName }) => { saved.push(fileName); return { pdfPath: fileName }; }, collectCompany: async request => ({ status: "success", dados: { cnpj: request.documento, razaoSocial: "Empresa Teste" } }) });
   const output = await collectSellerDocuments(input({ sellerQueries: ["fgts-company"], companyCnpjs: selection }), options);
   assert.equal(requests.length, 2);
   assert.deepEqual(requests.map(request => request.requestId), ["test-seller:fgts-company-empresa1", "test-seller:fgts-company-empresa2"]);
-  assert.deepEqual(saved, ["fgts-company-empresa1.pdf", "fgts-company-empresa2.pdf"]);
+  assert.deepEqual(saved.sort(), ["fgts-company-empresa1.pdf", "fgts-company-empresa2.pdf"]);
   assert.deepEqual(output.dados.certidoes.slice(0, 2).map(row => row.details["CNPJ consultado"]), [CNPJ, secondCnpj]);
   assert.ok(output.dados.certidoes.every(row => row.status === "success"));
   assert.equal(output.dados.progress.completed, 4);

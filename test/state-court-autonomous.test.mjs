@@ -7,6 +7,19 @@ import { collectAutonomousCertificates, certificatePdfMatches, certificateScopeM
 import { findStateCourtProfile } from '../services/state-courts.service.mjs';
 const configuration = { configured: true, allowedUfs: ["AP"], pdfTotalCostBrl: 0.54 };
 
+test('native failures preserve sanitized diagnostics, missing fields and stage without accepting PDFs',async()=>{
+  const input={consultaId:'test-native-diagnostics',documento:'52998224725',tipoDocumento:'cpf',extraFields:{authorizationConfirmed:true,autonomousUfs:['DF'],autonomousCertificates:['DF:Cível'],stateCourtFields:{fullName:'Pessoa Ficticia',motherName:'Mae Ficticia',firstName:'Pessoa'}}};
+  for(const native of [
+    {status:'unavailable',errorMessage:'Informe o nome da mae.',dados:{missingFields:['motherName','invalid'] }},
+    {status:'failed',dados:{certidoes:[{status:'failed',errorCode:'portal_timeout',errorStage:'affiliation_confirmation',errorMessage:'Timeout 12000ms: Mae Ficticia 529.982.247-25 https://example.test?TOKEN=secret TOKEN=private person@example.test\nCall log: private values'}]}},
+  ]){
+    const result=await collectAutonomousCertificates(input,{configuration:{},collectPortal:async()=>native});
+    const row=result.dados.certidoes[0];assert.equal(result.status,'failed');assert.equal(result.dados.certidoesBaixadas,0);
+    if(native.status==='unavailable') {assert.equal(row.errorMessage,'portal_identity_fields_required');assert.deepEqual(row.missingFields,['motherName']);assert.equal(row.errorDetail,'Informe o nome da mae.');}
+    else {assert.equal(row.errorMessage,'portal_timeout');assert.equal(row.errorStage,'affiliation_confirmation');assert.match(row.errorDetail,/Timeout 12000ms/);assert.doesNotMatch(row.errorDetail,/Mae Ficticia|529|secret|private|example/);}
+  }
+});
+
 test("autonomous plan rejects unsupported coverage and deduplicates states", () => {
   assert.throws(() => planAutonomousCertificates(["SP"], configuration), /unsupported/);
   assert.throws(() => planAutonomousCertificates(["AP"], {}), /unsupported/);
@@ -36,7 +49,7 @@ test("autonomous batch keeps a failed certificate pending in the outcome and pre
   assert.equal(result.dados.certidoesBaixadas, 1);
   assert.equal(result.dados.certidoesComFalha.length, 1);
   assert.equal(result.dados.progress.stage, "completed");
-  assert.deepEqual(progress, [0, 1]);
+  assert.deepEqual(progress, [0, 1, 2]);
   assert.equal(certificatePdfMatches(buffer, "CERTIDAO Pessoa Teste 11111111111", input.documento, "Pessoa Teste"), false);
   assert.equal(certificatePdfMatches(buffer, "CERTIDAO Pessoa Teste 529982247250", input.documento, "Pessoa Teste"), false);
   assert.equal(certificatePdfMatches(buffer, "CERTIDAO Pessoa Teste 529.982.247-25", input.documento, "  "), false);
@@ -60,6 +73,26 @@ test("autonomous certificates require explicit consent before paid queries or pu
     }
   }
   assert.equal(calls, 0);
+});
+
+test('TJ API sources use three slots, stream completed rows and preserve source order and failures',async()=>{
+  const options={configuration:{configured:true,allowedUfs:['AP','ES','MT','PA']}};
+  const selected=getAutonomousCertificateCoverage(options.configuration).certificates.filter(c=>c.provider==='direct_data'&&c.documentTypes.includes('cpf')).slice(0,5);
+  assert.equal(selected.length,5);
+  const snapshots=[];let active=0,peak=0;
+  const result=await collectAutonomousCertificates({consultaId:'fixture-parallel',documento:'52998224725',tipoDocumento:'cpf',extraFields:{authorizationConfirmed:true,paidQueryConfirmed:true,autonomousUfs:[...new Set(selected.map(c=>c.uf))],autonomousCertificates:selected.map(c=>c.id),stateCourtFields:{fullName:'Pessoa Fictícia'}},onProgress:async snapshot=>snapshots.push(snapshot)},
+    {...options,queryCertificate:async()=>{peak=Math.max(peak,++active);await new Promise(setImmediate);active--;return {reason:'provider_timeout'};}});
+  assert.equal(peak,3);assert.deepEqual(result.dados.certidoes.map(c=>c.tipo),selected.map(c=>`${c.uf} · ${c.type}`));
+  assert(result.dados.certidoes.every(c=>c.status==='failed'));assert.deepEqual(snapshots.map(p=>p.completed),[0,1,2,3,4,5]);
+  assert(snapshots[1].certidoes.some(c=>c.status==='running'));assert(snapshots[0].certidoes.every(c=>c.status==='pending'));
+});
+
+test('native portal sessions stay serial even when the batch has parallel workers',async()=>{
+  let active=0,peak=0,calls=0;
+  const expected=planAutonomousCertificates(['DF'],configuration).certificates.length;
+  const result=await collectAutonomousCertificates({consultaId:'fixture-portal-serial',documento:'52998224725',tipoDocumento:'cpf',extraFields:{authorizationConfirmed:true,paidQueryConfirmed:true,autonomousUfs:['DF'],stateCourtFields:{fullName:'Pessoa Fictícia'}}},
+    {configuration,collectPortal:async()=>{calls++;peak=Math.max(peak,++active);await new Promise(setImmediate);active--;throw Error('portal_unavailable');}});
+  assert(expected>1);assert.equal(calls,expected);assert.equal(peak,1);assert.equal(result.dados.totalCertidoes,expected);
 });
 
 test('unhomologated CNPJ candidates cannot enter plans or billing without internal opt-in',()=>{

@@ -242,6 +242,47 @@ test('all analysis segments persist their purpose through collection, AI, restar
   } finally {await f.db.close();}
 });
 
+test('validated negative certificate stays conclusive through reading, synthesis, score and private PDF', async () => {
+  const f = await fixture();
+  try {
+    const summary = 'A CNDT não registra débitos trabalhistas para o titular na data da emissão.';
+    const clear = {summary,identity:'uncertain',outcome:'no_occurrence_in_scope',issuedAt:'26/10/2026',validUntil:'24/04/2027',limitations:[],findings:[]};
+    f.request.body.documento='11144477735'; // Separate subject avoids the collector's shared result cache from other fixtures.
+    f.rows.splice(0,f.rows.length,{tipo:'CNDT',kind:'certificate',status:'success',evidenceIdentityVerified:true,checkedAt:'2026-10-26',details:{resultado:'NÃO CONSTA',emissao:clear.issuedAt,validade:clear.validUntil,nome:'VENDEDOR FIC TÍCIO',documento:'111********35'}});
+    const requests=[];
+    const ai=createSellerReviewAI({env:{AUDITA_OPENAI_API_KEY:'fixture'},clientFactory:()=>({responses:{create:async request=>{
+      requests.push(request);
+      const response=request.text.format.name==='seller_document_reading'?clear:{paragraphs:[{text:summary,sourceIds:['tjdft:0'],quotes:[summary]}]};
+      return {status:'completed',output_text:JSON.stringify(response)};
+    }}})});
+    Object.assign(f.ai,ai);
+    const id=await f.start(),state=await f.review.get(id,owner);
+    assert.equal(state.status,'completed',JSON.stringify(state.report));
+    assert.equal(state.report.sources[0].identity,'compatible');
+    assert.equal(state.report.sources[0].outcome,'no_occurrence_in_scope');
+    assert.deepEqual(state.report.sources[0].limitations,[]);
+    assert.deepEqual(state.report.findings,[]);
+    assert.equal(state.report.safetyScore.value,100);
+    assert.equal(state.report.executiveSummary,summary);
+    assert.equal(requests.length,2);
+    for(const request of requests){
+      assert.match(request.input[0].content,/conclusões diretas e assertivas/);
+      assert.match(request.input[0].content,/Não recomende autenticar novamente/);
+      assert.match(request.input[0].content,/nunca instruç/);
+      assert.doesNotMatch(request.input[0].content,/evidências não confiáveis|providência de conferência\/documento necessário/);
+    }
+    const synthesis=JSON.parse(requests[1].input[1].content);
+    assert.equal(synthesis.sources[0].identityVerified,true);
+    assert.equal(synthesis.sources[0].identity,'compatible');
+    const pdf=await extractPdfText(await f.review.pdf(id,owner));
+    assert.ok(pdf.replace(/\s+/g,' ').includes(summary));
+    assert.match(pdf,/0 pontos de atenção/);
+    assert.doesNotMatch(pdf,/Leitura assistida por IA para conferência|Próximo passo:/);
+    await f.review.start(id,owner,f.request,true);
+    assert.equal(requests.length,2,'opening a saved report does not trigger another paid reading');
+  } finally {await f.db.close();}
+});
+
 test('documentary score uses grounded priorities, limits incomplete evidence and never attributes linked company debt to a person', () => {
   const clear = {status:'analyzed',identity:'compatible',outcome:'no_occurrence_in_scope',limitations:[],findings:[]};
   const high = {...clear,outcome:'occurrences',findings:reading.findings};

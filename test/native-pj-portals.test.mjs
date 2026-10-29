@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { collect, fillTjdftFirstStep, fillTjdftSecondStep, fillEsTjesPageFields, getMissingStateCourtFields, hasEsTjesPrintableCertificateSignal, saveNativeCertificatePdf, waitForEsTjesResultOrValidation } from "../collectors/tjdft.collector.mjs";
+import { collect, collectCertificate, fillTjdftFirstStep, fillTjdftSecondStep, fillEsTjesPageFields, getMissingStateCourtFields, hasEsTjesPrintableCertificateSignal, saveNativeCertificatePdf, waitForEsTjesResultOrValidation } from "../collectors/tjdft.collector.mjs";
 
 const company = { tipoDocumento: "cnpj", documento: "11222333000181", extraFields: { stateCourtFields: { fullName: "EMPRESA FICTICIA TESTE LTDA", motherName: "Nao preencher", birthDate: "1980-01-01", rg: "Nao preencher" } } };
 function pageStub() {
@@ -18,6 +18,16 @@ function pageStub() {
   });
   return { calls, locator, getByRole: (role) => locator(role), async waitForFunction() { return { async jsonValue() { return "ready"; } }; } };
 }
+
+test('TJDFT preserves the failing stage and timeout code and closes the page', async()=>{
+  const page=pageStub();let closed=0;
+  page.setDefaultTimeout=()=>{};page.goto=async()=>{};page.close=async()=>{closed++;};
+  const locate=page.locator;
+  page.locator=selector=>({...locate(selector),nth:index=>index===2?{fill:async()=>{throw Object.assign(new Error('Timeout 12000ms exceeded'),{name:'TimeoutError'});}}:locate(selector).nth(index)});
+  const result=await collectCertificate({context:{newPage:async()=>page},input:{tipoDocumento:'cpf',documento:'52998224725'},firstName:'Pessoa',motherName:'Mae Ficticia',certificateType:{id:'civil',label:'Cível',radioIndex:1}});
+  assert.equal(result.status,'failed');assert.equal(result.errorCode,'portal_timeout');
+  assert.equal(result.errorStage,'affiliation_confirmation');assert.equal(closed,1);
+});
 
 test("TJDFT CNPJ skips the removed first-name control and preserves the requested certificate type", async () => {
   const page = pageStub();

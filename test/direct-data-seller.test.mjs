@@ -26,6 +26,17 @@ test('a paid certificate order skips the customer wallet; a client body cannot r
   assert.ok((await service.query(request(),{...AUTH,paidCertificateOrder:true})).result);assert.equal(calls,1);assert.equal(charges,0);
 });
 
+test('released orders do not hold the wallet queue while the provider waits; retries still share one emission',async t=>{
+  let release,calls=0;
+  const waiting=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+  const service=createDirectDataSellerService({env:ENV,creditsService:{getWallet:()=>assert.fail('no wallet for released order'),consume:()=>assert.fail('no second charge')},fetchImpl:async()=>{calls++;await waiting;return response();}});
+  const auth={...AUTH,paidCertificateOrder:true},first=request({requestId:'released-first'}),second=request({requestId:'released-second'});
+  const tasks=[service.query(first,auth),service.query(second,auth),service.query(first,auth)];
+  await new Promise(setImmediate);assert.equal(calls,2);
+  release();const results=await Promise.all(tasks);
+  assert(results.every(value=>value.result?.status==='success'));assert.equal(calls,2);
+});
+
 test("seller provider requires authorization, payment confirmation, identity, and documented parameters", async () => {
   let calls = 0;
   const service = createDirectDataSellerService({ env: ENV, fetchImpl: async () => { calls++; return response(); } });

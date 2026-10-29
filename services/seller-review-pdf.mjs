@@ -70,7 +70,7 @@ export async function sellerReportPdf(report) {
   text('Sobre este levantamento',true);
   text(report.scopeNotice || segment.scope);
   text(`Análise de ${report.analyzed} das ${report.total} fontes do levantamento, limitada ao material obtido e à data da consulta. Originais, status e detalhes das fontes permanecem disponíveis na consulta autenticada da IA Audita.`);
-  text('Leitura assistida por IA para conferência. Registros de processos ou empresas não representam automaticamente dívida pessoal do titular. Não é certidão oficial nem decisão jurídica ou garantia de regularidade.');
+  text('Relatório analítico elaborado a partir dos documentos e consultas obtidos. Cada conclusão se refere ao conteúdo, à data e ao alcance da respectiva fonte.');
   if(ps?.totals.length || ps?.total || ps?.aggregates?.length || report.processCoverage){
   next();
   text('Somatório dos valores dos processos',true);

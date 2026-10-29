@@ -9,6 +9,7 @@ import { extractPdfText, saveAndExtractPdfBuffer } from "./pdf.service.mjs";
 import { collect as collectPublicCompany } from "../collectors/receita-federal.collector.mjs";
 import { pdfHasCnpjRoot } from "./pdf-cnpj-root.service.mjs";
 import { SELLER_STATES, sellerQueriesForState } from './seller-state-plan.mjs';
+import { collectInParallel } from './collection-concurrency.mjs';
 
 const catalog = JSON.parse(readFileSync(new URL("../data/seller-document-coverage.json", import.meta.url), "utf8"));
 const clean = (value, limit = 250) => typeof value === "string" || typeof value === "number" ? String(value).replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, limit) : "";
@@ -214,12 +215,20 @@ export async function collectSellerDocuments(input, {
   }
   const rows=work.map(makeRow);
   function appendJob(job) { work.push(job); rows.push(makeRow(job)); }
-  let companyRequests=0;
-  async function progress(completed) {
-    await input.onProgress?.({ stage: completed === rows.length ? "completed" : "seller_documents", completed, total: rows.length, currentCertificate: rows[completed]?.tipo || "", certidoes: structuredClone(rows) });
+  let companyRequests=0, completed=0, companyTurn=Promise.resolve(), progressWrites=Promise.resolve();
+  function progress() {
+    const snapshot={ stage: completed === rows.length ? "completed" : "seller_documents", completed, total: rows.length, currentCertificate: rows.find(row=>row.status==='running')?.tipo || rows.find(row=>row.status==='pending')?.tipo || "", certidoes: structuredClone(rows) };
+    progressWrites=progressWrites.then(()=>input.onProgress?.(snapshot));
+    return progressWrites;
   }
-  await progress(0);
-  for (let index = 0; index < rows.length; index++) {
+  async function companyQuery(request) {
+    const task=companyTurn.then(async()=>{if(companyRequests++)await delay(12000);return collectCompany(request);});
+    companyTurn=task.catch(()=>{});
+    return task;
+  }
+  await progress();
+  await collectInParallel(work, async (_, index) => {
+    rows[index].status='running';
     try {
       if (!work[index].company) {
         const { item, document: target, documentType, id } = work[index];
@@ -274,9 +283,8 @@ export async function collectSellerDocuments(input, {
           if(linked.length>5) rows[index].details['Empresas adicionais']=`${linked.length-5} vínculos excedem o limite de cinco empresas desta análise.`;
         }
       } else {
-        if(companyRequests++) await delay(12000);
         const cnpj=work[index].company;
-        const company = await collectCompany({ documento: cnpj, tipoDocumento: "cnpj", consultaId: input.consultaId, extraFields: {}, usageContext: input.usageContext, retries: 0, timeoutMs: 15000 });
+        const company = await companyQuery({ documento: cnpj, tipoDocumento: "cnpj", consultaId: input.consultaId, extraFields: {}, usageContext: input.usageContext, retries: 0, timeoutMs: 15000 });
         if (company?.status !== "success" || normalizeDocument(company.dados?.cnpj) !== cnpj || !clean(company.dados?.razaoSocial)) throw new Error("company_identity_unverified");
         if(input.tipoDocumento==='cnpj'&&cnpj===document&&extra.stateCourtFields?.fullName&&compact(extra.stateCourtFields.fullName)!==compact(company.dados.razaoSocial)) throw new Error('evidence_name_mismatch');
         rows[index] = { ...rows[index], status: "success", details: companyDetails(company.dados), summary: "Cadastro empresarial e QSA obtidos. Situação cadastral não comprova regularidade fiscal.", checkedAt: new Date().toISOString(), providerReference: "" };
@@ -294,8 +302,9 @@ export async function collectSellerDocuments(input, {
       const errorCode = [error?.code, error?.message].find(value => /^[a-z0-9_]{1,80}$/.test(value || ""));
       rows[index] = { ...rows[index], status: "failed", resultado: "indisponivel", summary: "Não foi possível obter e validar esta consulta.", errorMessage: errorCode || "seller_document_unavailable", checkedAt: new Date().toISOString() };
     }
-    await progress(index + 1);
-  }
+    completed++;
+    await progress();
+  });
   const obtained = rows.filter((row) => row.status === "success").length;
   const outcome = rows.some((row) => row.resultado === "consta") ? "consta" : rows.length && rows.every((row) => row.resultado === "nada_consta") ? "nada_consta" : "indisponivel";
   return {
