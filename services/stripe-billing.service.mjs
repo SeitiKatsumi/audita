@@ -694,7 +694,7 @@ export function createStripeBillingService({
 
   async function itauCaseAccessState(authContext, caseIds = []) {
     const globalAccess = await accessState(authContext);
-    if (globalAccess.entitled && (globalAccess.source === "tester" || globalAccess.unlimited)) return globalAccess;
+    if (globalAccess.entitled && (globalAccess.annualItauLegalSupport || globalAccess.unlimited)) return globalAccess;
     const requested = [...new Set(caseIds.map(text).filter(Boolean))].slice(0, 20);
     if (!requested.length) return { entitled: false, source: "none" };
     const { pool, ready } = db();

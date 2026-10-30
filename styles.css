@@ -10258,6 +10258,43 @@ dialog.login-screen[open]::backdrop { animation: login-backdrop-enter 220ms ease
   padding: 24px;
 }
 
+.charge-recovery-form fieldset {
+  min-width: 0;
+  padding: 0;
+  margin: 22px 0 0;
+  border: 0;
+}
+.charge-recovery-form legend {
+  padding: 0 0 18px;
+  color: #f2f8fc;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.charge-recovery-form [hidden] { display: none !important; }
+.charge-recovery-form .charge-recovery-form-grid label { font-size: 0.9rem; }
+.charge-recovery-form .charge-recovery-form-grid input,
+.charge-recovery-form .charge-recovery-form-grid select { font-size: 1rem; }
+.charge-recovery-form [aria-invalid="true"] {
+  border: 2px solid #ff8995;
+  background: #321d2b;
+  outline-color: #ff8995;
+}
+.charge-recovery-form .charge-recovery-form-grid [aria-invalid="true"]:focus {
+  border-color: #ff8995;
+  box-shadow: 0 0 0 3px rgba(255, 137, 149, 0.2);
+}
+.charge-recovery-form label:has([aria-invalid="true"]) > span,
+.charge-recovery-form .charge-field-error { color: #ffb7bf; }
+.charge-recovery-form .charge-field-error { font-size: 0.88rem; font-weight: 600; }
+.charge-recovery-form [data-recovery-errors] {
+  border-color: #ff8995;
+  color: #ffe0e4;
+  background: #321d2b;
+  font-size: 0.9rem;
+}
+.charge-recovery-form [data-recovery-errors] a { color: inherit; text-decoration: underline; }
+.charge-recovery-form [data-recovery-errors] li + li { margin-top: 8px; }
+
 .charge-recovery-form-heading,
 .charge-recovery-guide > header {
   display: flex;

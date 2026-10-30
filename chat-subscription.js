@@ -28,7 +28,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       <p><strong>N\u00e3o inclui:</strong> consultas externas, certid\u00f5es, servi\u00e7os especializados ou honor\u00e1rios profissionais.</p>
       <p><strong>Uso individual, sem compartilhamento.</strong> Planos mensais renovam no anivers\u00e1rio da contrata\u00e7\u00e3o. Saldos n\u00e3o acumulam entre per\u00edodos e n\u00e3o h\u00e1 cobran\u00e7a autom\u00e1tica por excedentes. Experimente: compra \u00fanica, sem renova\u00e7\u00e3o.</p>
     </section>
-    <footer><button type="button" data-test-access hidden>Liberar acesso de teste (sem cobrança)</button><button type="button" data-refresh>Atualizar acesso</button><button type="button" data-manage hidden>Gerenciar assinatura</button></footer>`;
+    <footer><button type="button" data-refresh>Atualizar acesso</button><button type="button" data-manage hidden>Gerenciar assinatura</button></footer>`;
   document.body.append(dialog);
   const quota = document.createElement("section");
   quota.className = "chat-quota chat-quota-inline";
@@ -135,10 +135,6 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     dialog.querySelector("[data-payment-status]").textContent = !catalog
       ? loaded ? "Pagamentos indispon\u00edveis: n\u00e3o foi poss\u00edvel verificar a configura\u00e7\u00e3o deste ambiente." : "Consultando disponibilidade dos pagamentos."
       : `${catalog.billing?.demoMode || catalog.billing?.mode === "test" ? "Ambiente de testes: sem cobran\u00e7a real. " : ""}${!PLANS.some(plan => available(plan.id)) ? "Pagamentos indispon\u00edveis neste ambiente: a configura\u00e7\u00e3o de cobran\u00e7a n\u00e3o est\u00e1 habilitada. Nenhuma compra pode ser conclu\u00edda." : ""}`;
-    const testButton = dialog.querySelector('[data-test-access]');
-    testButton.hidden = access?.unlimited || (access?.active && !access.test && !access.legacy) || !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable);
-    testButton.disabled = busy || Boolean(loading) || access?.test === true;
-    testButton.textContent = access?.test ? 'Acesso de teste liberado' : 'Liberar acesso de teste (sem cobrança)';
     manage.hidden = !(owner && (access?.active && !access.legacy && !access.test && !access.unlimited || billing?.canManage && billing?.subscription?.provider === "stripe"));
     manage.disabled = busy;
     const legacy = billing?.subscription?.planId === "standard" ? billing.subscription : null;
@@ -171,7 +167,7 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
         target.innerHTML = source.innerHTML;
         target.hidden = source.hidden;
       }
-      for (const selector of ["[data-manage]", "[data-refresh]", "[data-test-access]"]) {
+      for (const selector of ["[data-manage]", "[data-refresh]"]) {
         const source = dialog.querySelector(selector), target = accountView.querySelector(selector);
         target.hidden = source.hidden;
         target.disabled = source.disabled;
@@ -340,35 +336,6 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
       }
     } finally { busy = false; render(); }
   }
-  async function enableTestAccess() {
-    if (busy || !(access?.testBypassAvailable || catalog?.chatTestBypassAvailable)) return;
-    if (!userId()) {
-      dialog.close();
-      requestLogin('Entre para liberar o chat sem cobrança durante os testes.', async () => {
-        await onAuthChanged();
-        open();
-        await enableTestAccess();
-      });
-      return;
-    }
-    const version = revision, account = userId();
-    busy = true;
-    notice.textContent = '';
-    render();
-    try {
-      if (loading) await loading;
-      if (version !== revision || account !== userId()) return;
-      await request('/api/chat/test-access', {});
-      if (version !== revision || account !== userId()) return;
-      await refresh();
-      if (version !== revision || account !== userId()) return;
-      if (!allowed()) throw new Error('Não foi possível confirmar a liberação. Atualize o acesso.');
-      if (dialog.open) dialog.close();
-      input.focus();
-    } catch (error) {
-      if (version === revision && account === userId()) notice.textContent = error.message;
-    } finally { busy = false; render(); }
-  }
   async function prepareDocument(file) {
     if (documentBusy) throw new Error("Aguarde o documento atual.");
     if (!file || !(/\.(pdf|png|jpe?g|txt|md|csv|json|html|docx|xlsx|wav|mp3|webm|m4a|mp4)$/i.test(file.name))) throw new Error("Use PDF, fotos, texto, Word, Excel ou áudio.");
@@ -427,12 +394,10 @@ export function initChatSubscription({ getAuthState, requestLogin }) {
     open();
     if (button.dataset.plan) void checkout(button.dataset.plan);
     else if (button.matches("[data-manage]")) void checkout(null, true);
-    else if (button.matches("[data-test-access]")) void enableTestAccess();
   });
   listen(dialog.querySelector("[data-close]"), "click", () => dialog.close());
   listen(dialog.querySelector("[data-refresh]"), "click", () => void refresh());
   listen(manage, "click", () => void checkout(null, true));
-  listen(dialog.querySelector('[data-test-access]'), 'click', () => void enableTestAccess());
   listen(cards, "click", event => { const button = event.target.closest("[data-plan]"); if (button && !button.disabled) void checkout(button.dataset.plan); });
   listen(window, "audita:auth-changed", () => void onAuthChanged());
   listen(window, "pageshow", () => void refresh());

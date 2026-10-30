@@ -303,6 +303,17 @@ test("Standard subscription does not replace the Itaú case purchase", async () 
   });
 });
 
+test('annual Itaú benefit dispenses with the case purchase; tester and monthly access do not', async () => {
+  for (const access of [
+    {entitled:true,source:'subscription',annualItauLegalSupport:true},
+    {entitled:true,source:'subscription',annualItauLegalSupport:false},
+    {entitled:true,source:'tester'},
+  ]) {
+    const service = createStripeBillingService({ env: configuredEnv(), accessService:{getEntitlement:async()=>access} });
+    assert.equal((await service.itauCaseAccessState(AUTH,['fixture'])).entitled, access.annualItauLegalSupport === true);
+  }
+});
+
 test("credit pack checkout is blocked before creating a Stripe customer when credits are disabled", async () => {
   let calls = 0;
   const service = createStripeBillingService({

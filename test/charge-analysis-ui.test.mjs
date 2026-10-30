@@ -529,12 +529,13 @@ test("automatic analysis and preliminary simulation happen before the one-time s
   assert.doesNotMatch(chargeAnalysisJs, /Não é apenas pedir o estorno/);
   assert.match(chargeAnalysisJs, /action === "continue-itau-service"\) \{\s*void purchaseItauService\(\);\s*return;/);
   const purchaseFlow = chargeAnalysisJs.slice(
-    chargeAnalysisJs.indexOf("function purchaseItauService()"),
+    chargeAnalysisJs.indexOf("async function purchaseItauService()"),
     chargeAnalysisJs.indexOf("function renderLawyerKit()"),
   );
-  assert.match(purchaseFlow, /state\.access = \{ entitled: true, source: "temporary_validation", caseIds \}/);
-  assert.match(purchaseFlow, /state\.screen = "result"/);
-  assert.doesNotMatch(purchaseFlow, /fetch\(|window\.location\.assign|\/api\/itau-refund\/checkout/);
+  assert.doesNotMatch(purchaseFlow, /temporary_validation|entitled: true/);
+  assert.match(purchaseFlow, /sessionStorage\.setItem\("audita:itau-checkout-cases"/);
+  assert.match(purchaseFlow, /fetch\("\/api\/itau-refund\/checkout"/);
+  assert.match(purchaseFlow, /window\.location\.assign\(data.url\)/);
   assert.match(serverJs, /resolveItauChargeServiceTier/);
   assert.match(serverJs, /stripeBillingService\.createCheckoutSession\(authContext/);
   assert.match(serverJs, /case: result\.case/);
@@ -685,7 +686,7 @@ test("guided results continue through recovery without redirecting to chat", () 
   assert.doesNotMatch(chargeAnalysisJs, /Consumidor\.gov\.br ou no Procon/);
   assert.doesNotMatch(chargeAnalysisJs, /function renderRecoveryIntro\(\)/);
   assert.match(chargeAnalysisJs, /state\.recovery\.phase = "report";[\s\S]*state\.screen = "recovery"/);
-  assert.match(chargeAnalysisJs, /data-charge-action="back-to-result">Voltar<\/button>/);
+  assert.match(chargeAnalysisJs, /data-charge-action="back-to-result">Voltar à análise<\/button>/);
   assert.match(chargeAnalysisJs, /function renderRecoveryReport\(\)/);
   assert.doesNotMatch(chargeAnalysisJs, /function renderRecoveryTestimony\(\)/);
   assert.match(chargeAnalysisJs, /function renderRecoveryGuide\(\)/);

@@ -110,7 +110,7 @@ test("certificate groups show applicable sources, 30x prices and only required i
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/Complementar certidões nos portais oficiais/);
   assert.match(elements.get('#sellerAnalysisQueries').innerHTML,/href="https:\/\/www.tjap.jus.br\/" target="_blank" rel="noopener noreferrer"/);
   assert.match(elements.get('#sellerAnalysisCost').innerHTML,/R\$ 48,60/);
-  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/preenchimento cadastral automático/);
+  assert.doesNotMatch(elements.get('#sellerAnalysisCost').innerHTML,/custo do provedor|carteira existente|bypass|continuar sem pagar/i);
   for(const selector of ['#sellerAnalysisBirthDate','#sellerAnalysisRg','#sellerAnalysisGender'])assert.equal(elements.get(selector).required,false,'identity is enriched before requesting manual input');
   for(const selector of ['#sellerBirthDateField','#sellerRgField','#sellerGenderField','#sellerFullNameField','#sellerAnalysisMotherField'])assert.equal(elements.get(selector).hidden,true);
   vm.runInContext("sellerMissingIdentityFields=new Set(['rg'])",context);context.updateSellerEstimate();
@@ -128,7 +128,7 @@ test("certificate groups show applicable sources, 30x prices and only required i
   vm.runInContext('sellerCoverage.certificateComplimentary=true;sellerCoverage.certificateCheckoutReady=false',context);context.updateSellerEstimate();
   assert.match(elements.get('#sellerAnalysisCost').innerHTML,/<strong>R\$ 35,84<\/strong>/,'individual release must preserve the subscriber quote');
   assert.match(elements.get('#sellerAnalysisCost').innerHTML,/pagamento dispensado/);
-  assert.equal(context.sellerAnalysisSubmit.textContent,'Continuar sem pagar');
+  assert.equal(context.sellerAnalysisSubmit.textContent,'Continuar');
   assert.doesNotMatch(elements.get('#sellerAnalysisCost').innerHTML,/Pagamento indisponível/,'individual release does not require checkout');
   vm.runInContext('sellerCoverage.certificateSubscriber=false',context);context.updateSellerEstimate();
   assert.match(elements.get('#sellerAnalysisCost').innerHTML,/<strong>R\$ 51,20<\/strong>/,'individual release must preserve the regular quote');
@@ -138,7 +138,8 @@ test("certificate groups show applicable sources, 30x prices and only required i
   vm.runInContext('sellerCoverage.certificateComplimentary=false;sellerCoverage.certificateTestBypassEnabled=true',context);context.updateSellerEstimate();
   assert.match(elements.get('#sellerAnalysisCost').innerHTML,/<strong>R\$ 51,20<\/strong>/,'test bypass must preserve the regular quote');
   assert.equal(context.sellerAnalysisSubmit.textContent,'Continuar para pagamento');
-  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/bypass de teste na próxima etapa/);
+  assert.doesNotMatch(elements.get('#sellerAnalysisCost').innerHTML,/bypass|teste/i);
+  assert.match(elements.get('#sellerAnalysisCost').innerHTML,/Pagamento temporariamente indisponível/);
   vm.runInContext('sellerCoverage.certificateCheckoutReady=true;sellerCoverage.certificateTestBypassEnabled=false',context);
   vm.runInContext('sellerCoverage.certificateSubscriber=false',context);
   assert.equal(elements.get('#sellerAnalysisBirthDate').required,false);

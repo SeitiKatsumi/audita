@@ -49,6 +49,116 @@ export function bindRecoveryFileDrop(stage) {
 
 export { buildChargeCalculationSnapshot } from "./charge-calculation.js";
 
+function recoveryStep(form, step, focus = true) {
+  const sections = [...form.querySelectorAll('[data-recovery-step]')];
+  step = Math.max(0, Math.min(sections.length - 1, Number(step) || 0));
+  form.dataset.step = String(step);
+  sections.forEach((section, index) => { section.hidden = index !== step; });
+  form.querySelector('[data-recovery-step-status]').textContent = `Etapa ${step + 1} de ${sections.length} · ${['Seus dados', 'Endereço', 'Documentos e assinatura'][step]}`;
+  form.querySelector('[data-recovery-previous]').hidden = step === 0;
+  const back = form.querySelector('[data-charge-action="back-to-result"]');
+  if (back) back.hidden = step !== 0;
+  form.querySelector('[data-recovery-next]').hidden = step === sections.length - 1;
+  form.querySelector('[data-recovery-submit]').hidden = step !== sections.length - 1;
+  if (focus) sections[step].querySelector('legend').focus();
+}
+
+export function showRecoveryFieldErrors(form, errors = {}, focus = true) {
+  for (const field of form.querySelectorAll('input[name], select[name]')) {
+    if (field.type === 'hidden') continue;
+    field.removeAttribute('aria-invalid');
+    const id = `charge-field-${field.name}`;
+    field.id ||= id;
+    const errorId = `${id}-error`;
+    const described = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter(value => value && value !== errorId);
+    form.querySelector(`#${errorId}`)?.remove();
+    if (errors[field.name]) {
+      field.setAttribute('aria-invalid', 'true');
+      const note = document.createElement('small');
+      note.id = errorId;
+      note.className = 'charge-field-error';
+      note.textContent = errors[field.name];
+      field.closest('label').appendChild(note);
+      described.push(errorId);
+    }
+    if (described.length) field.setAttribute('aria-describedby', described.join(' '));
+    else field.removeAttribute('aria-describedby');
+  }
+  const summary = form.querySelector('[data-recovery-errors]');
+  summary.replaceChildren();
+  const names = Object.keys(errors);
+  summary.hidden = !names.length;
+  if (!names.length) return;
+  const heading = document.createElement('strong');
+  heading.textContent = `Revise ${names.length === 1 ? 'o campo indicado' : 'os campos indicados'} para continuar:`;
+  summary.appendChild(heading);
+  const list = document.createElement('ul');
+  for (const [name, message] of Object.entries(errors)) {
+    const field = form.elements.namedItem(name);
+    const item = document.createElement('li');
+    if (!field?.closest('[data-recovery-step]')) {
+      item.textContent = message;
+      list.appendChild(item);
+      continue;
+    }
+    const link = document.createElement('a');
+    link.href = `#${field.id}`;
+    link.textContent = message;
+    link.addEventListener('click', event => {
+      event.preventDefault();
+      recoveryStep(form, field.closest('[data-recovery-step]').dataset.recoveryStep, false);
+      field.focus();
+    });
+    item.appendChild(link);
+    list.appendChild(item);
+  }
+  summary.appendChild(list);
+  const first = form.elements.namedItem(names[0]);
+  if (!focus) return;
+  if (first?.closest('[data-recovery-step]')) {
+    recoveryStep(form, first.closest('[data-recovery-step]').dataset.recoveryStep, false);
+    first.focus();
+  } else summary.focus();
+}
+
+export function validateRecoveryForm(form, all = true, focus = true) {
+  const errors = {};
+  for (const field of form.querySelectorAll('input[name], select[name]')) {
+    if (field.type === 'hidden' || field.disabled || (!all && field.closest('[data-recovery-step]')?.hidden)) continue;
+    const label = ({identityDocument:'Documento de identidade',proofOfResidence:'Comprovante de residência'})[field.name] || field.closest('label')?.querySelector('span')?.textContent.replace(/\s+/g, ' ').trim() || field.name;
+    if (field.validity.valueMissing || (field.required && !['file', 'checkbox'].includes(field.type) && !field.value.trim())) errors[field.name] = `Preencha ${label.toLocaleLowerCase('pt-BR')}.`;
+    else if (!field.validity.valid) errors[field.name] = field.validity.customError ? field.validationMessage : `Confira ${label.toLocaleLowerCase('pt-BR')}${field.type === 'email' ? ' (ex.: nome@exemplo.com)' : ''}.`;
+    if (field.type === 'file' && field.files[0]?.size > 12 * 1024 * 1024) errors[field.name] = `${label}: envie um arquivo de até 12 MB.`;
+  }
+  const acceptance = form.elements.powerOfAttorneyAccepted;
+  if (all || !acceptance.closest('[data-recovery-step]').hidden) {
+    if (!acceptance.checked) errors.powerOfAttorneyAccepted = 'Leia e aceite a procuração e o contrato para continuar.';
+    const normalize = value => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const signer = form.elements.powerOfAttorneySignerName;
+    if (signer.value.trim() && normalize(signer.value) !== normalize(form.elements.fullName.value)) errors.powerOfAttorneySignerName = 'A assinatura deve ter o mesmo nome completo informado na primeira etapa.';
+  }
+  showRecoveryFieldErrors(form, errors, focus);
+  return !Object.keys(errors).length;
+}
+
+export function bindRecoveryForm(stage) {
+  stage.addEventListener('click', event => {
+    const button = event.target.closest('[data-recovery-next], [data-recovery-previous]');
+    const form = button?.closest('#chargeRecoveryForm');
+    if (!form) return;
+    if (button.hasAttribute('data-recovery-next') && !validateRecoveryForm(form, false)) return;
+    recoveryStep(form, Number(form.dataset.step) + (button.hasAttribute('data-recovery-next') ? 1 : -1));
+  });
+  const correctField = event => {
+    const form = event.target.form;
+    if (form?.id !== 'chargeRecoveryForm' || event.target.getAttribute('aria-invalid') !== 'true') return;
+    // Revalidate only after a failed attempt; untouched fields stay quiet.
+    validateRecoveryForm(form, false, false);
+  };
+  stage.addEventListener('input', correctField);
+  stage.addEventListener('change', correctField);
+}
+
 export function bindRecoveryPostalCode(stage, fetchAddress = fetch) {
   const forms = new WeakMap();
   const fields = { street: "logradouro", district: "bairro", city: "localidade", uf: "uf" };
@@ -756,6 +866,7 @@ if (stage) {
       error: "",
     },
     recovery: {
+      formStep: 0,
       phase: "report",
       handoff: null,
       claimant: {},
@@ -775,6 +886,7 @@ if (stage) {
 
   function resetRecovery() {
     state.recovery = {
+      formStep: 0,
       phase: "report",
       handoff: null,
       claimant: {},
@@ -1548,20 +1660,37 @@ if (stage) {
                 <button type="button" class="primary-action" data-charge-action="continue-itau-service" ${state.busy ? "disabled" : ""}>Comprar agora</button>
               </article>
           </section>` : ""}
-        ${selectedTier ? `<p class="charge-paywall-demo" role="note">Fluxo liberado temporariamente para validação.</p>` : ""}
         <div class="charge-result-actions"><button type="button" class="secondary-action" data-charge-action="new-document">Voltar aos documentos</button></div>
       </div>
     `;
   }
 
-  function purchaseItauService() {
+  async function purchaseItauService() {
     if (state.busy) return;
     const caseIds = state.caseBatches.map((item) => item.id).filter(Boolean);
-    // ponytail: liberação de validação só nesta sessão; reative o checkout quando a cobrança voltar.
-    state.access = { entitled: true, source: "temporary_validation", caseIds };
+    state.busy = true;
     state.error = "";
-    state.screen = "result";
     render();
+    try {
+      const response = await fetch("/api/itau-refund/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ caseIds, requestId: crypto.randomUUID() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.url) throw new Error(data.message || "Não foi possível abrir o pagamento. Sua análise foi mantida; tente novamente.");
+      sessionStorage.setItem("audita:itau-checkout-cases", JSON.stringify({
+        caseIds, documentAvailability: state.documentAvailability,
+        authorizationAnswer: state.authorizationAnswer, selectedBrand: state.selectedBrand,
+        brandHistoryAnswer: state.brandHistoryAnswer,
+      }));
+      window.location.assign(data.url);
+    } catch (error) {
+      state.error = error?.message || "Não foi possível abrir o pagamento.";
+    } finally {
+      state.busy = false;
+      render();
+    }
   }
 
   function renderLawyerKit() {
@@ -1912,24 +2041,8 @@ if (stage) {
     ).join("");
   }
 
-  function recoveryMissingFieldsMarkup(prepared) {
-    const missingFields = Array.isArray(prepared?.missingFields)
-      ? prepared.missingFields
-      : [];
-    if (!missingFields.length) return "";
-    return `
-      <p class="charge-recovery-form-error" role="alert">
-        Revise: ${missingFields
-          .map((field) => RECOVERY_FIELD_LABELS[field] || field)
-          .map(escapeChargeHtml)
-          .join(", ")}.
-      </p>
-    `;
-  }
-
   function recoveryReportFormMarkup() {
     const claimant = state.recovery.claimant || {};
-    const prepared = state.recovery.prepared;
     const attachments = state.recovery.attachments || {};
     const powerOfAttorneyAcceptance = state.recovery.powerOfAttorneyAcceptance || {};
     const calculatedValues = state.recovery.handoff?.suggestion?.values || {};
@@ -1939,32 +2052,36 @@ if (stage) {
       "";
     const reportButtonLabel = "Concluir e encaminhar ao advogado";
     return `
-      <form class="charge-recovery-form" id="chargeRecoveryForm" aria-busy="${state.recovery.busy}">
+      <form class="charge-recovery-form" id="chargeRecoveryForm" novalidate aria-busy="${state.recovery.busy}">
         ${state.recovery.error ? `<p class="charge-recovery-form-error" role="alert">${escapeChargeHtml(state.recovery.error)}</p>` : ""}
         <div class="charge-recovery-form-heading">
           <div>
             <p class="eyebrow">Relatório Técnico de Auditoria</p>
-            <h3>Confira os dados que entrarão no PDF</h3>
+            <h3>Vamos concluir sua solicitação</h3>
           </div>
-          <span>${state.recovery.handoff?.journey === "with_historical_documents" ? "Modelo 1" : "Modelo 2"}</span>
+          <span data-recovery-step-status role="status" aria-live="polite">Etapa 1 de 3 · Seus dados</span>
         </div>
-        <p class="charge-recovery-form-intro">Esses dados são usados somente para montar o documento. A UF e a cidade abaixo correspondem ao seu endereço e ajudam a preparar a minuta; o tribunal será confirmado na etapa seguinte.</p>
+        <p class="charge-recovery-form-intro">Complete uma etapa por vez. Seus dados serão usados nos documentos e no encaminhamento ao advogado. Os campos opcionais estão identificados.</p>
 
+        <div class="charge-recovery-form-error" data-recovery-errors role="alert" tabindex="-1" hidden></div>
+        <fieldset data-recovery-step="0"><legend tabindex="-1">1. Seus dados</legend>
         <div class="charge-recovery-form-grid">
           <label class="wide"><span>Nome completo</span><input name="fullName" required maxlength="160" autocomplete="name" value="${escapeChargeHtml(claimant.fullName || "")}" /></label>
-          <label><span>CPF</span><input name="document" required inputmode="numeric" maxlength="14" autocomplete="off" data-recovery-mask="cpf" placeholder="000.000.000-00" value="${escapeChargeHtml(formatRecoveryCpf(claimant.document || ""))}" /></label>
+          <label><span>CPF</span><input name="document" required pattern="[0-9]{3}\\.[0-9]{3}\\.[0-9]{3}-[0-9]{2}" inputmode="numeric" maxlength="14" autocomplete="off" data-recovery-mask="cpf" placeholder="000.000.000-00" value="${escapeChargeHtml(formatRecoveryCpf(claimant.document || ""))}" /></label>
           <label><span>RG</span><input name="rg" required maxlength="40" autocomplete="off" value="${escapeChargeHtml(claimant.rg || "")}" /></label>
           <label><span>Nacionalidade</span><select name="nationality" required><option value="">Selecione</option><option value="Brasileiro(a)" ${String(claimant.nationality || "").toLowerCase().startsWith("brasileir") ? "selected" : ""}>Brasileiro(a)</option><option value="Estrangeiro(a)" ${String(claimant.nationality || "").toLowerCase().startsWith("estrangeir") ? "selected" : ""}>Estrangeiro(a)</option></select></label>
           <label><span>Estado civil</span><select name="maritalStatus" required><option value="">Selecione</option>${["Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "Separado(a)", "União estável"].map((value) => `<option value="${value}" ${String(claimant.maritalStatus || "").toLowerCase().startsWith(value.replace("(a)", "").slice(0, 5).toLowerCase()) ? "selected" : ""}>${value}</option>`).join("")}</select></label>
           <label><span>Profissão</span><input name="profession" required maxlength="120" autocomplete="organization-title" value="${escapeChargeHtml(claimant.profession || "")}" /></label>
           <label><span>E-mail</span><input name="email" required type="email" maxlength="160" autocomplete="email" value="${escapeChargeHtml(claimant.email || "")}" /></label>
-          <label><span>Telefone</span><input name="phone" required inputmode="tel" maxlength="15" autocomplete="tel" data-recovery-mask="phone" placeholder="(00) 00000-0000" value="${escapeChargeHtml(formatRecoveryPhone(claimant.phone || ""))}" /></label>
+          <label><span>Telefone</span><input name="phone" required pattern="\\([0-9]{2}\\) [0-9]{4,5}-[0-9]{4}" inputmode="tel" maxlength="15" autocomplete="tel" data-recovery-mask="phone" placeholder="(00) 00000-0000" value="${escapeChargeHtml(formatRecoveryPhone(claimant.phone || ""))}" /></label>
           <label><span>Agência Itaú <small>opcional</small></span><input name="bankAgency" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="Ex.: 1234" value="${escapeChargeHtml(claimant.bankAgency || "")}" /></label>
         </div>
 
-        <div class="charge-recovery-section-title"><strong>Endereço</strong><span>Usado para identificar o consumidor e a competência territorial.</span></div>
+        </fieldset>
+        <fieldset data-recovery-step="1" hidden><legend tabindex="-1">2. Seu endereço</legend>
+        <p class="charge-recovery-form-intro">Informe o CEP para preencher o endereço. Depois, confira e complete os dados.</p>
         <div class="charge-recovery-form-grid">
-          <label><span>CEP</span><input name="postalCode" required inputmode="numeric" maxlength="9" autocomplete="postal-code" data-recovery-mask="postalCode" aria-describedby="chargePostalStatus" placeholder="00000-000" value="${escapeChargeHtml(formatRecoveryPostalCode(claimant.postalCode || ""))}" /><small id="chargePostalStatus" data-postal-status role="status" aria-live="polite">Digite os 8 dígitos do CEP para buscar o endereço.</small></label>
+          <label><span>CEP</span><input name="postalCode" required pattern="[0-9]{5}-[0-9]{3}" inputmode="numeric" maxlength="9" autocomplete="postal-code" data-recovery-mask="postalCode" aria-describedby="chargePostalStatus" placeholder="00000-000" value="${escapeChargeHtml(formatRecoveryPostalCode(claimant.postalCode || ""))}" /><small id="chargePostalStatus" data-postal-status role="status" aria-live="polite">Digite os 8 dígitos do CEP para buscar o endereço.</small></label>
           <label><span>Bairro</span><input name="district" required maxlength="80" autocomplete="address-level3" value="${escapeChargeHtml(claimant.district || "")}" /></label>
           <label class="wide"><span>Logradouro</span><input name="street" required maxlength="160" autocomplete="address-line1" value="${escapeChargeHtml(claimant.street || "")}" /></label>
           <label><span>Número</span><input name="addressNumber" required maxlength="20" autocomplete="address-line2" value="${escapeChargeHtml(claimant.addressNumber || "")}" /></label>
@@ -1973,22 +2090,26 @@ if (stage) {
           <label><span>Cidade</span><input name="city" required maxlength="100" autocomplete="address-level2" value="${escapeChargeHtml(claimant.city || "")}" /></label>
         </div>
 
-        <div class="charge-recovery-section-title"><strong>Documentos e assinatura</strong><span>A identidade e o comprovante serão anexados ao laudo; a procuração e o contrato serão gerados separadamente.</span></div>
+        </fieldset>
+        <fieldset data-recovery-step="2" hidden><legend tabindex="-1">3. Documentos e assinatura eletrônica</legend>
+        <p class="charge-recovery-form-intro">Anexe os dois documentos, leia a procuração e o contrato e assine digitando seu nome completo.</p>
+        <div class="charge-recovery-form-grid">
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "Até 12 MB por arquivo")}</small></span><input type="file" name="identityDocument" ${attachments.identityDocument ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "Até 12 MB por arquivo")}</small></span><input type="file" name="proofOfResidence" ${attachments.proofOfResidence ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+        </div>
+        <p class="charge-recovery-form-intro">PDF, JPG e PNG aparecem no laudo; outros formatos são incorporados como anexos. Até 12 MB por arquivo.</p>
         <div class="charge-power-of-attorney">
-          <strong>Leia e assine a procuração e o contrato</strong>
-          <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" target="_blank" rel="noopener noreferrer">Ler a procuração</a> e <a href="/api/jec/legal-services-contract/preview" target="_blank" rel="noopener noreferrer">ler o contrato</a>. A IA AUDITA preencherá seus dados e gerará um PDF separado para cada documento.</p>
+          <strong>Procuração e contrato</strong>
+          <p><a href="/assets/documents/procuracao-ad-judicia-et-extra.pdf" target="_blank" rel="noopener noreferrer">Ler a procuração</a> e <a href="/api/jec/legal-services-contract/preview" target="_blank" rel="noopener noreferrer">ler o contrato</a>. Seus dados serão preenchidos automaticamente. Cada documento terá um PDF separado.</p>
           <label class="jec-confirmation">
             <input type="checkbox" name="powerOfAttorneyAccepted" ${powerOfAttorneyAcceptance.accepted ? "checked" : ""} />
             <span>Declaro que li e aceito integralmente a Procuração Ad Judicia et Extra e o Contrato de Prestação de Serviços Advocatícios com Honorários de Êxito, e que a digitação do meu nome completo representa minha assinatura eletrônica e manifestação de vontade.</span>
           </label>
-          <p>A data, a hora e o mesmo identificador serão registrados nos dois PDFs. Não é necessário desenhar a assinatura.</p>
+          <div class="charge-recovery-form-grid">          <label class="wide"><span>Nome completo — assinatura eletrônica</span><input name="powerOfAttorneySignerName" required maxlength="160" autocomplete="off" value="${escapeChargeHtml(powerOfAttorneyAcceptance.signerName || "")}" /></label>
+          </div>
+          <p>Digite o mesmo nome da primeira etapa. Não é necessário desenhar sua assinatura.</p>
         </div>
-        <div class="charge-recovery-form-grid">
-          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "Qualquer formato")}</small></span><input type="file" name="identityDocument" ${attachments.identityDocument ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
-          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "Qualquer formato")}</small></span><input type="file" name="proofOfResidence" ${attachments.proofOfResidence ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
-          <label class="wide"><span>Digite seu nome completo para assinar os dois documentos</span><input name="powerOfAttorneySignerName" required maxlength="160" autocomplete="off" value="${escapeChargeHtml(powerOfAttorneyAcceptance.signerName || "")}" /></label>
-        </div>
-        <p class="charge-recovery-form-intro">Envie identidade e comprovante de residência em qualquer formato, com até 12 MB por arquivo. PDF, JPG e PNG aparecem nas páginas do relatório; outros formatos ficam incorporados como anexos originais no PDF. O relatório, a procuração, o contrato e os anexos serão encaminhados ao advogado.</p>
+        </fieldset>
 
         <input type="hidden" name="historicalDocumentsAvailable" value="${escapeChargeHtml(historicalDocumentsAvailable)}" />
         <input type="hidden" name="doubleRefundAmount" value="${escapeChargeHtml(calculatedValues.doubleRefundAmount ?? claimant.doubleRefundAmount ?? "")}" />
@@ -1996,25 +2117,35 @@ if (stage) {
         <input type="hidden" name="lostProfitsAmount" value="${escapeChargeHtml(calculatedValues.lostProfitsAmount ?? claimant.lostProfitsAmount ?? "")}" />
         <input type="hidden" name="moralDamagesAmount" value="${escapeChargeHtml(calculatedValues.moralDamagesAmount ?? claimant.moralDamagesAmount ?? "")}" />
 
-        ${recoveryMissingFieldsMarkup(prepared)}
+
         <div class="charge-recovery-form-actions">
-          <button type="button" class="secondary-action" data-charge-action="back-to-result">Voltar</button>
-          <button type="submit" class="primary-action" data-recovery-submit="prepare" ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Processando..." : reportButtonLabel}</button>
+          <button type="button" class="secondary-action" data-charge-action="back-to-result">Voltar à análise</button>
+          <button type="button" class="secondary-action" data-recovery-previous hidden>Etapa anterior</button>
+          <button type="button" class="primary-action" data-recovery-next>Continuar →</button>
+          <button type="submit" class="primary-action" data-recovery-submit="prepare" hidden ${state.recovery.busy ? "disabled" : ""}>${state.recovery.busy ? "Processando..." : reportButtonLabel}</button>
         </div>
       </form>
     `;
   }
 
   function renderRecoveryReport() {
+    const previous = stage.querySelector('#chargeRecoveryForm');
+    if (previous) captureRecoveryDraft(previous);
     stage.innerHTML = `
       <div class="charge-analysis-conversation charge-recovery-conversation compact">
         ${assistantMessage(`
-          <p><strong>Agora vou montar o seu Relatório Técnico de Auditoria.</strong></p>
-          <p>Confira seus dados, envie identidade e comprovante de residência em qualquer formato e assine a procuração e o contrato com um único aceite e seu nome completo. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
+          <p><strong>Falta pouco para encaminhar sua solicitação.</strong></p>
+          <p>Confira seus dados, endereço e documentos nas três etapas abaixo. A IA organizará a apresentação dos fatos com base na análise já realizada, sem novas perguntas.</p>
         `, "IA AUDITA · Relatório")}
       </div>
       ${recoveryReportFormMarkup()}
     `;
+    const form = stage.querySelector('#chargeRecoveryForm');
+    recoveryStep(form, state.recovery.formStep, false);
+    if (state.recovery.prepared?.missingFields?.length) {
+      const errors = Object.fromEntries(state.recovery.prepared.missingFields.map(name => [name, `Confira ${RECOVERY_FIELD_LABELS[name] || 'os dados da análise'}.`]));
+      showRecoveryFieldErrors(form, errors);
+    }
   }
 
   function renderRecoveryGuide() {
@@ -2108,14 +2239,31 @@ if (stage) {
     }
   }
 
+  function captureRecoveryDraft(form) {
+    state.recovery.claimant = readRecoveryClaimant(form);
+    state.recovery.formStep = Number(form.dataset.step) || 0;
+    state.recovery.powerOfAttorneyAcceptance = {
+      accepted: Boolean(form.elements.powerOfAttorneyAccepted?.checked),
+      signerName: normalizeRecoveryText(form.elements.powerOfAttorneySignerName?.value),
+    };
+    const saved = state.recovery.attachments ||= {};
+    for (const name of ['identityDocument', 'proofOfResidence']) {
+      const file = form.elements[name]?.files?.[0];
+      if (file?.size && file.size <= 12 * 1024 * 1024) saved[name] = file;
+    }
+  }
+
   async function prepareRecoveryReport(form) {
     if (state.recovery.busy) return;
-    const claimant = readRecoveryClaimant(form);
+    state.recovery.formStep = Number(form.dataset.step) || 0;
+    captureRecoveryDraft(form);
+    const claimant = state.recovery.claimant;
     const powerOfAttorneyAcceptance = {
       accepted: Boolean(form.elements.powerOfAttorneyAccepted?.checked),
       signerName: normalizeRecoveryText(form.elements.powerOfAttorneySignerName?.value),
     };
     state.recovery.powerOfAttorneyAcceptance = powerOfAttorneyAcceptance;
+    if (!validateRecoveryForm(form)) return;
     let attachments;
     try {
       attachments = readRecoveryPdfAttachments(form);
@@ -2129,6 +2277,7 @@ if (stage) {
     state.recovery.attachments = attachments;
     state.recovery.busy = true;
     state.recovery.error = "";
+    state.recovery.prepared = null;
     render();
 
     const recovery = state.recovery;
@@ -2146,6 +2295,7 @@ if (stage) {
         throw new Error("Entre na IA AUDITA para preparar o Relatório Técnico.");
       }
       if (!response.ok || !data.prepared) {
+        if (Array.isArray(data.missingFields)) state.recovery.prepared = { missingFields: data.missingFields };
         throw new Error(recoveryApiError(data, "Não foi possível preparar o relatório agora."));
       }
       state.recovery.prepared = data.prepared;
@@ -2245,7 +2395,7 @@ if (stage) {
     else if (triageStarted) renderTriage();
     else stage.innerHTML = '<div class="charge-analysis-conversation" data-charge-conversation></div>';
     syncFloatingAssistantAvatar();
-    scrollLatestMessage(stage.querySelector(".charge-analysis-conversation"));
+    if (state.screen !== "recovery") scrollLatestMessage(stage.querySelector(".charge-analysis-conversation"));
     setError(state.error);
   }
 
@@ -2339,6 +2489,7 @@ if (stage) {
   }
 
   bindRecoveryFileDrop(stage);
+  bindRecoveryForm(stage);
 
   stage.addEventListener("click", (event) => {
     const button = event.target.closest("[data-charge-action]");
@@ -2483,6 +2634,7 @@ if (stage) {
   });
 
   stage.addEventListener("input", (event) => {
+    if (event.target.form?.id === 'chargeRecoveryForm') captureRecoveryDraft(event.target.form);
     if (event.target.id === "chargeBrandSearch") {
       state.brandSearch = event.target.value;
       renderBrands();
@@ -2501,6 +2653,7 @@ if (stage) {
   bindRecoveryPostalCode(stage);
 
   stage.addEventListener("change", (event) => {
+    if (event.target.form?.id === 'chargeRecoveryForm') captureRecoveryDraft(event.target.form);
     if (event.target.id === "lawyerKitUf") {
       state.lawyerKit.uf = String(event.target.value || "").toUpperCase();
       state.lawyerKit.error = "";
@@ -2518,6 +2671,11 @@ if (stage) {
   stage.addEventListener("submit", (event) => {
     if (event.target.id === "chargeRecoveryForm") {
       event.preventDefault();
+      const form = event.target;
+      if (Number(form.dataset.step || 0) < 2) {
+        if (validateRecoveryForm(form, false)) recoveryStep(form, Number(form.dataset.step || 0) + 1);
+        return;
+      }
       void prepareRecoveryReport(event.target);
       return;
     }
