@@ -76,7 +76,7 @@ body[data-active-page="isencao-ir"] .service-return { flex: none; margin-bottom:
 #isencao-ir .charge-analysis-bubble > .ir-section + .ir-section { margin-top: 24px; }
 #isencao-ir .charge-analysis-bubble { min-width: 0; overflow-wrap: anywhere; }
 @media(max-width:960px) {
-  body[data-active-page="isencao-ir"] .workspace { height: calc(100dvh - var(--mobile-nav-height)); padding: 16px 12px 0; }
+  body[data-active-page="isencao-ir"] .workspace { height: calc(100dvh - var(--mobile-nav-height)); padding: 24px 16px 0; }
   #isencao-ir .charge-analysis-shell { padding-left: 0; }
 }
 
@@ -86,7 +86,7 @@ body[data-active-page="isencao-ir"] .service-return { flex: none; margin-bottom:
 #isencao-ir .ir-entry-grid p,#isencao-ir .ir-entry-grid ul{line-height:1.65;margin:0;color:#bdd4e5}
 #isencao-ir .ir-entry-grid ul{padding-left:20px;margin-bottom:10px}
 #isencao-ir .ir-entry-grid button{margin-top:auto;min-height:48px}
-#isencao-ir .ir-calculator{max-width:720px;margin:0 auto}
+#isencao-ir .ir-calculator{width:100%;max-width:none;margin:0}
 #isencao-ir .ir-calculator h2{font-size:1.8rem;margin:24px 0 14px}
 #isencao-ir .ir-calculator form,#isencao-ir .ir-calculator-result{padding:24px;border:1px solid #28516a;border-radius:12px;background:#0c2436}
 #isencao-ir .ir-calculator-result{margin-top:24px;line-height:1.6}

@@ -1,7 +1,7 @@
 import { initGeneralChat, initExamConversation } from './general-chat.js?v=20261023-exams-drop';
 import { initProcessOnline } from './process-online.js?v=20261026-admin-access';
 import { processNumbers, normalizedCnj } from './judicial-processes.js';
-import { initServicesCatalog } from "./services-catalog.js?v=20261026-certidoes-order";
+import { initServicesCatalog } from "./services-catalog.js?v=20261030-service-icons";
 import { initChatSubscription } from "./chat-subscription.js?v=20261029-reuniao";
 import { analysisSegments, getAnalysisSegment } from './analysis-segments.js';
 import {certificateSelection,certificateQuote,serviceCertificateSelection,NATIONAL_PROCESS_PAGE,NATIONAL_PROCESS_TITLE} from './certificate-selection.js?v=20261022-national';

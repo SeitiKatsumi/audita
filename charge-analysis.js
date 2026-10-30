@@ -127,6 +127,7 @@ export function validateRecoveryForm(form, all = true, focus = true) {
     if (field.type === 'hidden' || field.disabled || (!all && field.closest('[data-recovery-step]')?.hidden)) continue;
     const label = ({identityDocument:'Documento de identidade',proofOfResidence:'Comprovante de residência'})[field.name] || field.closest('label')?.querySelector('span')?.textContent.replace(/\s+/g, ' ').trim() || field.name;
     if (field.validity.valueMissing || (field.required && !['file', 'checkbox'].includes(field.type) && !field.value.trim())) errors[field.name] = `Preencha ${label.toLocaleLowerCase('pt-BR')}.`;
+    else if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.value.trim())) errors[field.name] = 'Informe um e-mail completo (ex.: nome@exemplo.com).';
     else if (!field.validity.valid) errors[field.name] = field.validity.customError ? field.validationMessage : `Confira ${label.toLocaleLowerCase('pt-BR')}${field.type === 'email' ? ' (ex.: nome@exemplo.com)' : ''}.`;
     if (field.type === 'file' && field.files[0]?.size > 12 * 1024 * 1024) errors[field.name] = `${label}: envie um arquivo de até 12 MB.`;
   }
@@ -1986,25 +1987,29 @@ if (stage) {
       : "Esta apuração usa somente os lançamentos presentes nos documentos enviados e compatíveis com as cinco famílias analisadas.";
 
     stage.innerHTML = `
+      <section class="charge-result-summary" aria-label="Resultado da simulação">
       <div class="charge-result-heading">
         <div>
           <p class="eyebrow">Simulação concluída</p>
-          <h3>${selectedTier ? `Você pode ter entre ${escapeChargeHtml(tierRangeLabel(selectedTier))} para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
+          <h3>${selectedTier ? `Você pode ter entre <span class="charge-result-amount">${escapeChargeHtml(tierRangeLabel(selectedTier))}</span> para receber.` : belowMinimum ? "Esta simulação ficou abaixo da faixa atendida pela IA AUDITA." : "Esta simulação ficou fora das faixas atendidas automaticamente."}</h3>
           <p>${selectedTier ? "A faixa considera repetição em dobro, correção, juros e danos morais sugeridos para revisão." : belowMinimum ? `No momento, atendemos casos a partir de ${escapeChargeHtml(formatChargeCurrency(minimumClaimCents / 100))}.` : "O contato com o time IA AUDITA será disponibilizado em breve."}</p>
         </div>
       </div>
 
       <section class="charge-audit-report" aria-label="Resumo da simulação">
         <footer>
+          <h4>Sobre esta estimativa</h4>
           <p>${reportFooter} O valor exato e a memória de cálculo permanecem no relatório técnico para revisão. A faixa não garante restituição, indenização ou êxito judicial.</p>
           ${state.calculationWarning ? `<p>${escapeChargeHtml(state.calculationWarning)}</p>` : ""}
         </footer>
       </section>
 
       <div class="charge-result-actions">
+        ${selectedTier ? '<div class="charge-result-next"><strong>Próximo passo</strong><p>Confira seus documentos e prossiga para a coleta dos dados da recuperação.</p></div>' : ""}
         <button type="button" class="secondary-action" data-charge-action="new-document">Revisar documentos</button>
         ${selectedTier ? documentationActionMarkup() : ""}
       </div>
+      </section>
     `;
   }
 
@@ -2094,8 +2099,26 @@ if (stage) {
         <fieldset data-recovery-step="2" hidden><legend tabindex="-1">3. Documentos e assinatura eletrônica</legend>
         <p class="charge-recovery-form-intro">Anexe os dois documentos, leia a procuração e o contrato e assine digitando seu nome completo.</p>
         <div class="charge-recovery-form-grid">
-          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Documento de identidade <small>${escapeChargeHtml(attachments.identityDocument?.name || "Até 12 MB por arquivo")}</small></span><input type="file" name="identityDocument" ${attachments.identityDocument ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
-          <label class="charge-recovery-file-drop" data-recovery-file-drop><span>Comprovante de residência <small>${escapeChargeHtml(attachments.proofOfResidence?.name || "Até 12 MB por arquivo")}</small></span><input type="file" name="proofOfResidence" ${attachments.proofOfResidence ? "" : "required"} /><span class="charge-recovery-file-button">Selecionar arquivo</span><span data-recovery-file-names aria-live="polite"></span><small class="charge-recovery-drop-hint">Arraste o arquivo aqui ou clique para selecionar</small></label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop>
+            <span class="charge-recovery-upload-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="26" height="22" rx="3"/><circle cx="11" cy="13" r="3"/><path d="M6 22c0-5 10-5 10 0M21 11h4m-4 5h4m-4 5h3"/></svg></span>
+            <span class="charge-recovery-upload-title">Documento de identidade</span>
+            <small class="charge-recovery-upload-help">Envie uma cópia legível do seu RG ou CNH.</small>
+            <input type="file" name="identityDocument" aria-label="Anexar documento de identidade" ${attachments.identityDocument ? "" : "required"} />
+            <span class="charge-recovery-file-button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4"/></svg>Selecionar arquivo</span>
+            <small class="charge-recovery-drop-hint">ou arraste e solte o arquivo nesta área</small>
+            <small class="charge-recovery-upload-limit">Até 12 MB por arquivo</small>
+            <span data-recovery-file-names aria-live="polite">${escapeChargeHtml(attachments.identityDocument?.name || "")}</span>
+          </label>
+          <label class="charge-recovery-file-drop" data-recovery-file-drop>
+            <span class="charge-recovery-upload-icon" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 15 13-11 13 11M6 13v15h20V13M13 28V18h6v10"/></svg></span>
+            <span class="charge-recovery-upload-title">Comprovante de residência</span>
+            <small class="charge-recovery-upload-help">Envie uma conta ou documento com seu endereço.</small>
+            <input type="file" name="proofOfResidence" aria-label="Anexar comprovante de residência" ${attachments.proofOfResidence ? "" : "required"} />
+            <span class="charge-recovery-file-button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4"/></svg>Selecionar arquivo</span>
+            <small class="charge-recovery-drop-hint">ou arraste e solte o arquivo nesta área</small>
+            <small class="charge-recovery-upload-limit">Até 12 MB por arquivo</small>
+            <span data-recovery-file-names aria-live="polite">${escapeChargeHtml(attachments.proofOfResidence?.name || "")}</span>
+          </label>
         </div>
         <p class="charge-recovery-form-intro">PDF, JPG e PNG aparecem no laudo; outros formatos são incorporados como anexos. Até 12 MB por arquivo.</p>
         <div class="charge-power-of-attorney">

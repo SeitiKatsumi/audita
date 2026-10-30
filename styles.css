@@ -12337,14 +12337,30 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 }
 
 /* Service discovery reuses the existing Audita navigation and module tiles. */
-.services-page { scroll-margin-top: 120px; width: 100%; max-width: 1200px; margin: 0 auto; padding-bottom: 48px; }
+body[data-active-page="central-servicos"] .topbar { width: 100%; max-width: none; margin: 0 auto 24px; align-items: flex-start; }
+body[data-active-page="central-servicos"] .topbar h1 { font-size: clamp(2rem, 3.5vw, 3.2rem); line-height: 1.1; }
+.services-page { scroll-margin-top: 120px; width: 100%; max-width: none; margin: 0 auto; padding-bottom: 48px; }
 .services-intro { margin: 0 0 28px; color: var(--muted); font-size: 1rem; line-height: 1.6; }
 .services-search { display: grid; gap: 10px; color: var(--text); font-weight: 600; }
 .services-search input { width: 100%; min-width: 0; min-height: 56px; padding: 16px 18px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg-elevated); color: var(--text); font: inherit; font-weight: 400; }
 .services-search input::placeholder { color: var(--muted); }
 .services-search input:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
-.services-categories { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0 32px; }
-.services-categories button { min-height: 44px; color: var(--muted); background: var(--bg-elevated); border: 1px solid var(--line); box-shadow: none; }
+.services-categories { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 28px; padding: 16px 0; border-block: 1px solid var(--line); }
+.services-categories button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: auto; max-width: 100%; min-width: 0; min-height: 38px; padding: 8px 12px; text-align: left; white-space: normal; font-size: .8125rem; font-weight: 600; line-height: 1.4; color: var(--aqua); background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 7px; box-shadow: none; }
+.services-categories button::before { content: ""; flex: 0 0 16px; width: 16px; height: 16px; background: currentColor; opacity: .8; mask: url("assets/nav-icons/service-grid.svg") center / contain no-repeat; }
+.services-categories [data-service-category="all"]::before { mask-image: url("assets/nav-icons/service-grid.svg"); }
+.services-categories [data-service-category="bancario"]::before { mask-image: url("assets/nav-icons/service-bank.svg"); }
+.services-categories [data-service-category="beneficios"]::before { mask-image: url("assets/nav-icons/service-wallet.svg"); }
+.services-categories [data-service-category="certidoes"]::before { mask-image: url("assets/nav-icons/service-receipt.svg"); }
+.services-categories [data-service-category="processos-judiciais"]::before { mask-image: url("assets/nav-icons/service-scale.svg"); }
+.services-categories [data-service-category="energia"]::before { mask-image: url("assets/nav-icons/bolt.svg"); }
+.services-categories [data-service-category="imoveis"]::before { mask-image: url("assets/nav-icons/service-house-search.svg"); }
+.services-categories [data-service-category="importacao"]::before { mask-image: url("assets/nav-icons/service-ship.svg"); }
+.services-categories [data-service-category="saude"]::before { mask-image: url("assets/nav-icons/service-medical.svg"); }
+.services-categories [data-service-category="laudos"]::before { mask-image: url("assets/nav-icons/service-chart.svg"); }
+.services-categories [data-service-category="empresas"]::before { mask-image: url("assets/nav-icons/service-users.svg"); }
+.services-categories [data-service-category="diagnostico"]::before { mask-image: url("assets/nav-icons/service-identity.svg"); }
+.services-categories [data-service-category="licitacoes"]::before { mask-image: url("assets/nav-icons/service-gavel.svg"); }
 .services-categories button[aria-pressed="true"] { color: var(--lime); border-color: var(--lime); background: var(--lime-soft); }
 .services-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .services-heading h2 { margin: 0; font-size: 1.25rem; }
@@ -12353,18 +12369,21 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 .services-group { min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: rgba(7, 27, 43, .35); }
 .services-group h3 { margin: 0 0 18px; color: var(--text); font-size: 1.1rem; }
 @media (max-width: 600px) { .services-group { padding: 16px; } .services-groups { gap: 20px; } }
-.services-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
-.service-card { min-height: 172px; align-items: start; padding: 20px; }
+.services-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,320px),1fr)); grid-auto-rows: 1fr; align-items: stretch; gap: 16px; }
+.service-card { min-height: 392px; align-items: start; padding: 20px; }
 .service-card .home-module-copy { gap: 12px; }
+.service-card .home-module-icon { width: 56px; height: 56px; border-radius: 12px; }
+.service-card .home-module-icon img { width: 28px; height: 28px; }
+.service-card .home-module-copy strong { min-height: 4.2em; }
 .service-card .home-module-copy strong { font-size: 1rem; line-height: 1.4; }
 .service-card .home-module-copy small { font-size: .875rem; line-height: 1.5; }
 .service-card .home-module-copy .service-category-label { color: var(--aqua); font-size: .7rem; letter-spacing: .05em; text-transform: uppercase; }
 .service-card .home-module-chevron { align-self: end; }
 .service-card-explained { display: flex; flex-direction: column; align-items: stretch; height: auto; align-self: stretch; position: relative; }
 .service-card-explained a.service-card-entry::after { content: ""; position: absolute; inset: 0; }
-.service-card-explained .service-card-entry { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; color: inherit; text-decoration: none; }
+.service-card-explained .service-card-entry { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; color: inherit; text-decoration: none; }
 .service-card-explained summary { cursor: pointer; list-style: none; }
-.service-card-explained .service-disclosure { margin-top: auto; padding-top: 12px; position: relative; z-index: 1; }
+.service-card-explained .service-disclosure { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); position: relative; z-index: 1; }
 .service-card-explained summary::-webkit-details-marker { display: none; }
 .service-card-explained summary:focus-visible, .service-card-explained a:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; }
 .service-card-explained .home-module-copy { overflow-wrap: anywhere; }
@@ -12385,8 +12404,7 @@ body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"],
 .home-destination-actions .services-home-link { margin-top: 0; min-height: 44px; max-width: 100%; white-space: normal; }
 @media (max-width: 600px) { .home-destination-actions { flex-direction: column; align-items: stretch; } }
 .services-page [hidden] { display: none !important; }
-@media (max-width: 1350px) { .services-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-@media (max-width: 600px) { .services-grid { grid-template-columns: minmax(0,1fr); } .service-card { min-height: 144px; } .services-categories { gap: 8px; } }
+@media (max-width: 600px) { .services-grid { grid-template-columns: minmax(0,1fr); grid-auto-rows: auto; } .service-card { min-height: 144px; } .service-card .service-disclosure { margin-top: 20px; } .services-categories { gap: 6px; } .services-categories button { min-height: 44px; } }
 
 .service-return { margin-bottom: 20px; }
 .service-return a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--aqua); background: var(--bg-elevated); font-size: .875rem; text-decoration: none; }
@@ -12841,3 +12859,56 @@ body:has(.login-screen:not(.hidden)) .mobile-bottom-nav { display: none; }
   .pwa-install span { display: none; }
   body:has(.login-screen:not(.hidden)) .pwa-install { bottom: calc(16px + env(safe-area-inset-bottom)); }
 }
+
+/* Shared service boundaries follow the workspace rather than a centered narrow column. */
+body .workspace > .topbar { width: 100%; max-width: none; margin-inline: 0; }
+body:not([data-active-page="home"]):not([data-active-page="chat"]) .topbar h1 { font-size: clamp(2rem, 3.5vw, 3.2rem); line-height: 1.1; }
+.services-page, .seller-analysis-page, .charge-analysis-page { width: 100%; min-width: 0; max-width: none; }
+.seller-analysis-page .seller-step-shell { width: 100%; max-width: none; margin-inline: 0; }
+.seller-step-shell .seller-analysis-intro { max-width: none; }
+.charge-analysis-page { justify-items: stretch; }
+.charge-analysis-page > .charge-analysis-shell { width: 100%; max-width: none; margin-inline: 0; padding-inline: 0; }
+#dividas-bancarias > :is(#judicialReportModule, .judicial-previous) { width: 100%; min-width: 0; max-width: none; margin-inline: 0; }
+#contas-de-luz #energyApp,
+#auditoria-importacao .import-module,
+#auditoria-glosas #glosasApp,
+#processos-judiciais .process-online,
+#laudos-exames .exam-conversation { width: 100%; min-width: 0; max-width: none; margin-inline: 0; }
+.charge-analysis-content :is(.charge-brand-panel, .charge-upload-panel, .charge-estimate-panel, .charge-petition-note, .charge-analysis-processing, .charge-analysis-finish, .charge-result-heading, .charge-result-candidates, .charge-directed-search, .charge-calculation-items, .charge-audit-report, .charge-result-actions, .charge-recovery-form, .charge-recovery-guide) { width: 100%; min-width: 0; max-width: none; margin-inline: 0; }
+body:is([data-active-page="analise-cobrancas"], [data-active-page="isencao-ir"], [data-active-page="pis-pasep"], [data-active-page="dividas-bancarias"]) .workspace > .topbar { width: auto; }
+
+/* Itaú result: estimate, explanation, then one primary next step. */
+.charge-result-summary { width: 100%; min-width: 0; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 32px; padding: 32px; border: 1px solid var(--line); border-radius: 16px; background: #091e31; }
+.charge-result-summary .charge-result-heading { padding: 0; margin: 0; }
+.charge-result-summary .charge-result-heading .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 20px; font-size: .75rem; letter-spacing: .06em; }
+.charge-result-summary .charge-result-heading .eyebrow::before { content: "✓"; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--lime-soft); color: var(--lime); }
+.charge-result-summary .charge-result-heading h3 { margin: 0; font-size: 1.25rem; line-height: 1.5; font-weight: 500; }
+.charge-result-amount { display: block; margin: 8px 0; color: var(--lime); font-size: clamp(2rem, 3.5vw, 3.25rem); font-weight: 800; line-height: 1.15; letter-spacing: -.03em; }
+.charge-result-summary .charge-result-heading > div > p:last-child { margin-top: 16px; max-width: 52ch; font-size: .875rem; line-height: 1.7; }
+.charge-result-summary .charge-audit-report { align-self: center; margin: 0; border: 0; border-left: 1px solid var(--line); border-radius: 0; padding: 8px 0 8px 32px; background: transparent; }
+.charge-result-summary .charge-audit-report footer { padding: 0; border: 0; background: transparent; }
+.charge-result-summary .charge-audit-report h4 { margin: 0 0 12px; color: var(--text); font-size: .95rem; }
+.charge-result-summary .charge-audit-report footer p { margin: 0; color: var(--muted); font-size: .875rem; font-style: normal; line-height: 1.8; }
+.charge-result-summary .charge-audit-report footer p + p { margin-top: 12px; }
+.charge-result-summary .charge-result-actions { grid-column: 1 / -1; align-items: center; flex-wrap: wrap; margin: 0; padding: 24px 0 0; border-top: 1px solid var(--line); }
+.charge-result-next { flex: 1 1 260px; }
+.charge-result-next strong { font-size: .9rem; }
+.charge-result-next p { margin: 6px 0 0; color: var(--muted); font-size: .8125rem; line-height: 1.6; }
+.charge-result-summary .charge-result-actions .secondary-action { background: transparent; color: var(--aqua); border: 1px solid var(--line-strong); box-shadow: none; }
+.charge-result-summary .charge-result-actions > p { flex-basis: 100%; margin: 8px 0 0; }
+@media (max-width: 760px) { .charge-result-summary { grid-template-columns: minmax(0, 1fr); padding: 20px; gap: 24px; } .charge-result-summary .charge-audit-report { border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; } .charge-result-summary .charge-result-actions button { width: 100%; min-height: 48px; } }
+
+/* Clear upload targets retain the native accessible picker and existing drop events. */
+.charge-recovery-form-grid label.charge-recovery-file-drop { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; padding: 28px 20px; text-align: center; border: 1px dashed #397180; border-radius: 14px; background: #0b2334; }
+.charge-recovery-file-drop .charge-recovery-upload-icon { display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 4px; border: 1px solid #285266; border-radius: 14px; color: var(--aqua); background: #113349; }
+.charge-recovery-upload-icon svg { width: 32px; height: 32px; }
+.charge-recovery-file-drop .charge-recovery-upload-title { color: var(--text); font-size: 1rem; font-weight: 700; }
+.charge-recovery-file-drop .charge-recovery-upload-help { color: var(--muted); font-size: .8125rem; line-height: 1.5; }
+.charge-recovery-file-drop .charge-recovery-file-button { display: inline-flex; align-items: center; align-self: center; justify-content: center; gap: 8px; width: auto; min-height: 44px; margin-top: 8px; padding: 10px 20px; background: #164459; border: 1px solid #42849a; border-radius: 8px; color: #e7f8ff; font-size: .875rem; font-weight: 700; }
+.charge-recovery-file-button svg { width: 20px; height: 20px; }
+.charge-recovery-file-drop .charge-recovery-upload-limit { color: var(--muted); font-size: .75rem; }
+.charge-recovery-file-drop [data-recovery-file-names]:not(:empty) { display: block; width: 100%; margin-top: 6px; padding: 10px; border-radius: 8px; background: #123d36; color: #83f5bd; font-size: .8125rem; }
+.charge-recovery-file-drop [data-recovery-file-names]:not(:empty)::before { content: "✓ Arquivo selecionado: "; font-weight: 700; }
+.charge-recovery-form-grid label.charge-recovery-file-drop.dragover { border-color: var(--lime); background: #103e3a; }
+@media (hover: hover) { .charge-recovery-form-grid label.charge-recovery-file-drop:hover { border-color: var(--aqua); background: #102e42; } }
+@media (max-width: 600px) { .charge-recovery-form-grid label.charge-recovery-file-drop { padding: 22px 16px; } }
